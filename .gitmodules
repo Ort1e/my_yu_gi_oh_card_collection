@@ -1,0 +1,3 @@
+[submodule "data"]
+	path = data
+	url = git@github.com:Ort1e/my_yu_gi_oh_card_data.git
