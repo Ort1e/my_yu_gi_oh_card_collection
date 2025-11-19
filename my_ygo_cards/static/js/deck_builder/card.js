@@ -12,6 +12,9 @@ const api = window.apiUrls;
 const baseImgUrl = window.imgBaseUrl;
 
 
+// -------------------- Global Variables --------------------
+let banListId = null;
+
 // -------------------- Utils --------------------
 
 export function renderCard(card) {
@@ -36,7 +39,22 @@ export function renderCard(card) {
     const imgUrl = baseImgUrl + data.image_url;
     img.src = imgUrl;
     img.alt = data.en_name || card.en_name || card.name || "Card";
+
+    // add ban list data
+    if (banListId) {
+      const banStatus = data.ban_statuses.filter(bs => bs.ban_list_id === banListId)
+      console.log(banStatus)
+      if (banStatus.length > 0) {
+        div.dataset.ban_status = banStatus[0].status; // e.g., "forbidden", "limited", "semi-limited", "unlimited"
+      }
+    }
+
+    if (!div.dataset.ban_status) {
+      div.dataset.ban_status = "unlimited"; // default if not specified
+    }
+
     div.appendChild(img);
+
   
     // ---- Bind interactions ----
   
@@ -87,9 +105,15 @@ function get_cards_in_deck() {
       extraDeckArea.innerHTML = "";
       sideDeckArea.innerHTML = "";
 
+      if (data.ban_list) {
+        banListId = data.ban_list.id;
+      }
+
       data.main_deck.forEach(card => mainDeckArea.appendChild(renderCard(card)));
       data.extra_deck.forEach(card => extraDeckArea.appendChild(renderCard(card)));
       data.side_deck.forEach(card => sideDeckArea.appendChild(renderCard(card)));
+
+      
 
       sortCards(mainDeckArea);
       sortCards(extraDeckArea);
@@ -195,7 +219,7 @@ export function clearCategoriesCache() {
 }
 
 export async function showCardOverview(card) {
-  const { name, en_name, code, type, is_proxy, price, url, id } = card.dataset;
+  const { name, en_name, code, type, is_proxy, price, url, id, ban_status } = card.dataset;
   const imgSrc = card.querySelector("img")?.src;
   const cardOverview = document.getElementById("card-overview");
 
@@ -207,6 +231,7 @@ export async function showCardOverview(card) {
       <p>Type: ${type}</p>
       <p>Code: ${code}</p>
       <p>Price: ${price}€</p>
+      <p>Ban Status: ${ban_status}</p>
       <p>Proxy: ${is_proxy === "true" ? "Yes" : "No"}</p>
       <div id="category-selector"><strong>Categories:</strong><br/>Loading...</div>
     </div>

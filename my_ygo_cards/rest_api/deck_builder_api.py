@@ -69,6 +69,7 @@ class DeckVersionUpdateData(TypedDict, total=False):
     main_deck: List[int]
     extra_deck: List[int]
     side_deck: List[int]
+    ban_list_id: int
 
 
 class DeckVersionDetailAPI(APIView):
@@ -96,6 +97,9 @@ class DeckVersionDetailAPI(APIView):
 
             if 'side_deck' in data:
                 deck.side_deck.set(Card.objects.filter(id__in=data['side_deck']))
+            
+            if 'ban_list_id' in data:
+                deck.ban_list = get_object_or_404(AdvancedBanList, pk=data['ban_list_id']) #type: ignore
 
             deck.save()
             return Response(DeckVersionSerializer(deck).data)

@@ -1,16 +1,25 @@
 # serializers.py
 from rest_framework import serializers
-from ..models import Card, CardCategory, CardData, DeckVersion, Unite
+from ..models import Card, CardCategory, CardData, DeckVersion, Unite, AdvancedBanList, BanListEntry
 
 class UniteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Unite
         fields = ["price"]
 
+class BanListEntryForCardDataSerializer(serializers.ModelSerializer):
+    ban_list_date = serializers.DateField(source='ban_list.date')
+    ban_list_id = serializers.IntegerField(source='ban_list.id')
+
+    class Meta:
+        model = BanListEntry
+        fields = ['ban_list_date', 'status', 'ban_list_id']
+
 class CardDataSerializer(serializers.ModelSerializer):
+    ban_statuses = BanListEntryForCardDataSerializer(source='ban_list_entries', many=True, read_only=True)
     class Meta:
         model = CardData
-        fields = ["en_name", "ygopro_id", "card_type", "json_data", "image_url"]
+        fields = ["en_name", "ygopro_id", "card_type", "json_data", "image_url", "ban_statuses"]
 
 class CardSerializer(serializers.ModelSerializer):
     card_data = CardDataSerializer(read_only=True)
@@ -38,6 +47,31 @@ class CardSerializer(serializers.ModelSerializer):
         if unite:
             return unite.price
         return None
+    
+class BanListEntrySerializer(serializers.ModelSerializer):
+    card_data = CardDataSerializer(read_only=True)
+
+    class Meta:
+        model = BanListEntry
+        fields = [
+            'id',
+            'card_data',
+            'status',
+        ]
+        read_only_fields = fields
+        
+
+class AdvancedBanListSerializer(serializers.ModelSerializer):
+    entries = BanListEntrySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AdvancedBanList
+        fields = [
+            'id',
+            'date',
+            'entries',
+        ]
+        read_only_fields = fields
 
 class DeckVersionSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -47,11 +81,12 @@ class DeckVersionSerializer(serializers.ModelSerializer):
     ydke_with_proxies = serializers.SerializerMethodField()
     ydke_without_proxies = serializers.SerializerMethodField()
     ydke_only_proxies = serializers.SerializerMethodField()
+    ban_list = AdvancedBanListSerializer(read_only=True)
 
     class Meta:
         model = DeckVersion
         fields = ['id', 'name', 'version_name', 'main_deck', 'extra_deck', 'side_deck', 
-                  'ydke_with_proxies', 'ydke_without_proxies', 'ydke_only_proxies']
+                  'ydke_with_proxies', 'ydke_without_proxies', 'ydke_only_proxies', 'ban_list']
         
     def get_ydke_with_proxies(self, obj : DeckVersion):
         return obj.ydke_with_proxies
@@ -69,10 +104,11 @@ class DeckVersionUpdateSerializer(serializers.ModelSerializer):
     main_deck = serializers.ListField(child=serializers.IntegerField(), required=False)
     extra_deck = serializers.ListField(child=serializers.IntegerField(), required=False)
     side_deck = serializers.ListField(child=serializers.IntegerField(), required=False)
+    ban_list_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = DeckVersion
-        fields = ['version_name', 'main_deck', 'extra_deck', 'side_deck']
+        fields = ['version_name', 'main_deck', 'extra_deck', 'side_deck', 'ban_list_id']
 
 class DeckYdkeImportSerializer(serializers.Serializer):
     ydke_url = serializers.CharField(required=True)
@@ -93,3 +129,6 @@ class CardCategorySerializer(serializers.ModelSerializer):
 class CardCategoryAssignmentSerializer(serializers.Serializer):
     category_id = serializers.IntegerField()
     assigned = serializers.BooleanField()
+
+
+

@@ -20,11 +20,14 @@ document.getElementById("save-btn").addEventListener("click", () => {
     const mainIds = [...zones.main.querySelectorAll(".card")].map(c => c.dataset.id);
     const extraIds = [...zones.extra.querySelectorAll(".card")].map(c => c.dataset.id);
     const sideIds = [...zones.side.querySelectorAll(".card")].map(c => c.dataset.id);
+    const banListId = parseInt(document.getElementById("ban-list-switcher").value);
+
 
     backend.updateDeckVersion({
         main_deck: mainIds,
         extra_deck: extraIds,
         side_deck: sideIds,
+        ban_list_id: banListId,
     }).then(data => {
         alert("Deck saved!");
 
