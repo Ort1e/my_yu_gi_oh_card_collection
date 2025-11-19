@@ -4,6 +4,17 @@ my yu gi oh card collection
 # Stack
 Django + sqlite3
 
+# Data folder
+
+The data folder has this structure :
+```
+data/
+├── media/
+    ├── card_images/
+    └── shipment_files/
+└── db.sqlite3/
+```
+
 # Management
 
 ## launch the server
