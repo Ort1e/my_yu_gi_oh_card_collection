@@ -1,0 +1,37 @@
+<label for="name">Name:</label>
+<input type="text" name="name" id="name" value="{{ request.GET.name|default_if_none:'' }}" placeholder="Card name">
+
+<label for="code">Code:</label>
+<input type="text" name="code" id="code" value="{{ request.GET.code|default_if_none:'' }}" placeholder="Card code">
+
+<label for="status">Status:</label>
+<select name="status" id="status">
+<option value="" {% if not request.GET.status %}selected{% endif %}>All</option>
+<option value="MT" {% if request.GET.status == "MT" %}selected{% endif %}>MT</option>
+<option value="NM" {% if request.GET.status == "NM" %}selected{% endif %}>NM</option>
+<option value="EX" {% if request.GET.status == "EX" %}selected{% endif %}>EX</option>
+<option value="G"  {% if request.GET.status == "G" %}selected{% endif %}>G</option>
+<option value="P"  {% if request.GET.status == "P" %}selected{% endif %}>P</option>
+</select>
+
+<label for="card_type">Card Type:</label>
+<select name="card_type" id="card_type">
+<option value="" {% if not request.GET.card_type %}selected{% endif %}>All types</option>
+{%for type in all_card_types%}
+<option value="{{ type }}" {% if request.GET.card_type == type|stringformat:"s" %}selected{% endif %}>{{ type }}</option>
+{%endfor%}
+</select>
+
+<label for="proxy">Proxy:</label>
+<select name="proxy" id="proxy">
+<option value="" {% if request.GET.proxy == "" or request.GET.proxy == None %}selected{% endif %}>All cards</option>
+<option value="true" {% if request.GET.proxy == "true" %}selected{% endif %}>Only proxy</option>
+<option value="false" {% if request.GET.proxy == "false" %}selected{% endif %}>No proxy</option>
+</select>
+
+<label for="sold">Sold:</label>
+<select name="sold" id="sold">
+    <option value="" {% if request.GET.sold == "" or request.GET.sold == None %}selected{% endif %}>All cards</option>
+    <option value="true" {% if request.GET.sold == "true" %}selected{% endif %}>Only sold</option>
+    <option value="false" {% if request.GET.sold == "false" %}selected{% endif %}>Not sold</option>
+</select>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ deck.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/card.css' %}">
+{% endblock %}
+
+{% block content %}
+  <div class="card-list">
+    
+    <div class="card" style="display: flex; align-items: center;">
+      <div class="card-content">
+        <div class="card-title">{{ deck.name }}</div>
+        <div class="card-meta-line">
+            <div>Description: {{ deck.description }}</div>
+        </div>
+      </div>
+    </div>
+    
+    <h2 class="card-title">Versions : </h2>
+  {% for version in versions %}
+    {% include "my_ygo_cards/partials/one_deck_version_list.html" with item=version %}
+  {%endfor%}
+{% endblock %}

@@ -1,0 +1,394 @@
+/* ====================== Deck Builder Layout ====================== */
+.title {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: var(--primary);
+}
+
+/* ====================== Container Layout ====================== */
+.builder-container {
+  display: grid;
+  grid-template-columns: 66% 33%;
+  grid-template-rows: auto auto auto auto;
+  height: calc(100% - 4rem);
+  max-height: 90vh;
+  gap: 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Shared containers */
+.area,
+#deck-area,
+#reserve-area,
+#card-overview,
+#test-draw-area,
+#actions-area {
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ====================== Deck Area ====================== */
+#deck-area {
+  grid-column: 1 / 2;
+  grid-row: 1 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+/* ====================== Card Overview ====================== */
+#card-overview {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+  min-height: 200px;
+  max-height: 400px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#card-overview img {
+  width: 120px;
+  height: auto;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+#card-overview .overview-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+#card-overview .overview-text h4 {
+  margin: 0 0 8px;
+  font-size: 1.2em;
+}
+
+#card-overview .overview-text p {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+/* ====================== Actions ====================== */
+#actions-area {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ====================== Reserve Area ====================== */
+#reserve-area {
+  grid-column: 2 / 3;
+  grid-row: 3 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+#reserve {
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+/* Scrollbar styling */
+#reserve::-webkit-scrollbar {
+  width: 8px;
+}
+
+#reserve::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 4px;
+}
+
+#reserve::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+
+/* ====================== Headings ====================== */
+.area h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  color: var(--primary);
+}
+
+/* ====================== Card Containers ====================== */
+.dropzone {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 140px;
+  padding: 10px;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.dropzone.drag-over {
+  border-color: var(--secondary);
+  background: var(--hover-bg);
+}
+
+/* Individual cards */
+.card {
+  width: 65px;
+  height: 90px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7);
+}
+/* Highlight proxy cards */
+.card[data-is_proxy="true"] {
+  border: 2px solid red;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+  position: relative;
+}
+
+.card[data-is_proxy="true"]::after {
+  content: "Proxy";
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+
+/* ====================== Filter Input ====================== */
+#filter-name, #filter-code, #filter-type {
+  width: 80%;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-light);
+}
+
+#filter-name, #filter-code, #filter-type::placeholder {
+  color: var(--text-muted);
+}
+
+/* ====================== Buttons ====================== */
+.actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.actions button {
+  background: var(--primary);
+  color: var(--text-light);
+  font-size: 1rem;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.actions button:hover {
+  background: var(--secondary);
+}
+
+.actions select {
+  margin-left: 10px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+}
+
+/* Copy button (inline in title) */
+.copy-btn {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.9em;
+  color: #888;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  color: #444;
+  text-decoration: underline;
+}
+
+.copy-popup {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.copy-popup.hidden {
+  display: none;
+}
+
+.copy-popup button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.copy-popup button:hover {
+  background: #f0f0f0;
+}
+
+
+/* ====================== Tournament Area ====================== */
+#tournament-area {
+  grid-column: 1 / 3;
+  grid-row: 4 / 5;
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ====================== Test Draw Area ====================== */
+#test-draw-area {
+  grid-column: 1 / 3;
+  grid-row: 5 / 6;
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Control row */
+#test-draw-area .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Make input fill remaining width */
+#test-draw-count,
+#simulation-iterations {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-light);
+}
+
+/* Match heights: use consistent vertical padding */
+#test-draw-btn,
+#run-simulation-btn {
+  padding: 8px 14px; /* same vertical padding as input */
+  font-size: 1rem;
+  border-radius: 6px;
+  background: var(--primary);
+  color: var(--text-light);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#test-draw-btn:hover,
+#run-simulation-btn:hover {
+  background: var(--secondary);
+}
+
+/* ====================== category-selector ====================== */
+
+#category-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px; /* space between items */
+  margin-top: 0.5rem;
+  color: var(--text-dark);
+}
+
+#category-selector label {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--hover-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  user-select: none;
+  transition: background-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+#category-selector label:hover {
+  background-color: var(--bg-color);
+}
+
+#category-selector input[type="checkbox"] {
+  display: none; /* hide real checkbox */
+}
+
+/* Style when checked */
+#category-selector input[type="checkbox"]:checked + * {
+  color: var(--text-dark);
+  transform: scale(1.05);
+}
+
+/* Optional: make it wrap nicely on smaller screens */
+#category-selector {
+  justify-content: flex-start;
+}

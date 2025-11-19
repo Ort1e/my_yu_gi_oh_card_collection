@@ -1,0 +1,27 @@
+{% load static %}
+
+<a href="{% url 'card' item.id %}" class="card-link">
+    <div class="card" style="display: flex; align-items: center;">
+        <div class="image-wrapper">
+            <img src="{% get_media_prefix %}{{ item.data.image_url }}" alt="{{ item.name }}" class="card-image" width="100px"/>
+            <div class="image-popup">
+                <img src="{% get_media_prefix %}{{ item.data.image_url }}" alt="{{ item.name }}" class="popup-image" />
+            </div>
+        </div>
+        <div class="card-content">
+            <div class="card-title">{{ item.name }}</div>
+            <div class="card-meta-line">
+            <div>Code: {{ item.code|default:"—" }}</div>
+            <div>
+                Status:
+                {% if item.last_known_status %}
+                <span class="status-badge {{ item.last_known_status|lower }}">{{ item.get_last_known_status_display }}</span>
+                {% else %}
+                Unknown
+                {% endif %}
+            </div>
+            <div>Proxy: {{ item.is_proxy|yesno:"Yes,No" }}</div>
+            </div>
+        </div>
+    </div>
+</a>

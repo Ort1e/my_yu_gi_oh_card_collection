@@ -1,0 +1,47 @@
+<!-- templates/base.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Card Collection{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/header.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">  
+      <header class="site-header">
+        <nav class="navbar">
+          <div class="logo">
+            <a href="{% url 'index' %}">My yu-gi-oh Cards</a>
+          </div>
+          <ul class="nav-links">
+            <li><a href="{% url 'budget' %}">Budget</a></li>
+            <li><a href="{% url 'cards' %}?proxy=false&sold=false">Cards</a></li>
+            <li><a href="{% url 'lots' %}">Lots</a></li>
+            <li><a href="{% url 'sellers' %}">Sellers</a></li>
+            <li><a href="{% url 'decks' %}">Decks</a></li>
+            
+            {% if user.is_authenticated %}
+              <li><a href="{% url 'logout' %}">Logout ({{ user.username }})</a></li>
+            {% else %}
+              <li><a href="{% url 'login' %}">Login</a></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </header>
+        
+
+
+        {% block content %}
+        <!-- Child templates insert their content here -->
+        {% endblock %}
+    </div>
+
+    {% block extra_js %}
+    {% endblock %}
+</body>
+</html>

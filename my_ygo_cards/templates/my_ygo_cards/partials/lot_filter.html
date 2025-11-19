@@ -1,0 +1,8 @@
+<label for="seller_name">seller name:</label>
+<input type="text" name="seller_name" id="seller_name" value="{{ request.GET.seller_name|default_if_none:'' }}" placeholder="Seller name">
+<label for="sold">Sold:</label>
+<select name="sold" id="sold">
+    <option value="" {% if request.GET.sold == "" or request.GET.sold == None %}selected{% endif %}>All lots</option>
+    <option value="true" {% if request.GET.sold == "true" %}selected{% endif %}>Only sold</option>
+    <option value="false" {% if request.GET.sold == "false" %}selected{% endif %}>Only purchased</option>
+</select>

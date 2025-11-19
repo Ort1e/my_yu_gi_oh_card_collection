@@ -1,0 +1,68 @@
+:root {
+    --bg-color: #c6f4ff;
+    --card-bg: #1a1a1a;
+    --secondary: #04926f;
+    --primary: #0018a3;
+    --text-light: #e0e0e0;
+    --text-muted: #c2bcbc;
+    --text-dark: #000;
+    --border-color: #2a2a2a;
+    --hover-bg: #289faf;
+  }
+  
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-light);
+    line-height: 1.6;
+    color: var(--text-dark);
+  }
+  
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+  }
+  
+  .container {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 6rem 1rem 2rem; /* 👈 this creates space under the fixed header */
+  }
+
+  .inside-container {
+    max-width: 1200px;
+    margin: 0 auto; /* ✅ centers horizontally */
+  }
+  
+  .pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    text-align: center;
+}
+
+.pagination-controls {
+    flex: 1;
+}
+
+.pagination-left {
+    text-align: left;
+}
+
+.pagination-right {
+    text-align: right;
+}
+
+.pagination-current {
+    flex: 1;
+    font-weight: bold;
+    text-align: center;
+}

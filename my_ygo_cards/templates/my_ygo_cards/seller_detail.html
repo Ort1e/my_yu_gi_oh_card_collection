@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ seller.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/card.css' %}">
+{% endblock %}
+
+{% block content %}
+  <div class="card-list">
+    <div class="card">
+      <div class="card-title">{{ seller.name }}</div>
+      
+      <div class="card-subtitle">
+        Type: {{ seller.is_person|yesno:"Person,Shop or Company" }}
+      </div>
+
+      <div class="card-subtitle">
+        Source: {{ seller.source.name|default:"—" }}
+      </div>
+
+      <div class="card-subtitle">
+        Lots: {{ seller.lot_set.count }}
+      </div>
+
+      <div class="card-subtitle">
+        Cards: {{ seller.total_cards }}
+      </div>
+    </div>
+  </div>
+
+  {% if lots %}
+    <h2>Lots from this Seller</h2>
+    <div class="card-list">
+      {% for lot in lots %}
+        <a href="{% url 'lot' lot.id %}" class="card-link">
+          <div class="card">
+            <div class="card-title">{{ lot }}</div>
+            <div class="card-meta-line">
+              <div>Price: {{ lot.price }} €</div>
+              <div>Buy Date: {{ lot.buy_date }}</div>
+              <div>Cards: {{ lot.cards.count }}</div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

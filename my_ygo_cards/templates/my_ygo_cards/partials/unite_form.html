@@ -1,0 +1,52 @@
+<fieldset>
+    <legend>Card {{ card_number }}</legend>
+
+    <!-- Full-width card name -->
+    <div style="margin-bottom: 1rem;">
+      {{ form.card_name.label_tag }}
+      {{ form.card_name }}
+    </div>
+    <!-- Full-width en card name -->
+    <div style="margin-bottom: 1rem;">
+      {{ form.card_en_name.label_tag }}
+      {{ form.card_en_name }}
+    </div>
+
+    <!-- Inline fields: code, status, proxy, price -->
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
+
+      <div style="flex: 1 1 150px;">
+        {{ form.card_code.label_tag }}
+        {{ form.card_code }}
+      </div>
+
+      <div style="flex: 1 1 220px;">
+        <label style="display: inline-block; min-width: 160px;">
+          {{ form.card_last_known_status.label }}:
+        </label>
+        {{ form.card_last_known_status }}
+      </div>
+
+      <div class="checkbox-wrapper-3" style="display: inline-flex; align-items: center;">
+        {{ form.card_is_proxy }}
+        <label for="{{ form.card_is_proxy.id_for_label }}" class="toggle"><span></span></label>
+        <label for="{{ form.card_is_proxy.id_for_label }}" class="checkbox-label">Proxy Card</label>
+      </div>
+     
+      
+
+      <div style="flex: 1 1 120px;">
+        {{ form.price.label_tag }}
+        {{ form.price }}
+      </div>
+
+      <div style="flex: 1 1 120px;">
+        {{ form.quantity.label_tag }}
+        {{ form.quantity }}
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <ul class="errorlist">{{ form.non_field_errors }}</ul>
+    {% endif %}
+  </fieldset>

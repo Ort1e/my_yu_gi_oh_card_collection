@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Deck Builder{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/deck_builder.css' %}">
+{% endblock %}
+
+{% block content %}
+  <h2 class="title">
+    (<button id="import-ydke-btn" class="copy-btn">Import YDKE</button>) Deck Builder : <span id="deck-name">{{ deck.name }}</span> ({{ total_deck_price }}€)
+    (<button id="copy-ydke-btn" class="copy-btn">Copy YDKE</button>)
+    <div id="copy-popup" class="copy-popup hidden">
+      <button data-variant="with_proxies">With Proxies</button>
+      <button data-variant="without_proxies">Without Proxies</button>
+      <button data-variant="only_proxies">Only Proxies</button>
+    </div>
+  </h2>
+
+  <div class="builder-container">
+    <!-- ================== Deck Area (Left, spans rows) ================== -->
+    <div id="deck-area">
+
+      <!-- Main Deck -->
+      <div class="area">
+        <h3>Main Deck (<span id="count-main">0</span>, {{main_deck_price}}€)</h3>
+        <div id="main-deck" class="dropzone">
+        </div>
+      </div>
+
+      <!-- Extra Deck -->
+      <div class="area">
+        <h3>Extra Deck (<span id="count-extra">0</span>, {{extra_deck_price}}€)</h3>
+        <div id="extra-deck" class="dropzone">
+        </div>
+      </div>
+
+      <!-- Side Deck -->
+      <div class="area">
+        <h3>Side Deck (<span id="count-side">0</span>, {{side_deck_price}}€)</h3>
+        <div id="side-deck" class="dropzone">
+        </div>
+      </div>
+    </div>
+
+    <!-- ================== Card Overview (Top-right) ================== -->
+    <div id="card-overview"><!-- Populated by JS --></div>
+
+    <!-- ================== Actions ================== -->
+    <div id="actions-area" class="actions">
+      <button id="save-btn">💾 Save</button>
+      <button id="rename-btn">✏️ Rename</button>
+      <button id="new-btn">📦 New</button>
+      <button id="delete-btn">🗑️ Delete</button>
+
+      <select id="ban-list-switcher">
+        {% for b in ban_lists %}
+          <option value="{{ b.id }}" {% if deck.ban_list and b.id == deck.ban_list.id %}selected{% endif %}>
+            {{ b.date }}
+          </option>
+        {% endfor %}
+        <option value="" {% if not deck.ban_list %}selected{% endif %}>No Ban List</option>
+      </select>
+
+      <select id="deck-switcher">
+        {% for d in all_versions %}
+          <option value="{{ d.id }}" {% if d.id == deck.id %}selected{% endif %}>
+            {{ d.version_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- ================== Reserve Area (Bottom-right) ================== -->
+    <div id="reserve-area" class="area">
+      <h3>Reserve</h3>
+      <input type="text" id="filter-name" class="deck_builder_input" placeholder="Search cards...">
+      <input type="text" id="filter-code" class="deck_builder_input" placeholder="Search by code...">
+  
+      <select id="filter-type" class="deck_builder_input">
+        <option value="">Card Type (any)</option>
+        {%for type in all_card_types%}
+          <option value="{{ type }}" {% if request.GET.card_type == type|stringformat:"s" %}selected{% endif %}>{{ type }}</option>
+        {%endfor%}
+      </select>
+      <div id="reserve" class="dropzone">
+        Please enter at least one filter to search cards.
+      </div>
+    </div>
+
+      <!-- ================== Tournament Info Area (Bottom) ================== -->
+    <div id="tournament-area" class="area">
+      <h3>Tournament Info</h3>
+      <form method="post">
+        {% csrf_token %}
+        <fieldset>
+          {{ tournaments_form.as_p }}
+        </fieldset>
+        <input type="submit" name="tournament" value="Submit" />
+      </form>
+    </div>
+
+    <div id="test-draw-area" class="area">
+      <h3>Test Draw</h3>
+      <div class="controls">
+        <button id="test-draw-btn">Draw</button>
+        <input type="number" id="test-draw-count" value="5" min="1" max="60" />
+      </div>
+      <div class="controls">
+        <button id="run-simulation-btn">Run Simulation</button>
+        <input type="number" id="simulation-iterations" value="10000" min="1" max="1000000" />
+      </div>
+      <div id="test-draw-result" class="dropzone">
+
+      </div>
+
+      <div id="test-draw-stats">
+        <h4>Statistics</h4>
+        <div id="stats-content">
+          No draws yet.
+        </div>
+        <div style="margin-top: 20px;">
+          <canvas id="categoryChart" height="200"></canvas>
+        </div>
+      
+      </div>
+
+    </div>
+    
+
+
+
+  </div>
+
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script src="{% static 'js/deck_builder/types.js' %}"></script>
+  <script src="{% static 'js/deck_builder/backend_call.js' %}"></script>
+  <script>
+    const csrfToken = "{{ csrf_token }}";
+    const imgBaseUrl = "{% get_media_prefix %}";
+    
+    /** @type {ApiUrls} */
+    const apiUrls = {
+      deckVersionDetail: () => "{% url 'deckversion-detail' deck_version_id=deck.id %}",
+      deckVersionClone: () => "{% url 'deckversion-clone' deck_version_id=deck.id %}",
+      deckVersionProxyCreate: () => "{% url 'deckversion-proxy-create' deck_version_id=deck.id %}",
+      deckVersionProxyDelete: (card_id) => "{% url 'deckversion-proxy-delete' deck_version_id=deck.id card_id=0 %}".replace('/0', '/' + card_id),
+      deckVersionCardLists: () => "{% url 'deckversion-cardlists' deck_version_id=deck.id %}",
+      deckVersionCategories: () => "{% url 'deckversion-categories' deck_version_id=deck.id %}",
+      deckVersionAssignCategories: (card_id) => "{% url 'deckversion-assign-categories' deck_version_id=deck.id card_id=0 %}".replace('/0', '/' + card_id),
+      deckVersionCategoryDelete: (category_id) => "{% url 'deckversion-category-delete' deck_version_id=deck.id category_id=0 %}".replace('/0', '/' + category_id),
+      monteCarloSimulationUrl: () => "{% url 'deckversion-monte-carlo' deck_version_id=deck.id %}",
+
+
+      deckImportYdke: () => "{% url 'deck-import-ydke' deck_id=deck.deck.id %}",
+
+      deckListUrl: () => "{% url 'decks' %}",
+      deckBuilderUrl : (deck_version_id) => "{% url 'deck_builder' 0 %}".replace('/0', '/' + deck_version_id),
+      cardBaseUrl: (card_id) => "{% url 'card' 0 %}".replace('/0', '/' + card_id),
+    };
+
+    
+    let ydkeUrls = {
+        with_proxies: "{{ deck.ydke_with_proxies }}",
+        without_proxies: "{{ deck.ydke_without_proxies }}",
+        only_proxies: "{{ deck.ydke_only_proxies }}"
+    };
+
+    let currentDeckName = "{{ deck.name }}";
+
+    window.backendCall = new BackendCall(apiUrls, csrfToken);
+    window.apiUrls = apiUrls;
+    window.imgBaseUrl = imgBaseUrl;
+  </script>
+  <script type="module" src="{% static 'js/deck_builder/deck_management.js' %}"></script>
+
+  <script type="module" src="{% static 'js/deck_builder/ydke.js' %}"></script>
+  <script type="module" src="{% static 'js/deck_builder/card.js' %}"></script>
+  <script type="module" src="{% static 'js/deck_builder/draw_simulation.js' %}"></script>
+{% endblock %}

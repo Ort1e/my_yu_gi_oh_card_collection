@@ -1,0 +1,10 @@
+<a href="{% url 'seller' item.id %}" class="card-link">
+    <div class="card">
+        <div class="card-title">{{ item.name }}</div>
+        <div class="card-meta-line">
+            <div>Is Person: {{ item.is_person|yesno:"Yes,No" }}</div>
+            <div>Source: {{ item.source.name }}</div>
+            <div>Lots: {{ item.lot_set.count }}</div>
+        </div>
+    </div>
+</a>

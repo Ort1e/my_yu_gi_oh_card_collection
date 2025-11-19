@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Add Lot{% endblock %}
+
+{% block content %}
+  <h1 class="card-title">Add a New Lot</h1>
+
+  {% if shipment_file_name %}
+      <h2>Shipment File: {{ shipment_file_name }}</h2>
+  {% else %}
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+          {{shipment_form.as_p}}
+          <input type="submit" name="{{shipment_form.prefix}}" value="Upload" />
+      </form>
+  {% endif %}
+
+  {% if error_message %}
+    <div class="error">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Hidden input to store the uploaded file name if present-->
+    {% if shipment_file_name %}
+      <input type="hidden" name="shipment_file_name" value="{{ shipment_file_name }}">
+    {% endif %}
+
+    <fieldset>
+      <legend>Lot Info</legend>
+      {{ form.as_p }}
+    </fieldset>
+  
+    <fieldset>
+      <legend>Seller</legend>
+    
+      <label for="seller_select"><strong>Select Existing Seller:</strong></label>
+      <select name="seller_select" id="seller_select">
+        <option value="">— Create New Seller —</option>
+        {% for seller in sellers %}
+          <option value="{{ seller.id }}" {% if seller.id|stringformat:"s" == selected_seller_id|stringformat:"s" %}selected{% endif %}>
+            {{ seller.name }}
+          </option>
+        {% endfor %}
+      </select>
+    
+      <details>
+        <summary>If no existing seller is selected, the form below will be used to create one:</summary>
+      
+        {{ seller_form.as_p }}
+      </details>
+    </fieldset>
+  
+    <fieldset>
+      <legend>Cards in the Lot (<input
+        type="number"
+        id="cards-count-input"
+        name="cards_count"
+        min="0"
+        step="1"
+        value="{{ unite_formset.forms|length }}"
+        style="margin-left: 1rem; width: 4rem;"
+      /> Unites)</legend>
+
+      {{ unite_formset.management_form }}
+
+      {% for form in unite_formset %}
+        {%include "my_ygo_cards/partials/unite_form.html" with form=form card_number=forloop.counter%}
+      {% endfor %}
+    </fieldset>
+
+    <input type="submit" name="{{form.prefix}}" value="Submit" />
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('cards-count-input').addEventListener('change', function() {
+    let val = this.value;
+    if (val < 1) val = 1;
+    this.value = val;
+
+    const url = new URL(window.location);
+    url.searchParams.set('cards', val);
+    window.location = url.toString();
+  });
+</script>
+{% endblock %}

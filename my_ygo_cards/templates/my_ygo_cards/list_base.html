@@ -1,0 +1,99 @@
+{# templates/list_base.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/card.css' %}">
+  {% if include_filter %}
+    <link rel="stylesheet" href="{% static 'css/filtering.css' %}">
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1 class="card-title">{{ page_title }} {% if list_length %}({{page_obj.paginator.count}}/{{list_length}}){% endif %}:</h1>
+
+  {% if object_list %}
+    <div class="card-list">
+      {% for obj in object_list %}
+        {% include item_template with item=obj %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="card-title">No {{ object_name|default:"item" }}.</p>
+  {% endif %}
+  <div class="pagination-container">
+    <div class="pagination-controls pagination-left">
+        {% if page_obj.has_previous %}
+            <a href="?page=1{% if querystring %}&{{ querystring }}{% endif %}">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">previous</a>
+        {% endif %}
+    </div>
+  
+    <div class="pagination-current">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+    </div>
+  
+    <div class="pagination-controls pagination-right">
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if querystring %}&{{ querystring }}{% endif %}">last &raquo;</a>
+        {% endif %}
+    </div>
+  </div>
+
+  <!--adding button top left to add element -->
+  {% if user.is_authenticated and adding_url_name %}
+      <a href="{% url adding_url_name %}" title="Add {{ object_name|default:'item' }}" class="btn filter-badge" style="top: 70px; bottom: auto;">
+        Add {{ object_name|default:'item' }}
+      </a>
+  
+  {% endif %}
+
+
+
+  {% if include_filter %}
+    <!-- ✅ Filter Badge -->
+    <button id="filter-badge" class="filter-badge">Filter</button>
+
+    <!-- ✅ Filter Modal -->
+    <div id="filter-modal" class="filter-modal hidden">
+    <div class="filter-content">
+        <h2>Filter {{ object_name }}s</h2>
+        <form method="get">
+            {% include include_filter %}
+        
+        <div style="margin-top: 1rem;">
+            <button type="submit">Apply</button>
+            <a href="." class="reset-button" style="margin-left: 0.5rem;">Reset</a>
+        </div>
+        </form>
+    </div>
+    </div>
+    
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  {% if include_filter %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        const badge = document.getElementById('filter-badge');
+        const modal = document.getElementById('filter-modal');
+    
+        badge.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+    
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+            modal.classList.add('hidden');
+            }
+        });
+        });
+    </script>
+  {% endif %}
+{% endblock %}

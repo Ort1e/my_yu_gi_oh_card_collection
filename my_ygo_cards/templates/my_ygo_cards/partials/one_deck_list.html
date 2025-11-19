@@ -1,0 +1,9 @@
+<a href="{% url 'deck' item.id %}" class="card-link">
+    <div class="card">
+        <div class="card-title">{{ item }}</div>
+        <div class="card-meta-line">
+            <div>Description: {{ item.description }}</div>
+        </div>
+        
+    </div>
+</a>

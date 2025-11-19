@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}my yu-gi-oh card{% endblock %}
+
+
+{% block content %}
+<div class="inside-container">
+    <h1>My Yu-Gi-Oh Card Collection</h1>
+
+    <h2>Recent Recap</h2>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Category</th>
+                {% for recap in recap_entries %}
+                    <th>{{ recap.month_str }}</th>
+                {% endfor %}
+                <th>Total previsionnal</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <th>Spent (€)</th>
+                {% for recap in recap_entries %}
+                    <td>{{ recap.spent|floatformat:2 }}</td>
+                {% endfor %}
+                <td>{{ totals.total_spent|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <th>Shipping (€)</th>
+                {% for recap in recap_entries %}
+                    <td>{{ recap.shipping_cost|floatformat:2 }}</td>
+                {% endfor %}
+                <td>{{ totals.total_shipping_cost|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <th>Budget (€)</th>
+                {% for recap in recap_entries %}
+                    <td>{{ recap.budget|floatformat:2 }}</td>
+                {% endfor %}
+                <td>{{ totals.total_budget|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <th>Debt (€)</th>
+                {% for recap in recap_entries %}
+                    <td style="color: 
+                        {% if recap.debt > available_debt %}
+                            red
+                        {% elif recap.debt > 0 %}
+                            orange
+                        {% else %}
+                            green
+                        {% endif %}
+                    ;">
+                        {{ recap.debt|floatformat:2 }}
+                    </td>
+                {% endfor %}
+                <td style="color: 
+                    {% if totals.total_debt > available_debt %}
+                        red
+                    {% elif totals.total_debt > 0 %}
+                        orange
+                    {% else %}
+                        green
+                    {% endif %}
+                ;">
+                    {{ totals.total_debt|floatformat:2 }}
+                </td>
+            </tr>
+            <tr>
+                <th>Shipping %</th>
+                {% for recap in recap_entries %}
+                    <td>{{ recap.shipping_percent|floatformat:2 }}%</td>
+                {% endfor %}
+                <td>{{ totals.total_shipping_percent|floatformat:2 }}%</td>
+            </tr>
+            <tr>
+                <th>Sold (€)</th>
+                {% for recap in recap_entries %}
+                    <td>{{ recap.selling_revenue|floatformat:2 }}</td>
+                {% endfor %}
+                <td>{{ totals.total_selling_revenue|floatformat:2 }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <canvas id="monthly_depense_chart" width="400" height="200"></canvas>
+    <canvas id="card_added_chart" width="400" height="200"></canvas>
+    <canvas id="card_cost_chart" width="400" height="200"></canvas>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // monthly spending chart
+    const spendingCtx = document.getElementById('monthly_depense_chart').getContext('2d');
+
+    const labels = {{ labels|safe }};
+
+    const spendingChart = new Chart(spendingCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Shipping Cost (€)',
+                    data: {{ shipping_costs|safe }},
+                    backgroundColor: 'rgba(255, 206, 86, 0.5)',
+                    borderColor: 'rgba(255, 206, 86, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Card Spending (€)',
+                    data: {{ card_spending|safe }},
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    beginAtZero: true,
+                    stacked: true
+                }
+            }
+        }
+    });
+
+    // card added chart
+    const cardCtx = document.getElementById('card_added_chart').getContext('2d');
+    const cardChart = new Chart(cardCtx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Cards Added Per Month',
+                data: {{ card_counts|safe }},
+                backgroundColor: 'rgba(255, 99, 132, 0.3)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // card cost chart
+    const costCtx = document.getElementById('card_cost_chart').getContext('2d');
+    const number_by_card_cost = {{ number_by_card_cost|safe }};
+    const ordonned_cards_costs = {{ ordonned_cards_costs|safe }};
+    const costChart = new Chart(costCtx, {
+        type: 'line',
+        data: {
+            // Instead of separate labels + data, combine into x/y pairs
+            datasets: [{
+                label: 'Number of Cards by Cost',
+                data: ordonned_cards_costs.map((item) => ({x: item, y: number_by_card_cost[item]})),
+                backgroundColor: 'rgba(75, 192, 192, 0.3)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'logarithmic',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Cost (€)'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Cards'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

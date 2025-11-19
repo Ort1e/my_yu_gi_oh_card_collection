@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Lot {{ lot.id }}{% endblock %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/card.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<h1 class="card-title">{{ lot }}</h1>
+
+<div class="card">
+  <div class="card-meta-line">
+    <div><strong>Price:</strong> {{ lot.price }} €</div>
+    <div><strong>Buy date:</strong> {{ lot.buy_date }}</div>
+    <div><strong>Received:</strong> {{ lot.received_date|default:"—" }}</div>
+    <div><strong>Seller:</strong> {{ lot.seller }}</div>
+    <div><strong>Cards in Lot:</strong> {{ lot.cards.count }}</div>
+    {%if lot.shipment_file %}
+    <div><a href="{{ lot.shipment_file.url }}">Shipment file</a></div>
+    {% endif %}
+  </div>
+
+  <h2 style="margin-top: 1rem;">Cards</h2>
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Card</th>
+        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for unite in lot.unite_set.all %}
+      <tr>
+        <td style="padding: 0.5rem;">
+          <a href="{% url 'card' unite.card.id %}">{{ unite.card.name }}</a>
+        </td>
+        <td style="padding: 0.5rem;">
+          {% if unite.price %}
+            {{ unite.price }} €
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="2" style="padding: 0.5rem;">No cards in this lot.</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">Total</td>
+        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">
+          {{ total_price }} €
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  {% if user.is_authenticated %}
+    <form method="post">
+      {% csrf_token %}
+
+      {%include "my_ygo_cards/partials/unite_form.html" with form=unite_form card_number=1%}
+      <input type="submit" value="Add Card to Lot" style="margin-top: 1rem;">
+    </form>
+  {% endif %}
+
+{% endblock %}

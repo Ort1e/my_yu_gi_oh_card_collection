@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ card.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/card.css' %}">
+{% endblock %}
+
+{% block content %}
+  <div class="card-list">
+    
+    <div class="card" style="display: flex; align-items: center;">
+      <img src="{% get_media_prefix %}{{ card.data.image_url }}" alt="{{ card.name }}" class="card-image" width="120px"/>
+      <div class="card-content">
+        <div class="card-title">{{ card.name }}</div>
+        <div class="card-meta-line">
+          <div class="card-subtitle">Code: {{ card.code|default:"—" }}</div>
+          <div class="card-subtitle">
+            Status: 
+            {% if card.last_known_status %}
+              <span class="status-badge {{ card.last_known_status|lower }}">{{ card.get_last_known_status_display }}</span>
+            {% else %}
+              Unknown
+            {% endif %}
+          </div>
+          <div class="card-subtitle">Proxy: {{ card.is_proxy|yesno:"Yes,No" }}</div>
+          {% if price %}
+            <div>Price: {{ price }} €</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+
+  {% if lot %}
+    <h2 class="card-title">Lot Details : </h2>
+    {% include "my_ygo_cards/partials/one_lot_list.html" with item=lot %}
+  {%endif%}
+  
+  <h2 class="card-title">Deck Versions : </h2>
+  {% for version in card.deck_versions %}
+    {% include "my_ygo_cards/partials/one_deck_version_list.html" with item=version %}
+  {% empty %}
+    <p>No deck versions include this card.</p>
+  {% endfor %}
+{% endblock %}

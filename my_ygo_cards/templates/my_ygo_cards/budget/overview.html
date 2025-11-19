@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Budget Overview{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+    <h1>Monthly Budget Overview</h1>
+    <p>Available Debt (3 × last budget) : {{ available_debt|floatformat:2 }}(€)</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Month</th>
+                <th>Budget (€)</th>
+                <th>Spent (€)</th>
+                <th>Difference</th>
+                <th>Shipping (€)</th>
+                <th>Shipping %</th>
+                <th>Total sold (€)</th>
+                <th>Real Revenue (€)</th>
+                <th>Sold shipping (€)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="font-weight: bold; border-botom: 2px solid black;">
+                <td>Total previsionnal</td>
+                <td>{{ totals_prev.total_budget|floatformat:2 }}</td>
+                <td>{{ totals_prev.total_spent|floatformat:2 }}</td>
+                <td style="color: 
+                    {% if totals_prev.total_debt > available_debt %}
+                        red
+                    {% elif totals_prev.total_debt > 0 %}
+                        orange
+                    {% else %}
+                        green
+                    {% endif %}
+                ;">
+                    {{ totals_prev.total_debt|floatformat:2 }}
+                </td>
+                <td>{{ totals_prev.total_shipping_cost|floatformat:2 }}</td>
+                <td>{{ totals_prev.total_shipping_percent|floatformat:2 }}%</td>
+                <td>{{ totals_prev.total_selling_revenue|floatformat:2 }}</td>
+                <td>{{ totals_prev.total_real_selling_revenue|floatformat:2 }}</td>
+                <td>{{ totals_prev.total_selling_shipping_cost|floatformat:2 }}</td>
+            </tr>
+            {% for entry in recap %}
+            <tr>
+                <td>{{ entry.month }}</td>
+                <td>{{ entry.budget|floatformat:2 }}</td>
+                <td>{{ entry.spent|floatformat:2 }}</td>
+                <td style="color: {% if entry.debt > available_debt %}
+                        red
+                    {% elif entry.debt > 0 %}
+                        orange
+                    {% else %}
+                        green
+                    {% endif %};">
+                    {{ entry.debt|floatformat:2 }}
+                </td>
+                <td>{{ entry.shipping_cost|floatformat:2 }}</td>
+                <td>{{ entry.shipping_percent|floatformat:2 }}%</td>
+                <td>{{ entry.selling_revenue|floatformat:2 }}</td>
+                <td>{{ entry.selling_real_revenue|floatformat:2 }}</td>
+                <td>{{ entry.selling_shipping_cost|floatformat:2 }}</td>
+            </tr>
+
+            {% if forloop.first %}
+            <!-- Extra row after the first iteration -->
+            <tr style="font-weight: bold; border-botom: 2px solid black;">
+                <td>Total</td>
+                <td>{{ totals.total_budget|floatformat:2 }}</td>
+                <td>{{ totals.total_spent|floatformat:2 }}</td>
+                <td style="color: 
+                    {% if totals.total_debt > available_debt %}
+                        red
+                    {% elif totals.total_debt > 0 %}
+                        orange
+                    {% else %}
+                        green
+                    {% endif %}
+                ;">
+                    {{ totals.total_debt|floatformat:2 }}
+                </td>
+                <td>{{ totals.total_shipping_cost|floatformat:2 }}</td>
+                <td>{{ totals.total_shipping_percent|floatformat:2 }}%</td>
+                <td>{{ totals.total_selling_revenue|floatformat:2 }}</td>
+                <td>{{ totals.total_real_selling_revenue|floatformat:2 }}</td>
+                <td>{{ totals.total_selling_shipping_cost|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            
+        </tbody>
+    </table>
+</div>
+{% endblock %}
