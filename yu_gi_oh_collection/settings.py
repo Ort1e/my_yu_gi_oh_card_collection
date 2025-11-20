@@ -72,6 +72,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'yu_gi_oh_collection.wsgi.application'
 
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases

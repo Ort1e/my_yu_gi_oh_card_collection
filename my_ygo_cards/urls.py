@@ -1,6 +1,11 @@
 from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 from .rest_api import deck_builder_api
 
@@ -54,5 +59,7 @@ urlpatterns = [
     path("api/deck_versions/<int:deck_version_id>/", include(deck_version_patterns)),
 
     path("api/decks/<int:deck_id>/import_ydke/", deck_builder_api.DeckImportYdkeAPI.as_view(), name="deck-import-ydke"),
+
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema")
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

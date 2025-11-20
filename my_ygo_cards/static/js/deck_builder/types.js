@@ -1,13 +1,4 @@
 /**
- * @typedef {Object} DeckUpdateData
- * @property {string[]} [main_deck]
- * @property {string[]} [extra_deck]
- * @property {string[]} [side_deck]
- * @property {string} [version_name]
- * @property {string} [ydke_url]
- */
-
-/**
  * @typedef {Object} ApiUrls
  * @property {() => string} deckVersionDetail
  * @property {() => string} deckVersionClone

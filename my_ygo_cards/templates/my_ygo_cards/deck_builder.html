@@ -139,7 +139,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <script src="{% static 'js/deck_builder/types.js' %}"></script>
-  <script src="{% static 'js/deck_builder/backend_call.js' %}"></script>
+  <script src="{% static 'js/deck_builder/api/api.js' %}"></script>
   <script>
     const csrfToken = "{{ csrf_token }}";
     const imgBaseUrl = "{% get_media_prefix %}";
@@ -164,6 +164,12 @@
       cardBaseUrl: (card_id) => "{% url 'card' 0 %}".replace('/0', '/' + card_id),
     };
 
+    let api = new Api({
+      baseUrl = "{% url 'index' %}",
+      securityData = {
+        csrfToken: csrfToken,
+      },
+    });
     
     let ydkeUrls = {
         with_proxies: "{{ deck.ydke_with_proxies }}",
@@ -173,9 +179,10 @@
 
     let currentDeckName = "{{ deck.name }}";
 
-    window.backendCall = new BackendCall(apiUrls, csrfToken);
+    window.backendCall = api;
     window.apiUrls = apiUrls;
     window.imgBaseUrl = imgBaseUrl;
+    window.deckVersionId = {{ deck.id }};
   </script>
   <script type="module" src="{% static 'js/deck_builder/deck_management.js' %}"></script>
 

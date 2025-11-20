@@ -1,8 +1,8 @@
 /// <reference path="./types.js" />
-
+import { Api } from './api/api.js';
 import {zones} from "./deck_management.js";
 
-/** @type {BackendCall} */
+/** @type {Api} */
 const backend = window.backendCall;
 
 /** @type {ApiUrls} */
@@ -10,6 +10,9 @@ const api = window.apiUrls;
 
 /** @type {string} */
 const baseImgUrl = window.imgBaseUrl;
+
+/** @type {number} */
+const deckVersionId = window.deckVersionId;
 
 
 // -------------------- Global Variables --------------------
@@ -96,7 +99,7 @@ function updateCardCounts() {
 
  // -------------------- get cards in decks --------------------
 function get_cards_in_deck() {
-  backend.getDeckVersion().then(data => {
+  backend.myYgoCards.deckVersionsRetrieve(deckVersionId).then(data => {
       const mainDeckArea = zones.main;
       const extraDeckArea = zones.extra;
       const sideDeckArea = zones.side;

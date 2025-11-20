@@ -1,4 +1,5 @@
 # serializers.py
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from ..models import Card, CardCategory, CardData, DeckVersion, Unite, AdvancedBanList, BanListEntry
 
@@ -39,9 +40,11 @@ class CardSerializer(serializers.ModelSerializer):
             "unite_price",
         ]
 
+    @extend_schema_field(serializers.BooleanField())
     def get_is_proxy(self, obj):
         return obj.is_proxy
 
+    @extend_schema_field(serializers.FloatField(allow_null=True))
     def get_unite_price(self, obj):
         unite = Unite.objects.filter(card=obj).order_by('-id').first()
         if unite:
@@ -87,16 +90,20 @@ class DeckVersionSerializer(serializers.ModelSerializer):
         model = DeckVersion
         fields = ['id', 'name', 'version_name', 'main_deck', 'extra_deck', 'side_deck', 
                   'ydke_with_proxies', 'ydke_without_proxies', 'ydke_only_proxies', 'ban_list']
-        
+    
+    @extend_schema_field(serializers.CharField())
     def get_ydke_with_proxies(self, obj : DeckVersion):
         return obj.ydke_with_proxies
     
+    @extend_schema_field(serializers.CharField())
     def get_ydke_without_proxies(self, obj : DeckVersion):
         return obj.ydke_without_proxies
     
+    @extend_schema_field(serializers.CharField())
     def get_ydke_only_proxies(self, obj : DeckVersion):
         return obj.ydke_only_proxies
     
+    @extend_schema_field(serializers.CharField())
     def get_name(self, obj):
         return obj.name
 
@@ -122,7 +129,7 @@ class CardCategorySerializer(serializers.ModelSerializer):
         model = CardCategory
         fields = ["id", "name", "assigned", "is_conditional"]
 
-
+    @extend_schema_field(serializers.BooleanField())
     def get_is_conditional(self, obj):
         return hasattr(obj, 'cardconditionalcategory')
 

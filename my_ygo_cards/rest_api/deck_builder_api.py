@@ -1,4 +1,3 @@
-import json
 from typing import TypedDict, List, cast
 
 from django import forms
@@ -7,9 +6,13 @@ from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render, get_object_or_404
 
+from rest_framework import serializers
+
+from drf_spectacular.utils import extend_schema
+
 from my_ygo_cards.monte_carlos.monte_carlos import run_monte_carlo_simulation
 from my_ygo_cards.rest_api.serializers import CardCategoryAssignmentSerializer, CardCategorySerializer, CardSerializer, DeckVersionSerializer, DeckVersionUpdateSerializer, DeckYdkeImportSerializer
-from my_ygo_cards.views.cards import filter_cards_queryset
+from my_ygo_cards.views.cards import CardFilterSerializer, filter_cards_queryset
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -75,10 +78,17 @@ class DeckVersionUpdateData(TypedDict, total=False):
 class DeckVersionDetailAPI(APIView):
     """GET, PATCH, DELETE deck version"""
 
+    @extend_schema(
+        responses=DeckVersionSerializer,
+    )
     def get(self, request, deck_version_id):
         deck = get_object_or_404(DeckVersion, pk=deck_version_id)
         return Response(DeckVersionSerializer(deck).data)
 
+    @extend_schema(
+        request=DeckVersionUpdateSerializer,
+        responses=DeckVersionSerializer,
+    )
     def patch(self, request, deck_version_id):
         deck = get_object_or_404(DeckVersion, pk=deck_version_id)
         serializer = DeckVersionUpdateSerializer(deck, data=request.data, partial=True)
@@ -106,6 +116,9 @@ class DeckVersionDetailAPI(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        responses={204: None}
+    )
     def delete(self, request, deck_version_id):
         deck = get_object_or_404(DeckVersion, pk=deck_version_id)
         deck.delete()
@@ -115,6 +128,18 @@ class DeckVersionDetailAPI(APIView):
 class DeckVersionCloneAPI(APIView):
     """POST /api/deck_versions/{deck_version_id}/clone/"""
 
+    @extend_schema(
+        request=None,
+        responses={
+            201: {
+                "type": "object",
+                "properties": {
+                    "deck_id": {"type": "integer"},
+                    "deck_url": {"type": "string"}
+                }
+            }
+        }
+    )
     def post(self, request, deck_version_id):
         old = get_object_or_404(DeckVersion, pk=deck_version_id)
         name = request.data.get("name", f"{old.version_name} Copy")
@@ -140,18 +165,38 @@ class DeckVersionCloneAPI(APIView):
             "deck_url": new_url
         }, status=status.HTTP_201_CREATED)
 
+class DeckVersionProxyCreateInputSerializer(serializers.Serializer):
+    name = serializers.CharField(
+        max_length=255,
+        help_text="Name of the proxy card"
+    )
+    zone = serializers.ChoiceField(
+        choices=["main", "extra", "side"],
+        default="main",
+        help_text="Deck zone to add the proxy card"
+    )
 
 class DeckVersionProxyCreateAPI(APIView):
     """POST /api/deck_versions/{deck_version_id}/proxy/"""
 
+    @extend_schema(
+        request=DeckVersionProxyCreateInputSerializer,
+        responses=CardSerializer,
+    )
     def post(self, request, deck_version_id):
         deck = get_object_or_404(DeckVersion, pk=deck_version_id)
-        card = deck.add_proxy_card(name=request.data.get("name"), zone=request.data.get("zone", "main"))
+        serializer = DeckVersionProxyCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        card = deck.add_proxy_card(name=serializer.data.get("name"), zone=serializer.data.get("zone", "main"))
         return Response(CardSerializer(card).data, status=status.HTTP_201_CREATED)
 
 class DeckVersionProxyDeleteAPI(APIView):
     """DELETE /api/deck_versions/{deck_version_id}/proxy/{card_id}/"""
 
+    @extend_schema(
+        responses={204: None}
+    )
     def delete(self, request, deck_version_id, card_id):
         deck = get_object_or_404(DeckVersion, pk=deck_version_id)
         card = get_object_or_404(Card, pk=card_id, is_proxy=True)
@@ -169,18 +214,24 @@ class DeckVersionCardListAPI(APIView):
       - limit: limit number of results
     """
 
+    @extend_schema(
+        request=CardFilterSerializer,
+        responses=CardSerializer(many=True),
+    )
     def post(self, request, deck_version_id):
         deck_version = get_object_or_404(DeckVersion, pk=deck_version_id)
-        filters = request.data
 
-        # Convert QueryDict values to plain dict[str, str]
-        params = {k: v[0] if isinstance(v, list) else v for k, v in filters.items()}
-
+        params = dict(request.query_params)
         # Always filter out sold/proxy if needed (optional)
         params["proxy"] = "false"
         params["sold"] = "false"
 
-        qs = filter_cards_queryset(Card.objects.all(), params)
+        filters = CardFilterSerializer(data=params)
+        filters.is_valid(raise_exception=True)
+
+        
+
+        qs = filter_cards_queryset(Card.objects.all(), filters)
 
         # Exclude cards already in deck
         
@@ -207,11 +258,18 @@ class DeckVersionCardCategoryListAPI(APIView):
     POST -> Create a new category
     """
 
+    @extend_schema(
+        responses=CardCategorySerializer(many=True),
+    )
     def get(self, request, deck_version_id):
         categories = CardCategory.objects.filter(deck_version_id=deck_version_id)
         serializer = CardCategorySerializer(categories, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        request=CardCategorySerializer,
+        responses=CardCategorySerializer,
+    )
     def post(self, request, deck_version_id):
         serializer = CardCategorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -226,6 +284,9 @@ class DeckVersionCardCategoryRemoveAPI(APIView):
     DELETE -> remove category + its assignments
     """
 
+    @extend_schema(
+        responses={204: None}
+    )
     def delete(self, request, deck_version_id, category_id):
         # Delete assignments first
         CardCategoryAssignment.objects.filter(category_id=category_id).delete()
@@ -241,6 +302,21 @@ class DeckVersionCardCategoryAssignmentAPI(APIView):
     POST -> assign/unassign a card to a category
     """
 
+    @extend_schema(
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "assigned": {"type": "boolean"}
+                    }
+                }
+            }
+        }
+    )
     def get(self, request, card_id, deck_version_id):
         categories = CardCategory.objects.filter(deck_version_id=deck_version_id)
         assigned = set(
@@ -253,6 +329,10 @@ class DeckVersionCardCategoryAssignmentAPI(APIView):
         ]
         return Response(data)
 
+    @extend_schema(
+        request=CardCategoryAssignmentSerializer,
+        responses={200: {"type": "object", "properties": {"status": {"type": "string"}}}}
+    )
     def post(self, request, card_id, deck_version_id):
         """
         JSON payload: { category_id, assigned: true/false }
@@ -282,7 +362,19 @@ class DeckImportYdkeAPI(APIView):
     POST /api/decks/{deck_id}/import_ydke/
     Creates a new DeckVersion from a YDKE URL.
     """
-
+    @extend_schema(
+        request=DeckYdkeImportSerializer,
+        responses={
+            201: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string"},
+                    "deck_id": {"type": "integer"},
+                    "deck_url": {"type": "string"}
+                }
+            }
+        }
+    )
     def post(self, request, deck_id):
         deck = get_object_or_404(Deck, pk=deck_id)
         serializer = DeckYdkeImportSerializer(data=request.data)
@@ -308,16 +400,44 @@ class DeckImportYdkeAPI(APIView):
         
 # --------------------- Monte carlos api ---------------------- #
 
+class DeckVersionMonteCarloInputSerializer(serializers.Serializer):
+    num_simulations = serializers.IntegerField(
+        default=1000,
+        min_value=1,
+        help_text="Number of Monte Carlo simulations to run"
+    )
+    num_cards = serializers.IntegerField(
+        default=5,
+        min_value=1,
+        help_text="Number of cards to draw per simulation"
+    )
+
 class DeckVersionMonteCarloAPI(APIView):
     """
     POST /api/deck_versions/{deck_version_id}/monte_carlos/
     Runs Monte Carlo simulations on the deck version.
     """
 
+    @extend_schema(
+        request=DeckVersionMonteCarloInputSerializer,
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string"},
+                    "results": {"type": "object"}
+                }
+            }
+        }
+    )
     def post(self, request, deck_version_id):
         deck_version = get_object_or_404(DeckVersion, pk=deck_version_id)
-        num_simulations = request.data.get("num_simulations", 1000)
-        num_cards = request.data.get("num_cards", 5)
+        serializer = DeckVersionMonteCarloInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+
+        num_simulations = serializer.data.get("num_simulations", 1000)
+        num_cards = serializer.data.get("num_cards", 5)
 
         try:
             num_simulations = int(num_simulations)

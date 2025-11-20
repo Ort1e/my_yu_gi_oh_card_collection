@@ -48,3 +48,23 @@ python ./manage.py loaddata db.json
 # yu gi oh images
 
 here : https://ygoprodeck.com/api-guide/
+
+# NodeJS 
+
+## install dependencies
+```bash
+npm install
+```
+
+## usage
+
+I use NodeJS to generate automatically the js interface to the API. This library is used : https://www.npmjs.com/package/swagger-typescript-api
+
+```bash
+npx swagger-typescript-api generate \
+  -p http://localhost:8000/my_ygo_cards/api/schema/ \
+  -o my_ygo_cards/static/js/deck_builder/api/ \
+  -t fetch \
+  -n api.js \
+  --js
+```

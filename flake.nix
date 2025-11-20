@@ -23,10 +23,14 @@
             pythonPackages.venvShellHook
             pythonPackages.django
             pythonPackages.djangorestframework
-            pythonPackages.tkinter
             pythonPackages.pypdf
             pythonPackages.requests
+            pythonPackages.drf-spectacular
             autoPatchelfHook
+
+            # js
+            nodejs
+            
 
             # db
             sqlite

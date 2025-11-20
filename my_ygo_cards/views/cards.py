@@ -1,16 +1,28 @@
 
 
 
-from typing import Any, Mapping
 from urllib.parse import urlencode
 from django.views import generic
+from rest_framework import serializers
 from django.db.models import Exists, OuterRef, QuerySet
 
 from ..models import Card, CardData, Lot, Unite
 
 from django.db.models import Exists, OuterRef
 
-def filter_cards_queryset(queryset: QuerySet[Card], params: Mapping[str, Any]) -> QuerySet[Card]:
+class CardFilterSerializer(serializers.Serializer):
+    status = serializers.CharField(required=False)
+    proxy = serializers.ChoiceField(choices=["true", "false"], required=False)
+    name = serializers.CharField(required=False)
+    card_type = serializers.CharField(required=False)
+    code = serializers.CharField(required=False)
+    sold = serializers.ChoiceField(choices=["true", "false"], required=False)
+
+def filter_cards_queryset(
+    queryset: QuerySet[Card], 
+    serializer_data: CardFilterSerializer
+) -> QuerySet[Card]:
+    params = serializer_data.data
     status = params.get("status")
     proxy = params.get("proxy")
     name = params.get("name")
@@ -59,8 +71,10 @@ class CardsView(generic.ListView):
     context_object_name = 'object_list'  # important: expected by list_base.html
 
     def get_queryset(self):
+        serializer = CardFilterSerializer(data=self.request.GET)
+        serializer.is_valid(raise_exception=True)
         queryset = Card.objects.all()
-        return filter_cards_queryset(queryset, self.request.GET)
+        return filter_cards_queryset(queryset, serializer)
     
 
     def get_context_data(self, **kwargs):
