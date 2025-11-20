@@ -150,6 +150,7 @@
 
 /* Individual cards */
 .card {
+  position: relative;
   width: 65px;
   height: 90px;
   border: 1px solid var(--border-color);
@@ -165,6 +166,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  position: relative;
+  z-index: 1;
 }
 
 .card:active {
@@ -182,18 +185,52 @@
   position: relative;
 }
 
+
+/* Proxy badge (bottom-right) */
 .card[data-is_proxy="true"]::after {
   content: "Proxy";
   position: absolute;
   bottom: 2px;
-  right: 4px;
+  left: 4px;
   background: rgba(255, 0, 0, 0.8);
   color: white;
   font-size: 0.7rem;
   padding: 2px 4px;
   border-radius: 4px;
   pointer-events: none;
+  z-index: 10;
 }
+
+/* Ban status badge (top-right) */
+.card[data-ban_status="Limited"]::before,
+.card[data-ban_status="Semi-Limited"]::before,
+.card[data-ban_status="Banned"]::before {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.card[data-ban_status="Limited"]::before {
+  content: "1";
+  background: #ffc107;
+}
+
+.card[data-ban_status="Semi-Limited"]::before {
+  content: "2";
+  background: #17a2b8;
+}
+
+.card[data-ban_status="Banned"]::before {
+  content: "X";
+  background: #dc3545;
+}
+
 
 
 /* ====================== Filter Input ====================== */
