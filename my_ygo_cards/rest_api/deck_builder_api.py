@@ -129,7 +129,15 @@ class DeckVersionCloneAPI(APIView):
     """POST /api/deck_versions/{deck_version_id}/clone/"""
 
     @extend_schema(
-        request=None,
+        request={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the new cloned deck version"
+                }
+            }
+        },
         responses={
             201: {
                 "type": "object",

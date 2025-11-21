@@ -9,9 +9,9 @@
 
 import {zones} from "./deck_management.js";
 import {showCardOverview, sortCards, clearCategoriesCache} from "./card.js";
+import { Api } from './api/api.js';
 
-
-/** @type {BackendCall} */
+/** @type {Api} */
 const backend = window.backendCall;
 
 /** @type {ApiUrls} */
@@ -20,6 +20,8 @@ const api = window.apiUrls;
 /** @type {string} */
 const baseImgUrl = window.imgBaseUrl;
 
+/** @type {number} */
+const deckVersionId = window.deckVersionId;
 
 // -------------------- test draw --------------------
 // Shuffle function (Fisher-Yates algorithm)
@@ -232,7 +234,7 @@ function renderDeckCategories() {
         btn.addEventListener("click", async () => {
             const catId = btn.dataset.id;
 
-            await backend.deleteCategory(catId);
+            await backend.myYgoCards.deckVersionsCategoriesDeleteDestroy(catId, deckVersionId);
 
             deckCategoriesCache =
                 deckCategoriesCache.filter(c => c.id != catId);
@@ -263,7 +265,7 @@ monteCarloBtn.addEventListener("click", async () => {
     monteCarloBtn.textContent = "Running...";
     monteCarloResultsCache = null;
 
-    const response = await backend.getMonteCarloSimulationResult(nbCards.value, nbSimulations);
+    const response = await backend.myYgoCards.deckVersionsMonteCarlosCreate(deckVersionId, {num_cards : nbCards.value, num_simulations : nbSimulations});
     monteCarloResultsCache = response.results;
     console.log(response);
 
@@ -276,7 +278,7 @@ monteCarloBtn.addEventListener("click", async () => {
 
 async function loadDeckCategories() {
     if (deckCategoriesCache.length === 0) {
-        deckCategoriesCache = await backend.getCategories();
+        deckCategoriesCache = await backend.myYgoCards.deckVersionsCategoriesList(deckVersionId);
     }
     renderDeckCategories();
 }

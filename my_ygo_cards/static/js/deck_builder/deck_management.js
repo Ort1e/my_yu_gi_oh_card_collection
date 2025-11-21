@@ -1,10 +1,14 @@
 /// <reference path="./types.js" />
+import { Api } from './api/api.js';
 
-/** @type {BackendCall} */
+/** @type {Api} */
 const backend = window.backendCall;
 
 /** @type {ApiUrls} */
 const api = window.apiUrls;
+
+/** @type {number} */
+const deckVersionId = window.deckVersionId;
 
 export const zones = {
     main: document.getElementById("main-deck"),
@@ -23,12 +27,15 @@ document.getElementById("save-btn").addEventListener("click", () => {
     const banListId = parseInt(document.getElementById("ban-list-switcher").value);
 
 
-    backend.updateDeckVersion({
-        main_deck: mainIds,
-        extra_deck: extraIds,
-        side_deck: sideIds,
-        ban_list_id: banListId,
-    }).then(data => {
+    backend.myYgoCards.deckVersionsPartialUpdate(
+        deckVersionId,
+        {
+            main_deck: mainIds,
+            extra_deck: extraIds,
+            side_deck: sideIds,
+            ban_list_id: banListId,
+        }
+    ).then(data => {
         alert("Deck saved!");
 
         if (data.ydke_url) {
@@ -43,7 +50,7 @@ document.getElementById("rename-btn").addEventListener("click", () => {
     const newName = prompt("Enter new version name:", oldName);
     if (!newName) return;
 
-    backend.updateDeckVersion({
+    backend.myYgoCards.deckVersionsPartialUpdate(deckVersionId, {
         version_name: newName,
     }).then(data => {
         alert("Version renamed to " + data.version_name);
@@ -68,7 +75,7 @@ document.getElementById("new-btn").addEventListener("click", () => {
     const name = prompt("Enter name for new deck:", "New Deck");
     if (!name) return;
 
-    backend.cloneDeckVersion(name)
+    backend.myYgoCards.deckVersionsCloneCreate(deckVersionId, {name : name})
     .then(data => {
         window.location.href = data.deck_url; // redirect to new deck view
     });
@@ -77,7 +84,7 @@ document.getElementById("new-btn").addEventListener("click", () => {
 document.getElementById("delete-btn").addEventListener("click", () => {
     if (!confirm("Are you sure you want to delete this deck?")) return;
 
-    backend.deleteDeckVersion()
+    backend.myYgoCards.deckVersionsDestroy(deckVersionId)
     .then(() => {
         alert("Deck deleted");
         window.location.href = api.deckListUrl();

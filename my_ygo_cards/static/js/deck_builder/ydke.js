@@ -1,10 +1,12 @@
 /// <reference path="./types.js" />
 
+import { Api } from './api/api.js';
 
-/** @type {BackendCall} */
+/** @type {Api} */
 const backend = window.backendCall;
 
-
+/** @type {number} */
+const deckVersionId = window.deckVersionId;
 // -------------------- YDKE Copy --------------------
 
 const copyBtn = document.getElementById("copy-ydke-btn");
@@ -42,7 +44,7 @@ document.getElementById("import-ydke-btn").addEventListener("click", async () =>
     const ydkeUrl = prompt("Paste your YDKE string:");
     if (!ydkeUrl) return;
 
-    backend.importDeckFromYdke(ydkeUrl)
+    backend.myYgoCards.decksImportYdkeCreate(deckVersionId, {ydke_url : ydkeUrl})
     .then((response) => {
         if (response.error) {
             alert("Error: " + response.error);

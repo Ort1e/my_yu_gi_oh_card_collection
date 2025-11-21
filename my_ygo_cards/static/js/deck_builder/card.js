@@ -130,7 +130,7 @@ get_cards_in_deck();
 
 async function deleteProxyCard(card, cardId) {
   try {
-    const data = await backend.deleteProxyCard(cardId);
+    const data = await backend.myYgoCards.deckVersionsProxyDestroy(cardId, deckVersionId);
 
     
     card.remove();
@@ -197,7 +197,12 @@ function enableProxyCreation(zone, zoneName) {
     const name = prompt("Enter proxy card name:");
     if (!name) return;
 
-    await backend.createProxyCard(name, zoneName);
+    let data = {
+      name: name,
+      zone: zoneName
+    };
+
+    await backend.myYgoCards.deckVersionsProxyCreate(deckVersionId, data);
 
     get_cards_in_deck();
   });
@@ -245,7 +250,7 @@ export async function showCardOverview(card) {
   try {
     // ✅ Use cache if present
     if (!categoriesCache[id]) {
-      const categories = await backend.getAssignedCategories(id);
+      const categories = await backend.myYgoCards.deckVersionsAssignCategoriesRetrieve(id, deckVersionId);
       categoriesCache[id] = categories; // store in cache
     }
 
@@ -261,7 +266,7 @@ export async function showCardOverview(card) {
       input.addEventListener("change", async (e) => {
         const categoryId = e.target.dataset.categoryId;
         const assigned = e.target.checked;
-        await backend.assignCategories(id, categoryId, assigned);
+        await backend.myYgoCards.deckVersionsAssignCategoriesCreate(id, deckVersionId, {category_id : categoryId, assigned : assigned});
 
         // ✅ Update cache immediately so UI stays in sync without re-fetch
         const cat = categoriesCache[id].find(c => c.id == categoryId);
@@ -290,9 +295,10 @@ function refreshReserve(filters = {}) {
 
   currentRequestController = new AbortController();
 
-  backend.getDeckCardLists(
+  backend.myYgoCards.deckVersionsCardListsCreate(
+    deckVersionId,
     filters,
-    currentRequestController.signal
+    {cancelToken : currentRequestController.signal}
   ).then(data => {
     
     reserve.innerHTML = "";

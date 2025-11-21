@@ -430,10 +430,11 @@ export class Api extends HttpClient {
      * @request POST:/my_ygo_cards/api/deck_versions/{deck_version_id}/clone/
      * @secure
      */
-    deckVersionsCloneCreate: (deckVersionId, params = {}) =>
+    deckVersionsCloneCreate: (deckVersionId, data, params = {}) =>
       this.request({
         path: `/my_ygo_cards/api/deck_versions/${deckVersionId}/clone/`,
         method: "POST",
+        body: data,
         secure: true,
         format: "json",
         ...params,

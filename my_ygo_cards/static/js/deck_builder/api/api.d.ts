@@ -427,6 +427,7 @@ export declare class Api<
      */
     deckVersionsCloneCreate: (
       deckVersionId: number,
+      data: Record<string, any>,
       params?: RequestParams,
     ) => Promise<
       HttpResponse<
