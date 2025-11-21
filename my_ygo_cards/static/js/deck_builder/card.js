@@ -19,7 +19,9 @@ const deckVersionId = window.deckVersionId;
 let banListId = null;
 
 // -------------------- Utils --------------------
-
+/**
+ * @param {Card} card - Card object from backend
+ */
 export function renderCard(card) {
     const data = card.card_data || {}; // shortcut to nested card_data
   
@@ -44,9 +46,8 @@ export function renderCard(card) {
     img.alt = data.en_name || card.en_name || card.name || "Card";
 
     // add ban list data
-    if (banListId) {
+    if (banListId && data.ban_statuses) {
       const banStatus = data.ban_statuses.filter(bs => bs.ban_list_id === banListId)
-      console.log(banStatus)
       if (banStatus.length > 0) {
         div.dataset.ban_status = banStatus[0].status; // e.g., "forbidden", "limited", "semi-limited", "unlimited"
       }
@@ -99,7 +100,8 @@ function updateCardCounts() {
 
  // -------------------- get cards in decks --------------------
 function get_cards_in_deck() {
-  backend.myYgoCards.deckVersionsRetrieve(deckVersionId).then(data => {
+  backend.myYgoCards.deckVersionsRetrieve(deckVersionId).then(http_request => {
+      const data = http_request.data;
       const mainDeckArea = zones.main;
       const extraDeckArea = zones.extra;
       const sideDeckArea = zones.side;
@@ -250,7 +252,7 @@ export async function showCardOverview(card) {
   try {
     // ✅ Use cache if present
     if (!categoriesCache[id]) {
-      const categories = await backend.myYgoCards.deckVersionsAssignCategoriesRetrieve(id, deckVersionId);
+      const categories = (await backend.myYgoCards.deckVersionsAssignCategoriesRetrieve(id, deckVersionId)).data;
       categoriesCache[id] = categories; // store in cache
     }
 
@@ -299,8 +301,8 @@ function refreshReserve(filters = {}) {
     deckVersionId,
     filters,
     {cancelToken : currentRequestController.signal}
-  ).then(data => {
-    
+  ).then(http_request => {
+    const data = http_request.data;
     reserve.innerHTML = "";
 
     data.forEach(card => reserve.appendChild(renderCard(card)));

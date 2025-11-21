@@ -24,7 +24,13 @@ document.getElementById("save-btn").addEventListener("click", () => {
     const mainIds = [...zones.main.querySelectorAll(".card")].map(c => c.dataset.id);
     const extraIds = [...zones.extra.querySelectorAll(".card")].map(c => c.dataset.id);
     const sideIds = [...zones.side.querySelectorAll(".card")].map(c => c.dataset.id);
-    const banListId = parseInt(document.getElementById("ban-list-switcher").value);
+    let banListId = document.getElementById("ban-list-switcher").value;
+
+    if (banListId === "") {
+        banListId = null;
+    } else {
+        banListId = parseInt(banListId);
+    }
 
 
     backend.myYgoCards.deckVersionsPartialUpdate(
@@ -35,7 +41,9 @@ document.getElementById("save-btn").addEventListener("click", () => {
             side_deck: sideIds,
             ban_list_id: banListId,
         }
-    ).then(data => {
+    ).then(http_request => {
+        const data = http_request.data;
+
         alert("Deck saved!");
 
         if (data.ydke_url) {
@@ -52,7 +60,8 @@ document.getElementById("rename-btn").addEventListener("click", () => {
 
     backend.myYgoCards.deckVersionsPartialUpdate(deckVersionId, {
         version_name: newName,
-    }).then(data => {
+    }).then(http_request => {
+        const data = http_request.data;
         alert("Version renamed to " + data.version_name);
 
         // Update page title dynamically
@@ -75,8 +84,9 @@ document.getElementById("new-btn").addEventListener("click", () => {
     const name = prompt("Enter name for new deck:", "New Deck");
     if (!name) return;
 
-    backend.myYgoCards.deckVersionsCloneCreate(deckVersionId, {name : name})
-    .then(data => {
+    backend.myYgoCards.deckVersionsCloneCreate(deckVersionId, {"name" : name})
+    .then(http_request => {
+        const data = http_request.data;
         window.location.href = data.deck_url; // redirect to new deck view
     });
 });

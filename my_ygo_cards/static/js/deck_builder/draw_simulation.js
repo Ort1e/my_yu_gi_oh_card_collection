@@ -249,7 +249,7 @@ function renderDeckCategories() {
         const name = document.getElementById("new-category-name").value.trim();
         if (!name) return;
 
-        const res = await backend.createCategory(name);
+        const res = (await backend.myYgoCards.deckVersionsCategoriesCreate(deckVersionId, {name : name})).data;
         deckCategoriesCache.push(res);
         clearCategoriesCache(); // clear card category assignment cache
         renderDeckCategories();
@@ -266,9 +266,7 @@ monteCarloBtn.addEventListener("click", async () => {
     monteCarloResultsCache = null;
 
     const response = await backend.myYgoCards.deckVersionsMonteCarlosCreate(deckVersionId, {num_cards : nbCards.value, num_simulations : nbSimulations});
-    monteCarloResultsCache = response.results;
-    console.log(response);
-
+    monteCarloResultsCache = response.data.results;
 
     monteCarloBtn.disabled = false;
     monteCarloBtn.textContent = "Run Simulation";
@@ -278,7 +276,7 @@ monteCarloBtn.addEventListener("click", async () => {
 
 async function loadDeckCategories() {
     if (deckCategoriesCache.length === 0) {
-        deckCategoriesCache = await backend.myYgoCards.deckVersionsCategoriesList(deckVersionId);
+        deckCategoriesCache = (await backend.myYgoCards.deckVersionsCategoriesList(deckVersionId)).data;
     }
     renderDeckCategories();
 }

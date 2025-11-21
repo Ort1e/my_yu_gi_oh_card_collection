@@ -155,6 +155,13 @@ export interface DeckVersion {
   ydke_only_proxies: string;
   ban_list: AdvancedBanList;
 }
+export interface DeckVersionCloneInput {
+  /**
+   * Name of the new cloned deck version
+   * @maxLength 255
+   */
+  name: string;
+}
 export interface DeckVersionMonteCarloInput {
   /**
    * Number of Monte Carlo simulations to run
@@ -401,7 +408,7 @@ export declare class Api<
      */
     deckVersionsCategoriesCreate: (
       deckVersionId: number,
-      data: CardCategory,
+      data: Record<string, any>,
       params?: RequestParams,
     ) => Promise<HttpResponse<CardCategory, any>>;
     /**
@@ -427,7 +434,7 @@ export declare class Api<
      */
     deckVersionsCloneCreate: (
       deckVersionId: number,
-      data: Record<string, any>,
+      data: DeckVersionCloneInput,
       params?: RequestParams,
     ) => Promise<
       HttpResponse<

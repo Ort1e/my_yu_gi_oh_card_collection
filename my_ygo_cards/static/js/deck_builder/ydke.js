@@ -51,6 +51,6 @@ document.getElementById("import-ydke-btn").addEventListener("click", async () =>
             return;
         }
         alert("Deck imported successfully!");
-        window.location.href = response.deck_url; // redirect to new deck view
+        window.location.href = response.data.deck_url; // redirect to new deck view
     });
 });

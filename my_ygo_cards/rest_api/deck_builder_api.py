@@ -109,7 +109,10 @@ class DeckVersionDetailAPI(APIView):
                 deck.side_deck.set(Card.objects.filter(id__in=data['side_deck']))
             
             if 'ban_list_id' in data:
-                deck.ban_list = get_object_or_404(AdvancedBanList, pk=data['ban_list_id']) #type: ignore
+                if data['ban_list_id'] is None:
+                    deck.ban_list = None
+                else:
+                    deck.ban_list = get_object_or_404(AdvancedBanList, pk=data['ban_list_id']) #type: ignore
 
             deck.save()
             return Response(DeckVersionSerializer(deck).data)
@@ -125,19 +128,17 @@ class DeckVersionDetailAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 
+class DeckVersionCloneInputSerializer(serializers.Serializer):
+    name = serializers.CharField(
+        max_length=255,
+        help_text="Name of the new cloned deck version"
+    )
+
 class DeckVersionCloneAPI(APIView):
     """POST /api/deck_versions/{deck_version_id}/clone/"""
 
     @extend_schema(
-        request={
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Name of the new cloned deck version"
-                }
-            }
-        },
+        request=DeckVersionCloneInputSerializer,
         responses={
             201: {
                 "type": "object",
@@ -150,7 +151,9 @@ class DeckVersionCloneAPI(APIView):
     )
     def post(self, request, deck_version_id):
         old = get_object_or_404(DeckVersion, pk=deck_version_id)
-        name = request.data.get("name", f"{old.version_name} Copy")
+        serializer = DeckVersionCloneInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.data.get("name")
 
         new = DeckVersion.objects.create(deck=old.deck, version_name=name, tournament=old.tournament)
 
@@ -275,14 +278,20 @@ class DeckVersionCardCategoryListAPI(APIView):
         return Response(serializer.data)
 
     @extend_schema(
-        request=CardCategorySerializer,
+        request={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the new category"
+                }
+            }
+        },
         responses=CardCategorySerializer,
     )
     def post(self, request, deck_version_id):
-        serializer = CardCategorySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = cast(dict, serializer.validated_data)
-        name = data["name"].strip()
+        
+        name = request.data.get("name")
         cat = CardCategory.objects.create(name=name, deck_version_id=deck_version_id)
         return Response(CardCategorySerializer(cat).data, status=status.HTTP_201_CREATED)
 
