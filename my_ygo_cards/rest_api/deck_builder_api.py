@@ -231,18 +231,15 @@ class DeckVersionCardListAPI(APIView):
     )
     def post(self, request, deck_version_id):
         deck_version = get_object_or_404(DeckVersion, pk=deck_version_id)
+        params = CardFilterSerializer(data=request.data)
+        params.is_valid(raise_exception=True)
 
-        params = dict(request.query_params)
         # Always filter out sold/proxy if needed (optional)
-        params["proxy"] = "false"
-        params["sold"] = "false"
+        params.validated_data["proxy"] = "false" # type: ignore
+        params.validated_data["sold"] = "false" # type: ignore
+        print(params)        
 
-        filters = CardFilterSerializer(data=params)
-        filters.is_valid(raise_exception=True)
-
-        
-
-        qs = filter_cards_queryset(Card.objects.all(), filters)
+        qs = filter_cards_queryset(Card.objects.all(), serializer_data=params)
 
         # Exclude cards already in deck
         
@@ -252,11 +249,11 @@ class DeckVersionCardListAPI(APIView):
         qs = qs.exclude(id__in=excluded_ids)
 
         # Apply limit
-        if "limit" in params:
-            try:
-                qs = qs[:int(params["limit"])]
-            except ValueError:
-                return Response({"error": "Invalid limit"}, status=status.HTTP_400_BAD_REQUEST)
+        #if "limit" in params:
+        #    try:
+        #        qs = qs[:int(params["limit"])]
+        #    except ValueError:
+        #        return Response({"error": "Invalid limit"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = CardSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -404,7 +401,7 @@ class DeckImportYdkeAPI(APIView):
         try:
             # Assuming you want parent_deck_id to be None here, or you can modify as needed
             deck_version = DeckVersion.from_ydke(deck_id, ydke_url=ydke_url, name=deck_name)
-            deck_url = reverse("deck_builder", kwargs={"deck_id": deck_version.pk})
+            deck_url = reverse("deck_builder", kwargs={"deck_version_id": deck_version.pk})
 
             return Response({
                 "status": "ok",

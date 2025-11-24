@@ -7,6 +7,9 @@ const backend = window.backendCall;
 
 /** @type {number} */
 const deckVersionId = window.deckVersionId;
+
+/** @type {number} */
+const deckId = window.deckId;
 // -------------------- YDKE Copy --------------------
 
 const copyBtn = document.getElementById("copy-ydke-btn");
@@ -44,7 +47,7 @@ document.getElementById("import-ydke-btn").addEventListener("click", async () =>
     const ydkeUrl = prompt("Paste your YDKE string:");
     if (!ydkeUrl) return;
 
-    backend.myYgoCards.decksImportYdkeCreate(deckVersionId, {ydke_url : ydkeUrl})
+    backend.myYgoCards.decksImportYdkeCreate(deckId, {ydke_url : ydkeUrl})
     .then((response) => {
         if (response.error) {
             alert("Error: " + response.error);

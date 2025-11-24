@@ -11,11 +11,11 @@ from ..models import Card, CardData, Lot, Unite
 from django.db.models import Exists, OuterRef
 
 class CardFilterSerializer(serializers.Serializer):
-    status = serializers.CharField(required=False)
+    status = serializers.CharField(required=False, allow_blank=True)
     proxy = serializers.ChoiceField(choices=["true", "false"], required=False)
-    name = serializers.CharField(required=False)
-    card_type = serializers.CharField(required=False)
-    code = serializers.CharField(required=False)
+    name = serializers.CharField(required=False, allow_blank=True)
+    card_type = serializers.CharField(required=False, allow_blank=True)
+    code = serializers.CharField(required=False, allow_blank=True)
     sold = serializers.ChoiceField(choices=["true", "false"], required=False)
 
 def filter_cards_queryset(
@@ -23,6 +23,7 @@ def filter_cards_queryset(
     serializer_data: CardFilterSerializer
 ) -> QuerySet[Card]:
     params = serializer_data.data
+    print(params)
     status = params.get("status")
     proxy = params.get("proxy")
     name = params.get("name")
