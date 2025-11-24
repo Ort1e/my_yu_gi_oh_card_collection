@@ -10,7 +10,7 @@ from drf_spectacular.views import (
 from .rest_api import deck_builder_api
 
 
-from .views.deck import DeckDetailView, DecksView
+from .views.deck import AddDeckView, DeckDetailView, DecksView
 
 from .views.cards import CardDetailView, CardsView
 from .views.lots.lots import AddLotView, LotDetailView, LotListView
@@ -52,6 +52,7 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
 
     path("decks/", DecksView.as_view(), name="decks"),
+    path("decks/add/", AddDeckView.as_view(), name="add_deck"),
     path("decks/deck/<int:pk>", DeckDetailView.as_view(), name="deck"),
     path("deck_builder/<int:deck_version_id>/", deck_builder_api.DeckBuilderView.as_view(), name="deck_builder"),
 

@@ -399,6 +399,7 @@ export class Api extends HttpClient {
         method: "POST",
         body: data,
         secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

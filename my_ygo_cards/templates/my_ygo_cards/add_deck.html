@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Add Deck{% endblock %}
+
+{% block content %}
+  <h1 class="card-title">Create a New Deck</h1>
+
+  {% if form.errors %}
+    <div class="error">
+      <ul>
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend>Deck Information</legend>
+      {{ form.as_p }}
+    </fieldset>
+
+    <fieldset>
+      <legend>First Version</legend>
+      <p>Create the initial version of this deck.</p>
+      {{ version_form.as_p }}
+    </fieldset>
+
+    <input type="submit" value="Create Deck & Version" />
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Add Deck page-specific JS here if needed later -->
+{% endblock %}

@@ -115,6 +115,10 @@ export interface CardCategoryAssignment {
   category_id: number;
   assigned: boolean;
 }
+export interface CardCategoryCreate {
+  /** @maxLength 255 */
+  name: string;
+}
 export interface CardData {
   /** @maxLength 255 */
   en_name: string;
@@ -408,7 +412,7 @@ export declare class Api<
      */
     deckVersionsCategoriesCreate: (
       deckVersionId: number,
-      data: Record<string, any>,
+      data: CardCategoryCreate,
       params?: RequestParams,
     ) => Promise<HttpResponse<CardCategory, any>>;
     /**

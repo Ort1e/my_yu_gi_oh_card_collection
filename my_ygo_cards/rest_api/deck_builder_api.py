@@ -260,6 +260,9 @@ class DeckVersionCardListAPI(APIView):
 
 # .......... categories
 
+class CardCategoryCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+
 class DeckVersionCardCategoryListAPI(APIView):
     """
     GET  -> List all categories for a deck
@@ -275,19 +278,12 @@ class DeckVersionCardCategoryListAPI(APIView):
         return Response(serializer.data)
 
     @extend_schema(
-        request={
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Name of the new category"
-                }
-            }
-        },
+        request=CardCategoryCreateSerializer,
         responses=CardCategorySerializer,
     )
     def post(self, request, deck_version_id):
-        
+        serializer = CardCategoryCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         name = request.data.get("name")
         cat = CardCategory.objects.create(name=name, deck_version_id=deck_version_id)
         return Response(CardCategorySerializer(cat).data, status=status.HTTP_201_CREATED)
