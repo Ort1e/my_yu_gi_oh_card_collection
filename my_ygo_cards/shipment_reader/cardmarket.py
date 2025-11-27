@@ -51,7 +51,7 @@ class CardmarketShipmentReader:
         lines = card_text.splitlines()
 
         card_regex = re.compile(
-            r'(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>\d{3})\s+(?P<language_code>(?:EN)|(?:FR))\s+(?P<status>[A-Z]{2})\s+(?P<set>[A-Z0-9]+)\s+?.+\s+(?P<price>[\d,]+)\s+EUR'
+            r'(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>(?:\d|[a-zA-Z]){3})\s+(?P<language_code>(?:EN)|(?:FR))\s+(?P<status>[A-Z]{2})\s+(?P<set>[A-Z0-9]+)\s+?.+\s+(?P<price>[\d,]+)\s+EUR'
         )
 
         cards = []

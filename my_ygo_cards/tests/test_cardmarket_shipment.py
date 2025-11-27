@@ -12,6 +12,7 @@ SHIPMENT_PATHS = [
     "my_ygo_cards/tests/doc/Purchase_#1211746704.pdf",
     "my_ygo_cards/tests/doc/Purchase_#1169478602.pdf",
     "my_ygo_cards/tests/doc/Purchase_#1231846416.pdf",
+    "my_ygo_cards/tests/doc/Purchase_#1241276782.pdf",
 ]
 
 
@@ -215,6 +216,36 @@ class CardmarketShipmentReader6Tests(TestCase):
         self.assertEqual(zeus_cards[0]['code'], "STAS-EN044", "Card code should match expected value.")
         self.assertEqual(zeus_cards[0]['status'], "NM", "Card status should be NM.")
 
+class CardmarketShipmentReader7Tests(TestCase):
+    def setUp(self):
+        self.shipment_data_str = PdfReader(SHIPMENT_PATHS[6]).pages[0].extract_text()
+        #print(self.shipment_data_str)  # For debugging purposes, can be removed later
+    
+    def test_shipment_reader_6(self):
+        data = CardmarketShipmentReader.extract_dates_and_prices(self.shipment_data_str)
+        self.assertIsInstance(data, dict, "Extracted data should be a dictionary.")
+        self.assertEqual(data['seller_name'], "DevilKj", "Seller name should match expected value.")
+        self.assertIsNone(data['buyer_name'], "Buyer name should be None (me).")
+
+        self.assertEqual(data['price'], Decimal('17.45'), "Price should match expected value.")
+
+        buy_date_ref = datetime.strptime("15.11.2025", "%d.%m.%Y").date()
+        self.assertEqual(data['buy_date'], buy_date_ref, "Buy date should match expected value.")
+        received_date_ref = datetime.strptime("21.11.2025", "%d.%m.%Y").date()
+        self.assertEqual(data['received_date'], received_date_ref, "Received date should match expected value.")
+
+        cards_data = CardmarketShipmentReader.extract_cards(self.shipment_data_str)
+        self.assertIsInstance(cards_data, list, "Extracted cards data should be a list.")
+        self.assertEqual(len(cards_data), 5, "Cards data should not be empty.")
+
+        # zeus
+        cydra_nova_cards = [card for card in cards_data if card['name'] == "Cyber Dragon Nova"]
+        self.assertEqual(len(cydra_nova_cards), 1, "There should be exactly one Cyber Dragon Nova card.")
+        self.assertEqual(cydra_nova_cards[0]['code'], "LEDD-ENB30", "Card code should match expected value.")
+        self.assertEqual(cydra_nova_cards[0]['status'], "EX", "Card status should be NM.")
+
+
+
 class CardmarketSalesShipmentReader1Tests(TestCase):
     def setUp(self):
         self.shipment_data_str = PdfReader(SALES_SHIPMENT_PATHS[0]).pages[0].extract_text()
@@ -245,7 +276,7 @@ class CardmarketSalesShipmentReader1Tests(TestCase):
 class CardmarketSalesShipmentReader2Tests(TestCase):
     def setUp(self):
         self.shipment_data_str = PdfReader(SALES_SHIPMENT_PATHS[1]).pages[0].extract_text()
-        print(self.shipment_data_str)  # For debugging purposes, can be removed later
+        #print(self.shipment_data_str)  # For debugging purposes, can be removed later
     
     def test_sales_shipment_reader_1(self):
         data = CardmarketShipmentReader.extract_dates_and_prices(self.shipment_data_str)
