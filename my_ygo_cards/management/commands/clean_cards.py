@@ -2,11 +2,7 @@ import re
 from django.core.management.base import BaseCommand
 
 from my_ygo_cards.models import Card, CardData
-
-
-def strip_parentheses(name: str) -> str:
-    """Remove parentheses and their content from a string."""
-    return re.sub(r"\s*\([^)]*\)", "", name).strip()
+from my_ygo_cards.models.card import normalize_card_name
 
 
 class Command(BaseCommand):
@@ -19,8 +15,7 @@ class Command(BaseCommand):
 
         # Normalize CardData
         for carddata in CardData.objects.all():
-            new_name = strip_parentheses(carddata.en_name)
-            new_name = new_name.lower()
+            new_name = normalize_card_name(carddata.en_name)
             if new_name != carddata.en_name:
                 self.stdout.write(f"Updating CardData: {carddata.en_name} -> {new_name}")
                 carddata.en_name = new_name
@@ -35,8 +30,7 @@ class Command(BaseCommand):
                 )
                 continue
             has_updated = False
-            new_name = strip_parentheses(card.en_name)
-            new_name = new_name.lower()
+            new_name = normalize_card_name(card.en_name)
             
             if new_name != card.en_name:
                 self.stdout.write(f"Updating Card: {card.en_name} -> {new_name}")

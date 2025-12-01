@@ -56,8 +56,11 @@ class DeckBuilderView(LoginRequiredMixin, View):
     def post(self, request, deck_version_id, *args, **kwargs):
         deck_version = get_object_or_404(DeckVersion, id=deck_version_id)
 
-        # test the presence of the form data
-        tournament_form = TournamentForm(request.POST)
+        # If a tournament already exists, bind the form to that instance
+        if deck_version.tournament:
+            tournament_form = TournamentForm(request.POST, instance=deck_version.tournament)
+        else:
+            tournament_form = TournamentForm(request.POST)
         if tournament_form.is_bound and tournament_form.is_valid():
             tournament = tournament_form.save()
             deck_version.tournament = tournament

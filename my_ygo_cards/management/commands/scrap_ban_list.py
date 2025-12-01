@@ -92,77 +92,99 @@ class BanListJsonData:
 class Command(BaseCommand):
     help = "Scrape the Yugioh Advanced Forbidden & Limited list and update the database"
 
-    BAN_URL = "https://img.yugioh-card.com/eu/_data/fllists/current.json"
+    OPTION_LIST_URL = "https://www.yugioh-card.com/eu/_data/fllists/options.json"
+    BAN_URL = "https://img.yugioh-card.com/eu/_data/fllists/"
+    LAST_BAN_URL = f"{BAN_URL}current.json"
 
     def handle(self, *args, **options):
         self.stdout.write(f"Fetching ban list from {self.BAN_URL} …")
 
-        response: requests.Response = requests.get(self.BAN_URL)
-        response.raise_for_status()
+        ban_options_request: requests.Response = requests.get(self.OPTION_LIST_URL)
+        ban_options_request.raise_for_status()
 
-        ban_data = BanListJsonData.from_json(response.text)
+        # {"number" -> "human readable date"}
+        ban_options : dict[str, str] = json.loads(ban_options_request.text)
+        self.stdout.write(f"Available ban lists: {', '.join(ban_options.values())}")
 
-        # ------------------------------------------------------------------
-        # 1. Parse the effective date
-        # Example format from JSON: "2024-10-07"
-        # ------------------------------------------------------------------
-        try:
-            effective_date = datetime.datetime.strptime(ban_data._from, "%d/%m/%Y").date()
-        except ValueError:
-            self.stderr.write(f"Invalid date format in JSON: {ban_data._from}")
-            return
+        items = list(ban_options.items())          # convert to list so we can detect last item
+        last_key, last_value = items[-1] 
 
-        self.stdout.write(f"Ban list effective from: {effective_date}")
 
-        # ------------------------------------------------------------------
-        # 2. Create/get the AdvancedBanList object
-        # ------------------------------------------------------------------
-        ban_list, created = AdvancedBanList.objects.get_or_create(date=effective_date)
+        for ban_option in items:
+            self.stdout.write(f"  - {ban_option[0]}: {ban_option[1]}")
 
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"Created new AdvancedBanList for {effective_date}"))
-        else:
-            self.stdout.write(f"Using existing ban list — wiping old entries")
-            ban_list.entries.all().delete()  # type: ignore
+            # if this t
+            if ban_option == (last_key, last_value):
+                ban_url = self.LAST_BAN_URL
+            else:
+                ban_url = f"{self.BAN_URL}{ban_option[0]}.json"
 
-        # Mapping JSON sections to ban statuses
-        section_status_map = {
-            "_0": "Banned",
-            "_1": "Limited",
-            "_2": "Semi-Limited",
-        }
+            response: requests.Response = requests.get(ban_url)
+            response.raise_for_status()
 
-        # ------------------------------------------------------------------
-        # 3. Process each list (Forbidden, Limited, Semi-Limited)
-        # ------------------------------------------------------------------
-        total_imported = 0
+            ban_data = BanListJsonData.from_json(response.text)
 
-        with transaction.atomic():
+            # ------------------------------------------------------------------
+            # 1. Parse the effective date
+            # Example format from JSON: "2024-10-07"
+            # ------------------------------------------------------------------
+            try:
+                effective_date = datetime.datetime.strptime(ban_data._from, "%d/%m/%Y").date()
+            except ValueError:
+                self.stderr.write(f"Invalid date format in JSON: {ban_data._from}")
+                return
 
-            for section_name, status in section_status_map.items():
-                section_entries: list[BanListJsonEntry] = getattr(ban_data, section_name)
+            self.stdout.write(f"Ban list effective from: {effective_date}")
 
-                self.stdout.write(f"Processing {status}: {len(section_entries)} cards")
+            # ------------------------------------------------------------------
+            # 2. Create/get the AdvancedBanList object
+            # ------------------------------------------------------------------
+            ban_list, created = AdvancedBanList.objects.get_or_create(date=effective_date)
 
-                for entry in section_entries:
-                    name = format_strings(entry.nameeng)
-                    self.stdout.write(f"  - {entry.nameeng} ({name})")
-                    # Resolve CardData
-                    # You can expand this if your CardData model uses other fields
-                    card_data = CardData.get_or_fetch(
-                        html_unescape(name)
-                    )
+            if created:
+                self.stdout.write(self.style.SUCCESS(f"Created new AdvancedBanList for {effective_date}"))
+            else:
+                self.stdout.write(f"Using existing ban list — wiping old entries")
+                ban_list.entries.all().delete()  # type: ignore
 
-                    # Create BanListEntry
-                    ban_list.entries.create( # type: ignore
-                        card_data=card_data,
-                        status=status
-                    )
+            # Mapping JSON sections to ban statuses
+            section_status_map = {
+                "_0": "Banned",
+                "_1": "Limited",
+                "_2": "Semi-Limited",
+            }
 
-                    total_imported += 1
+            # ------------------------------------------------------------------
+            # 3. Process each list (Forbidden, Limited, Semi-Limited)
+            # ------------------------------------------------------------------
+            total_imported = 0
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Successfully imported {total_imported} cards for the {effective_date} ban list."
+            with transaction.atomic():
+
+                for section_name, status in section_status_map.items():
+                    section_entries: list[BanListJsonEntry] = getattr(ban_data, section_name)
+
+                    self.stdout.write(f"Processing {status}: {len(section_entries)} cards")
+
+                    for entry in section_entries:
+                        name = format_strings(entry.nameeng)
+                        self.stdout.write(f"  - {entry.nameeng} ({name})")
+                        # Resolve CardData
+                        # You can expand this if your CardData model uses other fields
+                        card_data = CardData.get_or_fetch(
+                            html_unescape(name)
+                        )
+
+                        # Create BanListEntry
+                        ban_list.entries.create( # type: ignore
+                            card_data=card_data,
+                            status=status
+                        )
+
+                        total_imported += 1
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Successfully imported {total_imported} cards for the {effective_date} ban list."
+                )
             )
-        )

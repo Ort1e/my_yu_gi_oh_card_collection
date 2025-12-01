@@ -1,7 +1,15 @@
+import re
 from django.db import models
 from django.db.models import Q
 
 from my_ygo_cards.image_downloader.image_downloader import ImageDownloader
+
+def normalize_card_name(name: str) -> str:
+    """
+    Normalize the card name by stripping whitespace and converting to lowercase.
+    Additional normalization logic can be added here.
+    """
+    return re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
 
 
 class CardData(models.Model):
@@ -100,3 +108,9 @@ class Card(models.Model):
         from my_ygo_cards.models.lot import Lot, Unite
         """Return True if this card is in a sold lot."""
         return Unite.objects.filter(card=self, lot__lot_type=Lot.SALE, lot__is_cancelled=False).exists()
+
+
+    def save(self, *args, **kwargs):
+            if self.en_name:
+                self.en_name = normalize_card_name(self.en_name)
+            super().save(*args, **kwargs)
