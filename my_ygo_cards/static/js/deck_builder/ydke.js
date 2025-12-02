@@ -10,6 +10,8 @@ const deckVersionId = window.deckVersionId;
 
 /** @type {number} */
 const deckId = window.deckId;
+
+const ydkeUrls = window.ydkeUrls; // {standard: string, compact: string}
 // -------------------- YDKE Copy --------------------
 
 const copyBtn = document.getElementById("copy-ydke-btn");
