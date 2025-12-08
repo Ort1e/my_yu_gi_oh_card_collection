@@ -14,6 +14,7 @@ class Command(BaseCommand):
         proxy_removed = 0
 
         # Normalize CardData
+        self.stdout.write("Normalizing CardData names...")
         for carddata in CardData.objects.all():
             new_name = normalize_card_name(carddata.en_name)
             if new_name != carddata.en_name:
@@ -22,6 +23,7 @@ class Command(BaseCommand):
                 carddata.save(update_fields=["en_name"])
                 updated_carddata += 1
 
+        self.stdout.write("Normalizing Cards and updating CardData references...")
         # Normalize Card
         for card in Card.objects.all():
             if not card.en_name:
@@ -70,6 +72,7 @@ class Command(BaseCommand):
             if has_updated:
                 updated_cards += 1
 
+        self.stdout.write("Cleaning up proxy cards...")
         # clean proxy :
         for card in Card.objects.exclude(en_name__isnull=True):
             if card.is_proxy:
