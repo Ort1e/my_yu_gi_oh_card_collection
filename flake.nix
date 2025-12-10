@@ -26,6 +26,7 @@
             pythonPackages.pypdf
             pythonPackages.requests
             pythonPackages.drf-spectacular
+            pythonPackages.pillow # image processing
             autoPatchelfHook
 
             # js

@@ -30,3 +30,7 @@ class AdventCalendarEntry(models.Model):
 
     def __str__(self):
         return f"Day {self.day} of {self.calendar}: {self.card}"
+    
+    def date(self):
+        from datetime import date
+        return date(self.calendar.year, 12, self.day)

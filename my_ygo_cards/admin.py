@@ -3,7 +3,7 @@ from django.contrib import admin
 
 from .models import Card, CardData, Deck, DeckVersion, Tournament, Seller, \
     Lot, SellerSource, Unite, MonthlyBudget, Apport, CardCategory, CardCategoryAssignment, CardConditionalCategory, \
-    AdvancedBanList, BanListEntry
+    AdvancedBanList, BanListEntry, AdventCalendar, AdventCalendarEntry
 
 
 
@@ -25,3 +25,5 @@ admin.site.register(CardCategoryAssignment)
 admin.site.register(CardConditionalCategory)
 admin.site.register(AdvancedBanList)
 admin.site.register(BanListEntry)
+admin.site.register(AdventCalendar)
+admin.site.register(AdventCalendarEntry)
