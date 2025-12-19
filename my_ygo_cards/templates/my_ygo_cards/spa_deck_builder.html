@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Deck Builder{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/deck_builder.css' %}">
+{% endblock %}
+
+{% block content %}
+  <div id="spa-deck-builder-root"></div>
+{% endblock %}
+
+{% block extra_js %}
+  <script type="module" src="{% static 'spa/deck-builder/main.js' %}"></script>
+{% endblock %}
