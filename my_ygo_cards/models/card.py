@@ -9,7 +9,12 @@ def normalize_card_name(name: str) -> str:
     Normalize the card name by stripping whitespace and converting to lowercase.
     Additional normalization logic can be added here.
     """
-    return re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
+    name =  re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
+
+    # maliss name : remove the " q " and " p " inside
+    name = re.sub(r"(?<=\bmaliss)\s+[qp]\s+", " ", name)
+
+    return name
 
 
 class CardData(models.Model):
