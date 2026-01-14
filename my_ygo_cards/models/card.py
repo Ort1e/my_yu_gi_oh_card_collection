@@ -11,8 +11,8 @@ def normalize_card_name(name: str) -> str:
     """
     name =  re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
 
-    # maliss name : remove the " q " and " p " inside
-    name = re.sub(r"(?<=\bmaliss)\s+[qp]\s+", " ", name)
+    # maliss name : remove the " q ", " p " and " c " inside
+    name = re.sub(r"(?<=\bmaliss)\s+[qpc]\s+", " ", name)
 
     return name
 

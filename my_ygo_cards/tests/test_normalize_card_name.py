@@ -46,3 +46,9 @@ class NormalizeCardNameTests(TestCase):
             normalize_card_name("  Maliss q Gamma (Promo) "),
             "maliss gamma"
         )
+
+    def test_c_removal(self):
+        self.assertEqual(
+            normalize_card_name("  Maliss c Gamma (Promo) "),
+            "maliss gamma"
+        )
