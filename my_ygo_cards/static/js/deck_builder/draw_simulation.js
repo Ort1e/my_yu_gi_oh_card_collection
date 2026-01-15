@@ -87,6 +87,7 @@ function renderDeckCategories() {
                         <td>${cat.name}</td>
                         <td>No info</td>
                         <td>No info</td>
+                        <td>No info</td>
                         <td><button class="remove-cat-btn" data-id="${cat.id}">✕</button></td>
                     </tr>
                 `;
@@ -109,18 +110,22 @@ function renderDeckCategories() {
         }
 
         monteCarloResultsCache.category_details_stats.forEach(detail => {
-            resultsDetailsMap[detail.category_id] = detail.nb_per_main_occurences;
+            resultsDetailsMap[detail.category_id] = {
+                nb_per_main_occurences: detail.nb_per_main_occurences,
+                nb_in_main: detail.nb_in_main,
+            };
         });
 
         statsHtml = `
             ${
                 deckCategoriesCache.map(cat => {
+                    const nbInMainDeck = resultsDetailsMap[cat.id] ? resultsDetailsMap[cat.id].nb_in_main : 0;
                     const occurrences = categoryResultsMap[cat.id] || 0;
                     const percentage = ((occurrences * 1.0 / monteCarloResultsCache.total_simulations)).toFixed(2);
 
                     let detailsHtml = "";
                     for (let i = 0; i <= maxCardsInHand; i++) {
-                        const nbPerMain = resultsDetailsMap[cat.id] ? (resultsDetailsMap[cat.id][i] || 0) : 0;
+                        const nbPerMain = resultsDetailsMap[cat.id] ? (resultsDetailsMap[cat.id].nb_per_main_occurences[i] || 0) : 0;
                         const percPerMain = ((nbPerMain * 1.0 / monteCarloResultsCache.total_simulations)*100).toFixed(2);
                         detailsHtml += `<td>${nbPerMain} (${percPerMain}%)</td>`;
                     }
@@ -128,6 +133,7 @@ function renderDeckCategories() {
                     return `
                         <tr>
                             <td>${cat.name}</td>
+                            <td>${nbInMainDeck}</td>
                             <td>${occurrences}</td>
                             <td>${percentage}</td>
                             <td><button class="remove-cat-btn" data-id="${cat.id}">✕</button></td>
@@ -213,9 +219,10 @@ function renderDeckCategories() {
 
 
     statsContent.innerHTML = `
-        <table>
+        <table class="bordered-table">
             <tr>
                 <th>Category</th>
+                <th>In main deck</th>
                 <th>Nb</th>
                 <th>Avg/main</th>
                 <th>Remove</th>

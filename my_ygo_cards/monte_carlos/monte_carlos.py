@@ -11,11 +11,13 @@ class MonteCarloCategoryResult:
     category_id: int
     name: str
     occurences: int
+    
 
     def __init__(self, category_id: int, name: str):
         self.category_id = category_id
         self.name = name
         self.occurences = 0
+        
 
     def add_occurrence(self, count: int):
         self.occurences += count
@@ -33,11 +35,13 @@ class MonteCarlosDetailsResultsPerCategory:
     name: str
     # nb_in_main → nb_occurences
     nb_per_main_occurences: dict[int, int]
+    nb_in_main_deck: int
 
-    def __init__(self, category_id: int, name: str):
+    def __init__(self, category_id: int, name: str, nb_in_main_deck: int):
         self.category_id = category_id
         self.name = name
         self.nb_per_main_occurences = defaultdict(int)
+        self.nb_in_main_deck = nb_in_main_deck
 
     def add_occurrence(self, nb_in_main: int):
         self.nb_per_main_occurences[nb_in_main] += 1
@@ -47,6 +51,7 @@ class MonteCarlosDetailsResultsPerCategory:
             "category_id": self.category_id,
             "name": self.name,
             "nb_per_main_occurences": dict(self.nb_per_main_occurences),
+            "nb_in_main": self.nb_in_main_deck,
         }
 
 def run_monte_carlo_simulation(deck_version: DeckVersion, nb_cards_by_simulation: int, nb_simulation: int):
@@ -55,7 +60,7 @@ def run_monte_carlo_simulation(deck_version: DeckVersion, nb_cards_by_simulation
     """
 
     # Cache queries once to avoid repeated DB hits
-    main_deck = list(deck_version.main_deck.all())
+    main_deck: list[Card] = list(deck_version.main_deck.all())
     categories_qs = deck_version.categories.prefetch_related( # type: ignore
         Prefetch(
             'cardconditionalcategory__categories_or_conditions',
@@ -70,13 +75,14 @@ def run_monte_carlo_simulation(deck_version: DeckVersion, nb_cards_by_simulation
 
     # Build a fast lookup: card.id → [category id]
     card_to_categories_id = defaultdict(list[int])
+    category_to_nb_cards_in_deck = defaultdict(int)
     for assign in category_assignments:
         card_to_categories_id[assign.card.pk].append(assign.category.pk)
+        category_to_nb_cards_in_deck[assign.category.pk] += 1
 
     # Initialize counters
-    category_stats = {cat.pk : MonteCarloCategoryResult(cat.pk, cat.name) for cat in categories_dict.values()}
-    category_details_stats = {cat.pk : MonteCarlosDetailsResultsPerCategory(cat.pk, cat.name) for cat in categories_dict.values()}
-
+    category_stats = {cat.pk : MonteCarloCategoryResult(cat.pk, cat.name, ) for cat in categories_dict.values()}
+    category_details_stats = {cat.pk : MonteCarlosDetailsResultsPerCategory(cat.pk, cat.name, category_to_nb_cards_in_deck[cat.pk]) for cat in categories_dict.values()}
     deck_size = len(main_deck)
     draws = min(nb_cards_by_simulation, deck_size)
 

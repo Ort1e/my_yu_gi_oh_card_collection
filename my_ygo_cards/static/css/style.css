@@ -66,3 +66,16 @@
     font-weight: bold;
     text-align: center;
 }
+
+
+.bordered-table {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+
+.bordered-table th,
+.bordered-table td {
+  border: 1px solid black;
+  padding: 8px;
+  text-align: left;
+}
