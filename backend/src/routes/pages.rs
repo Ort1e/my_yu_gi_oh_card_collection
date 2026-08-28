@@ -71,8 +71,12 @@ async fn add_item(
 
 #[derive(Template)]
 #[template(path = "complex_page.html")]
-struct ComplexPageTemplate;
+struct ComplexPageTemplate {
+    title: &'static str,
+}
 
 async fn complex_page() -> ComplexPageTemplate {
-    ComplexPageTemplate
+    ComplexPageTemplate {
+        title: "Complex Page",
+    }
 }
