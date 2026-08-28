@@ -1,0 +1,12 @@
+{
+    "files.exclude": {
+        ".direnv/**": true,
+        ".venv/**": true
+    },
+    "files.watcherExclude": {
+        ".direnv/**": true,
+        ".venv/**": true,
+    },
+    "rust-analyzer.server.path": "rust-analyzer",
+    "editor.formatOnSave": true // Use rust-analyzer from PATH not from extension installation
+}

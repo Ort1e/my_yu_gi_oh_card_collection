@@ -4,3 +4,13 @@
 node_modules/
 static/complex/
 .env
+
+# Environments 
+.env 
+.venv 
+env/ 
+venv/ 
+ENV/ 
+env.bak/ 
+venv.bak/ 
+.direnv/

@@ -2,7 +2,7 @@
   description = "Dev environment for myapp (axum + sqlx/SQLite backend, Svelte frontend)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -18,14 +18,12 @@
           overlays = [ rust-overlay.overlays.default ];
         };
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
-        };
+        fullToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in
       {
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            rustToolchain
+            fullToolchain
 
             # sqlx needs the sqlite lib + pkg-config at build time
             pkgs.sqlite
