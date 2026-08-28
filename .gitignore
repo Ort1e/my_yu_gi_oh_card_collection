@@ -1,0 +1,6 @@
+/target
+*.db
+*.db-journal
+node_modules/
+static/complex/
+.env

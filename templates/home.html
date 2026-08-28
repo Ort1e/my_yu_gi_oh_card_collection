@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+<p>This is a plain server-rendered page. No JS framework needed here.</p>
+
+<form hx-post="/items" hx-target="#item-list" hx-swap="outerHTML">
+    <input type="text" name="name" placeholder="New item" required>
+    <button type="submit">Add</button>
+</form>
+
+<div id="item-list" hx-get="/items" hx-trigger="load">
+    Loading...
+</div>
+{% endblock %}
