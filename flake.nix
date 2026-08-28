@@ -1,51 +1,80 @@
 {
-  description = "Dev environment for myapp (axum + sqlx/SQLite backend, Svelte frontend)";
+  description = "Rust dev environment with unified toolchain";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+
+    rust-overlay.url = "github:oxalica/rust-overlay";
+
+    flake-utils = {
+      url = "github:numtide/flake-utils";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ rust-overlay.overlays.default ];
+          overlays = [ (import rust-overlay) ];
         };
 
+        pythonPackages = pkgs.python313Packages;
+
+        # your full toolchain (rustc, cargo, rust-src, rust-analyzer, etc.)
         fullToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in
       {
-        devShells.default = pkgs.mkShell {
-          buildInputs = [
+        devShell = pkgs.mkShell rec {
+
+          #############################################
+          # ONE RUST TOOLCHAIN FOR EVERYTHING
+          #############################################
+          packages = with pkgs;[
+            #############################################
+            # Rust tools (ALL SAME VERSION as toolchain)
+            #############################################
             fullToolchain
 
-            # sqlx needs the sqlite lib + pkg-config at build time
-            pkgs.sqlite
-            pkgs.pkg-config
-            pkgs.openssl
+            ###############################
+            # Python + scientific stack
+            ###############################
+            pythonPackages.python
+            pythonPackages.venvShellHook
+            
+            autoPatchelfHook
 
-            # for running migrations / offline query cache outside the app
-            pkgs.sqlx-cli
 
-            # frontend (Svelte + Vite)
-            pkgs.nodejs_20
-
-            # handy extras
-            pkgs.cargo-watch
-            pkgs.sqlite-interactive
+            ##########################
+            # Databases
+            ##########################
+            sqlite
+            sqlite-web
+            
           ];
 
-          shellHook = ''
-            echo "myapp dev shell ready"
-            echo "  backend:  cargo run          (or: cargo watch -x run)"
-            echo "  frontend: cd frontend && npm install && npm run dev"
+          #############################################
+          # Python venv handling
+          #############################################
+          venvDir = "./.venv";
+
+          postVenvCreation = ''
+            unset SOURCE_DATE_EPOCH
+
+            source .venv/bin/activate
+
+            pip install -r requirements.txt
+
+            autoPatchelf ./.venv
+          '';
+
+          postShellHook = ''
+            unset SOURCE_DATE_EPOCH
           '';
         };
-      });
+      }
+    );
 }
