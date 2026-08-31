@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "backend",
-]
+members = ["backend", "importer"]
 
 
 [workspace.dependencies]
@@ -10,6 +8,7 @@ axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "trace"] }
+anyhow = "1.0.104"
 
 # Server-rendered templates for the "simple pages"
 askama = "0.12"
