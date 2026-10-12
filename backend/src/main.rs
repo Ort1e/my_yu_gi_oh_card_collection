@@ -1,3 +1,4 @@
+mod auth;
 mod card_data;
 mod cards;
 mod commands;
@@ -13,6 +14,8 @@ mod tests;
 
 use std::path::PathBuf;
 
+use axum::middleware::from_fn_with_state;
+use axum::routing::{get, post};
 use axum::Router;
 use commands::Command;
 use tower_http::services::ServeDir;
@@ -29,6 +32,7 @@ pub struct AppState {
     pub uploads_dir: PathBuf,
     /// Our Cardmarket username, to tell purchases from sales in shipments.
     pub cardmarket_account: String,
+    pub auth: auth::Auth,
 }
 
 #[tokio::main]
@@ -47,12 +51,17 @@ async fn main() {
 
     let env =
         |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
+    let pool = db::init_pool().await;
+    let auth = auth::Auth::load(&pool, std::env::var("APP_PASSWORD").ok())
+        .await
+        .expect("cannot load the session key");
     let state = AppState {
-        pool: db::init_pool().await,
+        pool,
         http: reqwest::Client::new(),
         media_dir: PathBuf::from(env("MEDIA_DIR", "data/media")),
         uploads_dir: PathBuf::from(env("UPLOADS_DIR", "uploads")),
         cardmarket_account: env("CARDMARKET_ACCOUNT", "0rtie"),
+        auth,
     };
 
     if command != Command::Serve {
@@ -63,22 +72,43 @@ async fn main() {
         return;
     }
 
+    let login = state.auth.enabled();
     let app = app(state).layer(TraceLayer::new_for_http());
 
-    // Local only by default: there is no login yet and /media exposes the
-    // shipment PDFs (personal data). Set BIND_ADDR=0.0.0.0:3000 to serve the LAN.
+    // Local only by default. Serving the LAN (BIND_ADDR=0.0.0.0:3000) needs
+    // APP_PASSWORD: without login anyone could edit, and read the shipment
+    // PDFs (personal data).
     let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_string());
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .unwrap_or_else(|e| panic!("cannot bind {addr}: {e}"));
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    let local = listener.local_addr().unwrap();
+    if !login && !local.ip().is_loopback() {
+        eprintln!("error: set APP_PASSWORD to listen on {local} (not a loopback address)");
+        std::process::exit(1);
+    }
+    tracing::info!(
+        "listening on {local}, login {}",
+        if login { "enabled" } else { "disabled" }
+    );
     axum::serve(listener, app).await.unwrap();
 }
 
 pub fn app(state: AppState) -> Router {
+    let login_required = from_fn_with_state(state.clone(), auth::require_login);
+    let shipments = Router::new()
+        .nest_service(
+            "/media/shipment_files",
+            ServeDir::new(state.media_dir.join("shipment_files")),
+        )
+        .layer(login_required.clone());
+
     Router::new()
         .merge(routes::router())
-        .merge(routes::write_router())
+        .merge(routes::write_router().route_layer(login_required))
+        .route("/login", get(auth::page).post(auth::login))
+        .route("/logout", post(auth::logout))
+        .merge(shipments)
         .nest_service("/static", ServeDir::new("static"))
         .nest_service("/media", ServeDir::new(&state.media_dir))
         .with_state(state)

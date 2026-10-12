@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Log in{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Log in</h1>
+
+  {% if !enabled %}
+    <p>No password is set (<code>APP_PASSWORD</code>): login is disabled and changes are allowed.</p>
+  {% else if logged_in %}
+    <p>You are logged in.</p>
+    <form method="post" action="/logout">
+      <input type="submit" value="Log out">
+    </form>
+  {% else %}
+    {% match error %}{% when Some with (error) %}<div class="error">{{ error }}</div>{% when None %}{% endmatch %}
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{ next }}">
+      <p>
+        <label for="password">Password:</label>
+        <input type="password" name="password" id="password" autocomplete="current-password" autofocus required>
+      </p>
+      <input type="submit" value="Log in">
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
