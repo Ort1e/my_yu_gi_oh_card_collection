@@ -5,117 +5,82 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 
 ## Branch situation — read first
 
-- `main` = the **Django** app (reference implementation, still the one in use).
-- `rust-stack` (this branch) = **rewrite in Rust**. Goal: reach feature parity with Django, then replace it.
+- `main` = the **Django** app (the original, still the one in use until cutover).
+- `rust-stack` (this branch) = the **Rust rewrite**, now at feature parity except the items in "Remaining".
 - The Django code is **not in this branch's tree**. Read it from `main` without switching branches:
-  - `git show main:my_ygo_cards/models/deck.py`
-  - `git ls-tree -r --name-only main`
-  - or `git archive main my_ygo_cards | tar -x -C <scratch dir>` to browse it all.
-- `README.md` is still the generic scaffold README ("myapp", wrong `src/` paths). Don't trust its layout section.
+  `git show main:my_ygo_cards/models/deck.py`, `git ls-tree -r --name-only main`, or
+  `git archive main my_ygo_cards | tar -x -C <scratch dir>`. On `main`, `deck_builder_frontend/` is an abandoned React stub.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
 | HTTP | axum 0.7, tower-http (ServeDir, trace) |
-| DB | SQLite via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
-| Simple pages | askama 0.12 + askama_axum templates, htmx 1.9 for fragments |
+| DB | SQLite (WAL) via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
+| Pages | askama 0.12 + askama_axum templates, a little inline JS, Chart.js from a CDN on the dashboard |
 | Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), built to `static/deck-builder/` (gitignored), talks only to `/api/*` |
 | Env | Nix flake (`flake.nix`, `.envrc` → `use flake`), Rust 1.88.0 pinned in `rust-toolchain.toml` |
 
 Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
-- `backend/` — the web server:
-  - `main.rs` (`AppState`: pool, reqwest client, media dir), `db.rs` (pool + `Money`, a `Decimal` stored as TEXT that sqlx reads/writes directly), `error.rs` (`AppError`/`AppResult`, `.or_404()`), `filters.rs` (askama filters `money`, `debt_color`, `yes_no`), `pagination.rs` (`Page`, 10 per page), `models.rs` (row types shared by pages: `CardRow`, `LotRow`, `DeckVersionRow`), `forms.rs` (`FormData`: raw form pairs → validated values + error list; repeated card rows `cards-<i>-<field>`), `card_data.rs` (ygoprodeck `get_or_fetch`, background card→card_data linking, `insert_lot_cards`), `tests.rs` (handler tests on a temp migrated DB, no network).
-  - `routes/<domain>.rs`: one module per page group, each with its row structs, queries, `#[derive(Template)]` structs and handlers. Read-only routes go in `routes::router()`, **every write route in `routes::write_router()`** (future login layer). Form modules: `lot_form.rs`, `deck_form.rs`, `budget_form.rs`.
-  - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`), partials prefixed `_`. CSS copied from Django in `static/css/`.
-- `domain/` — pure business logic (no DB/HTTP), unit-tested: `card` (name normalisation, statuses), `ydke`, `lot` (lot type, shipping cost), `budget` (monthly recap/totals), `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf).
-- `importer/` — one-off loader from Django `dumpdata` JSON into the sqlx schema.
-- `migrations/` — sqlx migrations (shared by both crates via `sqlx::migrate!("../migrations")`).
+- `backend/` — web server **and** maintenance commands (one binary):
+  - `main.rs` (`AppState`: pool, reqwest client, media/uploads dirs, Cardmarket account; dispatches `commands::Command`), `db.rs` (pool, `begin_write`, `Money`), `error.rs` (`AppError`/`AppResult`, `.or_404()`, `bad_request`), `filters.rs` (askama filters), `pagination.rs`, `models.rs` (row types shared by pages), `forms.rs` (`FormData`: raw form pairs → validated values + errors; card rows `cards-<i>-<field>`), `card_data.rs` (ygoprodeck lookups with a shared rate limiter, background card→card_data linking), `cards.rs` (card-row writes and shared SQL: `Zone`, `SOLD_EXISTS`, `IN_ANY_DECK`, `insert_lot_cards`, `new_proxy`, `delete_orphan_proxies`), `tests.rs` (`TestApp`: handler tests on a temp migrated DB, no network).
+  - `routes/<domain>.rs`: one module per page group (row structs, queries, `#[derive(Template)]` structs, handlers). Read-only routes in `routes::router()`, **every write route in `routes::write_router()`** (future login layer). Forms: `lot_form.rs`, `deck_form.rs`, `budget_form.rs`; deck builder JSON API: `deck_api.rs`.
+  - `commands/`: `scrap-ban-list`, `clean-cards` (Django's management commands).
+  - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), partials prefixed `_`. CSS from Django in `static/css/`.
+- `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
+- `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema.
+- `migrations/` — sqlx migrations, embedded by both binaries (`sqlx::migrate!("../migrations")`).
+- `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte`, `api.js` = HTTP client, `deck.js` = pure helpers).
 - `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): `data.json` (Django dump), `db.sqlite3` (Django DB), `media/card_images/`, `media/shipment_files/`.
 
 ## Commands
 
-All inside the Nix shell (`nix develop`, or automatic with direnv). Run from the **repo root**: `ServeDir::new("static")` and the default `DATABASE_URL` are relative paths.
+All inside the Nix shell (`nix develop`, or automatic with direnv). Run from the **repo root** (relative paths: `static/`, `app.db`, `data/media`).
 
 ```bash
 cargo check --workspace
-cargo test --workspace                    # unit tests
+cargo test --workspace
 cargo clippy --workspace --all-targets
-# parser vs the real shipment PDFs of the data submodule (prints only counts/lot ids)
-cargo test -p domain --test real_shipments -- --ignored --nocapture
-cargo run -p backend                      # http://127.0.0.1:3000 (BIND_ADDR to change), runs migrations on startup
-# rebuild the DB from the Django dump (importer is NOT idempotent: start from an empty DB)
-rm -f app.db && cargo run -p importer -- data/data.json
-cd frontend && npm install && npm run build  # → static/deck-builder/bundle.{js,css}, needed by /deck-builder/:id
-cd frontend && npm run dev                  # hot reload at http://localhost:5173/?id=<deck version id>, proxies /api → :3000
-sqlite3 app.db                              # inspect
+cargo test -p domain --test real_shipments -- --ignored --nocapture   # parser vs the real PDFs (prints counts/lot ids only)
+
+cargo run -p backend                          # web server, http://127.0.0.1:3000; runs migrations on startup
+cargo run -p backend -- scrap-ban-list        # import new/current Konami ban lists (--all, --dry-run)
+cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies (--dry-run)
+
+rm -f app.db && cargo run -p importer -- data/data.json   # rebuild the DB from the Django dump (not idempotent)
+
+cd frontend && npm install && npm run build   # → static/deck-builder/, needed by /deck-builder/:id
+cd frontend && npm run dev                    # hot reload at http://localhost:5173/?id=<deck version id>, proxies to :3000
 ```
 
-`.env` sets `DATABASE_URL=sqlite:app.db` (gitignored, as is `*.db`). Both binaries create the DB file if missing.
+`.env` sets `DATABASE_URL=sqlite:app.db` (gitignored, as are `*.db*`). Both binaries create the DB file if missing.
 Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`, gitignored), `CARDMARKET_ACCOUNT` (`0rtie`).
+
+## Routes
+
+- Pages: `/` dashboard, `/budget` (+ `/budget/manage`), `/cards` (filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (filters), `/lots/:id`, `/lots/add`, `/decks`, `/decks/:id`, `/decks/add`, `/deck-builder/:id`.
+- `/card-image/:card_data_id` serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing. `/static`, `/media` are plain file servers.
+- Lot creation: `POST /lots/add/shipment` parses a Cardmarket PDF and re-renders the form pre-filled; the PDF waits as `uploads/pending-<token>.pdf` (deleted after 24 h) and moves to `media/shipment_files/shipment_<lot id>.pdf` on save. New cards are linked to card data by a background task.
+- Deck builder API (`routes/deck_api.rs`): `/api/deck-versions/:id` `GET`/`PATCH`/`DELETE`, `…/clone`, `…/proxies[/:card_id]`, `…/reserve`, `…/categories[/:category_id]`, `…/cards/:card_id/categories[/:category_id]`, `…/monte-carlo`, `…/tournament`, and `/api/decks/:id/import-ydke`. Zone edits stay local in the app until "Save"; proxies, categories and the tournament save immediately; YDKE copy is computed client-side.
 
 ## Database conventions (`migrations/0002_ygo_schema.sql`)
 
 - Primary keys are the Django pks, imported verbatim.
-- Money (`price`, `no_card_price`, `amount`) is **TEXT**, never REAL (Django `DecimalField`). Read/write it as `db::Money` / `rust_decimal::Decimal`; never `SUM()` it in SQL (that goes through REAL).
+- Money (`price`, `no_card_price`, `amount`) is **TEXT**, never REAL (Django `DecimalField`). Read/write it as `db::Money` / `rust_decimal::Decimal`; never `SUM()`/`MIN()` it in SQL.
 - Dates are ISO `YYYY-MM-DD` TEXT. Booleans are INTEGER 0/1.
-- Django M2M → join tables `deck_version_{main,extra,side}_deck`, `card_category_condition`.
+- Django M2M → join tables `deck_version_{main,extra,side}_deck` (see `cards::Zone`), `card_category_condition`.
 - Django MTI `CardConditionalCategory(CardCategory)` → **flattened** into `card_category` with nullable `condition_description`, `categorie_true_id`, `categorie_false_id`. "Is conditional" = `condition_description IS NOT NULL`.
 - Domain names are kept from Django (some French): `unite` (one card in a lot), `apport` (one-off budget contribution), `categorie_true/false`.
-- `0002_ygo_schema.sql` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
-- `sqlx::migrate!` embeds migrations at compile time and checksums applied ones. **Until cutover** `0002` is the baseline and may be edited: then rebuild with `rm -f app.db && cargo run -p importer -- data/data.json`. **After cutover** only add new numbered files.
-- sqlx 0.7 + SQLite concurrency rules (see `backend/src/db.rs`): write transactions start with `db::begin_write(&pool)` (takes the write lock up front), never `pool.begin()`; never `INSERT ... RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. The DB runs in WAL mode.
+- `0002` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
+- `sqlx::migrate!` checksums applied migrations. **Until cutover** `0002` is the baseline and may be edited (then rebuild `app.db` with the importer). **After cutover** only add new numbered files.
+- sqlx 0.7 + SQLite concurrency (see `db.rs`): write transactions start with `db::begin_write(&pool)`, never `pool.begin()`; never `INSERT … RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. Do network calls (ygoprodeck) **before** opening a write transaction: they write card data through the pool.
 - SQLite + FKs: never drop/rebuild a parent table in a migration while `foreign_keys` is on — `DROP TABLE` fires ON DELETE CASCADE in children.
 
-## Migration status
+## Remaining before cutover
 
-Done: Rust workspace, Nix env, full schema with Django's constraints + importer (row counts, FK and integrity checks verified against `data.json`).
-Read-only pages ✅ (scaffold demo removed). Budget figures checked month by month against a re-implementation of Django's logic on `data.json`.
-
-Decided: serve from `/` (drop Django's `/my_ygo_cards/` prefix, e.g. `/my_ygo_cards/cards/` → `/cards/`); the deck builder becomes the Svelte app in `frontend/` (don't port the vanilla JS).
-Auth: none for now, server binds to 127.0.0.1 by default. Keep every write route in its own router so a login layer (single password from env + session cookie) can be added in one place when the app is served on the LAN; `/media/shipment_files` must go behind it too.
-Port order: schema ✅ → shared domain logic + tests ✅ → read-only pages ✅ → lots/budget writes ✅ → deck builder ✅.
-
-Deck builder: `/deck-builder/:id` (askama shell, `routes/decks.rs::builder`) mounts the Svelte app (`frontend/src/App.svelte` + `lib/*.svelte`, API client `api.js`, pure helpers `deck.js`). JSON API in `routes/deck_api.rs` under `/api/deck-versions/:id` (`GET`/`PATCH`/`DELETE`, `clone`, `proxies`, `reserve`, `categories`, `cards/:card_id/categories[/:category_id]`, `monte-carlo`, `tournament`) and `/api/decks/:id/import-ydke`. Zone edits are local until "Save" (PATCH of the three zones + ban list); proxies, categories and the tournament save immediately. YDKE copy is computed client-side from the current zones. Deliberate differences are listed at the top of `deck_api.rs`.
-
-Rust routes so far: `/` dashboard, `/budget`, `/cards` (+ filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (+ filters), `/lots/:id`, `/decks`, `/decks/:id`, `/card-image/:card_data_id` (serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing — Django downloaded during page render), `/static`, `/media`.
-Write routes: `/lots/add` (form + `POST /lots/add/shipment` PDF upload → pre-filled form, PDF kept as `uploads/pending-<token>.pdf` (deleted after 24 h) and moved to `media/shipment_files/shipment_<lot id>.pdf` on save), `POST /lots/:id/cards`, `/decks/add`, `/budget/manage` (+ `/budget/manage/budget` upsert, `/budget/manage/apports`, `/budget/manage/apports/:id/delete`).
-Deliberate differences: card rows added/removed with JS instead of `?cards=N` reloads; identical PDF cards are one row with a quantity; a new seller keeps is_person/source (Django's `get_or_create(name=)` dropped them); new cards are linked to card_data in a background task right after saving (Django fetched lazily on page views); budgets/apports have a page (Django used its admin).
-Missing vs Django: auth, editing/deleting cards, lots, sellers and decks (Django only had that in its admin), fetching card_data for the 3 imported cards that have none, management commands (`scrap_ban_list`, `clean_cards`; `clean_card_categories` is no longer needed).
-
-Django reference for everything (✅ = ported):
-
-### Pages (Django views in `my_ygo_cards/views/`, templates in `my_ygo_cards/templates/`)
-| Django URL | View | Notes |
-|---|---|---|
-| ✅ `/` | `index.index` | Dashboard: Chart.js charts (card vs shipping spend per month, cards bought per month, card-price histogram), last 5 months recap, totals, `available_debt = last budget × 3` |
-| ✅ `/budget/` | `budget.budget_overview` | `RecapEntry` / `BudgetTotals` logic: monthly budget carried forward + apports + sale-lot revenue; spending from non-cancelled purchase lots |
-| ✅ `/cards/`, `/cards/card/<pk>/` | `cards.py` | Filters: status, proxy, name (name OR en_name icontains), card_type, code, sold. Paginate 10, order `en_name, id`. Nav link defaults to `?proxy=false&sold=false` |
-| ✅ `/sellers/`, `/sellers/seller/<pk>` | `sellers.py` | Seller detail lists lots + total card count |
-| ✅ `/lots/`, `/lots/<pk>/`, `/lots/add/` | `lots/lots.py`, `lots/lot_form.py` | Lot detail POST adds N unites (quantity → N new cards). Add-lot: lot form + seller select/create + unite formset + **Cardmarket PDF upload that pre-fills the form** |
-| ✅ `/decks/`, `/decks/deck/<pk>`, `/decks/add/` | `deck.py` | Add deck also creates its first version |
-| ✅ `/deck_builder/<deck_version_id>/` | `rest_api/deck_builder_api.DeckBuilderView` | Rewritten as the Svelte app; the old vanilla JS in `my_ygo_cards/static/js/deck_builder/` was the behaviour reference |
-| `/accounts/login/` etc. | Django auth | Login required for add lot, add deck, deck builder. No Rust equivalent yet |
-
-### ✅ JSON API (`rest_api/deck_builder_api.py`, `rest_api/serializers.py`)
-Under `api/deck_versions/<id>/`: `""` GET/PATCH/DELETE · `clone/` POST · `proxy/` POST · `proxy/<card_id>/` DELETE · `card_lists/` POST (filtered cards not in deck, forced proxy=false sold=false) · `categories/` GET/POST · `assign_categories/<card_id>/` GET/POST · `categories/delete/<category_id>/` DELETE · `monte_carlos/` POST.
-Plus `api/decks/<deck_id>/import_ydke/` POST. The Svelte app is the only consumer, so shapes may be cleaned up, but keep the information the DRF serializers expose.
-
-### Domain logic
-Ported to `domain/` ✅ (pure parts): `normalize_card_name` / `clean_card_name`, YDKE encode/parse, `shipping_cost`, budget recap + totals + available debt, Monte Carlo, Cardmarket parser (validated on all 135 real PDFs). Deliberate differences are documented in each module's doc comment.
-
-Still to port (needs DB or HTTP, goes in the backend):
-- Apply `normalize_card_name` to `en_name` on every card insert/update (Django did it in `Card.save`).
-- `CardData.get_or_fetch` + `ImageDownloader`: ygoprodeck API `https://db.ygoprodeck.com/api/v7/cardinfo.php?name=|id=`; images cached as `data/media/card_images/<name_with_underscores>.jpg`, served under `media/`.
-- `Card.is_sold`: has a unite in a non-cancelled `sale` lot.
-- YDKE import (`DeckVersion.from_ydke`): reuses unused non-proxy owned cards with the same `en_name`, else creates proxy cards (fetching card data by ygopro id).
-- Deck price: Σ over cards of the min unite price.
-- Proxy cleanup: deleting a deck version / removing a card deletes proxy cards no longer in any deck.
-- Clone deck version: duplicates proxy cards, shares real cards.
-- Shipment upload: Django saves uploads as `uploads/shipment_<n>.pdf`, then moves them to `media/shipment_files/shipment_<lot id>.pdf` on lot creation. Cardmarket account name is `0rtie`.
-- Management commands: `scrap_ban_list` (Konami EU JSON at `img.yugioh-card.com/eu/_data/fllists/`), `clean_cards` (renormalize names, relink card_data, prune proxies), `clean_card_categories` (drop assignments for cards no longer in the category's deck version). Could become importer subcommands or a separate CLI crate.
-
-Also on `main`: `deck_builder_frontend/` is an abandoned React SPA stub; ignore it.
+- Auth: none yet; the server binds to 127.0.0.1 by default. When served on the LAN, add a login layer (single password from env + session cookie) on `routes::write_router()` and put `/media/shipment_files` behind it.
+- Editing/deleting cards, lots, sellers and decks (Django only had that in its admin).
+- Cutover itself: final `data.json` dump from Django → importer, then stop editing `0002`.
 
 ## Privacy rule: shipment PDFs
 
@@ -128,9 +93,10 @@ Cardmarket shipment PDFs (uploads, `data/media/shipment_files/`, and the test PD
 
 ## Working conventions
 
-- Match existing style: handlers + askama templates per page in `backend/src/routes/pages.rs`, JSON in `routes/api.rs`, state is `db::Pool` (`SqlitePool`). Split into modules per domain as it grows.
-- Frontend (`frontend/`): **4-space indentation and airy code** (blank lines between logical blocks, after guards/early returns, around try/catch); `.editorconfig` sets it. Keep pure logic in `deck.js`, HTTP in `api.js`.
-- Handlers return `AppResult<T>`; use `?` and `.or_404()`, never `.unwrap()` on DB results.
-- Askama quirks: method arguments in templates are passed inconsistently by value/reference — prefer argument-less helper methods (`page.next_href()`); `{% let x = field %}` moves, so expose `&` getters for non-Copy fields.
-- Format on save is on (rust-analyzer from PATH). Keep `cargo check --workspace` clean.
-- When porting a feature, read the Django model + view + template + serializer from `main` first and keep its behaviour (filters, ordering, pagination size). Idiomatic Rust is preferred over strict parity: enums, `Result` instead of crashes, fixing obvious Django bugs are fine — note each deliberate difference in a doc comment.
+- Handlers return `AppResult<T>`; use `?` and `.or_404()`, never `.unwrap()` on DB results. API input errors: `bad_request(...)` (JSON `{"error": …}`).
+- New behaviour goes where it belongs: pure logic in `domain/`, card-row writes in `backend/src/cards.rs`, ygoprodeck in `card_data.rs`, pages/handlers in `routes/`.
+- Tests: pure logic as unit tests in `domain/`; handlers and commands through `crate::tests::TestApp` (pre-insert any card data so nothing hits the network).
+- Frontend (`frontend/`): **4-space indentation and airy code** (blank lines between logical blocks, after guards/early returns, around try/catch); `.editorconfig` sets it.
+- Askama quirks: template method arguments are passed inconsistently by value/reference — prefer argument-less helper methods (`page.next_href()`); `{% let x = field %}` moves, so expose `&` getters for non-Copy fields.
+- Format on save is on (rustfmt via rust-analyzer); keep clippy clean.
+- Idiomatic Rust is preferred over strict Django parity (enums, `Result` instead of crashes, fixing Django bugs); note each deliberate difference in the module's doc comment. Clean up code freely while working.
