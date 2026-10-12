@@ -11,7 +11,9 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::Value;
-use sqlx::sqlite::SqlitePoolOptions;
+use std::str::FromStr;
+
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 #[derive(Deserialize)]
@@ -35,8 +37,11 @@ async fn main() -> Result<()> {
     let records: Vec<Record> = serde_json::from_str(&raw).context("parsing dumpdata JSON")?;
     println!("loaded {} records from {json_path}", records.len());
 
+    let options = SqliteConnectOptions::from_str(&db_url)
+        .with_context(|| format!("parsing {db_url}"))?
+        .create_if_missing(true);
     let pool = SqlitePoolOptions::new()
-        .connect(&db_url)
+        .connect_with(options)
         .await
         .with_context(|| format!("connecting to {db_url}"))?;
 
@@ -85,6 +90,9 @@ async fn import(pool: &SqlitePool, records: &[Record]) -> Result<()> {
             }
             "my_ygo_cards.banlistentry" => insert_ban_list_entry(&mut tx, r).await?,
             "my_ygo_cards.adventcalendar" => insert_advent_calendar(&mut tx, r).await?,
+            "my_ygo_cards.adventcalendarentry" => {
+                insert_advent_calendar_entry(&mut tx, r).await?
+            }
             // handled in the second pass, after all card_category rows exist
             "my_ygo_cards.cardconditionalcategory" => {}
             other => eprintln!("skipping unknown model: {other}"),
@@ -142,7 +150,7 @@ async fn insert_card_data(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     .bind(r.pk)
     .bind(req_str(f, "en_name"))
     .bind(get_i64(f, "ygopro_id"))
-    .bind(req_str(f, "card_type"))
+    .bind(get_str(f, "card_type"))
     .bind(json_data.to_string())
     .execute(&mut **tx)
     .await?;
@@ -157,7 +165,7 @@ async fn insert_card(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     )
     .bind(r.pk)
     .bind(req_str(f, "name"))
-    .bind(req_str(f, "en_name"))
+    .bind(get_str(f, "en_name"))
     .bind(get_i64(f, "card_data"))
     .bind(get_str(f, "code"))
     .bind(get_str(f, "last_known_status"))
@@ -277,7 +285,7 @@ async fn insert_lot(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     .bind(get_i64(f, "seller"))
     .bind(get_bool(f, "is_cancelled"))
     .bind(req_str(f, "no_card_price"))
-    .bind(get_str(f, "shipment_file"))
+    .bind(get_str(f, "shipment_file").filter(|p| !p.is_empty()))
     .execute(&mut **tx)
     .await?;
     Ok(())
@@ -313,7 +321,7 @@ async fn insert_apport(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     )
     .bind(r.pk)
     .bind(get_i64(f, "budget"))
-    .bind(get_str(f, "description"))
+    .bind(req_str(f, "description"))
     .bind(req_str(f, "amount"))
     .bind(req_str(f, "date"))
     .execute(&mut **tx)
@@ -396,5 +404,22 @@ async fn insert_advent_calendar(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
         .bind(get_i64(f, "year"))
         .execute(&mut **tx)
         .await?;
+    Ok(())
+}
+
+async fn insert_advent_calendar_entry(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
+    let f = &r.fields;
+    sqlx::query(
+        "INSERT INTO advent_calendar_entry (id, calendar_id, day, card_id, photo)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(r.pk)
+    .bind(get_i64(f, "calendar"))
+    .bind(get_i64(f, "day"))
+    .bind(get_i64(f, "card"))
+    // Django stores an empty string for an unset FileField
+    .bind(get_str(f, "photo").filter(|p| !p.is_empty()))
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
