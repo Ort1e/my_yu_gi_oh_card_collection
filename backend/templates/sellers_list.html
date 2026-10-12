@@ -1,0 +1,22 @@
+{% extends "list_base.html" %}
+
+{% block items %}
+  {% if sellers.is_empty() %}
+    <p class="card-title">No seller.</p>
+  {% else %}
+    <div class="card-list">
+      {% for seller in sellers %}
+      <a href="/sellers/{{ seller.id }}" class="card-link">
+        <div class="card">
+          <div class="card-title">{{ seller.name }}</div>
+          <div class="card-meta-line">
+            <div>Is Person: {{ seller.is_person|yes_no }}</div>
+            <div>Source: {{ seller.source.as_deref().unwrap_or("") }}</div>
+            <div>Lots: {{ seller.lot_count }}</div>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

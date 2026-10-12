@@ -1,0 +1,11 @@
+<a href="/lots/{{ lot.id }}" class="card-link">
+  <div class="card">
+    <div class="card-title">{{ lot.title() }}</div>
+    <div class="card-meta-line">
+      <div>Price: {{ lot.price }} €</div>
+      <div>Buy Date: {{ lot.buy_date }}</div>
+      <div>Seller: {{ lot.seller_name() }}</div>
+      <div>Cards: {{ lot.card_count }}</div>
+    </div>
+  </div>
+</a>

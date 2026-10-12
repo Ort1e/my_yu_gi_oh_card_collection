@@ -1,0 +1,19 @@
+<div class="pagination-container">
+  <div class="pagination-controls pagination-left">
+    {% if page.has_previous() %}
+      <a href="{{ page.first_href() }}">&laquo; first</a>
+      <a href="{{ page.prev_href() }}">previous</a>
+    {% endif %}
+  </div>
+
+  <div class="pagination-current">
+    Page {{ page.number }} of {{ page.num_pages }}.
+  </div>
+
+  <div class="pagination-controls pagination-right">
+    {% if page.has_next() %}
+      <a href="{{ page.next_href() }}">next</a>
+      <a href="{{ page.last_href() }}">last &raquo;</a>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,20 @@
+{% extends "list_base.html" %}
+
+{% block items %}
+  {% if decks.is_empty() %}
+    <p class="card-title">No deck.</p>
+  {% else %}
+    <div class="card-list">
+      {% for deck in decks %}
+      <a href="/decks/{{ deck.id }}" class="card-link">
+        <div class="card">
+          <div class="card-title">{{ deck.name }}</div>
+          <div class="card-meta-line">
+            <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,28 @@
+<a href="/cards/{{ card.id }}" class="card-link">
+  <div class="card" style="display: flex; align-items: center;">
+    <div class="image-wrapper">
+      {% match card.card_data_id %}{% when Some with (data_id) %}
+      <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-image" width="100px" loading="lazy"/>
+      <div class="image-popup">
+        <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="popup-image" loading="lazy"/>
+      </div>
+      {% when None %}{% endmatch %}
+    </div>
+    <div class="card-content">
+      <div class="card-title">{{ card.name }}</div>
+      <div class="card-meta-line">
+        <div>Code: {{ card.code.as_deref().unwrap_or("—") }}</div>
+        <div>
+          Status:
+          {% match card.status() %}
+          {% when Some with (status) %}
+            <span class="status-badge {{ status.code()|lower }}">{{ status.label() }}</span>
+          {% when None %}
+            Unknown
+          {% endmatch %}
+        </div>
+        <div>Proxy: {{ card.is_proxy|yes_no }}</div>
+      </div>
+    </div>
+  </div>
+</a>

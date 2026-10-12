@@ -2,15 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <title>{% block title %}Card Collection{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/header.css">
+    <link rel="stylesheet" href="/static/css/form.css">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav>
-        <a href="/">Home</a> |
-        <a href="/complex">Complex page</a>
-    </nav>
-    <hr>
-    {% block content %}{% endblock %}
+    <div class="container">
+      <header class="site-header">
+        <nav class="navbar">
+          <div class="logo">
+            <a href="/">My yu-gi-oh Cards</a>
+          </div>
+          <ul class="nav-links">
+            <li><a href="/budget">Budget</a></li>
+            <li><a href="/cards?proxy=false&sold=false">Cards</a></li>
+            <li><a href="/lots">Lots</a></li>
+            <li><a href="/sellers">Sellers</a></li>
+            <li><a href="/decks">Decks</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,73 @@
+use askama::Template;
+use axum::extract::{Path, Query, State};
+
+use crate::error::{AppResult, OrNotFound};
+use crate::models::DeckVersionRow;
+use crate::pagination::{Page, PageParam, PAGE_SIZE};
+use crate::AppState;
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct DeckRow {
+    id: i64,
+    name: String,
+    description: Option<String>,
+}
+
+#[derive(Template)]
+#[template(path = "decks_list.html")]
+pub struct DecksList {
+    page_title: &'static str,
+    page: Page,
+    total: i64,
+    decks: Vec<DeckRow>,
+}
+
+pub async fn list(
+    State(state): State<AppState>,
+    Query(param): Query<PageParam>,
+) -> AppResult<DecksList> {
+    let pool = &state.pool;
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM deck")
+        .fetch_one(pool)
+        .await?;
+    let page = Page::new(param.page, total, String::new());
+    let decks = sqlx::query_as(
+        "SELECT id, name, description FROM deck ORDER BY name, id LIMIT ? OFFSET ?",
+    )
+    .bind(PAGE_SIZE)
+    .bind(page.offset())
+    .fetch_all(pool)
+    .await?;
+
+    Ok(DecksList {
+        page_title: "All Decks",
+        page,
+        total,
+        decks,
+    })
+}
+
+#[derive(Template)]
+#[template(path = "deck_detail.html")]
+pub struct DeckDetail {
+    deck: DeckRow,
+    versions: Vec<DeckVersionRow>,
+}
+
+pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<DeckDetail> {
+    let pool = &state.pool;
+    let deck = sqlx::query_as("SELECT id, name, description FROM deck WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .or_404()?;
+    let versions = sqlx::query_as(&format!(
+        "{} WHERE deck_version.deck_id = ? ORDER BY deck_version.version_name DESC",
+        DeckVersionRow::SELECT
+    ))
+    .bind(id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(DeckDetail { deck, versions })
+}

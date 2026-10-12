@@ -1,0 +1,81 @@
+.card-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem; /* reduced gap between cards */
+}
+
+.card-link {
+  text-decoration: none;
+  width: 100%;
+  max-width: 900px; /* wider card layout */
+}
+
+.card {
+  background-color: var(--secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.card:hover {
+  background-color: var(--hover-bg);
+}
+
+.card-title {
+  font-size: 1.4rem;
+  color: var(--primary);
+  margin-bottom: 0.3rem;
+}
+
+.card-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Status badge styles */
+.status-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-left: 0.4rem;
+}
+
+.status-badge.mt { background-color: #4caf50; color: #000; }
+.status-badge.nm { background-color: #2196f3; color: #fff; }
+.status-badge.ex { background-color: #9c27b0; color: #fff; }
+.status-badge.g  { background-color: #ffc107; color: #000; }
+.status-badge.p  { background-color: #f44336; color: #fff; }
+
+.image-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.image-popup {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 110%; /* show to the right of the small image */
+  z-index: 10;
+  padding: 4px;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.image-wrapper:hover .image-popup {
+  display: block;
+}
+
+.popup-image {
+  max-width: 600px;
+  max-height: 600px;
+  object-fit: contain;
+}

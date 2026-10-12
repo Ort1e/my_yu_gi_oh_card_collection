@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/filtering.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1 class="card-title">{{ page_title }} ({{ page.count }}/{{ total }}):</h1>
+
+  {% block items %}{% endblock %}
+
+  {% include "_pagination.html" %}
+
+  {% block filter %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const badge = document.getElementById('filter-badge');
+      const modal = document.getElementById('filter-modal');
+      if (!badge || !modal) return;
+      badge.addEventListener('click', () => modal.classList.remove('hidden'));
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+    });
+  </script>
+{% endblock %}

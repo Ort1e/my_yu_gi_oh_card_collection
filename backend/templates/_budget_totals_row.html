@@ -1,0 +1,11 @@
+<tr style="font-weight: bold; border-bottom: 2px solid black;">
+  <td>{{ label }}</td>
+  <td>{{ t.total_budget|money }}</td>
+  <td>{{ t.total_spent|money }}</td>
+  <td style="color: {{ t.total_debt|debt_color(available_debt) }};">{{ t.total_debt|money }}</td>
+  <td>{{ t.total_shipping_cost|money }}</td>
+  <td>{{ t.total_shipping_percent|money }}%</td>
+  <td>{{ t.total_selling_revenue|money }}</td>
+  <td>{{ t.total_real_selling_revenue|money }}</td>
+  <td>{{ t.total_selling_shipping_cost|money }}</td>
+</tr>

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Budget Overview{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Monthly Budget Overview</h1>
+  <p>Available Debt (3 × last budget) : {{ available_debt|money }} (€)</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>Budget (€)</th>
+        <th>Spent (€)</th>
+        <th>Difference</th>
+        <th>Shipping (€)</th>
+        <th>Shipping %</th>
+        <th>Total sold (€)</th>
+        <th>Real Revenue (€)</th>
+        <th>Sold shipping (€)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% let t = self.totals_prev() %}
+      {% let label = "Total previsional" %}
+      {% include "_budget_totals_row.html" %}
+      {% for entry in recap %}
+      <tr>
+        <td>{{ entry.month_str() }}</td>
+        <td>{{ entry.budget|money }}</td>
+        <td>{{ entry.spent|money }}</td>
+        <td style="color: {{ entry.debt|debt_color(available_debt) }};">{{ entry.debt|money }}</td>
+        <td>{{ entry.shipping_cost|money }}</td>
+        <td>{{ entry.shipping_percent|money }}%</td>
+        <td>{{ entry.selling_revenue|money }}</td>
+        <td>{{ entry.selling_real_revenue|money }}</td>
+        <td>{{ entry.selling_shipping_cost|money }}</td>
+      </tr>
+      {% if loop.first %}
+        {% let t = self.totals() %}
+        {% let label = "Total" %}
+        {% include "_budget_totals_row.html" %}
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Lot {{ lot.id }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<h1 class="card-title">{{ lot.title() }}</h1>
+
+<div class="card">
+  <div class="card-meta-line">
+    <div><strong>Type:</strong> {{ lot.lot_type }}</div>
+    <div><strong>Price:</strong> {{ lot.price }} €</div>
+    <div><strong>Buy date:</strong> {{ lot.buy_date }}</div>
+    <div><strong>Received:</strong> {{ lot.received_date.as_deref().unwrap_or("—") }}</div>
+    <div><strong>Seller:</strong>
+      {% match lot.seller_id %}
+      {% when Some with (seller_id) %}<a href="/sellers/{{ seller_id }}">{{ lot.seller_name() }}</a>
+      {% when None %}{{ lot.seller_name() }}
+      {% endmatch %}
+    </div>
+    <div><strong>Cards in Lot:</strong> {{ lot.card_count }}</div>
+    {% match lot.shipment_file %}{% when Some with (file) %}
+    <div><a href="/media/{{ file }}">Shipment file</a></div>
+    {% when None %}{% endmatch %}
+  </div>
+
+  <h2 style="margin-top: 1rem;">Cards</h2>
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Card</th>
+        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for unite in unites %}
+      <tr>
+        <td style="padding: 0.5rem;"><a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a></td>
+        <td style="padding: 0.5rem;">
+          {% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" style="padding: 0.5rem;">No cards in this lot.</td></tr>
+      {% endfor %}
+      <tr>
+        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">Total</td>
+        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">{{ total_price }} €</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
