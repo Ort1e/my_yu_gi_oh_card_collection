@@ -2,6 +2,7 @@ mod budget;
 mod budget_form;
 mod cards;
 mod dashboard;
+mod deck_api;
 mod deck_form;
 mod decks;
 mod images;
@@ -10,7 +11,7 @@ mod lots;
 mod sellers;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 
 use crate::AppState;
@@ -28,6 +29,21 @@ pub fn router() -> Router<AppState> {
         .route("/lots/:id", get(lots::detail))
         .route("/decks", get(decks::list))
         .route("/decks/:id", get(decks::detail))
+        .route("/deck-builder/:id", get(decks::builder))
+        .route("/api/deck-versions/:id", get(deck_api::get_version))
+        .route("/api/deck-versions/:id/reserve", post(deck_api::reserve))
+        .route(
+            "/api/deck-versions/:id/categories",
+            get(deck_api::categories),
+        )
+        .route(
+            "/api/deck-versions/:id/cards/:card_id/categories",
+            get(deck_api::card_categories),
+        )
+        .route(
+            "/api/deck-versions/:id/monte-carlo",
+            post(deck_api::monte_carlo),
+        )
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
@@ -44,5 +60,39 @@ pub fn write_router() -> Router<AppState> {
         .route("/budget/manage", get(budget_form::page))
         .route("/budget/manage/budget", post(budget_form::set_budget))
         .route("/budget/manage/apports", post(budget_form::add_apport))
-        .route("/budget/manage/apports/:id/delete", post(budget_form::delete_apport))
+        .route(
+            "/budget/manage/apports/:id/delete",
+            post(budget_form::delete_apport),
+        )
+        // deck builder API
+        .route(
+            "/api/deck-versions/:id",
+            patch(deck_api::update_version).delete(deck_api::delete_version),
+        )
+        .route(
+            "/api/deck-versions/:id/clone",
+            post(deck_api::clone_version),
+        )
+        .route("/api/deck-versions/:id/proxies", post(deck_api::add_proxy))
+        .route(
+            "/api/deck-versions/:id/proxies/:card_id",
+            delete(deck_api::delete_proxy),
+        )
+        .route(
+            "/api/deck-versions/:id/categories",
+            post(deck_api::add_category),
+        )
+        .route(
+            "/api/deck-versions/:id/categories/:category_id",
+            delete(deck_api::delete_category),
+        )
+        .route(
+            "/api/deck-versions/:id/cards/:card_id/categories/:category_id",
+            put(deck_api::assign_category),
+        )
+        .route(
+            "/api/deck-versions/:id/tournament",
+            put(deck_api::save_tournament),
+        )
+        .route("/api/decks/:id/import-ydke", post(deck_api::import_ydke))
 }

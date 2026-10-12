@@ -67,7 +67,8 @@ impl CardFilter {
             .push(" COLLATE NOCASE)");
         }
         if let Some(sold) = Self::flag(&self.sold) {
-            qb.push(if sold { " AND " } else { " AND NOT " }).push(SOLD_EXISTS);
+            qb.push(if sold { " AND " } else { " AND NOT " })
+                .push(SOLD_EXISTS);
         }
     }
 
@@ -84,7 +85,7 @@ impl CardFilter {
 }
 
 /// A card is sold when it is in a non-cancelled sale lot.
-const SOLD_EXISTS: &str = "EXISTS (SELECT 1 FROM unite JOIN lot ON lot.id = unite.lot_id \
+pub const SOLD_EXISTS: &str = "EXISTS (SELECT 1 FROM unite JOIN lot ON lot.id = unite.lot_id \
      WHERE unite.card_id = card.id AND lot.lot_type = 'sale' AND lot.is_cancelled = 0)";
 
 /// `%text%` for LIKE, with `\` escaping the wildcards.

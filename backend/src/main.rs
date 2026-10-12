@@ -33,7 +33,8 @@ async fn main() {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let env = |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
+    let env =
+        |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
     let state = AppState {
         pool: db::init_pool().await,
         http: reqwest::Client::new(),

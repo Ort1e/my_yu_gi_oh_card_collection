@@ -1,10 +1,12 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-/// Error returned by handlers: 404 for missing rows, 500 (logged) otherwise.
+/// Error returned by handlers: 404 for missing rows, 400 with a JSON
+/// `{"error": ...}` body for invalid API input, 500 (logged) otherwise.
 #[derive(Debug)]
 pub enum AppError {
     NotFound,
+    BadRequest(String),
     Internal(String),
 }
 
@@ -14,6 +16,11 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Not found").into_response(),
+            AppError::BadRequest(msg) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({ "error": msg })),
+            )
+                .into_response(),
             AppError::Internal(msg) => {
                 tracing::error!("{msg}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
@@ -46,4 +53,8 @@ impl<T> OrNotFound<T> for Option<T> {
     fn or_404(self) -> AppResult<T> {
         self.ok_or(AppError::NotFound)
     }
+}
+
+pub fn bad_request<T>(msg: impl Into<String>) -> AppResult<T> {
+    Err(AppError::BadRequest(msg.into()))
 }

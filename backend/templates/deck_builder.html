@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Deck Builder - {{ title }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/deck-builder/bundle.css">
+{% endblock %}
+
+{% block content %}
+<div id="app" data-deck-version-id="{{ id }}">
+  <p>Loading the deck builder… If nothing happens, build it: <code>cd frontend && npm install && npm run build</code>.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script type="module" src="/static/deck-builder/bundle.js"></script>
+{% endblock %}

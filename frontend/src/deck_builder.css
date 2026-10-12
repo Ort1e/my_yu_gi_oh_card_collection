@@ -1,0 +1,417 @@
+/* Deck builder, adapted from Django's static/css/deck_builder.css.
+   Colours come from the site's style.css variables. */
+
+/* ====================== Layout ====================== */
+
+.title {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: var(--primary);
+}
+
+.title .unsaved {
+    font-size: 0.9rem;
+    color: #dc3545;
+    margin-left: 0.5rem;
+}
+
+.builder-container {
+    display: grid;
+    grid-template-columns: 66% 33%;
+    grid-template-rows: auto auto auto auto;
+    gap: 1rem;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.area,
+#deck-area,
+#reserve-area,
+#card-overview,
+#test-draw-area,
+#actions-area {
+    background: var(--secondary);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.area h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.2rem;
+    color: var(--primary);
+}
+
+.hint {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.warning {
+    color: #dc3545;
+    font-size: 0.9rem;
+}
+
+/* ====================== Deck area ====================== */
+
+#deck-area {
+    grid-column: 1 / 2;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    max-height: 90vh;
+}
+
+/* ====================== Card overview ====================== */
+
+#card-overview {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+    min-height: 200px;
+    max-height: 400px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#card-overview img {
+    width: 120px;
+    height: auto;
+    flex-shrink: 0;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+#card-overview .overview-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+#card-overview .overview-text h4 {
+    margin: 0 0 8px;
+    font-size: 1.2em;
+}
+
+#card-overview .overview-text p {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.category-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 0.5rem;
+    color: var(--text-dark);
+}
+
+.category-selector label {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--hover-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 20px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    user-select: none;
+    transition: background-color 0.2s, transform 0.15s;
+}
+
+.category-selector label:hover {
+    background-color: var(--bg-color);
+}
+
+.category-selector label.checked {
+    border-color: var(--primary);
+    font-weight: bold;
+    transform: scale(1.05);
+}
+
+.category-selector input[type="checkbox"] {
+    display: none;
+}
+
+/* ====================== Actions ====================== */
+
+#actions-area {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.actions button {
+    background: var(--primary);
+    color: var(--text-light);
+    font-size: 1rem;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.actions button:hover {
+    background: var(--secondary);
+}
+
+.actions select {
+    padding: 8px 12px;
+    font-size: 1rem;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+}
+
+/* inline buttons in the title */
+.copy-btn {
+    margin-left: 8px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 0.9em;
+    color: #888;
+    cursor: pointer;
+}
+
+.copy-btn:hover {
+    color: #444;
+    text-decoration: underline;
+}
+
+.copy-wrapper {
+    position: relative;
+}
+
+.copy-popup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #ccc;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    z-index: 20;
+    font-size: 1rem;
+}
+
+.copy-popup button {
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 4px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.copy-popup button:hover {
+    background: #f0f0f0;
+}
+
+/* ====================== Reserve ====================== */
+
+#reserve-area {
+    grid-column: 2 / 3;
+    grid-row: 3 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#reserve {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+}
+
+.deck-builder-input {
+    width: 80%;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-light);
+}
+
+/* ====================== Drop zones and cards ====================== */
+
+.dropzone {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 140px;
+    padding: 10px;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.dropzone.drag-over {
+    border-color: var(--secondary);
+    background: var(--hover-bg);
+}
+
+.deck-card {
+    position: relative;
+    width: 65px;
+    height: 90px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    cursor: grab;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.deck-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.deck-card .no-image {
+    display: block;
+    padding: 4px;
+    font-size: 0.6rem;
+    color: var(--text-light);
+    word-break: break-word;
+}
+
+.deck-card:active {
+    cursor: grabbing;
+}
+
+.deck-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7);
+}
+
+.deck-card.selected {
+    outline: 3px solid var(--primary);
+}
+
+/* proxy cards: red border and badge (bottom-left) */
+.deck-card[data-is_proxy="true"] {
+    border: 2px solid red;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+}
+
+.deck-card[data-is_proxy="true"]::after {
+    content: "Proxy";
+    position: absolute;
+    bottom: 2px;
+    left: 4px;
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ban status badge (top-right) */
+.deck-card[data-ban_status]::before {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.deck-card[data-ban_status="Limited"]::before {
+    content: "1";
+    background: #ffc107;
+}
+
+.deck-card[data-ban_status="Semi-Limited"]::before {
+    content: "2";
+    background: #17a2b8;
+}
+
+.deck-card[data-ban_status="Banned"]::before {
+    content: "X";
+    background: #dc3545;
+}
+
+/* ====================== Tournament and test draw ====================== */
+
+#tournament-area,
+#test-draw-area {
+    grid-column: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+#test-draw-area .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#test-draw-area .controls input {
+    width: 8rem;
+    padding: 8px 10px;
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-light);
+}
+
+#test-draw-area .controls button {
+    padding: 8px 14px;
+    font-size: 1rem;
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--text-light);
+    border: none;
+    cursor: pointer;
+}
+
+#test-draw-area .controls button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.bordered-table {
+    border-collapse: collapse;
+}
+
+.bordered-table th,
+.bordered-table td {
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+}
+
+.chart {
+    max-width: 900px;
+}

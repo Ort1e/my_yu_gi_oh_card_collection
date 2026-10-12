@@ -5,6 +5,7 @@ use axum::extract::State;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 
+use crate::db::begin_write;
 use crate::error::AppResult;
 use crate::forms::{FormData, Pairs};
 use crate::AppState;
@@ -25,7 +26,10 @@ pub async fn page() -> AddDeckPage {
     }
 }
 
-pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> AppResult<Response> {
+pub async fn create(
+    State(state): State<AppState>,
+    Form(pairs): Form<Pairs>,
+) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
     let name = form.required("name", "Name");
     let version_name = form.required("version_name", "Version name");
@@ -41,13 +45,13 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
         .into_response());
     };
 
-    let mut tx = state.pool.begin().await?;
-    let deck_id: i64 =
-        sqlx::query_scalar("INSERT INTO deck (name, description) VALUES (?, ?) RETURNING id")
-            .bind(&name)
-            .bind(&description)
-            .fetch_one(&mut *tx)
-            .await?;
+    let mut tx = begin_write(&state.pool).await?;
+    let deck_id: i64 = sqlx::query("INSERT INTO deck (name, description) VALUES (?, ?)")
+        .bind(&name)
+        .bind(&description)
+        .execute(&mut *tx)
+        .await?
+        .last_insert_rowid();
     sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
         .bind(deck_id)
         .bind(&version_name)

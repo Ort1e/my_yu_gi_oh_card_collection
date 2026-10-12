@@ -18,7 +18,7 @@ use domain::lot::LotType;
 use regex::Regex;
 
 use crate::card_data::{insert_lot_cards, spawn_link_cards};
-use crate::db::Money;
+use crate::db::{begin_write, Money};
 use crate::error::{AppError, AppResult};
 use crate::forms::{CardRowValues, FormData, Pairs};
 use crate::routes::lots;
@@ -142,7 +142,10 @@ async fn remove_stale_uploads(uploads: &FsPath) {
     }
 }
 
-pub async fn upload(State(state): State<AppState>, mut multipart: Multipart) -> AppResult<AddLotPage> {
+pub async fn upload(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> AppResult<AddLotPage> {
     let mut page = AddLotPage::new(&state).await?;
 
     let mut pdf = None;
@@ -178,7 +181,9 @@ pub async fn upload(State(state): State<AppState>, mut multipart: Multipart) -> 
     let token = format!("{:016x}", rand::random::<u64>());
     let path = pending_path(&state.uploads_dir, &token).expect("valid token");
     let io = |e: std::io::Error| AppError::Internal(format!("saving upload: {e}"));
-    tokio::fs::create_dir_all(&state.uploads_dir).await.map_err(io)?;
+    tokio::fs::create_dir_all(&state.uploads_dir)
+        .await
+        .map_err(io)?;
     tokio::fs::write(&path, &pdf).await.map_err(io)?;
 
     prefill(&state, &mut page, shipment).await?;
@@ -220,7 +225,10 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
     // One row per distinct card, with its quantity.
     let mut rows: Vec<(CardRowValues, u32)> = Vec::new();
     for card in shipment.cards {
-        let status = card.status().map(|s| s.code().to_string()).unwrap_or_default();
+        let status = card
+            .status()
+            .map(|s| s.code().to_string())
+            .unwrap_or_default();
         let row = CardRowValues {
             name: card.name.clone(),
             en_name: card.name,
@@ -231,7 +239,8 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
             quantity: String::new(),
         };
         match rows.iter_mut().find(|(r, _)| {
-            (&r.name, &r.code, &r.status, &r.price) == (&row.name, &row.code, &row.status, &row.price)
+            (&r.name, &r.code, &r.status, &r.price)
+                == (&row.name, &row.code, &row.status, &row.price)
         }) {
             Some((_, n)) => *n += 1,
             None => rows.push((row, 1)),
@@ -251,7 +260,10 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
 
 // ---------- lot creation ----------
 
-pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> AppResult<Response> {
+pub async fn create(
+    State(state): State<AppState>,
+    Form(pairs): Form<Pairs>,
+) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
 
     let lot_type = LotType::from_code(form.get("lot_type").unwrap_or_default());
@@ -267,14 +279,16 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
     let seller_source = form.id("seller_source", "Seller source");
     let cards = form.new_cards();
     if seller_id.is_none() && seller_name.is_none() {
-        form.errors.push("Select a seller or enter a new seller name.".into());
+        form.errors
+            .push("Select a seller or enter a new seller name.".into());
     }
     let pending = form.get("pending").map(str::to_string);
     let pending_file = match &pending {
         Some(token) => match pending_path(&state.uploads_dir, token) {
             Some(path) if path.exists() => Some(path),
             _ => {
-                form.errors.push("The uploaded shipment file expired, upload it again.".into());
+                form.errors
+                    .push("The uploaded shipment file expired, upload it again.".into());
                 None
             }
         },
@@ -307,16 +321,14 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
         return Ok(page.into_response());
     };
 
-    let mut tx = state.pool.begin().await?;
+    let mut tx = begin_write(&state.pool).await?;
 
     let seller_id = match (seller_id, seller_name) {
-        (Some(id), _) => {
-            sqlx::query_scalar::<_, i64>("SELECT id FROM seller WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or(AppError::NotFound)?
-        }
+        (Some(id), _) => sqlx::query_scalar::<_, i64>("SELECT id FROM seller WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(AppError::NotFound)?,
         (None, Some(name)) => {
             let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM seller WHERE name = ?")
                 .bind(&name)
@@ -325,23 +337,22 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
             match existing {
                 Some(id) => id,
                 None => {
-                    sqlx::query_scalar(
-                        "INSERT INTO seller (name, is_person, source_id) VALUES (?, ?, ?) RETURNING id",
-                    )
-                    .bind(&name)
-                    .bind(form.checked("seller_is_person"))
-                    .bind(seller_source)
-                    .fetch_one(&mut *tx)
-                    .await?
+                    sqlx::query("INSERT INTO seller (name, is_person, source_id) VALUES (?, ?, ?)")
+                        .bind(&name)
+                        .bind(form.checked("seller_is_person"))
+                        .bind(seller_source)
+                        .execute(&mut *tx)
+                        .await?
+                        .last_insert_rowid()
                 }
             }
         }
         (None, None) => unreachable!("validated above"),
     };
 
-    let lot_id: i64 = sqlx::query_scalar(
+    let lot_id: i64 = sqlx::query(
         "INSERT INTO lot (lot_type, price, buy_date, received_date, seller_id, no_card_price)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(lot_type.code())
     .bind(Money(price))
@@ -349,8 +360,9 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
     .bind(received_date.map(|d| d.to_string()))
     .bind(seller_id)
     .bind(Money(no_card_price.unwrap_or_default()))
-    .fetch_one(&mut *tx)
-    .await?;
+    .execute(&mut *tx)
+    .await?
+    .last_insert_rowid();
 
     let card_ids = insert_lot_cards(&mut tx, lot_id, &cards).await?;
 
@@ -359,7 +371,9 @@ pub async fn create(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> 
         Some(from) => {
             let (relative, to) = shipment_destination(&state.media_dir, lot_id);
             let io = |e: std::io::Error| AppError::Internal(format!("moving shipment file: {e}"));
-            tokio::fs::create_dir_all(to.parent().unwrap()).await.map_err(io)?;
+            tokio::fs::create_dir_all(to.parent().unwrap())
+                .await
+                .map_err(io)?;
             tokio::fs::rename(&from, &to).await.map_err(io)?;
             sqlx::query("UPDATE lot SET shipment_file = ? WHERE id = ?")
                 .bind(relative)
@@ -418,7 +432,7 @@ pub async fn add_cards(
         return Ok(page.into_response());
     }
 
-    let mut tx = state.pool.begin().await?;
+    let mut tx = begin_write(&state.pool).await?;
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM lot WHERE id = ?")
         .bind(lot_id)
         .fetch_optional(&mut *tx)

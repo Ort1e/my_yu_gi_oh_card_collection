@@ -20,7 +20,7 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 | HTTP | axum 0.7, tower-http (ServeDir, trace) |
 | DB | SQLite via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
 | Simple pages | askama 0.12 + askama_axum templates, htmx 1.9 for fragments |
-| Rich page | Svelte 4 + Vite 5 in `frontend/`, built to `static/complex/`, talks only to `/api/*` |
+| Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), built to `static/deck-builder/` (gitignored), talks only to `/api/*` |
 | Env | Nix flake (`flake.nix`, `.envrc` → `use flake`), Rust 1.88.0 pinned in `rust-toolchain.toml` |
 
 Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
@@ -46,8 +46,8 @@ cargo test -p domain --test real_shipments -- --ignored --nocapture
 cargo run -p backend                      # http://127.0.0.1:3000 (BIND_ADDR to change), runs migrations on startup
 # rebuild the DB from the Django dump (importer is NOT idempotent: start from an empty DB)
 rm -f app.db && cargo run -p importer -- data/data.json
-cd frontend && npm install && npm run dev   # Vite dev server, proxies /api → :3000
-cd frontend && npm run build                # → static/complex/bundle.{js,css}
+cd frontend && npm install && npm run build  # → static/deck-builder/bundle.{js,css}, needed by /deck-builder/:id
+cd frontend && npm run dev                  # hot reload at http://localhost:5173/?id=<deck version id>, proxies /api → :3000
 sqlite3 app.db                              # inspect
 ```
 
@@ -64,6 +64,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `MEDIA_DIR` (`data/
 - Domain names are kept from Django (some French): `unite` (one card in a lot), `apport` (one-off budget contribution), `categorie_true/false`.
 - `0002_ygo_schema.sql` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
 - `sqlx::migrate!` embeds migrations at compile time and checksums applied ones. **Until cutover** `0002` is the baseline and may be edited: then rebuild with `rm -f app.db && cargo run -p importer -- data/data.json`. **After cutover** only add new numbered files.
+- sqlx 0.7 + SQLite concurrency rules (see `backend/src/db.rs`): write transactions start with `db::begin_write(&pool)` (takes the write lock up front), never `pool.begin()`; never `INSERT ... RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. The DB runs in WAL mode.
 - SQLite + FKs: never drop/rebuild a parent table in a migration while `foreign_keys` is on — `DROP TABLE` fires ON DELETE CASCADE in children.
 
 ## Migration status
@@ -73,12 +74,14 @@ Read-only pages ✅ (scaffold demo removed). Budget figures checked month by mon
 
 Decided: serve from `/` (drop Django's `/my_ygo_cards/` prefix, e.g. `/my_ygo_cards/cards/` → `/cards/`); the deck builder becomes the Svelte app in `frontend/` (don't port the vanilla JS).
 Auth: none for now, server binds to 127.0.0.1 by default. Keep every write route in its own router so a login layer (single password from env + session cookie) can be added in one place when the app is served on the LAN; `/media/shipment_files` must go behind it too.
-Port order: schema ✅ → shared domain logic + tests ✅ → read-only pages ✅ → lots/budget writes ✅ → deck builder.
+Port order: schema ✅ → shared domain logic + tests ✅ → read-only pages ✅ → lots/budget writes ✅ → deck builder ✅.
+
+Deck builder: `/deck-builder/:id` (askama shell, `routes/decks.rs::builder`) mounts the Svelte app (`frontend/src/App.svelte` + `lib/*.svelte`, API client `api.js`, pure helpers `deck.js`). JSON API in `routes/deck_api.rs` under `/api/deck-versions/:id` (`GET`/`PATCH`/`DELETE`, `clone`, `proxies`, `reserve`, `categories`, `cards/:card_id/categories[/:category_id]`, `monte-carlo`, `tournament`) and `/api/decks/:id/import-ydke`. Zone edits are local until "Save" (PATCH of the three zones + ban list); proxies, categories and the tournament save immediately. YDKE copy is computed client-side from the current zones. Deliberate differences are listed at the top of `deck_api.rs`.
 
 Rust routes so far: `/` dashboard, `/budget`, `/cards` (+ filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (+ filters), `/lots/:id`, `/decks`, `/decks/:id`, `/card-image/:card_data_id` (serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing — Django downloaded during page render), `/static`, `/media`.
 Write routes: `/lots/add` (form + `POST /lots/add/shipment` PDF upload → pre-filled form, PDF kept as `uploads/pending-<token>.pdf` (deleted after 24 h) and moved to `media/shipment_files/shipment_<lot id>.pdf` on save), `POST /lots/:id/cards`, `/decks/add`, `/budget/manage` (+ `/budget/manage/budget` upsert, `/budget/manage/apports`, `/budget/manage/apports/:id/delete`).
 Deliberate differences: card rows added/removed with JS instead of `?cards=N` reloads; identical PDF cards are one row with a quantity; a new seller keeps is_person/source (Django's `get_or_create(name=)` dropped them); new cards are linked to card_data in a background task right after saving (Django fetched lazily on page views); budgets/apports have a page (Django used its admin).
-Missing vs Django: auth, editing/deleting cards, lots, sellers and decks (Django only had that in its admin), fetching card_data for the 3 imported cards that have none, deck builder + API, management commands.
+Missing vs Django: auth, editing/deleting cards, lots, sellers and decks (Django only had that in its admin), fetching card_data for the 3 imported cards that have none, management commands (`scrap_ban_list`, `clean_cards`; `clean_card_categories` is no longer needed).
 
 Django reference for everything (✅ = ported):
 
@@ -91,10 +94,10 @@ Django reference for everything (✅ = ported):
 | ✅ `/sellers/`, `/sellers/seller/<pk>` | `sellers.py` | Seller detail lists lots + total card count |
 | ✅ `/lots/`, `/lots/<pk>/`, `/lots/add/` | `lots/lots.py`, `lots/lot_form.py` | Lot detail POST adds N unites (quantity → N new cards). Add-lot: lot form + seller select/create + unite formset + **Cardmarket PDF upload that pre-fills the form** |
 | ✅ `/decks/`, `/decks/deck/<pk>`, `/decks/add/` | `deck.py` | Add deck also creates its first version |
-| `/deck_builder/<deck_version_id>/` | `rest_api/deck_builder_api.DeckBuilderView` | GET page + POST tournament form. Rewrite as the Svelte app; the old vanilla JS in `my_ygo_cards/static/js/deck_builder/` is only a behaviour reference |
+| ✅ `/deck_builder/<deck_version_id>/` | `rest_api/deck_builder_api.DeckBuilderView` | Rewritten as the Svelte app; the old vanilla JS in `my_ygo_cards/static/js/deck_builder/` was the behaviour reference |
 | `/accounts/login/` etc. | Django auth | Login required for add lot, add deck, deck builder. No Rust equivalent yet |
 
-### JSON API (`rest_api/deck_builder_api.py`, `rest_api/serializers.py`)
+### ✅ JSON API (`rest_api/deck_builder_api.py`, `rest_api/serializers.py`)
 Under `api/deck_versions/<id>/`: `""` GET/PATCH/DELETE · `clone/` POST · `proxy/` POST · `proxy/<card_id>/` DELETE · `card_lists/` POST (filtered cards not in deck, forced proxy=false sold=false) · `categories/` GET/POST · `assign_categories/<card_id>/` GET/POST · `categories/delete/<category_id>/` DELETE · `monte_carlos/` POST.
 Plus `api/decks/<deck_id>/import_ydke/` POST. The Svelte app is the only consumer, so shapes may be cleaned up, but keep the information the DRF serializers expose.
 
@@ -126,6 +129,7 @@ Cardmarket shipment PDFs (uploads, `data/media/shipment_files/`, and the test PD
 ## Working conventions
 
 - Match existing style: handlers + askama templates per page in `backend/src/routes/pages.rs`, JSON in `routes/api.rs`, state is `db::Pool` (`SqlitePool`). Split into modules per domain as it grows.
+- Frontend (`frontend/`): **4-space indentation and airy code** (blank lines between logical blocks, after guards/early returns, around try/catch); `.editorconfig` sets it. Keep pure logic in `deck.js`, HTTP in `api.js`.
 - Handlers return `AppResult<T>`; use `?` and `.or_404()`, never `.unwrap()` on DB results.
 - Askama quirks: method arguments in templates are passed inconsistently by value/reference — prefer argument-less helper methods (`page.next_href()`); `{% let x = field %}` moves, so expose `&` getters for non-Copy fields.
 - Format on save is on (rust-analyzer from PATH). Keep `cargo check --workspace` clean.

@@ -1,5 +1,6 @@
 use askama::Template;
 use axum::extract::{Path, Query, State};
+use sqlx::Row;
 
 use crate::error::{AppResult, OrNotFound};
 use crate::models::DeckVersionRow;
@@ -31,13 +32,12 @@ pub async fn list(
         .fetch_one(pool)
         .await?;
     let page = Page::new(param.page, total, String::new());
-    let decks = sqlx::query_as(
-        "SELECT id, name, description FROM deck ORDER BY name, id LIMIT ? OFFSET ?",
-    )
-    .bind(PAGE_SIZE)
-    .bind(page.offset())
-    .fetch_all(pool)
-    .await?;
+    let decks =
+        sqlx::query_as("SELECT id, name, description FROM deck ORDER BY name, id LIMIT ? OFFSET ?")
+            .bind(PAGE_SIZE)
+            .bind(page.offset())
+            .fetch_all(pool)
+            .await?;
 
     Ok(DecksList {
         page_title: "All Decks",
@@ -70,4 +70,31 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     .await?;
 
     Ok(DeckDetail { deck, versions })
+}
+
+/// Shell page of the deck builder: the Svelte app (built from `frontend/`)
+/// mounts on `#app` and talks to `/api/deck-versions/:id`.
+#[derive(Template)]
+#[template(path = "deck_builder.html")]
+pub struct DeckBuilder {
+    id: i64,
+    title: String,
+}
+
+pub async fn builder(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<DeckBuilder> {
+    let row = sqlx::query(
+        "SELECT deck.name, deck_version.version_name
+         FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
+         WHERE deck_version.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .or_404()?;
+    let deck: Option<String> = row.get(0);
+    let version: String = row.get(1);
+    Ok(DeckBuilder {
+        id,
+        title: format!("{} - {version}", deck.as_deref().unwrap_or("No Deck")),
+    })
 }

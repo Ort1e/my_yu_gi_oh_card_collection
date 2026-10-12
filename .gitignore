@@ -1,8 +1,10 @@
 /target
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 node_modules/
-static/complex/
+static/deck-builder/
 .env
 
 # Environments 
