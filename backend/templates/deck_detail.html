@@ -14,6 +14,12 @@
       <div class="card-meta-line">
         <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
       </div>
+      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
+        <form method="post" action="/decks/{{ deck.id }}/delete">
+          <button type="submit" onclick="return confirm('Delete this deck and all its versions?')">Delete</button>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -21,5 +27,16 @@
   {% for version in versions %}
     {% include "_deck_version_item.html" %}
   {% endfor %}
+
+  <form method="post" action="/decks/{{ deck.id }}/versions">
+    <fieldset>
+      <legend>New empty version</legend>
+      {% include "_form_errors.html" %}
+      <label for="version_name">Version name:</label>
+      <input type="text" name="version_name" id="version_name" maxlength="100" required>
+      <input type="submit" value="Create">
+      <p><small>To start from an existing version, use "Clone" in the deck builder.</small></p>
+    </fieldset>
+  </form>
 </div>
 {% endblock %}

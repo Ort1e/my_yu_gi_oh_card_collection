@@ -26,6 +26,7 @@
           {% endmatch %}
         </div>
         <div class="card-subtitle">Proxy: {{ card.is_proxy|yes_no }}</div>
+        <div><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>
         {% match price %}{% when Some with (price) %}
         <div>Price: {{ price }} €</div>
         {% when None %}{% endmatch %}

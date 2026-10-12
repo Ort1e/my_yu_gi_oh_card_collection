@@ -2,6 +2,7 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 use sqlx::Row;
 
+use crate::db::Pool;
 use crate::error::{AppResult, OrNotFound};
 use crate::models::DeckVersionRow;
 use crate::pagination::{Page, PageParam, PAGE_SIZE};
@@ -52,10 +53,15 @@ pub async fn list(
 pub struct DeckDetail {
     deck: DeckRow,
     versions: Vec<DeckVersionRow>,
+    /// Errors of the "new version" form.
+    errors: Vec<String>,
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<DeckDetail> {
-    let pool = &state.pool;
+    load_detail(&state.pool, id, Vec::new()).await
+}
+
+pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult<DeckDetail> {
     let deck = sqlx::query_as("SELECT id, name, description FROM deck WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
@@ -69,7 +75,11 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     .fetch_all(pool)
     .await?;
 
-    Ok(DeckDetail { deck, versions })
+    Ok(DeckDetail {
+        deck,
+        versions,
+        errors,
+    })
 }
 
 /// Shell page of the deck builder: the Svelte app (built from `frontend/`)

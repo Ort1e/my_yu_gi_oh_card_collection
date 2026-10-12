@@ -1,4 +1,5 @@
-//! Lot creation (Django: `AddLotView`, `LotDetailView.post`).
+//! Lot creation (Django: `AddLotView`, `LotDetailView.post`) and edition
+//! (Django: admin only). Lots and their unites are never deleted.
 //!
 //! A Cardmarket shipment PDF can be uploaded first: it is parsed in memory to
 //! pre-fill the form and kept as a *pending* file in the uploads directory,
@@ -20,7 +21,7 @@ use regex::Regex;
 use crate::card_data::spawn_link_cards;
 use crate::cards::insert_lot_cards;
 use crate::db::{begin_write, Money};
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, OrNotFound};
 use crate::forms::{CardRowValues, FormData, Pairs};
 use crate::routes::lots;
 use crate::AppState;
@@ -45,6 +46,47 @@ impl Default for LotValues {
             no_card_price: "0.00".to_string(),
         }
     }
+}
+
+impl LotValues {
+    fn from_form(form: &FormData) -> LotValues {
+        LotValues {
+            lot_type: form.text("lot_type"),
+            price: form.text("price"),
+            buy_date: form.text("buy_date"),
+            received_date: form.text("received_date"),
+            no_card_price: form.text("no_card_price"),
+        }
+    }
+}
+
+/// Validated lot fields.
+struct ValidLot {
+    lot_type: LotType,
+    price: rust_decimal::Decimal,
+    buy_date: chrono::NaiveDate,
+    received_date: Option<chrono::NaiveDate>,
+    no_card_price: rust_decimal::Decimal,
+}
+
+/// Validate the lot fields. Errors go to `form.errors`: callers must also
+/// check it is empty (an invalid optional field still gives `Some`).
+fn validate_lot(form: &mut FormData) -> Option<ValidLot> {
+    let lot_type = LotType::from_code(form.get("lot_type").unwrap_or_default());
+    if lot_type.is_none() {
+        form.errors.push("Lot type is required.".into());
+    }
+    let price = form.required_decimal("price", "Price");
+    let buy_date = form.required_date("buy_date", "Buy date");
+    let received_date = form.date("received_date", "Received date");
+    let no_card_price = form.decimal("no_card_price", "No card price");
+    Some(ValidLot {
+        lot_type: lot_type?,
+        price: price?,
+        buy_date: buy_date?,
+        received_date,
+        no_card_price: no_card_price.unwrap_or_default(),
+    })
 }
 
 /// New-seller fields as typed.
@@ -267,14 +309,7 @@ pub async fn create(
 ) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
 
-    let lot_type = LotType::from_code(form.get("lot_type").unwrap_or_default());
-    if lot_type.is_none() {
-        form.errors.push("Lot type is required.".into());
-    }
-    let price = form.required_decimal("price", "Price");
-    let buy_date = form.required_date("buy_date", "Buy date");
-    let received_date = form.date("received_date", "Received date");
-    let no_card_price = form.decimal("no_card_price", "No card price");
+    let lot = validate_lot(&mut form);
     let seller_id = form.id("seller_select", "Seller");
     let seller_name = form.get("seller_name").map(str::to_string);
     let seller_source = form.id("seller_source", "Seller source");
@@ -296,17 +331,9 @@ pub async fn create(
         None => None,
     };
 
-    let (Some(lot_type), Some(price), Some(buy_date), true) =
-        (lot_type, price, buy_date, form.errors.is_empty())
-    else {
+    let (Some(lot), true) = (lot, form.errors.is_empty()) else {
         let mut page = AddLotPage::new(&state).await?;
-        page.lot = LotValues {
-            lot_type: form.text("lot_type"),
-            price: form.text("price"),
-            buy_date: form.text("buy_date"),
-            received_date: form.text("received_date"),
-            no_card_price: form.text("no_card_price"),
-        };
+        page.lot = LotValues::from_form(&form);
         page.seller_select = form.text("seller_select");
         page.new_seller = SellerValues {
             name: form.text("seller_name"),
@@ -355,12 +382,12 @@ pub async fn create(
         "INSERT INTO lot (lot_type, price, buy_date, received_date, seller_id, no_card_price)
          VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind(lot_type.code())
-    .bind(Money(price))
-    .bind(buy_date.to_string())
-    .bind(received_date.map(|d| d.to_string()))
+    .bind(lot.lot_type.code())
+    .bind(Money(lot.price))
+    .bind(lot.buy_date.to_string())
+    .bind(lot.received_date.map(|d| d.to_string()))
     .bind(seller_id)
-    .bind(Money(no_card_price.unwrap_or_default()))
+    .bind(Money(lot.no_card_price))
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();
@@ -413,6 +440,172 @@ fn shipment_destination(media: &FsPath, lot_id: i64) -> (String, PathBuf) {
         }
         n += 1;
     }
+}
+
+// ---------- lot edition ----------
+
+/// A unite of the edited lot, its price as typed.
+#[derive(Debug, sqlx::FromRow)]
+pub struct UniteValues {
+    card_id: i64,
+    card_name: String,
+    price: String,
+}
+
+#[derive(Template)]
+#[template(path = "edit_lot.html")]
+pub struct EditLotPage {
+    id: i64,
+    errors: Vec<String>,
+    lot: LotValues,
+    is_cancelled: bool,
+    seller_select: String,
+    unites: Vec<UniteValues>,
+    sellers: Vec<(i64, String)>,
+}
+
+impl EditLotPage {
+    fn lot_type_is(&self, code: &str) -> bool {
+        self.lot.lot_type == code
+    }
+
+    fn seller_is(&self, id: &i64) -> bool {
+        self.seller_select == id.to_string()
+    }
+}
+
+async fn lot_unites(state: &AppState, lot_id: i64) -> sqlx::Result<Vec<UniteValues>> {
+    sqlx::query_as(
+        "SELECT unite.card_id, card.name AS card_name, coalesce(unite.price, '') AS price
+         FROM unite JOIN card ON card.id = unite.card_id
+         WHERE unite.lot_id = ? ORDER BY unite.id",
+    )
+    .bind(lot_id)
+    .fetch_all(&state.pool)
+    .await
+}
+
+async fn sellers(state: &AppState) -> sqlx::Result<Vec<(i64, String)>> {
+    sqlx::query_as("SELECT id, name FROM seller ORDER BY name COLLATE NOCASE")
+        .fetch_all(&state.pool)
+        .await
+}
+
+#[derive(sqlx::FromRow)]
+struct StoredLot {
+    lot_type: String,
+    price: Money,
+    buy_date: String,
+    received_date: Option<String>,
+    no_card_price: Money,
+    is_cancelled: bool,
+    seller_id: Option<i64>,
+}
+
+pub async fn edit_page(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> AppResult<EditLotPage> {
+    let lot: StoredLot = sqlx::query_as(
+        "SELECT lot_type, price, buy_date, received_date, no_card_price, is_cancelled, seller_id
+         FROM lot WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .or_404()?;
+
+    Ok(EditLotPage {
+        id,
+        errors: Vec::new(),
+        lot: LotValues {
+            lot_type: lot.lot_type,
+            price: lot.price.0.to_string(),
+            buy_date: lot.buy_date,
+            received_date: lot.received_date.unwrap_or_default(),
+            no_card_price: lot.no_card_price.0.to_string(),
+        },
+        is_cancelled: lot.is_cancelled,
+        seller_select: lot.seller_id.map(|id| id.to_string()).unwrap_or_default(),
+        unites: lot_unites(&state, id).await?,
+        sellers: sellers(&state).await?,
+    })
+}
+
+/// Name of the price field of the unite of `card_id`.
+fn unite_price_field(card_id: i64) -> String {
+    format!("unite-{card_id}-price")
+}
+
+pub async fn update(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(pairs): Form<Pairs>,
+) -> AppResult<Response> {
+    let mut form = FormData::new(pairs);
+    let lot = validate_lot(&mut form);
+    let seller_id = form.id("seller_select", "Seller");
+
+    let mut unites = lot_unites(&state, id).await?;
+    let mut prices = Vec::with_capacity(unites.len());
+    for unite in &mut unites {
+        let field = unite_price_field(unite.card_id);
+        let label = format!("Price of {}", unite.card_name);
+        prices.push((unite.card_id, form.decimal(&field, &label)));
+        unite.price = form.text(&field);
+    }
+
+    let (Some(lot), true) = (lot, form.errors.is_empty()) else {
+        return Ok(EditLotPage {
+            id,
+            lot: LotValues::from_form(&form),
+            is_cancelled: form.checked("is_cancelled"),
+            seller_select: form.text("seller_select"),
+            unites,
+            sellers: sellers(&state).await?,
+            errors: form.errors,
+        }
+        .into_response());
+    };
+
+    let mut tx = begin_write(&state.pool).await?;
+    if let Some(seller_id) = seller_id {
+        sqlx::query_scalar::<_, i64>("SELECT id FROM seller WHERE id = ?")
+            .bind(seller_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    }
+    let updated = sqlx::query(
+        "UPDATE lot SET lot_type = ?, price = ?, buy_date = ?, received_date = ?,
+            no_card_price = ?, is_cancelled = ?, seller_id = ?
+         WHERE id = ?",
+    )
+    .bind(lot.lot_type.code())
+    .bind(Money(lot.price))
+    .bind(lot.buy_date.to_string())
+    .bind(lot.received_date.map(|d| d.to_string()))
+    .bind(Money(lot.no_card_price))
+    .bind(form.checked("is_cancelled"))
+    .bind(seller_id)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if updated == 0 {
+        return Err(AppError::NotFound);
+    }
+    for (card_id, price) in prices {
+        sqlx::query("UPDATE unite SET price = ? WHERE lot_id = ? AND card_id = ?")
+            .bind(price.map(Money))
+            .bind(id)
+            .bind(card_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+
+    Ok(Redirect::to(&format!("/lots/{id}")).into_response())
 }
 
 // ---------- add cards to an existing lot ----------

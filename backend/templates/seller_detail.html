@@ -14,6 +14,7 @@
     <div class="card-subtitle">Source: {{ seller.source.as_deref().unwrap_or("—") }}</div>
     <div class="card-subtitle">Lots: {{ seller.lot_count }}</div>
     <div class="card-subtitle">Cards: {{ total_cards }}</div>
+    <div><a href="/sellers/{{ seller.id }}/edit" class="btn">Edit</a></div>
   </div>
 </div>
 

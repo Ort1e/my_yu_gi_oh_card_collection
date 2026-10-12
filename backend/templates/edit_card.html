@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ card.name }}{% endblock %}
+
+{% block content %}
+<h1 class="card-title">Edit Card</h1>
+<p><a href="/cards/{{ id }}">← Back to the card</a></p>
+
+{% include "_form_errors.html" %}
+
+<form method="post" action="/cards/{{ id }}/edit">
+  <fieldset>
+    <legend>Card</legend>
+    <p>
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" value="{{ card.name }}" maxlength="255" required>
+    </p>
+    <p>
+      <label for="en_name">English name:</label>
+      <input type="text" name="en_name" id="en_name" value="{{ card.en_name }}" maxlength="255" placeholder="defaults to the name">
+      <br><small>Changing it relinks the card to its card data.</small>
+    </p>
+    <p>
+      <label for="code">Code:</label>
+      <input type="text" name="code" id="code" value="{{ card.code }}" maxlength="20">
+    </p>
+    <p>
+      <label for="status">Last known status:</label>
+      <select name="status" id="status">
+        <option value="">---------</option>
+        {% for status in self.statuses() %}
+        <option value="{{ status.code() }}" {% if card.status == status.code() %}selected{% endif %}>{{ status.label() }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    <div class="checkbox-wrapper-3" style="display: inline-flex; align-items: center;">
+      <input type="checkbox" name="is_proxy" id="is_proxy" {% if card.is_proxy %}checked{% endif %}>
+      <label for="is_proxy" class="toggle"><span></span></label>
+      <label for="is_proxy" class="checkbox-label">Proxy Card</label>
+    </div>
+  </fieldset>
+
+  <p><input type="submit" value="Save"></p>
+</form>
+{% endblock %}

@@ -1,5 +1,6 @@
 mod budget;
 mod budget_form;
+mod card_form;
 mod cards;
 mod dashboard;
 mod deck_api;
@@ -8,6 +9,7 @@ mod decks;
 mod images;
 mod lot_form;
 mod lots;
+mod seller_form;
 mod sellers;
 
 use axum::extract::DefaultBodyLimit;
@@ -56,7 +58,25 @@ pub fn write_router() -> Router<AppState> {
             post(lot_form::upload).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
         )
         .route("/lots/:id/cards", post(lot_form::add_cards))
+        .route(
+            "/lots/:id/edit",
+            get(lot_form::edit_page).post(lot_form::update),
+        )
+        .route(
+            "/cards/:id/edit",
+            get(card_form::page).post(card_form::update),
+        )
+        .route(
+            "/sellers/:id/edit",
+            get(seller_form::page).post(seller_form::update),
+        )
         .route("/decks/add", get(deck_form::page).post(deck_form::create))
+        .route(
+            "/decks/:id/edit",
+            get(deck_form::edit_page).post(deck_form::update),
+        )
+        .route("/decks/:id/delete", post(deck_form::delete))
+        .route("/decks/:id/versions", post(deck_form::add_version))
         .route("/budget/manage", get(budget_form::page))
         .route("/budget/manage/budget", post(budget_form::set_budget))
         .route("/budget/manage/apports", post(budget_form::add_apport))

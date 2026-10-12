@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Lot {{ id }}{% endblock %}
+
+{% block content %}
+<h1 class="card-title">Edit Lot {{ id }}</h1>
+<p><a href="/lots/{{ id }}">← Back to the lot</a></p>
+
+{% include "_form_errors.html" %}
+
+<form method="post" action="/lots/{{ id }}/edit">
+  <fieldset>
+    <legend>Lot Info</legend>
+    <p>
+      <label for="price">Price:</label>
+      <input type="text" inputmode="decimal" name="price" id="price" value="{{ lot.price }}" required>
+    </p>
+    <p>
+      Lot type:
+      <label><input type="radio" name="lot_type" value="purchase" {% if self.lot_type_is("purchase") %}checked{% endif %}> Purchase</label>
+      <label><input type="radio" name="lot_type" value="sale" {% if self.lot_type_is("sale") %}checked{% endif %}> Sale</label>
+    </p>
+    <p>
+      <label for="buy_date">Buy date:</label>
+      <input type="date" name="buy_date" id="buy_date" value="{{ lot.buy_date }}" required>
+    </p>
+    <p>
+      <label for="received_date">Received date:</label>
+      <input type="date" name="received_date" id="received_date" value="{{ lot.received_date }}">
+    </p>
+    <p>
+      <label for="no_card_price">No card price:</label>
+      <input type="text" inputmode="decimal" name="no_card_price" id="no_card_price" value="{{ lot.no_card_price }}">
+    </p>
+    <p>
+      <label for="seller_select">Seller:</label>
+      <select name="seller_select" id="seller_select">
+        <option value="">— No seller —</option>
+        {% for (seller_id, seller_name) in sellers %}
+        <option value="{{ seller_id }}" {% if self.seller_is(seller_id) %}selected{% endif %}>{{ seller_name }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    <p>
+      <label><input type="checkbox" name="is_cancelled" {% if is_cancelled %}checked{% endif %}> Cancelled</label>
+    </p>
+  </fieldset>
+
+  {% if !unites.is_empty() %}
+  <fieldset>
+    <legend>Card prices</legend>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tbody>
+        {% for unite in unites %}
+        <tr>
+          <td style="padding: 0.5rem;"><label for="unite-{{ unite.card_id }}-price">{{ unite.card_name }}</label></td>
+          <td style="padding: 0.5rem;">
+            <input type="text" inputmode="decimal" name="unite-{{ unite.card_id }}-price" id="unite-{{ unite.card_id }}-price" value="{{ unite.price }}">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </fieldset>
+  {% endif %}
+
+  <p><input type="submit" value="Save"></p>
+</form>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ name }}{% endblock %}
+
+{% block content %}
+<h1 class="card-title">Edit Deck</h1>
+<p><a href="/decks/{{ id }}">← Back to the deck</a></p>
+
+{% include "_form_errors.html" %}
+
+<form method="post" action="/decks/{{ id }}/edit">
+  <fieldset>
+    <legend>Deck Information</legend>
+    <p>
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" value="{{ name }}" maxlength="100" required>
+    </p>
+    <p>
+      <label for="description">Description:</label>
+      <textarea name="description" id="description" rows="4">{{ description }}</textarea>
+    </p>
+  </fieldset>
+
+  <p><input type="submit" value="Save"></p>
+</form>
+{% endblock %}

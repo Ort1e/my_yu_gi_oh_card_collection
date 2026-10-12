@@ -24,7 +24,7 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
 - `backend/` — web server **and** maintenance commands (one binary):
   - `main.rs` (`AppState`: pool, reqwest client, media/uploads dirs, Cardmarket account; dispatches `commands::Command`), `db.rs` (pool, `begin_write`, `Money`), `error.rs` (`AppError`/`AppResult`, `.or_404()`, `bad_request`), `filters.rs` (askama filters), `pagination.rs`, `models.rs` (row types shared by pages), `forms.rs` (`FormData`: raw form pairs → validated values + errors; card rows `cards-<i>-<field>`), `card_data.rs` (ygoprodeck lookups with a shared rate limiter, background card→card_data linking), `cards.rs` (card-row writes and shared SQL: `Zone`, `SOLD_EXISTS`, `IN_ANY_DECK`, `insert_lot_cards`, `new_proxy`, `delete_orphan_proxies`), `tests.rs` (`TestApp`: handler tests on a temp migrated DB, no network).
-  - `routes/<domain>.rs`: one module per page group (row structs, queries, `#[derive(Template)]` structs, handlers). Read-only routes in `routes::router()`, **every write route in `routes::write_router()`** (future login layer). Forms: `lot_form.rs`, `deck_form.rs`, `budget_form.rs`; deck builder JSON API: `deck_api.rs`.
+  - `routes/<domain>.rs`: one module per page group (row structs, queries, `#[derive(Template)]` structs, handlers). Read-only routes in `routes::router()`, **every write route in `routes::write_router()`** (future login layer). Forms: `lot_form.rs` (create + edit), `deck_form.rs` (create, edit, delete, new version), `card_form.rs`, `seller_form.rs` (edit), `budget_form.rs`; deck builder JSON API: `deck_api.rs`.
   - `commands/`: `scrap-ban-list`, `clean-cards` (Django's management commands).
   - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), partials prefixed `_`. CSS from Django in `static/css/`.
 - `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
@@ -59,6 +59,8 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `MEDIA_DIR` (`data/
 ## Routes
 
 - Pages: `/` dashboard, `/budget` (+ `/budget/manage`), `/cards` (filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (filters), `/lots/:id`, `/lots/add`, `/decks`, `/decks/:id`, `/decks/add`, `/deck-builder/:id`.
+- Edition: `/{cards,sellers,lots,decks}/:id/edit` (GET form, POST save); `POST /decks/:id/delete` (versions cascade, orphan proxies removed), `POST /decks/:id/versions` (new empty version → deck builder).
+- **Cards, unites, lots and sellers are never deleted** (they are the collection's history): no delete routes for them. Deck versions are edited/deleted only in the deck builder.
 - `/card-image/:card_data_id` serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing. `/static`, `/media` are plain file servers.
 - Lot creation: `POST /lots/add/shipment` parses a Cardmarket PDF and re-renders the form pre-filled; the PDF waits as `uploads/pending-<token>.pdf` (deleted after 24 h) and moves to `media/shipment_files/shipment_<lot id>.pdf` on save. New cards are linked to card data by a background task.
 - Deck builder API (`routes/deck_api.rs`): `/api/deck-versions/:id` `GET`/`PATCH`/`DELETE`, `…/clone`, `…/proxies[/:card_id]`, `…/reserve`, `…/categories[/:category_id]`, `…/cards/:card_id/categories[/:category_id]`, `…/monte-carlo`, `…/tournament`, and `/api/decks/:id/import-ydke`. Zone edits stay local in the app until "Save"; proxies, categories and the tournament save immediately; YDKE copy is computed client-side.
@@ -79,7 +81,6 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `MEDIA_DIR` (`data/
 ## Remaining before cutover
 
 - Auth: none yet; the server binds to 127.0.0.1 by default. When served on the LAN, add a login layer (single password from env + session cookie) on `routes::write_router()` and put `/media/shipment_files` behind it.
-- Editing/deleting cards, lots, sellers and decks (Django only had that in its admin).
 - Cutover itself: final `data.json` dump from Django → importer, then stop editing `0002`.
 
 ## Privacy rule: shipment PDFs
