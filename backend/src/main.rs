@@ -1,9 +1,13 @@
+mod card_data;
 mod db;
 mod error;
 mod filters;
+mod forms;
 mod models;
 mod pagination;
 mod routes;
+#[cfg(test)]
+mod tests;
 
 use std::path::PathBuf;
 
@@ -18,6 +22,10 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// Django's MEDIA_ROOT: card images and shipment files.
     pub media_dir: PathBuf,
+    /// Shipment PDFs uploaded but not yet attached to a lot.
+    pub uploads_dir: PathBuf,
+    /// Our Cardmarket username, to tell purchases from sales in shipments.
+    pub cardmarket_account: String,
 }
 
 #[tokio::main]
@@ -25,20 +33,16 @@ async fn main() {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let media_dir =
-        PathBuf::from(std::env::var("MEDIA_DIR").unwrap_or_else(|_| "data/media".to_string()));
+    let env = |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
     let state = AppState {
         pool: db::init_pool().await,
         http: reqwest::Client::new(),
-        media_dir: media_dir.clone(),
+        media_dir: PathBuf::from(env("MEDIA_DIR", "data/media")),
+        uploads_dir: PathBuf::from(env("UPLOADS_DIR", "uploads")),
+        cardmarket_account: env("CARDMARKET_ACCOUNT", "0rtie"),
     };
 
-    let app = Router::new()
-        .merge(routes::router())
-        .nest_service("/static", ServeDir::new("static"))
-        .nest_service("/media", ServeDir::new(media_dir))
-        .with_state(state)
-        .layer(TraceLayer::new_for_http());
+    let app = app(state).layer(TraceLayer::new_for_http());
 
     // Local only by default: there is no login yet and /media exposes the
     // shipment PDFs (personal data). Set BIND_ADDR=0.0.0.0:3000 to serve the LAN.
@@ -48,4 +52,13 @@ async fn main() {
         .unwrap_or_else(|e| panic!("cannot bind {addr}: {e}"));
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
+}
+
+pub fn app(state: AppState) -> Router {
+    Router::new()
+        .merge(routes::router())
+        .merge(routes::write_router())
+        .nest_service("/static", ServeDir::new("static"))
+        .nest_service("/media", ServeDir::new(&state.media_dir))
+        .with_state(state)
 }

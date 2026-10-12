@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Add Deck{% endblock %}
+
+{% block content %}
+<h1 class="card-title">Create a New Deck</h1>
+
+{% include "_form_errors.html" %}
+
+<form method="post" action="/decks/add">
+  <fieldset>
+    <legend>Deck Information</legend>
+    <p>
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" value="{{ name }}" maxlength="100" required>
+    </p>
+    <p>
+      <label for="description">Description:</label>
+      <textarea name="description" id="description" rows="4">{{ description }}</textarea>
+    </p>
+  </fieldset>
+
+  <fieldset>
+    <legend>First Version</legend>
+    <p>Create the initial version of this deck.</p>
+    <p>
+      <label for="version_name">Version name:</label>
+      <input type="text" name="version_name" id="version_name" value="{{ version_name }}" maxlength="100" required>
+    </p>
+  </fieldset>
+
+  <input type="submit" value="Create Deck & Version">
+</form>
+{% endblock %}

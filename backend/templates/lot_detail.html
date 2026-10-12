@@ -52,5 +52,14 @@
       </tr>
     </tbody>
   </table>
+
+  <form method="post" action="/lots/{{ lot.id }}/cards">
+    <h2 style="margin-top: 1rem;">Add a card</h2>
+    {% include "_form_errors.html" %}
+    {% let i = 0 %}
+    {% let remove_button = false %}
+    {% include "_card_row.html" %}
+    <input type="submit" value="Add Card to Lot" style="margin-top: 1rem;">
+  </form>
 </div>
 {% endblock %}

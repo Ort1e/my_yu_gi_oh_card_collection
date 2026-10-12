@@ -3,7 +3,8 @@ use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
-use crate::db::Money;
+use crate::db::{Money, Pool};
+use crate::forms::CardRowValues;
 use crate::error::{AppResult, OrNotFound};
 use crate::models::LotRow;
 use crate::pagination::{self, Page, PAGE_SIZE};
@@ -103,10 +104,27 @@ pub struct LotDetail {
     lot: LotRow,
     unites: Vec<UniteRow>,
     total_price: Money,
+    /// "Add card" form: errors and values of the last submission.
+    errors: Vec<String>,
+    row: CardRowValues,
+}
+
+impl LotDetail {
+    fn statuses(&self) -> [domain::card::CardStatus; 5] {
+        domain::card::CardStatus::ALL
+    }
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
-    let pool = &state.pool;
+    load_detail(&state.pool, id, Vec::new(), CardRowValues::default()).await
+}
+
+pub async fn load_detail(
+    pool: &Pool,
+    id: i64,
+    errors: Vec<String>,
+    row: CardRowValues,
+) -> AppResult<LotDetail> {
     let lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
         .bind(id)
         .fetch_optional(pool)
@@ -126,5 +144,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         lot,
         unites,
         total_price,
+        errors,
+        row,
     })
 }

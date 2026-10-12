@@ -28,3 +28,8 @@ url = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }

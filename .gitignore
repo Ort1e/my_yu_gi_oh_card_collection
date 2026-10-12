@@ -14,3 +14,6 @@ ENV/
 env.bak/ 
 venv.bak/ 
 .direnv/
+
+# pending shipment uploads (personal data)
+/uploads/

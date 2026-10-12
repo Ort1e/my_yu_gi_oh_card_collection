@@ -25,8 +25,8 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 
 Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
 - `backend/` — the web server:
-  - `main.rs` (`AppState`: pool, reqwest client, media dir), `db.rs` (pool + `Money`, a `Decimal` stored as TEXT that sqlx reads/writes directly), `error.rs` (`AppError`/`AppResult`, `.or_404()`), `filters.rs` (askama filters `money`, `debt_color`, `yes_no`), `pagination.rs` (`Page`, 10 per page), `models.rs` (row types shared by pages: `CardRow`, `LotRow`, `DeckVersionRow`).
-  - `routes/<domain>.rs`: one module per page group, each with its row structs, queries, `#[derive(Template)]` structs and handlers. Registered in `routes/mod.rs`.
+  - `main.rs` (`AppState`: pool, reqwest client, media dir), `db.rs` (pool + `Money`, a `Decimal` stored as TEXT that sqlx reads/writes directly), `error.rs` (`AppError`/`AppResult`, `.or_404()`), `filters.rs` (askama filters `money`, `debt_color`, `yes_no`), `pagination.rs` (`Page`, 10 per page), `models.rs` (row types shared by pages: `CardRow`, `LotRow`, `DeckVersionRow`), `forms.rs` (`FormData`: raw form pairs → validated values + error list; repeated card rows `cards-<i>-<field>`), `card_data.rs` (ygoprodeck `get_or_fetch`, background card→card_data linking, `insert_lot_cards`), `tests.rs` (handler tests on a temp migrated DB, no network).
+  - `routes/<domain>.rs`: one module per page group, each with its row structs, queries, `#[derive(Template)]` structs and handlers. Read-only routes go in `routes::router()`, **every write route in `routes::write_router()`** (future login layer). Form modules: `lot_form.rs`, `deck_form.rs`, `budget_form.rs`.
   - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`), partials prefixed `_`. CSS copied from Django in `static/css/`.
 - `domain/` — pure business logic (no DB/HTTP), unit-tested: `card` (name normalisation, statuses), `ydke`, `lot` (lot type, shipping cost), `budget` (monthly recap/totals), `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf).
 - `importer/` — one-off loader from Django `dumpdata` JSON into the sqlx schema.
@@ -52,6 +52,7 @@ sqlite3 app.db                              # inspect
 ```
 
 `.env` sets `DATABASE_URL=sqlite:app.db` (gitignored, as is `*.db`). Both binaries create the DB file if missing.
+Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`, gitignored), `CARDMARKET_ACCOUNT` (`0rtie`).
 
 ## Database conventions (`migrations/0002_ygo_schema.sql`)
 
@@ -72,12 +73,14 @@ Read-only pages ✅ (scaffold demo removed). Budget figures checked month by mon
 
 Decided: serve from `/` (drop Django's `/my_ygo_cards/` prefix, e.g. `/my_ygo_cards/cards/` → `/cards/`); the deck builder becomes the Svelte app in `frontend/` (don't port the vanilla JS).
 Auth: none for now, server binds to 127.0.0.1 by default. Keep every write route in its own router so a login layer (single password from env + session cookie) can be added in one place when the app is served on the LAN; `/media/shipment_files` must go behind it too.
-Port order: schema ✅ → shared domain logic + tests ✅ → read-only pages ✅ → lots/budget writes → deck builder.
+Port order: schema ✅ → shared domain logic + tests ✅ → read-only pages ✅ → lots/budget writes ✅ → deck builder.
 
 Rust routes so far: `/` dashboard, `/budget`, `/cards` (+ filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (+ filters), `/lots/:id`, `/decks`, `/decks/:id`, `/card-image/:card_data_id` (serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing — Django downloaded during page render), `/static`, `/media`.
-Missing vs Django: all forms/writes (add lot + PDF upload, add unite on lot page, add deck, tournament form, budget/apport editing — Django did those in admin), "Add" buttons, auth, fetching `card_data` for cards that have none (3 cards), deck builder + API.
+Write routes: `/lots/add` (form + `POST /lots/add/shipment` PDF upload → pre-filled form, PDF kept as `uploads/pending-<token>.pdf` (deleted after 24 h) and moved to `media/shipment_files/shipment_<lot id>.pdf` on save), `POST /lots/:id/cards`, `/decks/add`, `/budget/manage` (+ `/budget/manage/budget` upsert, `/budget/manage/apports`, `/budget/manage/apports/:id/delete`).
+Deliberate differences: card rows added/removed with JS instead of `?cards=N` reloads; identical PDF cards are one row with a quantity; a new seller keeps is_person/source (Django's `get_or_create(name=)` dropped them); new cards are linked to card_data in a background task right after saving (Django fetched lazily on page views); budgets/apports have a page (Django used its admin).
+Missing vs Django: auth, editing/deleting cards, lots, sellers and decks (Django only had that in its admin), fetching card_data for the 3 imported cards that have none, deck builder + API, management commands.
 
-Django reference for everything (✅ = read-only part ported):
+Django reference for everything (✅ = ported):
 
 ### Pages (Django views in `my_ygo_cards/views/`, templates in `my_ygo_cards/templates/`)
 | Django URL | View | Notes |
@@ -86,8 +89,8 @@ Django reference for everything (✅ = read-only part ported):
 | ✅ `/budget/` | `budget.budget_overview` | `RecapEntry` / `BudgetTotals` logic: monthly budget carried forward + apports + sale-lot revenue; spending from non-cancelled purchase lots |
 | ✅ `/cards/`, `/cards/card/<pk>/` | `cards.py` | Filters: status, proxy, name (name OR en_name icontains), card_type, code, sold. Paginate 10, order `en_name, id`. Nav link defaults to `?proxy=false&sold=false` |
 | ✅ `/sellers/`, `/sellers/seller/<pk>` | `sellers.py` | Seller detail lists lots + total card count |
-| ✅ `/lots/`, `/lots/<pk>/` · `/lots/add/` | `lots/lots.py`, `lots/lot_form.py` | Lot detail POST adds N unites (quantity → N new cards). Add-lot: lot form + seller select/create + unite formset + **Cardmarket PDF upload that pre-fills the form** |
-| ✅ `/decks/`, `/decks/deck/<pk>` · `/decks/add/` | `deck.py` | Add deck also creates its first version |
+| ✅ `/lots/`, `/lots/<pk>/`, `/lots/add/` | `lots/lots.py`, `lots/lot_form.py` | Lot detail POST adds N unites (quantity → N new cards). Add-lot: lot form + seller select/create + unite formset + **Cardmarket PDF upload that pre-fills the form** |
+| ✅ `/decks/`, `/decks/deck/<pk>`, `/decks/add/` | `deck.py` | Add deck also creates its first version |
 | `/deck_builder/<deck_version_id>/` | `rest_api/deck_builder_api.DeckBuilderView` | GET page + POST tournament form. Rewrite as the Svelte app; the old vanilla JS in `my_ygo_cards/static/js/deck_builder/` is only a behaviour reference |
 | `/accounts/login/` etc. | Django auth | Login required for add lot, add deck, deck builder. No Rust equivalent yet |
 
