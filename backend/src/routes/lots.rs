@@ -4,8 +4,8 @@ use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
 use crate::db::{Money, Pool};
-use crate::forms::CardRowValues;
 use crate::error::{AppResult, OrNotFound};
+use crate::forms::CardRowValues;
 use crate::models::LotRow;
 use crate::pagination::{self, Page, PAGE_SIZE};
 use crate::routes::cards::like_pattern;
@@ -21,7 +21,12 @@ pub struct LotFilter {
 impl LotFilter {
     fn push_where(&self, qb: &mut QueryBuilder<'_, Sqlite>) {
         qb.push(" WHERE 1");
-        if let Some(name) = self.seller_name.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+        if let Some(name) = self
+            .seller_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|n| !n.is_empty())
+        {
             qb.push(" AND seller.name LIKE ")
                 .push_bind(like_pattern(name))
                 .push(" ESCAPE '\\'");

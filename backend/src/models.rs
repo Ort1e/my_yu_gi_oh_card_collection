@@ -20,7 +20,9 @@ impl CardRow {
         "card.id, card.name, card.code, card.last_known_status, card.is_proxy, card.card_data_id";
 
     pub fn status(&self) -> Option<CardStatus> {
-        self.last_known_status.as_deref().and_then(CardStatus::from_code)
+        self.last_known_status
+            .as_deref()
+            .and_then(CardStatus::from_code)
     }
 }
 

@@ -56,7 +56,8 @@ impl FormData {
         match parse_decimal(value) {
             Some(d) if d >= Decimal::ZERO => Some(d),
             _ => {
-                self.errors.push(format!("{label}: \"{value}\" is not a valid amount."));
+                self.errors
+                    .push(format!("{label}: \"{value}\" is not a valid amount."));
                 None
             }
         }
@@ -72,7 +73,8 @@ impl FormData {
         match value.parse() {
             Ok(d) => Some(d),
             Err(_) => {
-                self.errors.push(format!("{label}: \"{value}\" is not a valid date."));
+                self.errors
+                    .push(format!("{label}: \"{value}\" is not a valid date."));
                 None
             }
         }
@@ -153,7 +155,8 @@ impl FormData {
                 p => match parse_decimal(p).filter(|d| *d >= Decimal::ZERO) {
                     Some(d) => Some(d),
                     None => {
-                        self.errors.push(format!("Card {n}: \"{p}\" is not a valid price."));
+                        self.errors
+                            .push(format!("Card {n}: \"{p}\" is not a valid price."));
                         ok = false;
                         None
                     }
@@ -164,14 +167,19 @@ impl FormData {
                 q => match q.parse::<u32>() {
                     Ok(q) if (1..=100).contains(&q) => q,
                     _ => {
-                        self.errors.push(format!("Card {n}: quantity must be between 1 and 100."));
+                        self.errors
+                            .push(format!("Card {n}: quantity must be between 1 and 100."));
                         ok = false;
                         1
                     }
                 },
             };
             if ok {
-                let en_name = if row.en_name.is_empty() { &row.name } else { &row.en_name };
+                let en_name = if row.en_name.is_empty() {
+                    &row.name
+                } else {
+                    &row.en_name
+                };
                 cards.push(NewCards {
                     name: row.name.clone(),
                     en_name: normalize_card_name(en_name),
@@ -231,7 +239,12 @@ mod tests {
     use super::*;
 
     fn form(pairs: &[(&str, &str)]) -> FormData {
-        FormData::new(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
+        FormData::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        )
     }
 
     #[test]

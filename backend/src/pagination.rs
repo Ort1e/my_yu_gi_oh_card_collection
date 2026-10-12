@@ -97,7 +97,11 @@ mod tests {
     #[test]
     fn querystring_skips_empty() {
         assert_eq!(
-            querystring([("name", Some("dark magician")), ("code", Some("")), ("x", None)]),
+            querystring([
+                ("name", Some("dark magician")),
+                ("code", Some("")),
+                ("x", None)
+            ]),
             "name=dark+magician"
         );
     }

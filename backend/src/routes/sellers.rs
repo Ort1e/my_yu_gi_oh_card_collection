@@ -63,10 +63,7 @@ pub struct SellerDetail {
     total_cards: i64,
 }
 
-pub async fn detail(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> AppResult<SellerDetail> {
+pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<SellerDetail> {
     let pool = &state.pool;
     let seller: SellerRow = sqlx::query_as(&format!("{SELLER_SELECT} WHERE seller.id = ?"))
         .bind(id)

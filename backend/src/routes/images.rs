@@ -15,7 +15,9 @@ use crate::AppState;
 
 /// Same file name as Django: cleaned name, spaces → underscores.
 fn file_name(en_name: &str) -> String {
-    let name = clean_card_name(en_name).replace(' ', "_").replace(['/', '\\'], "_");
+    let name = clean_card_name(en_name)
+        .replace(' ', "_")
+        .replace(['/', '\\'], "_");
     format!("{name}.jpg")
 }
 
@@ -88,7 +90,10 @@ mod tests {
 
     #[test]
     fn file_names_match_django() {
-        assert_eq!(file_name("ash blossom & joyous spring"), "ash_blossom_&_joyous_spring.jpg");
+        assert_eq!(
+            file_name("ash blossom & joyous spring"),
+            "ash_blossom_&_joyous_spring.jpg"
+        );
         assert_eq!(file_name("Dark Magician (V.2)"), "dark_magician.jpg");
         assert_eq!(file_name("a/b"), "a_b.jpg");
     }

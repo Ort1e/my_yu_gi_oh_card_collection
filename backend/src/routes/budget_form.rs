@@ -49,7 +49,10 @@ pub struct ManagePage {
 
 impl ManagePage {
     fn apports_of(&self, budget_id: &i64) -> Vec<&ApportRow> {
-        self.apports.iter().filter(|a| a.budget_id == *budget_id).collect()
+        self.apports
+            .iter()
+            .filter(|a| a.budget_id == *budget_id)
+            .collect()
     }
 }
 
@@ -83,7 +86,8 @@ pub async fn set_budget(
     let month = form.required("month", "Month").and_then(|m| {
         let parsed = NaiveDate::parse_from_str(&format!("{m}-01"), "%Y-%m-%d").ok();
         if parsed.is_none() {
-            form.errors.push(format!("Month: \"{m}\" is not a valid month."));
+            form.errors
+                .push(format!("Month: \"{m}\" is not a valid month."));
         }
         parsed
     });

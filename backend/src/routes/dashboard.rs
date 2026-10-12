@@ -40,7 +40,9 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
         if lot.is_cancelled || lot.lot_type != LotType::Purchase {
             continue;
         }
-        *cards_per_month.entry(first_of_month(lot.buy_date)).or_default() += prices.len() as u32;
+        *cards_per_month
+            .entry(first_of_month(lot.buy_date))
+            .or_default() += prices.len() as u32;
         for price in prices.iter().flatten() {
             *cards_per_price.entry(price.normalize()).or_default() += 1;
         }
