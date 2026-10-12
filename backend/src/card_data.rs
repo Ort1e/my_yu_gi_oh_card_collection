@@ -2,17 +2,30 @@
 //! (Django: `CardData.get_or_fetch`, `ImageDownloader.get_card_data`).
 
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 use domain::card::clean_card_name;
 use serde_json::Value;
-use sqlx::{Sqlite, Transaction};
+use tokio::sync::Mutex;
 
-use crate::db::{Money, Pool};
+use crate::db::Pool;
 use crate::error::{AppError, AppResult};
-use crate::forms::NewCards;
 use crate::AppState;
 
 const API_URL: &str = "https://db.ygoprodeck.com/api/v7/cardinfo.php";
+
+/// ygoprodeck allows 20 requests per second; stay well below.
+const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(60);
+static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
+
+/// Wait so that two API requests are at least `MIN_REQUEST_INTERVAL` apart.
+async fn throttle() {
+    let mut last = LAST_REQUEST.lock().await;
+    if let Some(at) = *last {
+        tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;
+    }
+    *last = Some(Instant::now());
+}
 
 /// Find the `card_data` of a card by its English name, fetching and storing
 /// it from ygoprodeck when unknown. `Ok(None)` when the API doesn't know it.
@@ -21,19 +34,25 @@ pub async fn get_or_fetch(
     http: &reqwest::Client,
     en_name: &str,
 ) -> AppResult<Option<i64>> {
-    let name = clean_card_name(en_name);
-    let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM card_data WHERE en_name = ?")
-        .bind(&name)
-        .fetch_optional(pool)
-        .await?;
-    if existing.is_some() {
-        return Ok(existing);
+    if let Some(id) = find(pool, en_name).await? {
+        return Ok(Some(id));
     }
+    let name = clean_card_name(en_name);
 
     match fetch(http, "name", &name).await? {
         Some(data) => store(pool, &name, &data).await.map(Some),
         None => Ok(None),
     }
+}
+
+/// The stored `card_data` of a card name, without calling the API.
+pub async fn find(pool: &Pool, en_name: &str) -> AppResult<Option<i64>> {
+    Ok(
+        sqlx::query_scalar("SELECT id FROM card_data WHERE en_name = ?")
+            .bind(clean_card_name(en_name))
+            .fetch_optional(pool)
+            .await?,
+    )
 }
 
 /// Same as [`get_or_fetch`], by ygopro id (used by YDKE import). Returns the
@@ -62,6 +81,7 @@ pub async fn get_or_fetch_by_ygopro_id(
 /// First card of a ygoprodeck search, `None` when unknown.
 async fn fetch(http: &reqwest::Client, param: &str, value: &str) -> AppResult<Option<Value>> {
     let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
+    throttle().await;
     let response = http
         .get(API_URL)
         .query(&[(param, value)])
@@ -152,38 +172,4 @@ async fn link_cards(state: &AppState, card_ids: &[i64]) -> AppResult<()> {
         }
     }
     Ok(())
-}
-
-/// Create the cards of `rows` (each `quantity` times) with one unite each in
-/// `lot_id`. Returns the new card ids.
-pub async fn insert_lot_cards(
-    tx: &mut Transaction<'_, Sqlite>,
-    lot_id: i64,
-    rows: &[NewCards],
-) -> sqlx::Result<Vec<i64>> {
-    let mut ids = Vec::new();
-    for row in rows {
-        for _ in 0..row.quantity {
-            let card_id: i64 = sqlx::query(
-                "INSERT INTO card (name, en_name, code, last_known_status, is_proxy)
-                 VALUES (?, ?, ?, ?, ?)",
-            )
-            .bind(&row.name)
-            .bind(&row.en_name)
-            .bind(&row.code)
-            .bind(row.status.map(|s| s.code()))
-            .bind(row.is_proxy)
-            .execute(&mut **tx)
-            .await?
-            .last_insert_rowid();
-            sqlx::query("INSERT INTO unite (price, lot_id, card_id) VALUES (?, ?, ?)")
-                .bind(row.price.map(Money))
-                .bind(lot_id)
-                .bind(card_id)
-                .execute(&mut **tx)
-                .await?;
-            ids.push(card_id);
-        }
-    }
-    Ok(ids)
 }

@@ -1,4 +1,6 @@
 mod card_data;
+mod cards;
+mod commands;
 mod db;
 mod error;
 mod filters;
@@ -12,6 +14,7 @@ mod tests;
 use std::path::PathBuf;
 
 use axum::Router;
+use commands::Command;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
@@ -33,6 +36,15 @@ async fn main() {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let command = match Command::parse(&args) {
+        Ok(command) => command,
+        Err(e) => {
+            eprintln!("{e}\n\n{}", commands::USAGE);
+            std::process::exit(2);
+        }
+    };
+
     let env =
         |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
     let state = AppState {
@@ -42,6 +54,14 @@ async fn main() {
         uploads_dir: PathBuf::from(env("UPLOADS_DIR", "uploads")),
         cardmarket_account: env("CARDMARKET_ACCOUNT", "0rtie"),
     };
+
+    if command != Command::Serve {
+        if let Err(e) = commands::run(command, &state).await {
+            eprintln!("error: {e:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
 
     let app = app(state).layer(TraceLayer::new_for_http());
 

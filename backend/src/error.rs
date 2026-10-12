@@ -12,6 +12,17 @@ pub enum AppError {
 
 pub type AppResult<T> = Result<T, AppError>;
 
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AppError::NotFound => f.write_str("not found"),
+            AppError::BadRequest(msg) | AppError::Internal(msg) => f.write_str(msg),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match self {

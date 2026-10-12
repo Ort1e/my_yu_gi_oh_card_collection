@@ -23,35 +23,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
 
 use crate::card_data::{get_or_fetch, get_or_fetch_by_ygopro_id};
+use crate::cards::{delete_orphan_proxies, new_proxy, Zone, SOLD_EXISTS};
 use crate::db::{begin_write, Money, Pool};
 use crate::error::{bad_request, AppError, AppResult, OrNotFound};
-use crate::routes::cards::{card_types, CardFilter, SOLD_EXISTS};
+use crate::routes::cards::{card_types, CardFilter};
 use crate::AppState;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Zone {
-    Main,
-    Extra,
-    Side,
-}
-
-impl Zone {
-    const ALL: [Zone; 3] = [Zone::Main, Zone::Extra, Zone::Side];
-
-    fn table(self) -> &'static str {
-        match self {
-            Zone::Main => "deck_version_main_deck",
-            Zone::Extra => "deck_version_extra_deck",
-            Zone::Side => "deck_version_side_deck",
-        }
-    }
-}
-
-/// Ids of the cards in any zone of any deck version.
-const IN_ANY_DECK: &str = "SELECT card_id FROM deck_version_main_deck
-    UNION SELECT card_id FROM deck_version_extra_deck
-    UNION SELECT card_id FROM deck_version_side_deck";
 
 // ---------- cards ----------
 
@@ -448,19 +424,6 @@ async fn exists(conn: &mut SqliteConnection, table: &str, id: i64) -> AppResult<
     }
 }
 
-/// Delete proxy cards that are in no deck and no lot.
-async fn delete_orphan_proxies(conn: &mut SqliteConnection) -> AppResult<()> {
-    sqlx::query(&format!(
-        "DELETE FROM card WHERE is_proxy = 1
-           AND id NOT IN ({IN_ANY_DECK})
-           AND id NOT IN (SELECT card_id FROM unite)
-           AND id NOT IN (SELECT card_id FROM advent_calendar_entry)"
-    ))
-    .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
 #[derive(Debug, Serialize)]
 pub struct Deleted {
     deck_id: Option<i64>,
@@ -575,14 +538,7 @@ pub async fn add_proxy(
     let card_data_id = get_or_fetch(&state.pool, &state.http, name).await?;
 
     let mut tx = begin_write(&state.pool).await?;
-    let card_id: i64 =
-        sqlx::query("INSERT INTO card (name, en_name, card_data_id, is_proxy) VALUES (?, ?, ?, 1)")
-            .bind(name)
-            .bind(normalize_card_name(name))
-            .bind(card_data_id)
-            .execute(&mut *tx)
-            .await?
-            .last_insert_rowid();
+    let card_id = new_proxy(&mut tx, name, card_data_id).await?;
     sqlx::query(&format!(
         "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
         input.zone.table()
@@ -1027,20 +983,12 @@ pub async fn import_ydke(
                     .await?;
                     match owned.into_iter().find(|id| !used.contains(id)) {
                         Some(id) => id,
-                        None => {
-                            new_proxy(
-                                &mut tx,
-                                en_name,
-                                &normalize_card_name(en_name),
-                                Some(*data_id),
-                            )
-                            .await?
-                        }
+                        None => new_proxy(&mut tx, en_name, Some(*data_id)).await?,
                     }
                 }
                 None => {
                     let name = format!("Unknown-{ygopro_id}");
-                    new_proxy(&mut tx, &name, &name.to_lowercase(), None).await?
+                    new_proxy(&mut tx, &name, None).await?
                 }
             };
             used.insert(card_id);
@@ -1056,21 +1004,4 @@ pub async fn import_ydke(
     }
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(Created { id: version_id })))
-}
-
-async fn new_proxy(
-    conn: &mut SqliteConnection,
-    name: &str,
-    en_name: &str,
-    card_data_id: Option<i64>,
-) -> AppResult<i64> {
-    Ok(
-        sqlx::query("INSERT INTO card (name, en_name, card_data_id, is_proxy) VALUES (?, ?, ?, 1)")
-            .bind(name)
-            .bind(en_name)
-            .bind(card_data_id)
-            .execute(&mut *conn)
-            .await?
-            .last_insert_rowid(),
-    )
 }

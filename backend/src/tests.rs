@@ -11,8 +11,8 @@ use tower::ServiceExt;
 
 use crate::{app, AppState};
 
-struct TestApp {
-    state: AppState,
+pub(crate) struct TestApp {
+    pub(crate) state: AppState,
     dir: PathBuf,
 }
 
@@ -23,7 +23,7 @@ impl Drop for TestApp {
 }
 
 impl TestApp {
-    async fn new() -> TestApp {
+    pub(crate) async fn new() -> TestApp {
         // show handler errors in failing tests' output
         let _ = tracing_subscriber::fmt().with_test_writer().try_init();
         let dir = std::env::temp_dir().join(format!("ygo-test-{:016x}", rand::random::<u64>()));
@@ -88,14 +88,14 @@ impl TestApp {
         read(response).await
     }
 
-    async fn scalar(&self, sql: &str) -> i64 {
+    pub(crate) async fn scalar(&self, sql: &str) -> i64 {
         sqlx::query_scalar(sql)
             .fetch_one(&self.state.pool)
             .await
             .unwrap()
     }
 
-    async fn text(&self, sql: &str) -> Option<String> {
+    pub(crate) async fn text(&self, sql: &str) -> Option<String> {
         sqlx::query_scalar(sql)
             .fetch_one(&self.state.pool)
             .await

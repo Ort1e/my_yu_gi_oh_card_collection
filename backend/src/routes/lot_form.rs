@@ -17,7 +17,8 @@ use domain::cardmarket::{parse_shipment_pdf, Shipment};
 use domain::lot::LotType;
 use regex::Regex;
 
-use crate::card_data::{insert_lot_cards, spawn_link_cards};
+use crate::card_data::spawn_link_cards;
+use crate::cards::insert_lot_cards;
 use crate::db::{begin_write, Money};
 use crate::error::{AppError, AppResult};
 use crate::forms::{CardRowValues, FormData, Pairs};
