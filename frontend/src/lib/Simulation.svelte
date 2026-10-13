@@ -1,10 +1,9 @@
 <script>
-    import { createEventDispatcher, onDestroy } from 'svelte';
-    import { Chart, registerables } from 'chart.js';
+    import { createEventDispatcher } from 'svelte';
     import CardTile from './CardTile.svelte';
+    import CategoryForm from './CategoryForm.svelte';
+    import SimulationChart from './SimulationChart.svelte';
     import { draw, sortCards } from '../deck.js';
-
-    Chart.register(...registerables);
 
     export let api;
     export let main;
@@ -20,9 +19,6 @@
     let hand = [];
     let result = null;
     let running = false;
-    let newCategory = '';
-    let canvas;
-    let chart;
 
     function testDraw() {
         hand = sortCards(draw(main, handSize));
@@ -40,74 +36,41 @@
         }
     }
 
-    async function addCategory() {
-        const name = newCategory.trim();
-
-        if (!name) return;
-
+    // reload from the server: deleting a category also deletes the
+    // conditional categories whose rule uses it
+    async function reloadCategories() {
         try {
-            const category = await api.addCategory(name);
-            newCategory = '';
-            dispatch('categories', [...categories, category]);
+            dispatch('categories', await api.categories());
         } catch (e) {
-            alert(`Could not add the category: ${e.message}`);
+            alert(`Could not reload the categories: ${e.message}`);
         }
     }
 
     async function removeCategory(category) {
-        if (!confirm(`Delete the category "${category.name}"?`)) return;
+        if (!confirm(`Delete the category "${category.name}"? Conditional categories using it are deleted too.`)) return;
 
         try {
             await api.deleteCategory(category.id);
-            dispatch('categories', categories.filter((c) => c.id !== category.id));
+            result = null;
+            await reloadCategories();
         } catch (e) {
             alert(`Could not delete the category: ${e.message}`);
         }
+    }
+
+    $: names = new Map(categories.map((c) => [c.id, c.name]));
+
+    /** "if extender or lv5: starter, otherwise brick" */
+    function rule({ if_any_of, then, otherwise }) {
+        const ifs = if_any_of.map((id) => names.get(id)).join(' or ');
+
+        return `if ${ifs}: ${names.get(then)}, otherwise ${otherwise ? names.get(otherwise) : 'nothing'}`;
     }
 
     // stats of a category in the last result, if any
     $: stats = new Map((result?.categories ?? []).map((s) => [s.category_id, s]));
     $: maxInHand = result ? Math.max(0, ...result.categories.flatMap((s) => Object.keys(s.per_hand).map(Number))) : 0;
     const percent = (n) => ((n / result.total_simulations) * 100).toFixed(2);
-
-    $: if (canvas && result) drawChart(result, categories);
-
-    function drawChart(result, categories) {
-        chart?.destroy();
-        const labels = Array.from({ length: maxInHand + 1 }, (_, i) => String(i));
-        chart = new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: categories.map((category, i) => {
-                    const s = stats.get(category.id);
-                    const color = `hsl(${(i * 60) % 360}, 70%, 50%)`;
-
-                    return {
-                        label: category.name,
-                        data: labels.map((n) => (s ? percent(s.per_hand[n] ?? 0) : 0)),
-                        borderColor: color,
-                        backgroundColor: color,
-                        tension: 0.2,
-                    };
-                }),
-            },
-            options: {
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    title: { display: true, text: 'Hands with N cards of each category (%)' },
-                    tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y}%` } },
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Number of cards in hand' } },
-                    y: { title: { display: true, text: 'Hands (%)' }, min: 0, max: 100 },
-                },
-            },
-        });
-    }
-
-    onDestroy(() => chart?.destroy());
 </script>
 
 <div class="controls">
@@ -141,11 +104,16 @@
     {#each categories as category (category.id)}
         {@const s = stats.get(category.id)}
         <tr>
-            <td>{category.name}{category.is_conditional ? ' (conditional)' : ''}</td>
+            <td>
+                {category.name}
+                {#if category.condition}
+                    <div class="rule" title={category.condition.description}>{rule(category.condition)}</div>
+                {/if}
+            </td>
             <td>{s ? s.cards_in_deck : 'No info'}</td>
             <td>{s ? s.occurrences : 'No info'}</td>
             <td>{s ? (s.occurrences / result.total_simulations).toFixed(2) : 'No info'}</td>
-            <td><button type="button" class="remove-cat-btn" on:click={() => removeCategory(category)}>✕</button></td>
+            <td><button type="button" class="btn-small btn-danger" on:click={() => removeCategory(category)}>✕</button></td>
             {#if result}
                 {#each Array(maxInHand + 1) as _, n}
                     {@const count = s?.per_hand[n] ?? 0}
@@ -155,9 +123,9 @@
         </tr>
     {/each}
 </table>
-<form on:submit|preventDefault={addCategory}>
-    <input type="text" bind:value={newCategory} placeholder="New category name" maxlength="255" />
-    <button type="submit">Add Category</button>
-</form>
 
-{#if result}<div class="chart"><canvas bind:this={canvas} height="200"></canvas></div>{/if}
+{#if result && result.categories.length > 0}
+    <SimulationChart {result} />
+{/if}
+
+<CategoryForm {api} {categories} on:added={reloadCategories} />

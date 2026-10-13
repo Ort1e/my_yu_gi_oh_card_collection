@@ -14,11 +14,13 @@ mod tests;
 
 use std::path::PathBuf;
 
+use axum::http::{header, HeaderValue};
 use axum::middleware::from_fn_with_state;
 use axum::routing::{get, post};
 use axum::Router;
 use commands::Command;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeader;
 use tower_http::trace::TraceLayer;
 
 /// Shared state handed to every handler.
@@ -131,7 +133,17 @@ pub fn app(state: AppState) -> Router {
         .route("/login", get(auth::page).post(auth::login))
         .route("/logout", post(auth::logout))
         .merge(shipments)
-        .nest_service("/static", ServeDir::new("static"))
+        // CSS and the deck builder bundle: `no-cache` makes browsers check for
+        // a newer file on each page load (a 304 when unchanged) instead of
+        // reusing a stale copy after an update.
+        .nest_service(
+            "/static",
+            SetResponseHeader::overriding(
+                ServeDir::new("static"),
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-cache"),
+            ),
+        )
         .nest_service("/media", ServeDir::new(&state.media_dir))
         .with_state(state)
 }

@@ -163,6 +163,21 @@ async fn pages_render() {
 }
 
 #[tokio::test]
+async fn static_files_are_revalidated() {
+    let t = TestApp::new().await;
+    let response = t
+        .router()
+        .oneshot(
+            Request::get("/static/css/style.css")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-cache");
+}
+
+#[tokio::test]
 async fn create_lot_with_new_seller_and_cards() {
     let t = TestApp::new().await;
     let (status, location) = t.post("/lots/add", LOT).await;
@@ -619,6 +634,52 @@ async fn categories_and_monte_carlo() {
             .await,
         0
     );
+}
+
+#[tokio::test]
+async fn conditional_categories() {
+    let t = TestApp::new().await;
+    let (v, _) = t.deck_fixture().await;
+    let uri = format!("/api/deck-versions/{v}/categories");
+    let mut ids = Vec::new();
+    for name in ["starter", "extender", "brick"] {
+        let (_, cat) = t.json("POST", &uri, json!({ "name": name })).await;
+        ids.push(cat["id"].as_i64().unwrap());
+    }
+    let [starter, extender, brick] = ids[..] else {
+        unreachable!()
+    };
+
+    let rule = |if_any_of: Vec<i64>, then: i64| {
+        json!({
+            "name": "starter with an extender",
+            "condition": {
+                "description": "starts only with an extender",
+                "if_any_of": if_any_of,
+                "then": then,
+                "otherwise": brick,
+            },
+        })
+    };
+    let (status, cat) = t.json("POST", &uri, rule(vec![extender], starter)).await;
+    assert_eq!(status, StatusCode::CREATED, "{cat}");
+    let (_, list) = t.json("GET", &uri, json!(null)).await;
+    assert_eq!(list[3]["condition"]["if_any_of"], json!([extender]));
+    assert_eq!(list[3]["condition"]["then"], starter);
+    assert_eq!(list[3]["condition"]["otherwise"], brick);
+    assert_eq!(list[0]["condition"], json!(null));
+
+    // invalid rules
+    let (status, _) = t.json("POST", &uri, rule(vec![], starter)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = t.json("POST", &uri, rule(vec![extender], 12345)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // deleting the `then` category deletes the conditional one
+    t.json("DELETE", &format!("{uri}/{starter}"), json!(null))
+        .await;
+    let (_, list) = t.json("GET", &uri, json!(null)).await;
+    assert_eq!(list.as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]

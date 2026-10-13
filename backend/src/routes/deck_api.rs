@@ -8,7 +8,8 @@
 //!   deck (Django needed the `clean_card_categories` command);
 //! - YDKE import never reuses sold cards, and one owned copy is used once
 //!   across all zones;
-//! - clone keeps the ban list as well as the tournament.
+//! - clone keeps the ban list as well as the tournament;
+//! - conditional categories are created here (Django: in the admin only).
 
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -629,52 +630,169 @@ pub async fn reserve(
 
 // ---------- categories ----------
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct ApiCategory {
     id: i64,
     name: String,
-    is_conditional: bool,
+    /// The rule of a conditional category, `None` for a plain one.
+    condition: Option<ApiCondition>,
+}
+
+/// A card of a conditional category counts, in a hand, as a card of `then`
+/// when the hand also has a card of one of the `if_any_of` categories, and
+/// as a card of `otherwise` (or of nothing) when it doesn't.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiCondition {
+    description: String,
+    if_any_of: Vec<i64>,
+    then: i64,
+    otherwise: Option<i64>,
+}
+
+#[derive(sqlx::FromRow)]
+struct CategoryRecord {
+    id: i64,
+    name: String,
+    condition_description: Option<String>,
+    categorie_true_id: Option<i64>,
+    categorie_false_id: Option<i64>,
+}
+
+/// The categories of a deck version, with their rules.
+async fn load_categories(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+) -> sqlx::Result<Vec<ApiCategory>> {
+    let rows: Vec<CategoryRecord> = sqlx::query_as(
+        "SELECT id, name, condition_description, categorie_true_id, categorie_false_id
+         FROM card_category WHERE deck_version_id = ? ORDER BY id",
+    )
+    .bind(version_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let conditions: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT category_id, condition_category_id FROM card_category_condition
+         WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)
+         ORDER BY condition_category_id",
+    )
+    .bind(version_id)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| ApiCategory {
+            id: r.id,
+            name: r.name,
+            condition: match (r.condition_description, r.categorie_true_id) {
+                (Some(description), Some(then)) => Some(ApiCondition {
+                    description,
+                    if_any_of: conditions
+                        .iter()
+                        .filter(|(c, _)| *c == r.id)
+                        .map(|(_, other)| *other)
+                        .collect(),
+                    then,
+                    otherwise: r.categorie_false_id,
+                }),
+                _ => None,
+            },
+        })
+        .collect())
 }
 
 pub async fn categories(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Vec<ApiCategory>>> {
-    exists(&mut *state.pool.acquire().await?, "deck_version", id).await?;
-    Ok(Json(
-        sqlx::query_as(
-            "SELECT id, name, condition_description IS NOT NULL AS is_conditional
-             FROM card_category WHERE deck_version_id = ? ORDER BY id",
-        )
-        .bind(id)
-        .fetch_all(&state.pool)
-        .await?,
-    ))
+    let mut conn = state.pool.acquire().await?;
+    exists(&mut conn, "deck_version", id).await?;
+    Ok(Json(load_categories(&mut conn, id).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CategoryInput {
+    name: String,
+    /// Present to create a conditional category.
+    #[serde(default)]
+    condition: Option<ApiCondition>,
 }
 
 pub async fn add_category(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Json(input): Json<NameInput>,
+    Json(input): Json<CategoryInput>,
 ) -> AppResult<(StatusCode, Json<ApiCategory>)> {
-    let name = input.name.trim();
+    let name = input.name.trim().to_string();
     if name.is_empty() {
         return bad_request("The category name can't be empty.");
     }
-    exists(&mut *state.pool.acquire().await?, "deck_version", id).await?;
-    let category_id =
-        sqlx::query("INSERT INTO card_category (name, deck_version_id) VALUES (?, ?)")
-            .bind(name)
-            .bind(id)
-            .execute(&state.pool)
-            .await?
-            .last_insert_rowid();
+    let mut condition = input.condition;
+    if let Some(c) = &mut condition {
+        c.description = c.description.trim().to_string();
+        if c.description.is_empty() {
+            return bad_request("Describe the condition.");
+        }
+        if c.if_any_of.is_empty() {
+            return bad_request("Choose at least one category for the condition.");
+        }
+        c.if_any_of.sort_unstable();
+        c.if_any_of.dedup();
+    }
+
+    let mut tx = begin_write(&state.pool).await?;
+    exists(&mut tx, "deck_version", id).await?;
+    if let Some(c) = &condition {
+        // every category of the rule must be one of this version's
+        let mut wanted: HashSet<i64> = c.if_any_of.iter().copied().collect();
+        wanted.insert(c.then);
+        wanted.extend(c.otherwise);
+        let mut query = QueryBuilder::<Sqlite>::new(
+            "SELECT count(*) FROM card_category WHERE deck_version_id = ",
+        );
+        query.push_bind(id).push(" AND id IN (");
+        let mut ids = query.separated(", ");
+        for category_id in &wanted {
+            ids.push_bind(*category_id);
+        }
+        query.push(")");
+        let found: i64 = query.build_query_scalar().fetch_one(&mut *tx).await?;
+        if found as usize != wanted.len() {
+            return bad_request("The condition uses categories that don't exist in this version.");
+        }
+    }
+
+    let category_id = sqlx::query(
+        "INSERT INTO card_category
+             (name, deck_version_id, condition_description, categorie_true_id, categorie_false_id)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&name)
+    .bind(id)
+    .bind(condition.as_ref().map(|c| &c.description))
+    .bind(condition.as_ref().map(|c| c.then))
+    .bind(condition.as_ref().and_then(|c| c.otherwise))
+    .execute(&mut *tx)
+    .await?
+    .last_insert_rowid();
+    for other in condition.iter().flat_map(|c| &c.if_any_of) {
+        sqlx::query(
+            "INSERT INTO card_category_condition (category_id, condition_category_id)
+             VALUES (?, ?)",
+        )
+        .bind(category_id)
+        .bind(other)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+
     Ok((
         StatusCode::CREATED,
         Json(ApiCategory {
             id: category_id,
-            name: name.to_string(),
-            is_conditional: false,
+            name,
+            condition,
         }),
     ))
 }
@@ -756,15 +874,6 @@ pub async fn assign_category(
 
 // ---------- Monte Carlo ----------
 
-#[derive(sqlx::FromRow)]
-struct CategoryRecord {
-    id: i64,
-    name: String,
-    condition_description: Option<String>,
-    categorie_true_id: Option<i64>,
-    categorie_false_id: Option<i64>,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct SimulationInput {
     hand_size: usize,
@@ -786,20 +895,7 @@ pub async fn monte_carlo(
     exists(&mut conn, "deck_version", id).await?;
     let main = zone_card_ids(&mut conn, id, Zone::Main).await?;
 
-    let rows: Vec<CategoryRecord> = sqlx::query_as(
-        "SELECT id, name, condition_description, categorie_true_id, categorie_false_id
-         FROM card_category WHERE deck_version_id = ? ORDER BY id",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?;
-    let conditions: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT category_id, condition_category_id FROM card_category_condition
-         WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let categories = load_categories(&mut conn, id).await?;
     let assignments: Vec<(i64, i64)> = sqlx::query_as(
         "SELECT card_id, category_id FROM card_category_assignment
          WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)",
@@ -809,23 +905,16 @@ pub async fn monte_carlo(
     .await?;
     drop(conn);
 
-    let categories: Vec<Category> = rows
+    let categories: Vec<Category> = categories
         .into_iter()
-        .map(|r| Category {
-            id: r.id,
-            name: r.name,
-            condition: r
-                .condition_description
-                .and(r.categorie_true_id)
-                .map(|then| Condition {
-                    if_any_of: conditions
-                        .iter()
-                        .filter(|(c, _)| *c == r.id)
-                        .map(|(_, other)| *other)
-                        .collect(),
-                    then,
-                    otherwise: r.categorie_false_id,
-                }),
+        .map(|c| Category {
+            id: c.id,
+            name: c.name,
+            condition: c.condition.map(|c| Condition {
+                if_any_of: c.if_any_of.into_iter().collect(),
+                then: c.then,
+                otherwise: c.otherwise,
+            }),
         })
         .collect();
 

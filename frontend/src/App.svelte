@@ -265,12 +265,16 @@
     <p class="error">Could not load the deck: {loadError}</p>
 {:else if deck}
     <h2 class="title">
-        (<button type="button" class="copy-btn" on:click={doImport}>Import YDKE</button>)
-        Deck Builder : {title} ({euros(total)})
+        Deck Builder: {title} ({euros(total)})
+        {#if dirty}<span class="unsaved">● unsaved</span>{/if}
+    </h2>
+
+    <div class="toolbar">
+        <button type="button" class="btn-secondary" on:click={doImport}>Import YDKE</button>
         <span class="copy-wrapper">
-            (<button type="button" class="copy-btn" on:click|stopPropagation={() => (copyOpen = !copyOpen)}>
-                {copied ? `Copied ${copied}!` : 'Copy YDKE'}
-            </button>)
+            <button type="button" class="btn-secondary" on:click|stopPropagation={() => (copyOpen = !copyOpen)}>
+                {copied ? `Copied ${copied}!` : 'Copy YDKE ▾'}
+            </button>
             {#if copyOpen}
                 <div class="copy-popup">
                     {#each Object.keys(variants) as label}
@@ -279,8 +283,7 @@
                 </div>
             {/if}
         </span>
-        {#if dirty}<span class="unsaved">● unsaved</span>{/if}
-    </h2>
+    </div>
 
     <div class="builder-container">
         <div id="deck-area">
@@ -306,24 +309,40 @@
             <CardOverview card={selected} {banListId} {api} {categoriesVersion} />
         </div>
 
-        <div id="actions-area" class="actions">
-            <button type="button" on:click={save}>💾 Save</button>
-            <button type="button" on:click={rename}>✏️ Rename</button>
-            <button type="button" on:click={newVersion}>📦 New</button>
-            <button type="button" on:click={remove}>🗑️ Delete</button>
+        <div id="actions-area">
+            <div class="control">
+                <label for="version-select">Version</label>
+                <select id="version-select" value={deckVersionId} on:change={switchVersion}>
+                    {#each deck.versions as version (version.id)}
+                        <option value={version.id}>{version.version_name}</option>
+                    {/each}
+                </select>
+                <div class="button-row">
+                    <button type="button" class="btn-secondary" on:click={rename}>Rename</button>
+                    <button type="button" class="btn-secondary" on:click={newVersion}>Copy as new version</button>
+                    <button type="button" class="btn-danger" on:click={remove}>Delete</button>
+                </div>
+            </div>
 
-            <select bind:value={banListId} on:change={() => (dirty = true)} title="Ban list">
-                {#each deck.ban_lists as banList (banList.id)}
-                    <option value={banList.id}>{banList.date}</option>
-                {/each}
-                <option value={null}>No Ban List</option>
-            </select>
+            <div class="control">
+                <label for="ban-list-select">Ban list</label>
+                <select id="ban-list-select" bind:value={banListId} on:change={() => (dirty = true)}>
+                    {#each deck.ban_lists as banList, i (banList.id)}
+                        <option value={banList.id}>{banList.date}{i === 0 ? ' (latest)' : ''}</option>
+                    {/each}
+                    <option value={null}>No ban list</option>
+                </select>
+                <span class="hint">Limits shown on the cards. Saved with the deck.</span>
+            </div>
 
-            <select value={deckVersionId} on:change={switchVersion} title="Version">
-                {#each deck.versions as version (version.id)}
-                    <option value={version.id}>{version.version_name}</option>
-                {/each}
-            </select>
+            <div class="control save-row">
+                <button type="button" on:click={save}>Save the deck</button>
+                {#if dirty}
+                    <span class="warning">Unsaved changes</span>
+                {:else}
+                    <span class="hint">Everything is saved</span>
+                {/if}
+            </div>
         </div>
 
         <div id="reserve-area" class="area">

@@ -39,7 +39,8 @@ export function deckApi(id) {
         deleteProxy: (cardId) => request('DELETE', `${base}/proxies/${cardId}`),
         reserve: (filters) => request('POST', `${base}/reserve`, filters),
         categories: () => request('GET', `${base}/categories`),
-        addCategory: (name) => request('POST', `${base}/categories`, { name }),
+        // `condition`: null for a plain category, else { description, if_any_of, then, otherwise }
+        addCategory: (name, condition = null) => request('POST', `${base}/categories`, { name, condition }),
         deleteCategory: (categoryId) => request('DELETE', `${base}/categories/${categoryId}`),
         cardCategories: (cardId) => request('GET', `${base}/cards/${cardId}/categories`),
         assignCategory: (cardId, categoryId, assigned) =>
