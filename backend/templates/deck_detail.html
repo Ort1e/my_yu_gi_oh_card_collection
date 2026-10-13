@@ -8,18 +8,16 @@
 
 {% block content %}
 <div class="card-list">
-  <div class="card" style="display: flex; align-items: center;">
-    <div class="card-content">
-      <div class="card-title">{{ deck.name }}</div>
-      <div class="card-meta-line">
-        <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
-      </div>
-      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-        <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
-        <form method="post" action="/decks/{{ deck.id }}/delete">
-          <button type="submit" onclick="return confirm('Delete this deck and all its versions?')">Delete</button>
-        </form>
-      </div>
+  <div class="card">
+    <div class="card-title">{{ deck.name }}</div>
+    <div class="card-meta-line">
+      <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
+    </div>
+    <div class="button-row">
+      <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
+      <form method="post" action="/decks/{{ deck.id }}/delete" class="inline">
+        <button type="submit" class="btn-danger" onclick="return confirm('Delete this deck and all its versions?')">Delete</button>
+      </form>
     </div>
   </div>
 
@@ -34,9 +32,9 @@
       {% include "_form_errors.html" %}
       <label for="version_name">Version name:</label>
       <input type="text" name="version_name" id="version_name" maxlength="100" required>
-      <input type="submit" value="Create">
-      <p><small>To start from an existing version, use "Clone" in the deck builder.</small></p>
+      <small>To start from an existing version, use "Clone" in the deck builder.</small>
     </fieldset>
+    <input type="submit" value="Create the version">
   </form>
 </div>
 {% endblock %}

@@ -1,44 +1,54 @@
-/* Filter badge */
-.btn.filter-badge, /* for priority with btn */
-.filter-badge {
+/*
+ * The list pages' floating buttons and their filter popup
+ * (templates/cards_list.html, lots_list.html, decks_list.html).
+ */
+
+/* A round button that stays in a corner of the window while scrolling.
+ *   class="floating-button"       bottom right (Filter)
+ *   class="floating-button top"   top right, under the header (Add lot, Add deck)
+ */
+.floating-button {
     position: fixed;
-    bottom: 20px;
     right: 20px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 12px 16px;
-    border-radius: 50px;
-    font-size: 16px;
-    cursor: pointer;
+    bottom: 20px;
     z-index: 1000;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  }
-  
-  /* Modal overlay */
-  .filter-modal {
+    padding: 12px 18px;
+    border-radius: 50px;
+    font-size: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+.floating-button.top {
+    top: 70px;
+    bottom: auto;
+}
+
+/* The popup: a dark veil over the whole page, the filters in the middle. */
+.filter-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    inset: 0;                   /* top, right, bottom and left: 0 */
+    z-index: 1001;              /* above the floating buttons */
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1001;
-  }
-  
-  .filter-content {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* The filter form itself is the green panel of form.css. */
+.filter-content {
     width: 90%;
-    max-width: 400px;
-    position: relative;
-  }
-  
-  .hidden {
+    max-width: 420px;
+}
+
+.filter-content form {
+    margin: 0;
+}
+
+.filter-content h2 {
+    margin-top: 0;
+}
+
+/* Added by the page's script to hide the popup. */
+.hidden {
     display: none;
-  }
-  
+}

@@ -1,81 +1,143 @@
+/*
+ * The green boxes of the list and detail pages (a card, a lot, a deck…).
+ *
+ *   <div class="card-list">                      a centred column of boxes
+ *     <a class="card-link" href="…">             the whole box is a link
+ *       <div class="card">
+ *         <div class="card-title">…</div>
+ *         <div class="card-meta-line">…</div>    small facts on one line
+ *       </div>
+ *     </a>
+ *   </div>
+ *
+ * A box with a card picture on the left: <div class="card with-image">.
+ */
+
 .card-list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem; /* reduced gap between cards */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+/* A form in the column is as wide as the boxes. */
+.card-list > form {
+    width: 100%;
+    max-width: 900px;
 }
 
 .card-link {
-  text-decoration: none;
-  width: 100%;
-  max-width: 900px; /* wider card layout */
+    width: 100%;
+    max-width: 900px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.card-link:hover {
+    text-decoration: none;
 }
 
 .card {
-  background-color: var(--secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1rem 1.5rem;
-  cursor: pointer;
-  transition: background-color 0.3s;
+    width: 100%;
+    max-width: 900px;
+    padding: 1rem 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background-color: var(--secondary);
+    color: var(--text-light);
 }
 
-.card:hover {
-  background-color: var(--hover-bg);
+/* Only the boxes that are links react to the mouse. */
+.card-link .card {
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.card-link .card:hover {
+    background-color: var(--hover-bg);
+}
+
+.card.with-image {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
 }
 
 .card-title {
-  font-size: 1.4rem;
-  color: var(--primary);
-  margin-bottom: 0.3rem;
+    margin-bottom: 0.3rem;
+    font-size: 1.4rem;
+    color: var(--primary);
 }
 
 .card-meta-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1.5rem;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
 }
 
-/* Status badge styles */
+/* One fact per line (seller page). */
+.card-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.card .button-row {
+    margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Card status badges: <span class="status-badge nm">Near Mint</span>    */
+/* ------------------------------------------------------------------ */
+
 .status-badge {
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-weight: bold;
-  margin-left: 0.4rem;
+    margin-left: 0.4rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
 }
 
-.status-badge.mt { background-color: #4caf50; color: #000; }
-.status-badge.nm { background-color: #2196f3; color: #fff; }
-.status-badge.ex { background-color: #9c27b0; color: #fff; }
-.status-badge.g  { background-color: #ffc107; color: #000; }
-.status-badge.p  { background-color: #f44336; color: #fff; }
+.status-badge.mt { background-color: #4caf50; color: #000; }   /* Mint */
+.status-badge.nm { background-color: #2196f3; color: #fff; }   /* Near Mint */
+.status-badge.ex { background-color: #9c27b0; color: #fff; }   /* Excellent */
+.status-badge.g  { background-color: #ffc107; color: #000; }   /* Good */
+.status-badge.p  { background-color: #f44336; color: #fff; }   /* Poor */
 
+/* ------------------------------------------------------------------ */
+/* Card pictures                                                        */
+/* ------------------------------------------------------------------ */
+
+.card-image {
+    display: block;
+    height: auto;
+}
+
+/* The big picture shown when the mouse is over a small one (card list). */
 .image-wrapper {
-  position: relative;
-  display: inline-block;
+    position: relative;
+    flex-shrink: 0;
 }
 
 .image-popup {
-  display: none;
-  position: absolute;
-  top: 0;
-  left: 110%; /* show to the right of the small image */
-  z-index: 10;
-  padding: 4px;
-  background: white;
-  border: 1px solid #ccc;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 110%;                 /* to the right of the small picture */
+    z-index: 10;
+    padding: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .image-wrapper:hover .image-popup {
-  display: block;
+    display: block;
 }
 
 .popup-image {
-  max-width: 600px;
-  max-height: 600px;
-  object-fit: contain;
+    max-width: 600px;
+    max-height: 600px;
+    object-fit: contain;
 }

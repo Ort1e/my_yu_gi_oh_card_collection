@@ -7,7 +7,8 @@
   <h1>My Yu-Gi-Oh Card Collection</h1>
 
   <h2>Recent Recap</h2>
-  <table class="table table-bordered">
+  <div class="table-scroll">
+  <table class="numbers">
     <thead>
       <tr>
         <th>Category</th>
@@ -34,9 +35,9 @@
       <tr>
         <th>Debt (€)</th>
         {% for entry in recap %}
-        <td style="color: {{ entry.debt|debt_color(available_debt) }};">{{ entry.debt|money }}</td>
+        <td class="debt-{{ entry.debt|debt_color(available_debt) }}">{{ entry.debt|money }}</td>
         {% endfor %}
-        <td style="color: {{ totals.total_debt|debt_color(available_debt) }};">{{ totals.total_debt|money }}</td>
+        <td class="debt-{{ totals.total_debt|debt_color(available_debt) }}">{{ totals.total_debt|money }}</td>
       </tr>
       <tr>
         <th>Shipping %</th>
@@ -50,6 +51,7 @@
       </tr>
     </tbody>
   </table>
+  </div>
   <canvas id="combined_chart" width="400" height="200"></canvas>
   <canvas id="card_cost_chart" width="400" height="200"></canvas>
 </div>

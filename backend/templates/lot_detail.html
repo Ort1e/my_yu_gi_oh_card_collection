@@ -7,8 +7,9 @@
 {% endblock %}
 
 {% block content %}
+<div class="inside-container narrow">
 <h1 class="card-title">{{ lot.title() }}</h1>
-<p><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a></p>
+<div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a></div>
 
 <div class="card">
   <div class="card-meta-line">
@@ -28,39 +29,35 @@
     {% when None %}{% endmatch %}
   </div>
 
-  <h2 style="margin-top: 1rem;">Cards</h2>
-  <table style="width: 100%; border-collapse: collapse;">
+  <h2>Cards</h2>
+  <table class="numbers">
     <thead>
-      <tr>
-        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Card</th>
-        <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc;">Price</th>
-      </tr>
+      <tr><th>Card</th><th>Price</th></tr>
     </thead>
     <tbody>
       {% for unite in unites %}
       <tr>
-        <td style="padding: 0.5rem;"><a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a></td>
-        <td style="padding: 0.5rem;">
-          {% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}
-        </td>
+        <td><a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a></td>
+        <td>{% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="2" style="padding: 0.5rem;">No cards in this lot.</td></tr>
+      <tr><td colspan="2">No cards in this lot.</td></tr>
       {% endfor %}
-      <tr>
-        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">Total</td>
-        <td style="padding: 0.5rem; font-weight: bold; border-top: 2px solid #000;">{{ total_price }} €</td>
+      <tr class="total-row">
+        <td>Total</td>
+        <td>{{ total_price }} €</td>
       </tr>
     </tbody>
   </table>
 
-  <form method="post" action="/lots/{{ lot.id }}/cards">
-    <h2 style="margin-top: 1rem;">Add a card</h2>
+  <form method="post" action="/lots/{{ lot.id }}/cards" class="plain">
+    <h2>Add a card</h2>
     {% include "_form_errors.html" %}
     {% let i = 0 %}
     {% let remove_button = false %}
     {% include "_card_row.html" %}
-    <input type="submit" value="Add Card to Lot" style="margin-top: 1rem;">
+    <input type="submit" value="Add the card to the lot">
   </form>
+</div>
 </div>
 {% endblock %}

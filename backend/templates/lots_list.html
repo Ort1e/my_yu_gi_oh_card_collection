@@ -13,12 +13,12 @@
 {% endblock %}
 
 {% block filter %}
-<button id="filter-badge" class="filter-badge">Filter</button>
+<button id="filter-badge" class="floating-button">Filter</button>
 <div id="filter-modal" class="filter-modal hidden">
   <div class="filter-content">
-    <h2>Filter lots</h2>
     <form method="get">
-      <label for="seller_name">seller name:</label>
+      <h2>Filter lots</h2>
+      <label for="seller_name">Seller name:</label>
       <input type="text" name="seller_name" id="seller_name" value="{{ filter.seller_name.as_deref().unwrap_or("") }}" placeholder="Seller name">
       <label for="sold">Sold:</label>
       <select name="sold" id="sold">
@@ -26,9 +26,9 @@
         <option value="true" {% if self.sold_is("true") %}selected{% endif %}>Only sold</option>
         <option value="false" {% if self.sold_is("false") %}selected{% endif %}>Only purchased</option>
       </select>
-      <div style="margin-top: 1rem;">
+      <div class="button-row">
         <button type="submit">Apply</button>
-        <a href="/lots" class="reset-button" style="margin-left: 0.5rem;">Reset</a>
+        <a href="/lots" class="btn btn-secondary">Reset</a>
       </div>
     </form>
   </div>
@@ -36,5 +36,5 @@
 {% endblock %}
 
 {% block add_button %}
-  <a href="/lots/add" title="Add lot" class="btn filter-badge" style="top: 70px; bottom: auto;">Add lot</a>
+  <a href="/lots/add" title="Add lot" class="btn floating-button top">Add lot</a>
 {% endblock %}

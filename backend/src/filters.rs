@@ -11,8 +11,8 @@ pub fn money(d: &Decimal) -> askama::Result<String> {
     ))
 }
 
-/// CSS colour of a debt amount: red above the allowed debt, orange when in
-/// debt, green otherwise.
+/// Colour name of a debt amount, for the `debt-<colour>` CSS classes
+/// (style.css): red above the allowed debt, orange when in debt, green otherwise.
 pub fn debt_color(debt: &Decimal, available: &Decimal) -> askama::Result<&'static str> {
     Ok(if debt > available {
         "red"

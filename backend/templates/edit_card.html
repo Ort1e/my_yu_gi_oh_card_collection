@@ -3,8 +3,9 @@
 {% block title %}Edit {{ card.name }}{% endblock %}
 
 {% block content %}
-<h1 class="card-title">Edit Card</h1>
-<p><a href="/cards/{{ id }}">← Back to the card</a></p>
+<div class="inside-container narrow">
+<h1>Edit Card</h1>
+<p class="back-link"><a href="/cards/{{ id }}">← Back to the card</a></p>
 
 {% include "_form_errors.html" %}
 
@@ -18,7 +19,7 @@
     <p>
       <label for="en_name">English name:</label>
       <input type="text" name="en_name" id="en_name" value="{{ card.en_name }}" maxlength="255" placeholder="defaults to the name">
-      <br><small>Changing it relinks the card to its card data.</small>
+      <small>Changing it relinks the card to its card data.</small>
     </p>
     <p>
       <label for="code">Code:</label>
@@ -33,13 +34,10 @@
         {% endfor %}
       </select>
     </p>
-    <div class="checkbox-wrapper-3" style="display: inline-flex; align-items: center;">
-      <input type="checkbox" name="is_proxy" id="is_proxy" {% if card.is_proxy %}checked{% endif %}>
-      <label for="is_proxy" class="toggle"><span></span></label>
-      <label for="is_proxy" class="checkbox-label">Proxy Card</label>
-    </div>
+    <label class="switch"><input type="checkbox" name="is_proxy" {% if card.is_proxy %}checked{% endif %}> Proxy card</label>
   </fieldset>
 
-  <p><input type="submit" value="Save"></p>
+  <input type="submit" value="Save">
 </form>
+</div>
 {% endblock %}

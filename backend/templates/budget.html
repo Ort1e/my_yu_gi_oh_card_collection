@@ -7,7 +7,8 @@
   <h1>Monthly Budget Overview</h1>
   <p><a href="/budget/manage">Manage budgets and apports</a></p>
   <p>Available Debt (3 × last budget) : {{ available_debt|money }} (€)</p>
-  <table>
+  <div class="table-scroll">
+  <table class="numbers">
     <thead>
       <tr>
         <th>Month</th>
@@ -30,7 +31,7 @@
         <td>{{ entry.month_str() }}</td>
         <td>{{ entry.budget|money }}</td>
         <td>{{ entry.spent|money }}</td>
-        <td style="color: {{ entry.debt|debt_color(available_debt) }};">{{ entry.debt|money }}</td>
+        <td class="debt-{{ entry.debt|debt_color(available_debt) }}">{{ entry.debt|money }}</td>
         <td>{{ entry.shipping_cost|money }}</td>
         <td>{{ entry.shipping_percent|money }}%</td>
         <td>{{ entry.selling_revenue|money }}</td>
@@ -45,5 +46,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

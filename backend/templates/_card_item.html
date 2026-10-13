@@ -1,5 +1,5 @@
 <a href="/cards/{{ card.id }}" class="card-link">
-  <div class="card" style="display: flex; align-items: center;">
+  <div class="card with-image">
     <div class="image-wrapper">
       {% match card.card_data_id %}{% when Some with (data_id) %}
       <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-image" width="100px" loading="lazy"/>

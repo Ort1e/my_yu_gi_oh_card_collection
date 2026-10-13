@@ -1,173 +1,344 @@
-form {
-    background-color: var(--secondary);
-    padding: 2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+/*
+ * Forms, fields and buttons, on every page.
+ *
+ * A form is a green panel by default. Two classes change that:
+ *   <form class="plain">   no panel: a form inside another panel
+ *   <form class="inline">  no panel, on the same line: a form that is only a button
+ *                          (delete an apport, delete a deck)
+ *
+ * Field widths: text fields are at most --field-width wide, the short values
+ * (dates, months, amounts, quantities) at most --field-width-short.
+ */
+
+:root {
+    --field-width: 36rem;
+    --field-width-short: 12rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Form panels                                                          */
+/* ------------------------------------------------------------------ */
+
+:where(form) {
     margin-bottom: 2rem;
-  }
-  
-  fieldset {
+    padding: 1.5rem 2rem;
+    border-radius: 10px;
+    background-color: var(--secondary);
+    color: var(--text-light);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+form.plain,
+form.inline {
+    margin: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+}
+
+form.inline {
+    display: inline;
+}
+
+/* A group of fields with a title (<legend>) in its frame. */
+fieldset {
+    margin: 0 0 1.5rem;
+    padding: 1rem 1.5rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1rem 1.5rem;
-    margin-bottom: 2rem;
     background-color: rgba(255, 255, 255, 0.03);
-  }
-  
-  legend {
+}
+
+legend {
+    display: flex;              /* keeps a ✕ button on the title's line */
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem;
     font-size: 1.2rem;
     font-weight: bold;
-    color: var(--text-light);
-    padding: 0 0.5rem;
-  }
-  
-  label {
+}
+
+/* ------------------------------------------------------------------ */
+/* Labels                                                               */
+/* ------------------------------------------------------------------ */
+
+/* A field's name, on its own line above the field. */
+:where(label),
+.label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
     font-weight: 600;
-    color: var(--text-light);
-  }
-  
-  input[type="text"],
-  input[type="date"],
-  input[type="number"],
-  input[type="url"],
-  input[type="password"],
-  textarea,
-  select {
+}
+
+/* Radio buttons side by side, after their title:
+ *   <div class="choices">
+ *     <span class="label">Lot type:</span>
+ *     <label><input type="radio" …> Purchase</label>
+ *     …
+ *   </div>
+ */
+.choices {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    margin: 1rem 0;
+}
+
+.choices .label {
+    margin: 0;
+}
+
+.choices label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fields                                                               */
+/* ------------------------------------------------------------------ */
+
+:where(
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="url"],
+    input[type="search"],
+    input[type="number"],
+    input[type="date"],
+    input[type="month"],
+    textarea,
+    select
+) {
+    display: block;
+    width: 100%;
+    max-width: var(--field-width);
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
     background-color: var(--primary);
     color: var(--text-light);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.5rem;
+    font: inherit;
+    font-size: 0.95rem;
+    color-scheme: dark;         /* light calendar and arrow icons on the dark field */
+}
+
+/* Every one-line field has the same height (a date picker is taller than a
+   select otherwise, and fields side by side would not line up). */
+:where(input:not([type="checkbox"], [type="radio"], [type="file"]), select) {
+    height: 2.5rem;
+}
+
+/* Short values don't need a wide field. */
+:where(
+    input[type="number"],
+    input[type="date"],
+    input[type="month"],
+    input[inputmode="decimal"]
+) {
+    max-width: var(--field-width-short);
+}
+
+:where(textarea) {
+    resize: vertical;           /* can be made taller, not wider */
+}
+
+::placeholder {
+    color: var(--text-light);
+    opacity: 0.5;
+}
+
+/* The file picker: its button looks like our other buttons. */
+:where(input[type="file"]) {
     margin-bottom: 1rem;
-    width: 100%;
-  }
+}
 
-  /* ------------------- CHECKBOX ------------------ */
-
-  .checkbox-wrapper-3 input[type="checkbox"] {
-    visibility: hidden;
-    display: none;
-  }
-  
-  /* Toggle track */
-  .checkbox-wrapper-3 .toggle {
-    position: relative;
-    display: block;
-    width: 40px;
-    height: 20px;
+:where(input[type="file"])::file-selector-button {
+    margin-right: 1rem;
+    padding: 0.4rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    background-color: var(--primary);
+    color: #fff;
+    font: inherit;
+    font-weight: bold;
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transform: translate3d(0, 0, 0);
-  }
-  
-  /* Toggle background */
-  .checkbox-wrapper-3 .toggle::before {
-    content: "";
+}
+
+/*
+ * Fields side by side, wrapping to the next line when there's no room
+ * (the card rows of the lot forms):
+ *   <div class="field-row">
+ *     <div>label + field</div>
+ *     <div>label + field</div>
+ *   </div>
+ * Each field then fills its share of the row.
+ */
+.field-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1rem;
+}
+
+.field-row > * {
+    flex: 1 1 7rem;             /* grow and shrink, ideally 7rem wide */
+}
+
+.field-row input,
+.field-row select {
+    max-width: none;
+}
+
+/* A field that deserves twice the room (a name). */
+.field-row > .wide {
+    flex: 2 1 10rem;
+}
+
+/* A switch in a row keeps its natural size, level with the fields. */
+.field-row > .switch {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-bottom: 0.9rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* The card rows of the lot forms (templates/_card_row.html):           */
+/* a compact version of the fields, since a lot can have many cards.    */
+/* ------------------------------------------------------------------ */
+
+.card-row {
+    margin-bottom: 0.75rem;
+    padding: 0.25rem 1rem 0.5rem;
+}
+
+.card-row legend {
+    font-size: 1rem;
+}
+
+.card-row label {
+    margin-bottom: 0.1rem;
+    font-size: 0.85rem;
+}
+
+.card-row :where(input:not([type="checkbox"]), select) {
+    height: 2.1rem;
+    margin-bottom: 0.4rem;
+    padding: 0.3rem 0.5rem;
+}
+
+.card-row .switch {
+    margin-bottom: 0.6rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* On/off switch, for the checkboxes                                    */
+/*   <label class="switch"><input type="checkbox" name="…"> Proxy card</label>
+/* ------------------------------------------------------------------ */
+
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.5rem 0 1rem;
+    cursor: pointer;
+}
+
+/* The checkbox, redrawn as a track… */
+.switch input {
+    appearance: none;           /* hide the browser's checkbox */
     position: relative;
-    top: 3px;
-    left: 3px;
-    width: 34px;
-    height: 14px;
-    display: block;
-    background: #9A9999;
-    border-radius: 8px;
-    transition: background 0.2s ease;
-  }
-  
-  /* Toggle knob */
-  .checkbox-wrapper-3 .toggle span {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 20px;
-    height: 20px;
-    display: block;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 3px 8px rgba(154, 153, 153, 0.5);
-    transition: all 0.2s ease;
-  }
-  
-  /* Pulse effect */
-  .checkbox-wrapper-3 .toggle span::before {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 1.4rem;
+    margin: 0;
+    border-radius: 1rem;
+    background-color: #9a9999;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+/* …with a round knob on the left… */
+.switch input::before {
     content: "";
     position: absolute;
-    display: block;
-    margin: -18px;
-    width: 56px;
-    height: 56px;
-    background: rgba(79, 46, 220, 0.5);
+    top: 0.2rem;
+    left: 0.2rem;
+    width: 1rem;
+    height: 1rem;
     border-radius: 50%;
-    transform: scale(0);
-    opacity: 1;
-    pointer-events: none;
-  }
-  
-  /* Checked styles */
-  .checkbox-wrapper-3 input[type="checkbox"]:checked + .toggle::before {
-    background: #947ADA;
-  }
-  .checkbox-wrapper-3 input[type="checkbox"]:checked + .toggle span {
-    background: #4F2EDC;
-    transform: translateX(20px);
-    transition: all 0.2s cubic-bezier(0.8, 0.4, 0.3, 1.25), background 0.15s ease;
-    box-shadow: 0 3px 8px rgba(79, 46, 220, 0.2);
-  }
-  .checkbox-wrapper-3 input[type="checkbox"]:checked + .toggle span::before {
-    transform: scale(1);
-    opacity: 0;
-    transition: all 0.4s ease;
-  }
-  
-  /* ------------------- CHECKBOX ------------------ */
-  
-  button[type="submit"],
-  button {
-    background-color: var(--secondary);
-    color: #000;
-    padding: 0.6rem 1.2rem;
-    border: var(--border-color) 1px solid;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  .btn:hover {
-    background-color: #009ec2;
-  }
-  
-  button:hover {
-    background-color: #00b59f;
-    color: #000;
-  }
-  
-  .errorlist {
-    color: #ff6b6b;
-    margin: -0.5rem 0 1rem;
-    font-size: 0.9rem;
-    list-style: none;
-    padding-left: 0;
-  }
+    background-color: #fff;
+    transition: transform 0.2s;
+}
 
-  /* -------------------- link-button ------------------- */
+/* …that turns blue and slides right when checked. */
+.switch input:checked {
+    background-color: var(--primary);
+}
 
-  a.btn {
-    display: inline-block; /* so padding works properly */
-    background-color: var(--secondary);
-    color: #000;
-    padding: 0.6rem 1.2rem;
-    border: var(--border-color) 1px solid;
-    border-radius: 6px;
+.switch input:checked::before {
+    transform: translateX(1.1rem);
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons                                                              */
+/*                                                                      */
+/* <button>, <input type="submit"> and links with class="btn" all look  */
+/* the same. Add one of these classes to change it:                     */
+/*   btn-secondary   outlined, for less important actions (Reset)       */
+/*   btn-danger      red, for deletions                                 */
+/*   btn-small       compact, for a ✕ next to an item                   */
+/* ------------------------------------------------------------------ */
+
+:where(button, input[type="submit"], .btn) {
+    display: inline-block;
+    padding: 0.55rem 1.2rem;
+    border: none;
+    border-radius: var(--radius);
+    background-color: var(--primary);
+    color: #fff;
+    font: inherit;
     font-weight: bold;
+    line-height: 1.2;
+    text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.3s ease;
-    text-decoration: none; /* remove underline */
-  }
-  
-  a.btn:hover {
-    background-color: #00b59f;
-    color: #000;
-  }
+    transition: background-color 0.2s;
+}
+
+:where(button, input[type="submit"], .btn):hover {
+    background-color: var(--hover-bg);
+    text-decoration: none;
+}
+
+:where(button, input[type="submit"]):disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.btn-secondary {
+    border: 1px solid var(--primary);
+    background-color: #fff;
+    color: var(--primary);
+}
+
+.btn-secondary:hover {
+    background-color: #e3e8ff;
+}
+
+.btn-danger {
+    background-color: var(--danger);
+}
+
+.btn-danger:hover {
+    background-color: #e53935;
+}
+
+.btn-small {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.85rem;
+}

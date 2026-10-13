@@ -1,24 +1,26 @@
 {# One card row of a lot form. Needs `i` (row index) and `row` (CardRowValues). #}
 <fieldset class="card-row">
-  <legend>Card {% if remove_button %}<button type="button" class="remove-row" title="Remove this card">✕</button>{% endif %}</legend>
+  <legend>Card {% if remove_button %}<button type="button" class="remove-row btn-small btn-danger" title="Remove this card">✕</button>{% endif %}</legend>
 
-  <div style="margin-bottom: 1rem;">
-    <label for="cards-{{ i }}-name">Card name:</label>
-    <input type="text" name="cards-{{ i }}-name" id="cards-{{ i }}-name" value="{{ row.name }}" maxlength="255">
-  </div>
-  <div style="margin-bottom: 1rem;">
-    <label for="cards-{{ i }}-en_name">Card en name:</label>
-    <input type="text" name="cards-{{ i }}-en_name" id="cards-{{ i }}-en_name" value="{{ row.en_name }}" maxlength="255" placeholder="defaults to the card name">
+  <div class="field-row">
+    <div class="wide">
+      <label for="cards-{{ i }}-name">Name:</label>
+      <input type="text" name="cards-{{ i }}-name" id="cards-{{ i }}-name" value="{{ row.name }}" maxlength="255">
+    </div>
+    <div class="wide">
+      <label for="cards-{{ i }}-en_name">English name:</label>
+      <input type="text" name="cards-{{ i }}-en_name" id="cards-{{ i }}-en_name" value="{{ row.en_name }}" maxlength="255" placeholder="defaults to the name">
+    </div>
+    <label class="switch"><input type="checkbox" name="cards-{{ i }}-is_proxy" {% if row.is_proxy %}checked{% endif %}> Proxy</label>
   </div>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
-    <div style="flex: 1 1 150px;">
-      <label for="cards-{{ i }}-code">Card code:</label>
+  <div class="field-row">
+    <div>
+      <label for="cards-{{ i }}-code">Code:</label>
       <input type="text" name="cards-{{ i }}-code" id="cards-{{ i }}-code" value="{{ row.code }}" maxlength="20">
     </div>
-
-    <div style="flex: 1 1 220px;">
-      <label for="cards-{{ i }}-status" style="display: inline-block; min-width: 160px;">Card last known status:</label>
+    <div>
+      <label for="cards-{{ i }}-status">Status:</label>
       <select name="cards-{{ i }}-status" id="cards-{{ i }}-status">
         <option value="">---------</option>
         {% for status in self.statuses() %}
@@ -26,19 +28,11 @@
         {% endfor %}
       </select>
     </div>
-
-    <div class="checkbox-wrapper-3" style="display: inline-flex; align-items: center;">
-      <input type="checkbox" name="cards-{{ i }}-is_proxy" id="cards-{{ i }}-is_proxy" {% if row.is_proxy %}checked{% endif %}>
-      <label for="cards-{{ i }}-is_proxy" class="toggle"><span></span></label>
-      <label for="cards-{{ i }}-is_proxy" class="checkbox-label">Proxy Card</label>
-    </div>
-
-    <div style="flex: 1 1 120px;">
+    <div>
       <label for="cards-{{ i }}-price">Price:</label>
       <input type="text" inputmode="decimal" name="cards-{{ i }}-price" id="cards-{{ i }}-price" value="{{ row.price }}">
     </div>
-
-    <div style="flex: 1 1 120px;">
+    <div>
       <label for="cards-{{ i }}-quantity">Quantity:</label>
       <input type="number" min="1" max="100" name="cards-{{ i }}-quantity" id="cards-{{ i }}-quantity" value="{{ row.quantity }}" placeholder="1">
     </div>

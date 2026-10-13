@@ -13,11 +13,11 @@
 {% endblock %}
 
 {% block filter %}
-<button id="filter-badge" class="filter-badge">Filter</button>
+<button id="filter-badge" class="floating-button">Filter</button>
 <div id="filter-modal" class="filter-modal hidden">
   <div class="filter-content">
-    <h2>Filter cards</h2>
     <form method="get">
+      <h2>Filter cards</h2>
       <label for="name">Name:</label>
       <input type="text" name="name" id="name" value="{{ filter.name.as_deref().unwrap_or("") }}" placeholder="Card name">
 
@@ -54,9 +54,9 @@
         <option value="false" {% if self.selected(filter.sold, "false") %}selected{% endif %}>Not sold</option>
       </select>
 
-      <div style="margin-top: 1rem;">
+      <div class="button-row">
         <button type="submit">Apply</button>
-        <a href="/cards" class="reset-button" style="margin-left: 0.5rem;">Reset</a>
+        <a href="/cards" class="btn btn-secondary">Reset</a>
       </div>
     </form>
   </div>

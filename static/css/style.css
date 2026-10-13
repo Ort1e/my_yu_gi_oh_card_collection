@@ -1,52 +1,225 @@
+/*
+ * Base styles, loaded by every page (templates/base.html).
+ *
+ * The stylesheets, by topic:
+ *   style.css      colours, page layout, text, tables, messages   (every page)
+ *   header.css     the top navigation bar                         (every page)
+ *   form.css       forms, fields, buttons, the on/off switch      (every page)
+ *   card.css       the green "card" boxes of the lists            (list and detail pages)
+ *   filtering.css  the floating buttons and the filter popup      (list pages)
+ * The deck builder has its own: frontend/src/deck_builder.css.
+ *
+ * How to read these files:
+ * - `.name` styles the elements with class="name", `#name` the one with id="name",
+ *   a bare `p` or `table` every such element.
+ * - `a b` means "b inside a"; `a > b` "b directly inside a"; `a, b` "a and b".
+ * - Plain-element rules are wrapped in `:where(...)`. It changes nothing to what
+ *   they match, it only makes them weak: any rule with a class wins over them, so
+ *   a class can always override the defaults (the deck builder relies on it).
+ * - Sizes in `rem` are multiples of the base font size (1rem ≈ 16px).
+ */
+
+/* ------------------------------------------------------------------ */
+/* Colours and sizes: change them here, they are used everywhere        */
+/* ------------------------------------------------------------------ */
+
 :root {
-    --bg-color: #c6f4ff;
-    --card-bg: #1a1a1a;
-    --secondary: #04926f;
-    --primary: #0018a3;
-    --text-light: #e0e0e0;
-    --text-muted: #c2bcbc;
-    --text-dark: #000;
-    --border-color: #2a2a2a;
-    --hover-bg: #289faf;
-  }
-  
-  body {
+    --bg-color: #c6f4ff;        /* page background (light blue) */
+    --secondary: #04926f;       /* green: header, panels, cards */
+    --primary: #0018a3;         /* dark blue: links, titles, buttons, fields */
+    --hover-bg: #289faf;        /* teal: hovered cards and buttons */
+    --card-bg: #1a1a1a;         /* near black: deck builder tiles */
+    --border-color: #2a2a2a;    /* dark grey borders */
+    --danger: #c62828;          /* red: delete buttons, errors */
+
+    --text-dark: #000;          /* text on the light background */
+    --text-light: #e0e0e0;      /* text on green or blue */
+    --text-muted: #c2bcbc;      /* secondary text on green */
+
+    --radius: 6px;              /* rounded corners of fields and buttons */
+    --page-width: 1200px;       /* max width of a page's content */
+    --form-page-width: 800px;   /* max width of the form pages */
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                 */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The width of an element includes its padding and border. Without this,
+ * `width: 100%` plus some padding is wider than its container (fields used to
+ * stick out of their frame).
+ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-light);
     line-height: 1.6;
+    background-color: var(--bg-color);
     color: var(--text-dark);
-  }
-  
-  a {
+}
+
+:where(a) {
     color: var(--primary);
     text-decoration: none;
-  }
-  
-  a:hover {
+}
+
+:where(a:hover) {
     text-decoration: underline;
-  }
-  
-  .container {
+}
+
+/* Secondary text: help under a field, notes. */
+:where(small) {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+/* ------------------------------------------------------------------ */
+/* Page layout                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Everything below the header. The top padding leaves room for the fixed header. */
+.container {
     max-width: 1800px;
     margin: 0 auto;
-    padding: 6rem 1rem 2rem; /* 👈 this creates space under the fixed header */
-  }
+    padding: 6rem 1rem 2rem;
+}
 
-  .inside-container {
-    max-width: 1200px;
-    margin: 0 auto; /* ✅ centers horizontally */
-  }
-  
-  .pagination-container {
+/* A centred column, for most pages. */
+.inside-container {
+    max-width: var(--page-width);
+    margin: 0 auto;
+}
+
+/* A narrower centred column, for the form pages. */
+.inside-container.narrow {
+    max-width: var(--form-page-width);
+}
+
+/* "← Back to …" links and other links under a page title. */
+.back-link {
+    margin-top: -0.5rem;
+}
+
+/* A row of buttons or links, side by side. */
+.button-row {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Messages                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Form errors (templates/_form_errors.html), login and upload errors. */
+.error {
+    margin: 0 0 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    background-color: #ffe5e5;
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.error ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tables                                                               */
+/* ------------------------------------------------------------------ */
+
+:where(table) {
+    border-collapse: collapse;  /* one line between cells, not two */
+    margin: 1rem 0;
+}
+
+:where(th, td) {
+    padding: 0.4rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* The header row gets a thicker line below it. */
+:where(thead th) {
+    border-bottom: 2px solid rgba(0, 0, 0, 0.5);
+}
+
+/* Every other row slightly lighter, to follow a line across the table. */
+:where(tbody tr:nth-child(even)) {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Tables on a green panel (a card box or a form): light lines, fainter stripes. */
+.card th,
+.card td,
+form th,
+form td {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.card tbody tr:nth-child(even),
+form tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Tables of amounts: numbers aligned on the right, except the first column. */
+.numbers td {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.numbers td:first-child {
+    text-align: left;
+}
+
+/* Debt amounts (budget pages), coloured by the `debt_color` filter (filters.rs). */
+.debt-green  { color: #1b7f3a; }    /* under budget */
+.debt-orange { color: #c25e00; }    /* over budget, within the allowed debt */
+.debt-red    { color: var(--danger); font-weight: bold; }   /* over the allowed debt */
+
+/* A "Total" row. */
+.total-row {
+    font-weight: bold;
+    border-top: 2px solid rgba(0, 0, 0, 0.5);
+}
+
+/* The dashboard and budget tables can be wider than the screen: scroll them. */
+.table-scroll {
+    overflow-x: auto;
+}
+
+/* The apports column of Budget → Manage: text, left-aligned, one apport per line. */
+.numbers td.apports {
+    text-align: left;
+    white-space: normal;
+}
+
+.apports div {
+    padding: 0.15rem 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pagination (templates/_pagination.html)                              */
+/* ------------------------------------------------------------------ */
+
+.pagination-container {
+    display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    margin-top: 1rem;
     gap: 1rem;
-    flex-wrap: wrap;
-    text-align: center;
+    margin-top: 1rem;
 }
 
 .pagination-controls {
@@ -67,15 +240,3 @@
     text-align: center;
 }
 
-
-.bordered-table {
-  border: 1px solid black;
-  border-collapse: collapse;
-}
-
-.bordered-table th,
-.bordered-table td {
-  border: 1px solid black;
-  padding: 8px;
-  text-align: left;
-}

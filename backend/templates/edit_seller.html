@@ -3,8 +3,9 @@
 {% block title %}Edit {{ seller.name }}{% endblock %}
 
 {% block content %}
-<h1 class="card-title">Edit Seller</h1>
-<p><a href="/sellers/{{ id }}">← Back to the seller</a></p>
+<div class="inside-container narrow">
+<h1>Edit Seller</h1>
+<p class="back-link"><a href="/sellers/{{ id }}">← Back to the seller</a></p>
 
 {% include "_form_errors.html" %}
 
@@ -15,9 +16,7 @@
       <label for="name">Name:</label>
       <input type="text" name="name" id="name" value="{{ seller.name }}" maxlength="255" required>
     </p>
-    <p>
-      <label><input type="checkbox" name="is_person" {% if seller.is_person %}checked{% endif %}> Is person</label>
-    </p>
+    <label class="switch"><input type="checkbox" name="is_person" {% if seller.is_person %}checked{% endif %}> Is a person</label>
     <p>
       <label for="source">Source:</label>
       <select name="source" id="source">
@@ -29,6 +28,7 @@
     </p>
   </fieldset>
 
-  <p><input type="submit" value="Save"></p>
+  <input type="submit" value="Save">
 </form>
+</div>
 {% endblock %}
