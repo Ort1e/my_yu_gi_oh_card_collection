@@ -637,8 +637,8 @@ pub async fn add_cards(
         form.errors.push("Card 1: name is required.".into());
     }
     if !form.errors.is_empty() {
-        let row = form.card_rows().into_iter().next().unwrap_or_default();
-        let page = lots::load_detail(&state.pool, lot_id, form.errors, row).await?;
+        let rows = form.card_rows();
+        let page = lots::load_detail(&state.pool, lot_id, form.errors, rows).await?;
         return Ok(page.into_response());
     }
 

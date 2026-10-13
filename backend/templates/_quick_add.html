@@ -1,0 +1,36 @@
+{# "Quick add from a set": fills the card rows from a set code and card numbers
+   (static/js/card_rows.js, data from GET /api/sets/:code). Needs self.statuses(). #}
+<fieldset id="quick-add" class="quick-add">
+  <legend>Quick add from a set</legend>
+
+  <div class="field-row">
+    <div>
+      <label for="qa-set">Set code</label>
+      <input type="text" id="qa-set" placeholder="e.g. RA05-FR" autocomplete="off">
+    </div>
+    <div>
+      <label for="qa-status">Status</label>
+      <select id="qa-status">
+        <option value="">---------</option>
+        {% for status in self.statuses() %}
+        <option value="{{ status.code() }}" {% if status.code() == "NM" %}selected{% endif %}>{{ status.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="qa-number">Number, then Enter</label>
+      <input type="text" id="qa-number" placeholder="e.g. 37" autocomplete="off" disabled>
+    </div>
+  </div>
+
+  <div id="qa-rarities" class="qa-rarities" hidden></div>
+
+  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards (with the language, e.g. <code>RA05-FR</code>), then each card's number.</small></p>
+
+  <details>
+    <summary>Or paste a list of numbers or codes</summary>
+    <label for="qa-paste">One per line, or separated by spaces or commas (<code>37 41 41 102</code>, <code>RA05-FR037</code>)</label>
+    <textarea id="qa-paste" rows="3"></textarea>
+    <button type="button" id="qa-paste-add" class="btn-secondary">Add these cards</button>
+  </details>
+</fieldset>

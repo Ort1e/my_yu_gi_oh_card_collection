@@ -141,3 +141,34 @@
     max-height: 600px;
     object-fit: contain;
 }
+
+/* ------------------------------------------------------------------ */
+/* The rarity guide (templates/rarities.html)                           */
+/* ------------------------------------------------------------------ */
+
+/* The "look at this first" table: cells that span several rows stay on top. */
+.rarity-checks td[rowspan] {
+    vertical-align: top;
+    font-weight: 600;
+}
+
+.rarity .card-title {
+    color: var(--primary);
+    font-weight: bold;
+}
+
+.rarity-summary {
+    margin: 0 0 0.5rem;
+    color: #fff;
+    font-weight: 600;
+}
+
+.rarity div {
+    margin-bottom: 0.25rem;
+    color: var(--text-light);
+}
+
+/* The box opened from a link (/rarities#ultra-rare) is outlined. */
+.rarity:target {
+    outline: 3px solid var(--primary);
+}

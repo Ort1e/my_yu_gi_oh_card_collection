@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Rarities{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <h1>Recognising rarities</h1>
+  <p>
+    The same card code can exist in several rarities (Rarity Collection sets: up to 7).
+    Tilt the card under a light and check, in this order:
+  </p>
+
+  <table class="rarity-checks">
+    <thead>
+      <tr><th>Look at</th><th>If you see</th><th>It's probably</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>The text box</td><td>a "25th Quarter Century" logo watermark</td><td>Quarter Century Secret Rare</td></tr>
+      <tr><td rowspan="6">The card border</td><td>hieroglyphs, and a serial number on the card</td><td>Grand Master Rare</td></tr>
+      <tr><td>straight horizontal holo lines over the whole card</td><td>Starlight Rare</td></tr>
+      <tr><td>stars, small squares or shattered glass in a foil over the whole card</td><td>Starfoil, Mosaic or Shatterfoil Rare</td></tr>
+      <tr><td>an irregular rainbow pattern, slightly raised</td><td>Collector's Rare</td></tr>
+      <tr><td>platinum (silver-grey) foil</td><td>Platinum Secret Rare</td></tr>
+      <tr><td>gold</td><td>Gold Rare (holo art), Gold Secret Rare (Secret pattern), Ghost/Gold Rare (ghostly art), Premium Gold Rare (embossed)</td></tr>
+      <tr><td rowspan="5">The card name<br><small>(border plain)</small></td><td>no foil</td><td>Common or Short Print (plain art), Super Rare (holo art)</td></tr>
+      <tr><td>silver</td><td>Rare (plain art) or Ghost Rare (ghostly art)</td></tr>
+      <tr><td>gold</td><td>Ultra Rare, or Ultimate Rare if the art is raised</td></tr>
+      <tr><td>rainbow</td><td>Secret Rare</td></tr>
+      <tr><td>champagne gold, speckled</td><td>Quarter Century Secret Rare</td></tr>
+      <tr><td>Your finger on the art</td><td>a raised, embossed texture</td><td>Ultimate Rare</td></tr>
+    </tbody>
+  </table>
+
+  <p><small>
+    Compiled from <a href="https://seller.tcgplayer.com/articles/understanding-yu-gi-oh-rarities/">TCGplayer's rarity guide</a>
+    and <a href="https://yugipedia.com/wiki/Rarity">Yugipedia</a>. Looks change between releases: when in
+    doubt, compare with a card whose rarity you know.
+  </small></p>
+
+  <div id="rarity-list" class="card-list"></div>
+
+  <p id="rarity-undescribed"><small></small></p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/rarities.js"></script>
+<script>
+    // One box per rarity, from static/js/rarities.js.
+    const list = document.getElementById('rarity-list');
+
+    const line = (label, text) => (text ? `<div><strong>${label}:</strong> ${text}</div>` : '');
+
+    for (const rarity of RARITIES) {
+        list.insertAdjacentHTML('beforeend', `
+            <section class="card rarity" id="${rarityAnchor(rarity.name)}">
+                <div class="card-title">${[rarity.name, ...(rarity.aliases ?? [])].join(' / ')}</div>
+                <p class="rarity-summary">${rarity.summary}</p>
+                ${line('Name', rarity.cardName)}
+                ${line('Artwork', rarity.artwork)}
+                ${line('Elsewhere', rarity.rest)}
+                ${line('Not to confuse with', rarity.lookAlikes)}
+            </section>`);
+    }
+
+    document.querySelector('#rarity-undescribed small').textContent =
+        `Not described yet: ${UNDESCRIBED.join(', ')}.`;
+
+    // opened from a link like /rarities#ultra-rare: the box exists only now
+    document.getElementById(location.hash.slice(1))?.scrollIntoView();
+</script>
+{% endblock %}

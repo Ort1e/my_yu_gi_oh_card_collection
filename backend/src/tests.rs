@@ -155,6 +155,7 @@ async fn pages_render() {
         "/lots/add",
         "/decks/add",
         "/budget/manage",
+        "/rarities",
     ] {
         let (status, body) = t.get(uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {body}");
@@ -339,6 +340,25 @@ async fn add_cards_to_existing_lot() {
     let (status, page) = t.post(&uri, &[("cards-0-name", "")]).await;
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("name is required"));
+
+    // several rows (quick add): one invalid row keeps all of them on the page
+    let (status, page) = t
+        .post(
+            &uri,
+            &[
+                ("cards-0-name", "Dark Magician"),
+                ("cards-3-name", "Kuriboh"),
+                ("cards-3-price", "abc"),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("is not a valid price"), "{page}");
+    assert!(
+        page.contains("Dark Magician") && page.contains("abc"),
+        "{page}"
+    );
+    assert_eq!(t.scalar("SELECT count(*) FROM unite").await, 5);
 
     assert_eq!(
         t.post("/lots/999/cards", &[("cards-0-name", "X")]).await.0,

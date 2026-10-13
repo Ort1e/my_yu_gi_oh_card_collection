@@ -109,27 +109,35 @@ pub struct LotDetail {
     lot: LotRow,
     unites: Vec<UniteRow>,
     total_price: Money,
-    /// "Add card" form: errors and values of the last submission.
+    /// "Add cards" form: errors and card rows of the last submission (at
+    /// least one row).
     errors: Vec<String>,
-    row: CardRowValues,
+    rows: Vec<CardRowValues>,
 }
 
 impl LotDetail {
+    fn blank_row(&self) -> CardRowValues {
+        CardRowValues::default()
+    }
+
     fn statuses(&self) -> [domain::card::CardStatus; 5] {
         domain::card::CardStatus::ALL
     }
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
-    load_detail(&state.pool, id, Vec::new(), CardRowValues::default()).await
+    load_detail(&state.pool, id, Vec::new(), Vec::new()).await
 }
 
 pub async fn load_detail(
     pool: &Pool,
     id: i64,
     errors: Vec<String>,
-    row: CardRowValues,
+    mut rows: Vec<CardRowValues>,
 ) -> AppResult<LotDetail> {
+    if rows.is_empty() {
+        rows.push(CardRowValues::default());
+    }
     let lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
         .bind(id)
         .fetch_optional(pool)
@@ -150,6 +158,6 @@ pub async fn load_detail(
         unites,
         total_price,
         errors,
-        row,
+        rows,
     })
 }

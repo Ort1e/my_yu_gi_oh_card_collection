@@ -6,6 +6,7 @@
 pub mod ban_list;
 pub mod budget;
 pub mod card;
+pub mod card_set;
 pub mod cardmarket;
 pub mod lot;
 pub mod monte_carlo;

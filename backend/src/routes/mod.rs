@@ -9,8 +9,10 @@ mod decks;
 mod images;
 mod lot_form;
 mod lots;
+mod rarities;
 mod seller_form;
 mod sellers;
+mod sets;
 
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, patch, post, put};
@@ -31,6 +33,8 @@ pub fn router() -> Router<AppState> {
         .route("/decks", get(decks::list))
         .route("/decks/:id", get(decks::detail))
         .route("/deck-builder/:id", get(decks::builder))
+        .route("/rarities", get(rarities::page))
+        .route("/api/sets/:code", get(sets::set_cards))
         .route("/api/deck-versions/:id", get(deck_api::get_version))
         .route("/api/deck-versions/:id/reserve", post(deck_api::reserve))
         .route(

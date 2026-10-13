@@ -51,13 +51,31 @@
   </table>
 
   <form method="post" action="/lots/{{ lot.id }}/cards" class="plain">
-    <h2>Add a card</h2>
+    <h2>Add cards</h2>
     {% include "_form_errors.html" %}
-    {% let i = 0 %}
-    {% let remove_button = false %}
-    {% include "_card_row.html" %}
-    <input type="submit" value="Add the card to the lot">
+    <div id="card-rows">
+      {% include "_quick_add.html" %}
+      {% for row in rows %}
+        {% let i = loop.index0 %}
+        {% let remove_button = true %}
+        {% include "_card_row.html" %}
+      {% endfor %}
+      <button type="button" id="add-row" class="btn-secondary">+ Add a card</button>
+    </div>
+    <input type="submit" value="Add the cards to the lot">
   </form>
 </div>
+
+<template id="card-row-template">
+  {% let i = "__i__" %}
+  {% let row = self.blank_row() %}
+  {% let remove_button = true %}
+  {% include "_card_row.html" %}
+</template>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/rarities.js"></script>
+<script src="/static/js/card_rows.js"></script>
 {% endblock %}

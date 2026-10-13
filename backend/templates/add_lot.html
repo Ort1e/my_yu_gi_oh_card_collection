@@ -83,6 +83,7 @@
 
   <fieldset id="card-rows">
     <legend>Cards in the Lot</legend>
+    {% include "_quick_add.html" %}
     {% for row in rows %}
       {% let i = loop.index0 %}
       {% let remove_button = true %}
@@ -104,17 +105,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  const rows = document.getElementById('card-rows');
-  let next = rows.querySelectorAll('.card-row').length;
-
-  document.getElementById('add-row').addEventListener('click', () => {
-    const html = document.getElementById('card-row-template').innerHTML.replaceAll('__i__', next++);
-    rows.insertAdjacentHTML('beforeend', html);
-  });
-
-  rows.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-row')) e.target.closest('.card-row').remove();
-  });
-</script>
+<script src="/static/js/rarities.js"></script>
+<script src="/static/js/card_rows.js"></script>
 {% endblock %}

@@ -190,6 +190,14 @@ legend {
     flex: 1 1 7rem;             /* grow and shrink, ideally 7rem wide */
 }
 
+/* A label + field cell: the field sits at the bottom, so the fields of a row
+   stay level even when one label wraps onto two lines (wider fonts). */
+.field-row > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
 .field-row input,
 .field-row select {
     max-width: none;
@@ -341,4 +349,63 @@ legend {
 .btn-small {
     padding: 0.15rem 0.5rem;
     font-size: 0.85rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* "Quick add from a set" (templates/_quick_add.html,                   */
+/* static/js/card_rows.js), above the card rows of a lot form.          */
+/* ------------------------------------------------------------------ */
+
+.quick-add {
+    background-color: rgba(0, 24, 163, 0.12);   /* a blue tint: a tool, not a card */
+}
+
+.quick-add-info {
+    margin: 0 0 0.5rem;
+}
+
+/* A message about something that went wrong (unknown number, set not found). */
+.error-text {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background-color: var(--danger);
+    color: #fff;
+}
+
+.quick-add summary {
+    cursor: pointer;
+}
+
+/* "+ Add a card", under the card rows: keep it apart from the submit button. */
+#add-row {
+    margin-bottom: 1rem;
+}
+
+/* A card row just filled by the quick add: a short light flash. */
+.card-row.just-added {
+    animation: just-added 1.2s ease-out;
+}
+
+@keyframes just-added {
+    from { background-color: rgba(255, 255, 255, 0.45); }
+    to   { background-color: rgba(255, 255, 255, 0.03); }
+}
+
+/* The rarities of the card just added by the quick add (several possible). */
+.qa-rarities {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    background-color: rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+}
+
+.qa-rarities p,
+.qa-rarities ul {
+    margin: 0;
+}
+
+.qa-rarities a {
+    color: #fff;
+    text-decoration: underline;
 }

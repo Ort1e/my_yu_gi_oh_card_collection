@@ -96,6 +96,29 @@ async fn fetch(http: &reqwest::Client, param: &str, value: &str) -> AppResult<Op
     Ok(body["data"].get(0).cloned())
 }
 
+/// The ygoprodeck answers for one set prefix (`"RA05"`), for
+/// `domain::card_set::set_cards`. Several sets can share a prefix: their
+/// cards are put together. Spec: `docs/specs/set-lookup.md`.
+#[allow(dead_code)] // TODO: remove once used by routes::sets
+#[derive(Debug)]
+pub struct FetchedSet {
+    /// Name of the biggest set with that prefix (`"Rarity Collection 5"`).
+    pub name: String,
+    /// English cards: the `data` arrays of `cardinfo.php?cardset=…`.
+    pub en: Vec<Value>,
+    /// French cards (`&language=fr`), empty when ygoprodeck has none.
+    pub fr: Vec<Value>,
+}
+
+/// Fetch every card of the sets whose code is `prefix`, `None` for an
+/// unknown prefix. Calls `cardsets.php`, then `cardinfo.php` in English and
+/// French for each matching set; `throttle()` before each request.
+#[allow(dead_code)] // TODO: remove once used by routes::sets
+#[allow(unused_variables)] // TODO: remove once implemented
+pub async fn fetch_set(http: &reqwest::Client, prefix: &str) -> AppResult<Option<FetchedSet>> {
+    todo!("see docs/specs/set-lookup.md; copy the request/error handling of `fetch`")
+}
+
 /// Insert API data as a `card_data` row (or find the row it duplicates).
 async fn store(pool: &Pool, name: &str, data: &Value) -> AppResult<i64> {
     let ygopro_id = data["id"].as_i64();
