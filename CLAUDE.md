@@ -3,13 +3,14 @@
 Personal Yu-Gi-Oh! card collection manager: cards owned, purchase/sale lots, sellers,
 monthly budget, decks (versions, categories, YDKE import/export, draw simulation), ban lists.
 
-## Branch situation — read first
+## History — read first
 
-- `main` = the **Django** app (the original, retired: cutover to Rust done on 2026-10-13).
-- `rust-stack` (this branch) = the **Rust rewrite**, the app in use. Its live data is `data/app.db`.
-- The Django code is **not in this branch's tree**. Read it from `main` without switching branches:
-  `git show main:my_ygo_cards/models/deck.py`, `git ls-tree -r --name-only main`, or
-  `git archive main my_ygo_cards | tar -x -C <scratch dir>`. On `main`, `deck_builder_frontend/` is an abandoned React stub.
+- `main` is the **Rust app** (the one in use). Its live data is `data/app.db` (data submodule).
+- It replaced a **Django** app (cutover 2026-10-13). The Django code is only in history, at tag
+  `django-final`: `git show django-final:my_ygo_cards/models/deck.py`,
+  `git ls-tree -r --name-only django-final`, or `git archive django-final my_ygo_cards | tar -x -C <scratch dir>`.
+  Its `deck_builder_frontend/` is an abandoned React stub.
+- Human-oriented docs: `docs/tour.md` (architecture), `docs/recipes.md` (how to change things). Keep them in sync.
 
 ## Stack
 
@@ -82,7 +83,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (uns
 
 ## Privacy rule: shipment PDFs
 
-Cardmarket shipment PDFs (uploads, `data/media/shipment_files/`, and the test PDFs in `my_ygo_cards/tests/doc/` on `main`) contain **personal data** (names, addresses).
+Cardmarket shipment PDFs (uploads, `data/media/shipment_files/`, and the test PDFs in `my_ygo_cards/tests/doc/` at tag `django-final`) contain **personal data** (names, addresses).
 - Never store their extracted text anywhere: not in the DB, logs/tracing, error messages, test fixtures, snapshots, docs, commits, or Claude memory. Only the parsed fields the app needs (dates, total, seller name, card lines) may be persisted.
 - Parse the text in memory and drop it. Tests must read the PDF at runtime and assert on parsed fields; never paste PDF text into source files. Unit tests use synthetic text.
 - Use `lopdf` for extraction: `pdf-extract` `println!`s text fragments to stdout. Check any new PDF crate for prints/logs of content.

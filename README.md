@@ -5,7 +5,11 @@ they were bought or sold in (with Cardmarket shipment import), sellers, a
 monthly budget, decks with a deck builder (YDKE import/export, categories,
 opening-hand simulation) and the Forbidden & Limited lists.
 
-This branch (`rust-stack`) is the Rust rewrite of the Django app on `main`.
+Written in Rust; it replaced the original Django app in October 2026 (still
+in the history, tag `django-final`).
+
+New to the code? Read [docs/tour.md](docs/tour.md), then
+[docs/recipes.md](docs/recipes.md) for how to make the usual changes.
 
 ## Stack
 
