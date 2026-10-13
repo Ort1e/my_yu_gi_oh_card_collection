@@ -17,9 +17,11 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 The port is finished; the project now serves as Rust practice for the owner.
 - **Frontend: Claude implements.** Templates (`backend/templates/`), CSS (`static/css/`), the deck
   builder (`frontend/`), inline JS.
-- **Backend: the owner implements, Claude suggests.** Rust in `backend/src/`, `domain/`,
-  `migrations/`, `importer/`: don't edit it. Explain, review, and propose changes (route, JSON in/out,
-  where the code goes, similar code to copy from), then build the frontend against the API once it exists.
+- **Backend: the owner implements the substantial work, Claude suggests.** Rust in `backend/src/`,
+  `domain/`, `migrations/`, `importer/`: for new features, data model, API design or real logic, explain,
+  review and propose (route, JSON in/out, where the code goes, similar code to copy from), then build the
+  frontend against the API once it exists. Small, mechanical backend edits (e.g. log lines across
+  handlers) Claude may make directly; when unsure whether a change is small, ask.
 
 ## Stack
 
