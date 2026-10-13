@@ -29,7 +29,10 @@ cargo clippy --workspace --all-targets
 - Deck builder changed → `cd frontend && npm run build`, or `npm run dev`
   for hot reload at `http://localhost:5173/?id=<deck version id>` (backend
   running on :3000).
-- `RUST_LOG=debug cargo run -p backend` shows the SQL and the requests.
+- The terminal shows `INFO` logs by default: one line per page or API call,
+  plus one per change to the collection ("lot created lot_id=153 cards=4").
+  `RUST_LOG=debug cargo run -p backend` adds the SQL and more detail;
+  `RUST_LOG=info,sqlx=warn`-style lists tune it per module (see `EnvFilter`).
 - To look at the data: `sqlite3 data/app.db` (read-only queries are
   harmless while the server runs).
 

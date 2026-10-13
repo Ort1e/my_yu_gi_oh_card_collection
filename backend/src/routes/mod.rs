@@ -24,7 +24,6 @@ pub fn router() -> Router<AppState> {
         .route("/budget", get(budget::overview))
         .route("/cards", get(cards::list))
         .route("/cards/:id", get(cards::detail))
-        .route("/card-image/:card_data_id", get(images::card_image))
         .route("/sellers", get(sellers::list))
         .route("/sellers/:id", get(sellers::detail))
         .route("/lots", get(lots::list))
@@ -46,6 +45,12 @@ pub fn router() -> Router<AppState> {
             "/api/deck-versions/:id/monte-carlo",
             post(deck_api::monte_carlo),
         )
+}
+
+/// Routes that serve files rather than pages (kept out of the request log:
+/// a deck builder page loads dozens of card images).
+pub fn files_router() -> Router<AppState> {
+    Router::new().route("/card-image/:card_data_id", get(images::card_image))
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added

@@ -326,6 +326,8 @@ pub async fn update_version(
     Path(id): Path<i64>,
     Json(update): Json<VersionUpdate>,
 ) -> AppResult<Json<DeckVersion>> {
+    let renamed = update.version_name.is_some();
+    let ban_list_changed = update.ban_list_id.is_some();
     let mut tx = begin_write(&state.pool).await?;
     exists(&mut tx, "deck_version", id).await?;
 
@@ -405,6 +407,13 @@ pub async fn update_version(
         .await?;
     }
     tx.commit().await?;
+    tracing::info!(
+        version_id = id,
+        zones_changed,
+        renamed,
+        ban_list_changed,
+        "deck version saved"
+    );
 
     Ok(Json(load_version(&state.pool, id).await?))
 }
@@ -445,8 +454,14 @@ pub async fn delete_version(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    delete_orphan_proxies(&mut tx).await?;
+    let proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     tx.commit().await?;
+    tracing::info!(
+        version_id = id,
+        ?deck_id,
+        proxies_deleted,
+        "deck version deleted"
+    );
     Ok(Json(Deleted { deck_id }))
 }
 
@@ -514,6 +529,11 @@ pub async fn clone_version(
         }
     }
     tx.commit().await?;
+    tracing::info!(
+        from_version_id = id,
+        version_id = new_id,
+        "deck version copied"
+    );
     Ok((StatusCode::CREATED, Json(Created { id: new_id })))
 }
 
@@ -553,6 +573,7 @@ pub async fn add_proxy(
         .pop()
         .expect("just inserted");
     tx.commit().await?;
+    tracing::info!(version_id = id, card_id, zone = ?input.zone, "proxy added");
     Ok((StatusCode::CREATED, Json(card)))
 }
 
@@ -581,6 +602,7 @@ pub async fn delete_proxy(
     }
     delete_orphan_proxies(&mut tx).await?;
     tx.commit().await?;
+    tracing::info!(version_id = id, card_id, "proxy removed");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -786,6 +808,12 @@ pub async fn add_category(
         .await?;
     }
     tx.commit().await?;
+    tracing::info!(
+        version_id = id,
+        category_id,
+        conditional = condition.is_some(),
+        "category added"
+    );
 
     Ok((
         StatusCode::CREATED,
@@ -809,6 +837,7 @@ pub async fn delete_category(
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    tracing::info!(version_id = id, category_id, "category deleted");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -869,6 +898,13 @@ pub async fn assign_category(
         .bind(card_id)
         .execute(&mut *conn)
         .await?;
+    tracing::info!(
+        version_id = id,
+        card_id,
+        category_id,
+        assigned = input.assigned,
+        "card category changed"
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1004,6 +1040,7 @@ pub async fn save_tournament(
         }
     }
     tx.commit().await?;
+    tracing::info!(version_id = id, "tournament saved");
     Ok(Json(tournament))
 }
 
@@ -1092,5 +1129,6 @@ pub async fn import_ydke(
         }
     }
     tx.commit().await?;
+    tracing::info!(deck_id, version_id, "deck version imported from YDKE");
     Ok((StatusCode::CREATED, Json(Created { id: version_id })))
 }

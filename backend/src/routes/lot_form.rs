@@ -215,6 +215,7 @@ pub async fn upload(
         Ok(s) => s,
         Err(e) => {
             // `e` never contains PDF text
+            tracing::warn!("shipment PDF not parsed: {e}");
             page.upload_error = Some(format!("Failed to process the shipment PDF: {e}."));
             return Ok(page);
         }
@@ -229,6 +230,12 @@ pub async fn upload(
         .map_err(io)?;
     tokio::fs::write(&path, &pdf).await.map_err(io)?;
 
+    // counts only: the PDF holds personal data (CLAUDE.md, "Privacy rule")
+    tracing::info!(
+        lot_type = shipment.lot_type.code(),
+        cards = shipment.cards.len(),
+        "shipment PDF parsed"
+    );
     prefill(&state, &mut page, shipment).await?;
     page.pending = Some(token);
     Ok(page)
@@ -412,12 +419,20 @@ pub async fn create(
         }
         None => None,
     };
+    let with_shipment = moved.is_some();
     if let Err(e) = tx.commit().await {
         if let Some((from, to)) = moved {
             let _ = tokio::fs::rename(to, from).await;
         }
         return Err(e.into());
     }
+    tracing::info!(
+        lot_id,
+        seller_id,
+        cards = card_ids.len(),
+        with_shipment,
+        "lot created"
+    );
 
     spawn_link_cards(state, card_ids);
     Ok(Redirect::to(&format!("/lots/{lot_id}")).into_response())
@@ -604,6 +619,7 @@ pub async fn update(
             .await?;
     }
     tx.commit().await?;
+    tracing::info!(lot_id = id, "lot edited");
 
     Ok(Redirect::to(&format!("/lots/{id}")).into_response())
 }
@@ -634,6 +650,7 @@ pub async fn add_cards(
     exists.ok_or(AppError::NotFound)?;
     let card_ids = insert_lot_cards(&mut tx, lot_id, &cards).await?;
     tx.commit().await?;
+    tracing::info!(lot_id, cards = card_ids.len(), "cards added to lot");
 
     spawn_link_cards(state, card_ids);
     Ok(Redirect::to(&format!("/lots/{lot_id}")).into_response())

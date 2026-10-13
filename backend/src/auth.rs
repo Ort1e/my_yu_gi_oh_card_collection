@@ -224,11 +224,13 @@ pub async fn login(
     }
 
     let cookie = state.auth.session_cookie(chrono::Utc::now().timestamp());
+    tracing::info!("logged in");
     Ok(([(header::SET_COOKIE, cookie)], Redirect::to(&next)).into_response())
 }
 
 pub async fn logout() -> impl IntoResponse {
     let cookie = format!("{COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict");
+    tracing::info!("logged out");
     ([(header::SET_COOKIE, cookie)], Redirect::to("/"))
 }
 

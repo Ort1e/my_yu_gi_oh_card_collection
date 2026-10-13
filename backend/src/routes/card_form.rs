@@ -117,6 +117,7 @@ pub async fn update(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+    tracing::info!(card_id = id, relinked = renamed, "card edited");
 
     if renamed {
         spawn_link_cards(state, vec![id]);

@@ -62,6 +62,7 @@ pub async fn create(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    tracing::info!(deck_id, "deck created");
 
     Ok(Redirect::to(&format!("/decks/{deck_id}")).into_response())
 }
@@ -122,6 +123,7 @@ pub async fn update(
         return Err(AppError::NotFound);
     }
     tx.commit().await?;
+    tracing::info!(deck_id = id, "deck edited");
 
     Ok(Redirect::to(&format!("/decks/{id}")).into_response())
 }
@@ -138,8 +140,9 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     if deleted == 0 {
         return Err(AppError::NotFound);
     }
-    delete_orphan_proxies(&mut tx).await?;
+    let proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     tx.commit().await?;
+    tracing::info!(deck_id = id, proxies_deleted, "deck deleted");
 
     Ok(Redirect::to("/decks"))
 }
@@ -169,6 +172,7 @@ pub async fn add_version(
         .await?
         .last_insert_rowid();
     tx.commit().await?;
+    tracing::info!(deck_id = id, version_id, "deck version created");
 
     Ok(Redirect::to(&format!("/deck-builder/{version_id}")).into_response())
 }

@@ -69,7 +69,8 @@ Plus `frontend/` (the Svelte deck builder, built by npm, not Cargo) and
 
 `main()`:
 
-1. reads `.env` (`dotenvy`), parses the command line (`commands::Command`);
+1. reads `.env` (`dotenvy`), sets up the logs (`tracing`, level from
+   `RUST_LOG`, `info` by default), parses the command line (`commands::Command`);
 2. opens the SQLite pool and runs pending migrations (`db::init_pool`);
 3. builds `AppState`, the struct every handler receives: the DB pool, an
    HTTP client (for ygoprodeck), the media/uploads directories, your
@@ -78,7 +79,13 @@ Plus `frontend/` (the Svelte deck builder, built by npm, not Cargo) and
 5. closes the pool, which folds the SQLite WAL back into `data/app.db`.
 
 `app()` is the whole URL map: the read router, the write router behind
-the login middleware, `/login`, and the static/media file servers.
+the login middleware, `/login`, and the static/media file servers. Its
+`TraceLayer` logs one line per page or API call; it sits before the file
+routes (card images, `/static`, `/media`), which are therefore not logged,
+because a `.layer()` only wraps the routes added before it.
+
+Changes to the collection are logged by the handlers themselves, after the
+commit, with named fields: `tracing::info!(lot_id, cards = n, "lot created")`.
 
 ## Following a page request
 

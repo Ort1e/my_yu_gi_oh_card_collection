@@ -1,7 +1,7 @@
 # TODO
 
 - [x] Clean up the interface artifacts.
-- [ ] Add logs.
+- [x] Add logs.
 - [ ] Run cleanups automatically instead of by hand (`clean-cards`), in the
       background or as part of the action that needs them:
   - [ ] remove unused proxies automatically;

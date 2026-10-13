@@ -104,6 +104,7 @@ pub async fn set_budget(
     .bind(Money(amount))
     .execute(&state.pool)
     .await?;
+    tracing::info!(%month, %amount, "monthly budget set");
     Ok(Redirect::to(MANAGE).into_response())
 }
 
@@ -123,13 +124,17 @@ pub async fn add_apport(
         return Ok(load(&state.pool, form.errors).await?.into_response());
     };
 
-    sqlx::query("INSERT INTO apport (budget_id, description, amount, date) VALUES (?, ?, ?, ?)")
-        .bind(budget_id)
-        .bind(description)
-        .bind(Money(amount))
-        .bind(date.to_string())
-        .execute(&state.pool)
-        .await?;
+    let apport_id = sqlx::query(
+        "INSERT INTO apport (budget_id, description, amount, date) VALUES (?, ?, ?, ?)",
+    )
+    .bind(budget_id)
+    .bind(description)
+    .bind(Money(amount))
+    .bind(date.to_string())
+    .execute(&state.pool)
+    .await?
+    .last_insert_rowid();
+    tracing::info!(apport_id, budget_id, %amount, "apport added");
     Ok(Redirect::to(MANAGE).into_response())
 }
 
@@ -137,9 +142,13 @@ pub async fn delete_apport(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> AppResult<Redirect> {
-    sqlx::query("DELETE FROM apport WHERE id = ?")
+    let deleted = sqlx::query("DELETE FROM apport WHERE id = ?")
         .bind(id)
         .execute(&state.pool)
-        .await?;
+        .await?
+        .rows_affected();
+    if deleted > 0 {
+        tracing::info!(apport_id = id, "apport deleted");
+    }
     Ok(Redirect::to(MANAGE))
 }

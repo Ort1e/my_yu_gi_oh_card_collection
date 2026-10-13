@@ -107,6 +107,7 @@ pub async fn update(
         return Err(AppError::NotFound);
     }
     tx.commit().await?;
+    tracing::info!(seller_id = id, "seller edited");
 
     Ok(Redirect::to(&format!("/sellers/{id}")).into_response())
 }

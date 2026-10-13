@@ -21,7 +21,10 @@ use axum::Router;
 use commands::Command;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeader;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing::level_filters::LevelFilter;
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
 /// Shared state handed to every handler.
 #[derive(Clone)]
@@ -40,7 +43,11 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt::init();
+
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = match Command::parse(&args) {
@@ -81,7 +88,7 @@ async fn main() {
     }
 
     let login = state.auth.enabled();
-    let app = app(state).layer(TraceLayer::new_for_http());
+    let app = app(state);
 
     // Local only by default. Serving the LAN (BIND_ADDR=0.0.0.0:3000) needs
     // APP_PASSWORD: without login anyone could edit, and read the shipment
@@ -132,6 +139,15 @@ pub fn app(state: AppState) -> Router {
         .merge(routes::write_router().route_layer(login_required))
         .route("/login", get(auth::page).post(auth::login))
         .route("/logout", post(auth::logout))
+        // One INFO line per page or API call: method, path, status and time.
+        // A layer only wraps the routes added before it, so the files below
+        // (card images, CSS, media) are not logged.
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
+        .merge(routes::files_router())
         .merge(shipments)
         // CSS and the deck builder bundle: `no-cache` makes browsers check for
         // a newer file on each page load (a 304 when unchanged) instead of
