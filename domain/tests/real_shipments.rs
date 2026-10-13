@@ -1,5 +1,5 @@
 //! Checks the Cardmarket parser against the real shipment PDFs of the `data`
-//! submodule, using the lots they were imported into (`app.db`) as expected
+//! submodule, using the lots they were imported into (`data/app.db`) as expected
 //! values. Ignored by default (needs the private data):
 //!
 //!   cargo test -p domain --test real_shipments -- --ignored
@@ -20,9 +20,9 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 #[tokio::test]
 #[ignore]
 async fn real_shipments_match_their_lots() {
-    let pool = sqlx::SqlitePool::connect(&format!("sqlite:{ROOT}/app.db?mode=ro"))
+    let pool = sqlx::SqlitePool::connect(&format!("sqlite:{ROOT}/data/app.db?mode=ro"))
         .await
-        .expect("app.db (run the importer first)");
+        .expect("data/app.db");
     let lots = sqlx::query(
         "SELECT l.id, l.lot_type, l.price, l.buy_date, l.shipment_file,
                 (SELECT count(*) FROM unite u WHERE u.lot_id = l.id) AS unites

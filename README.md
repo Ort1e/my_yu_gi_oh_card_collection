@@ -11,8 +11,8 @@ This branch (`rust-stack`) is the Rust rewrite of the Django app on `main`.
 
 - **Backend**: Rust — axum, sqlx (SQLite), askama templates
 - **Deck builder**: Svelte + Vite (`frontend/`)
-- **Data**: the private `data` submodule holds the Django dump, card images
-  and shipment files
+- **Data**: the private `data` submodule holds the database (`data/app.db`),
+  card images and shipment files
 
 ## Setup
 
@@ -29,11 +29,18 @@ Build the deck builder once (and after each change in `frontend/`):
 cd frontend && npm install && npm run build
 ```
 
-Create the database from the Django dump:
+The database `data/app.db` is tracked in the `data` submodule. To save the
+data, stop the server (Ctrl-C: it checkpoints the SQLite WAL into `app.db`)
+then commit in the submodule:
 
 ```bash
-cargo run -p importer -- data/data.json
+git -C data add -A && git -C data commit -m "…" && git -C data push
+git add data && git commit -m "update data"
 ```
+
+`data/app.db` was created once from the Django dump (`importer`, which
+refuses a non-empty database); `data/data.json` and `data/db.sqlite3` are the
+Django data it came from.
 
 ## Running
 
@@ -42,7 +49,7 @@ cargo run -p backend          # http://127.0.0.1:3000
 ```
 
 Settings come from the environment (or `.env`): `DATABASE_URL`
-(`sqlite:app.db`), `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD`,
+(`sqlite:data/app.db`), `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD`,
 `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`), `CARDMARKET_ACCOUNT`.
 
 With `APP_PASSWORD` set, every change (forms, deck builder saves) and the

@@ -5,8 +5,8 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 
 ## Branch situation — read first
 
-- `main` = the **Django** app (the original, still the one in use until cutover).
-- `rust-stack` (this branch) = the **Rust rewrite**, now at feature parity except the items in "Remaining".
+- `main` = the **Django** app (the original, retired: cutover to Rust done on 2026-10-13).
+- `rust-stack` (this branch) = the **Rust rewrite**, the app in use. Its live data is `data/app.db`.
 - The Django code is **not in this branch's tree**. Read it from `main` without switching branches:
   `git show main:my_ygo_cards/models/deck.py`, `git ls-tree -r --name-only main`, or
   `git archive main my_ygo_cards | tar -x -C <scratch dir>`. On `main`, `deck_builder_frontend/` is an abandoned React stub.
@@ -28,14 +28,14 @@ Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
   - `commands/`: `scrap-ban-list`, `clean-cards` (Django's management commands).
   - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), partials prefixed `_`. CSS from Django in `static/css/`.
 - `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
-- `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema.
+- `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, embedded by both binaries (`sqlx::migrate!("../migrations")`).
 - `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte`, `api.js` = HTTP client, `deck.js` = pure helpers).
-- `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): `data.json` (Django dump), `db.sqlite3` (Django DB), `media/card_images/`, `media/shipment_files/`.
+- `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): **`app.db` (the live database, tracked)**, `media/card_images/`, `media/shipment_files/`, and the Django leftovers `data.json` (dump `app.db` was imported from) and `db.sqlite3` (Django DB). Its `.gitignore` excludes `*.db-wal`/`-shm`/`-journal`.
 
 ## Commands
 
-All inside the Nix shell (`nix develop`, or automatic with direnv). Run from the **repo root** (relative paths: `static/`, `app.db`, `data/media`).
+All inside the Nix shell (`nix develop`, or automatic with direnv). Run from the **repo root** (relative paths: `static/`, `data/app.db`, `data/media`).
 
 ```bash
 cargo check --workspace
@@ -47,13 +47,14 @@ cargo run -p backend                          # web server, http://127.0.0.1:300
 cargo run -p backend -- scrap-ban-list        # import new/current Konami ban lists (--all, --dry-run)
 cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies (--dry-run)
 
-rm -f app.db && cargo run -p importer -- data/data.json   # rebuild the DB from the Django dump (not idempotent)
+DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)
 
 cd frontend && npm install && npm run build   # → static/deck-builder/, needed by /deck-builder/:id
 cd frontend && npm run dev                    # hot reload at http://localhost:5173/?id=<deck version id>, proxies to :3000
 ```
 
-`.env` sets `DATABASE_URL=sqlite:app.db` (gitignored, as are `*.db*`). Both binaries create the DB file if missing.
+`.env` sets `DATABASE_URL=sqlite:data/app.db` (the default too). Both binaries create the DB file if missing.
+`data/app.db` is **real data tracked in git**: don't delete/rebuild it, and don't run tests or experiments against it (use a scratch DB). The server closes the pool on Ctrl-C/SIGTERM (graceful shutdown), which checkpoints the WAL into `app.db`; commit it in the submodule only with the server stopped, then bump the submodule pointer here.
 Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (unset = login disabled, then only a loopback `BIND_ADDR` is accepted), `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`, gitignored), `CARDMARKET_ACCOUNT` (`0rtie`).
 
 ## Routes
@@ -75,13 +76,9 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (uns
 - Django MTI `CardConditionalCategory(CardCategory)` → **flattened** into `card_category` with nullable `condition_description`, `categorie_true_id`, `categorie_false_id`. "Is conditional" = `condition_description IS NOT NULL`.
 - Domain names are kept from Django (some French): `unite` (one card in a lot), `apport` (one-off budget contribution), `categorie_true/false`.
 - `0002` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
-- `sqlx::migrate!` checksums applied migrations. **Until cutover** `0002` is the baseline and may be edited (then rebuild `app.db` with the importer). **After cutover** only add new numbered files.
+- `sqlx::migrate!` checksums applied migrations. Cutover is done: **never edit an existing migration**, only add new numbered files (`0004_…sql`). They run on `data/app.db` at the next startup.
 - sqlx 0.7 + SQLite concurrency (see `db.rs`): write transactions start with `db::begin_write(&pool)`, never `pool.begin()`; never `INSERT … RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. Do network calls (ygoprodeck) **before** opening a write transaction: they write card data through the pool.
 - SQLite + FKs: never drop/rebuild a parent table in a migration while `foreign_keys` is on — `DROP TABLE` fires ON DELETE CASCADE in children.
-
-## Remaining before cutover
-
-- Cutover itself: final `data.json` dump from Django → importer, then stop editing `0002`.
 
 ## Privacy rule: shipment PDFs
 

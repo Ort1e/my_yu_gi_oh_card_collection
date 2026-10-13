@@ -64,8 +64,14 @@ async fn main() {
         auth,
     };
 
+    // The DB is tracked in git (data submodule): always close the pool on the
+    // way out, so SQLite checkpoints the WAL into app.db and deletes it.
+    let pool = state.pool.clone();
+
     if command != Command::Serve {
-        if let Err(e) = commands::run(command, &state).await {
+        let result = commands::run(command, &state).await;
+        pool.close().await;
+        if let Err(e) = result {
             eprintln!("error: {e:#}");
             std::process::exit(1);
         }
@@ -91,7 +97,23 @@ async fn main() {
         "listening on {local}, login {}",
         if login { "enabled" } else { "disabled" }
     );
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+    pool.close().await;
+    tracing::info!("stopped");
+}
+
+/// Ctrl-C or SIGTERM.
+async fn shutdown_signal() {
+    let ctrl_c = tokio::signal::ctrl_c();
+    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("cannot listen for SIGTERM");
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = term.recv() => {}
+    }
 }
 
 pub fn app(state: AppState) -> Router {

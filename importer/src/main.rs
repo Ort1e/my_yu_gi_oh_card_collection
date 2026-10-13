@@ -1,12 +1,12 @@
 //! One-off importer: reads a Django `dumpdata` JSON export and inserts it
 //! into the sqlx-managed SQLite schema (migrations/0002_ygo_schema.sql).
+//! Used once for the cutover from Django; `data/app.db` is the live data since.
 //!
 //! Usage:
-//!   DATABASE_URL=sqlite:app.db cargo run -p importer -- data.json
+//!   DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json
 //!
-//! Safe to re-run against an empty database; NOT idempotent against a
-//! database that already has data (primary keys are taken verbatim from
-//! the Django export, so re-running will hit UNIQUE constraint errors).
+//! Only imports into an empty database: it refuses one that already has data
+//! (primary keys are taken verbatim from the Django export).
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     let json_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "data.json".to_string());
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:app.db".to_string());
+    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:data/app.db".to_string());
 
     let raw =
         std::fs::read_to_string(&json_path).with_context(|| format!("reading {json_path}"))?;
@@ -50,7 +50,16 @@ async fn main() -> Result<()> {
         .await
         .context("running migrations")?;
 
+    let has_data: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM card_data) OR EXISTS (SELECT 1 FROM card)
+             OR EXISTS (SELECT 1 FROM lot) OR EXISTS (SELECT 1 FROM deck)",
+    )
+    .fetch_one(&pool)
+    .await?;
+    anyhow::ensure!(!has_data, "{db_url} already has data, refusing to import");
+
     import(&pool, &records).await?;
+    pool.close().await;
 
     println!("import complete");
     Ok(())
