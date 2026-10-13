@@ -12,6 +12,15 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
   Its `deck_builder_frontend/` is an abandoned React stub.
 - Human-oriented docs: `docs/tour.md` (architecture), `docs/recipes.md` (how to change things). Keep them in sync.
 
+## Division of work — read first
+
+The port is finished; the project now serves as Rust practice for the owner.
+- **Frontend: Claude implements.** Templates (`backend/templates/`), CSS (`static/css/`), the deck
+  builder (`frontend/`), inline JS.
+- **Backend: the owner implements, Claude suggests.** Rust in `backend/src/`, `domain/`,
+  `migrations/`, `importer/`: don't edit it. Explain, review, and propose changes (route, JSON in/out,
+  where the code goes, similar code to copy from), then build the frontend against the API once it exists.
+
 ## Stack
 
 | Layer | Tech |
