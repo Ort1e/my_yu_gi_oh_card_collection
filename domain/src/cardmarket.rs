@@ -6,9 +6,10 @@
 //!
 //! Differences from Django: the account name is a parameter instead of a
 //! constant, a missing total is an error instead of a crash, Cardmarket
-//! conditions are mapped to [`CardStatus`], and the rarity is read (from the
+//! conditions are mapped to [`CardStatus`], the rarity is read (from the
 //! rarity code of the line, else from the `(V.x - …)` suffix of the name,
-//! which is stripped).
+//! which is stripped), and the six TCG languages are read (Django: English
+//! and French only).
 
 use std::fmt;
 use std::sync::LazyLock;
@@ -17,7 +18,7 @@ use chrono::NaiveDate;
 use regex::Regex;
 use rust_decimal::Decimal;
 
-use crate::card::CardStatus;
+use crate::card::{CardStatus, Language};
 use crate::lot::LotType;
 use crate::rarity::{split_cardmarket_name, Rarity};
 
@@ -84,10 +85,16 @@ static ARRIVED: LazyLock<Regex> =
 static TOTAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Total\s+([\d,]+)\s+EUR").unwrap());
 // Matched against the whole singles section joined on one line: depending on
 // the PDF library a card is one line (pypdf) or one line per cell (lopdf).
+// `lang` is any spelling of a [`Language`].
 static CARD: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>[0-9a-zA-Z]{3})\s+(?P<lang>EN|FR)\s+(?P<status>[A-Z]{2})\s+(?P<set>[A-Z0-9]+)\s+(?:(?P<rarity>[0-9A-Za-z]+)\s+)?.*?(?P<price>[\d,]+)\s+EUR",
-    )
+    let languages: Vec<&str> = Language::ALL
+        .iter()
+        .flat_map(|l| l.spellings().iter().copied())
+        .collect();
+    Regex::new(&format!(
+        r"(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>[0-9a-zA-Z]{{3}})\s+(?P<lang>{})\s+(?P<status>[A-Z]{{2}})\s+(?P<set>[A-Z0-9]+)\s+(?:(?P<rarity>[0-9A-Za-z]+)\s+)?.*?(?P<price>[\d,]+)\s+EUR",
+        languages.join("|")
+    ))
     .unwrap()
 });
 
@@ -143,14 +150,19 @@ fn parse_cards(text: &str) -> Vec<ShipmentCard> {
     let singles = singles.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut cards = Vec::new();
     for c in CARD.captures_iter(&singles) {
-        let (Ok(qty), Some(price)) = (c["qty"].parse::<usize>(), parse_eur(&c["price"])) else {
+        let (Ok(qty), Some(price), Some(language)) = (
+            c["qty"].parse::<usize>(),
+            parse_eur(&c["price"]),
+            Language::from_code(&c["lang"]),
+        ) else {
             continue;
         };
         let (name, suffix_rarity) = split_cardmarket_name(c["name"].trim());
         let rarity_code = c.name("rarity").map(|m| m.as_str().to_string());
         let card = ShipmentCard {
             name: name.to_string(),
-            code: format!("{}-{}{}", &c["set"], &c["lang"], &c["code"]),
+            // the card code spelling of the language: "ES" → "SP"
+            code: format!("{}-{}{}", &c["set"], language.code(), &c["code"]),
             rarity: rarity_code
                 .as_deref()
                 .and_then(Rarity::from_cardmarket_code)
@@ -230,6 +242,23 @@ not a card line
         assert_eq!(s.cards[0].name, "Raigeki");
         assert_eq!(s.cards[0].rarity_code.as_deref(), Some("XYZ"));
         assert_eq!(s.cards[0].rarity, Some(Rarity::UltraRare));
+    }
+
+    #[test]
+    fn every_language_is_read() {
+        let text = "Total 3,00 EUR\nYugioh Singles:\n\
+            1 Schwarzer Magier 001 DE NM LOB UR 1,00 EUR\n\
+            1 Mago Oscuro 001 ES EX LOB UR 1,00 EUR\n\
+            1 Mago Nero 001 IT GD LOB UR 1,00 EUR\n";
+        let s = parse_shipment(text, "me").unwrap();
+        let codes: Vec<&str> = s.cards.iter().map(|c| c.code.as_str()).collect();
+        assert_eq!(codes, ["LOB-DE001", "LOB-SP001", "LOB-IT001"]);
+    }
+
+    #[test]
+    fn unknown_language_lines_are_skipped() {
+        let text = "Total 1,00 EUR\nYugioh Singles:\n1 Something 001 XX NM LOB UR 1,00 EUR\n";
+        assert!(parse_shipment(text, "me").unwrap().cards.is_empty());
     }
 
     #[test]

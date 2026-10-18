@@ -2,7 +2,8 @@
 
 Backend half of "quick add from a set" (TODO.md, faster card entry). The
 frontend panel (Claude) types a set code once, then card numbers, and fills
-the lot's card rows from this endpoint. **To implement in the backend.**
+the lot's card rows from this endpoint. **Done (2026-10-18)**: `domain::card_set`
+by the owner, `fetch_set` (with the cache) and the handler by Claude.
 
 ## What it returns
 
@@ -87,16 +88,42 @@ synthetic JSON** in `domain/`: two cards, one with two rarities, one without a
 French name, a code from another set to be ignored, a `…-ENSE1` and an old
 `…-E001` code for the number rule. That's where the bugs would be.
 
+## Cache (required)
+
+ygoprodeck allows about 20 requests per second and blocks the IP for an
+hour above that. `throttle()` (60 ms between requests, shared by every
+ygoprodeck call of the server) already keeps us under it, but each panel
+load still costs 3 requests per set (more when several sets share the
+prefix), and ygoprodeck asks API users to keep what they fetch. So
+`fetch_set` caches its answers in memory:
+
+```rust
+/// Answers of `fetch_set` by prefix (uppercase). A released set doesn't
+/// change; a restart empties it.
+static SET_CACHE: Mutex<BTreeMap<String, FetchedSet>> = Mutex::const_new(BTreeMap::new());
+```
+
+- next to `LAST_REQUEST` in `store/card_data.rs` (the same `tokio::sync::Mutex`);
+  `FetchedSet` gets `#[derive(Clone)]`;
+- look the prefix up first and return a clone when it's there; otherwise
+  fetch, store, return. Don't hold the lock during the requests (look up,
+  release, fetch, then lock again to insert): two loads of the same new set
+  at once just fetch it twice, which is fine;
+- **only successful answers** are stored: an unknown prefix (`Ok(None)`) or
+  an error is fetched again next time, so a set released today works today;
+- log each real fetch, not the cache hits:
+  `tracing::info!(prefix, cards = n, "set fetched from ygoprodeck")`;
+- no expiry: a set never changes once released. `cardsets.php` (the list of
+  every set, ~1000 entries, a new set now and then) may be cached the same
+  way for a day (`Instant` stored with it) — optional.
+
+The handler doesn't change. Test: nothing automatic (no network in tests);
+by hand, the second `curl /api/sets/RA05` answers at once, and the log shows
+a single `set fetched from ygoprodeck` line.
+
 ## Nice to have (later)
 
-- **Cache** the result per prefix in memory (a set doesn't change): a
-  `Mutex<HashMap<String, SetResponse>>` in `AppState`, or a `static` like
-  `LAST_REQUEST` in `store/card_data.rs`. Without it, each panel load costs
-  3 requests per set (more when several sets share the prefix), which is fine
-  to start with.
-- `cardsets.php` is ~1000 sets: it could be cached too, or the frontend could
-  offer the list as suggestions.
-- A log line, `tracing::info!(prefix, cards = n, "set fetched")`.
+- The frontend could offer the `cardsets.php` list as suggestions.
 
 ## What the panel does with it (frontend, for reference)
 

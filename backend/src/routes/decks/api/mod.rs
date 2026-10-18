@@ -42,6 +42,8 @@ pub struct ApiCard {
     id: i64,
     name: String,
     en_name: Option<String>,
+    /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
+    name_en: Option<String>,
     code: Option<String>,
     status: Option<String>,
     rarity: Option<String>,
@@ -60,6 +62,7 @@ struct CardRecord {
     id: i64,
     name: String,
     en_name: Option<String>,
+    name_en: Option<String>,
     code: Option<String>,
     last_known_status: Option<String>,
     rarity: Option<String>,
@@ -91,7 +94,9 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
         .collect();
 
     let mut qb = QueryBuilder::new(
-        "SELECT card.id, card.name, card.en_name, card.code, card.last_known_status, card.rarity,
+        "SELECT card.id, card.name, card.en_name,
+                json_extract(card_data.json_data, '$.name') AS name_en,
+                card.code, card.last_known_status, card.rarity,
                 card.is_proxy, card.card_data_id, card_data.card_type, card_data.ygopro_id
          FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN ",
     );
@@ -140,6 +145,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                     .unwrap_or_default(),
                 name: r.name,
                 en_name: r.en_name,
+                name_en: r.name_en,
                 code: r.code,
                 status: r.last_known_status,
                 rarity: r.rarity,

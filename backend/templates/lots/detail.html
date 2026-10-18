@@ -36,8 +36,11 @@
     </thead>
     <tbody>
       {% for unite in unites %}
-      <tr>
-        <td><a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a></td>
+      <tr data-code="{{ unite.code_text() }}">
+        <td>
+          <a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a>
+          {% match unite.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
+        </td>
         <td>{% match unite.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}—{% endmatch %}</td>
         <td>{% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}</td>
       </tr>

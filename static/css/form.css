@@ -391,6 +391,21 @@ legend {
     to   { background-color: rgba(255, 255, 255, 0.03); }
 }
 
+/* "Sets in this lot: [MAMO-FR] [RA05-FR]": the loaded one is marked. */
+.qa-set-choices {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.qa-set-choices button.active {
+    outline: 2px solid #fff;
+    font-weight: 700;
+}
+
 /* The rarities of the card just added by the quick add (several possible). */
 .qa-rarities {
     margin-bottom: 0.5rem;

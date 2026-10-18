@@ -6,7 +6,8 @@
   <div class="field-row">
     <div>
       <label for="qa-set">Set code</label>
-      <input type="text" id="qa-set" placeholder="e.g. RA05-FR" autocomplete="off">
+      <input type="text" id="qa-set" placeholder="e.g. RA05-FR" autocomplete="off" list="qa-set-suggestions">
+      <datalist id="qa-set-suggestions"></datalist>
     </div>
     <div>
       <label for="qa-status">Status</label>
@@ -23,13 +24,15 @@
     </div>
   </div>
 
+  <div id="qa-set-choices" class="qa-set-choices" hidden></div>
+
   <div id="qa-rarities" class="qa-rarities" hidden></div>
 
-  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards (with the language, e.g. <code>RA05-FR</code>), then each card's number.</small></p>
+  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards, <strong>with the language</strong> (e.g. <code>RA05-FR</code>), then each card's number. A number printed in several rarities gets one row per copy: choose each one's rarity in its row.</small></p>
 
   <details>
     <summary>Or paste a list of numbers or codes</summary>
-    <label for="qa-paste">One per line, or separated by spaces or commas (<code>37 41 41 102</code>, <code>RA05-FR037</code>)</label>
+    <label for="qa-paste">One per line, or separated by spaces or commas (<code>37 41 41 102</code>, or full codes in the set's language: <code>RA05-FR037</code>)</label>
     <textarea id="qa-paste" rows="3"></textarea>
     <button type="button" id="qa-paste-add" class="btn-secondary">Add these cards</button>
   </details>

@@ -14,6 +14,7 @@
     {% when None %}{% endmatch %}
     <div class="card-content">
       <div class="card-title">{{ card.name }} {% match card.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}{% endmatch %}</div>
+      {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
       <div class="card-meta-line">
         <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}</div>
         <div class="card-subtitle">

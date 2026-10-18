@@ -3,10 +3,11 @@
 
 use axum::extract::{Path, State};
 use axum::Json;
-use domain::card_set::SetCard;
+use domain::card_set::{self, SetCard};
 use serde::Serialize;
 
-use crate::web::error::AppResult;
+use crate::store::card_data::fetch_set;
+use crate::web::error::{bad_request, AppResult};
 use crate::AppState;
 
 #[derive(Debug, Serialize)]
@@ -20,10 +21,18 @@ pub struct SetResponse {
 
 /// `GET /api/sets/:code`: the cards of a set. Unknown code → 400
 /// `{"error": "Unknown set code RA99."}` (`bad_request`).
-#[allow(unused_variables)] // TODO: remove once implemented
 pub async fn set_cards(
     State(state): State<AppState>,
     Path(code): Path<String>,
 ) -> AppResult<Json<SetResponse>> {
-    todo!("card_data::fetch_set, then domain::card_set::set_cards")
+    let code = code.trim().to_uppercase();
+    let Some(set) = fetch_set(&state.http, &code).await? else {
+        return bad_request(format!("Unknown set code {code}."));
+    };
+
+    Ok(Json(SetResponse {
+        cards: card_set::set_cards(&code, &set.en, &set.fr),
+        name: set.name,
+        code,
+    }))
 }

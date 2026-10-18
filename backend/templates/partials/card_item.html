@@ -10,6 +10,7 @@
     </div>
     <div class="card-content">
       <div class="card-title">{{ card.name }} {% match card.rarity %}{% when Some with (rarity) %}<span class="rarity-badge">{{ rarity }}</span>{% when None %}{% endmatch %}</div>
+      {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
       <div class="card-meta-line">
         <div>Code: {{ card.code.as_deref().unwrap_or("—") }}</div>
         <div>

@@ -14,17 +14,32 @@ pub struct CardRow {
     pub rarity: Option<String>,
     pub is_proxy: bool,
     pub card_data_id: Option<i64>,
+    /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
+    pub name_en: Option<String>,
 }
 
 impl CardRow {
     pub const COLUMNS: &'static str = "card.id, card.name, card.code, card.last_known_status, \
-         card.rarity, card.is_proxy, card.card_data_id";
+         card.rarity, card.is_proxy, card.card_data_id, \
+         (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
+          WHERE card_data.id = card.card_data_id) AS name_en";
+
+    /// The English name, when it isn't the name already shown.
+    pub fn english_name(&self) -> Option<&str> {
+        other_name(&self.name, self.name_en.as_deref())
+    }
 
     pub fn status(&self) -> Option<CardStatus> {
         self.last_known_status
             .as_deref()
             .and_then(CardStatus::from_code)
     }
+}
+
+/// `english` when it differs from `name` (ignoring case): a French card shows
+/// its English name too, an English card doesn't repeat it.
+pub fn other_name<'a>(name: &str, english: Option<&'a str>) -> Option<&'a str> {
+    english.filter(|en| !en.eq_ignore_ascii_case(name.trim()))
 }
 
 /// A lot as shown in lists.
@@ -76,5 +91,21 @@ impl DeckVersionRow {
             self.deck_name.as_deref().unwrap_or("No Deck"),
             self.version_name
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::other_name;
+
+    #[test]
+    fn english_name_only_when_it_differs() {
+        assert_eq!(
+            other_name("Dragon à Trois Cornes", Some("Tri-Horned Dragon")),
+            Some("Tri-Horned Dragon")
+        );
+        assert_eq!(other_name("Polymerization", Some("Polymerization")), None);
+        assert_eq!(other_name("polymerization ", Some("Polymerization")), None);
+        assert_eq!(other_name("Kuriboh", None), None);
     }
 }

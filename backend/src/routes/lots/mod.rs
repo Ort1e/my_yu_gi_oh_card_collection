@@ -7,7 +7,7 @@ use sqlx::{QueryBuilder, Sqlite};
 
 use crate::routes::cards::like_pattern;
 use crate::store::db::{Money, Pool};
-use crate::store::models::LotRow;
+use crate::store::models::{other_name, LotRow};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::CardRowValues;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
@@ -102,8 +102,21 @@ pub async fn list(
 pub struct UniteRow {
     card_id: i64,
     card_name: String,
+    name_en: Option<String>,
+    code: Option<String>,
     rarity: Option<String>,
     price: Option<Money>,
+}
+
+impl UniteRow {
+    fn english_name(&self) -> Option<&str> {
+        other_name(&self.card_name, self.name_en.as_deref())
+    }
+
+    /// For the set code suggestions of the quick add (`data-code`).
+    fn code_text(&self) -> &str {
+        self.code.as_deref().unwrap_or("")
+    }
 }
 
 #[derive(Template)]
@@ -151,8 +164,11 @@ pub async fn load_detail(
         .await?
         .or_404()?;
     let unites: Vec<UniteRow> = sqlx::query_as(
-        "SELECT unite.card_id, card.name AS card_name, card.rarity, unite.price
+        "SELECT unite.card_id, card.name AS card_name,
+                json_extract(card_data.json_data, '$.name') AS name_en,
+                card.code, card.rarity, unite.price
          FROM unite JOIN card ON card.id = unite.card_id
+         LEFT JOIN card_data ON card_data.id = card.card_data_id
          WHERE unite.lot_id = ? ORDER BY unite.id",
     )
     .bind(id)

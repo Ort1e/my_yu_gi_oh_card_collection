@@ -125,6 +125,13 @@ a.rarity-badge:hover {
     text-decoration: underline;
 }
 
+/* The English name under a French one (cards, lots). */
+.english-name {
+    font-size: 0.85em;
+    font-style: italic;
+    opacity: 0.8;
+}
+
 /* ------------------------------------------------------------------ */
 /* Card pictures                                                        */
 /* ------------------------------------------------------------------ */

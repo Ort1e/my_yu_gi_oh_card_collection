@@ -6,12 +6,16 @@
 //!    card that isn't in that version yet, moving its category assignments;
 //! 4. delete the proxies that are left unused;
 //! 5. move the rarity out of Cardmarket names (`Raigeki (V.4 - Ultra Rare)`
-//!    → name `Raigeki`, rarity `Ultra Rare`) for the cards without a rarity.
+//!    → name `Raigeki`, rarity `Ultra Rare`) for the cards without a rarity;
+//! 6. put names in the language of their code: a card coded in another
+//!    language than English (`MAMO-FR023`) but still named in English gets
+//!    its name in that language from ygoprodeck (the code is the truth).
+//!    ygoprodeck is only read, so a dry run looks the names up too.
 //!
 //! Differences from Django: sold cards are never used as replacements,
 //! category assignments follow the replacement, proxies bought in a lot are
 //! kept, a rename that would clash with another card data is skipped, and
-//! step 5 is new (Django had no rarity).
+//! steps 5 and 6 are new (Django had no rarity, and kept the names as typed).
 
 use std::collections::HashMap;
 
@@ -20,7 +24,7 @@ use domain::rarity::split_cardmarket_name;
 use sqlx::SqliteConnection;
 
 use super::finish;
-use crate::store::card_data::get_or_fetch;
+use crate::store::card_data::{get_or_fetch, plan_translations, Translation};
 use crate::store::cards::{delete_orphan_proxies, version_card_ids, Zone, SOLD_EXISTS};
 use crate::store::db::begin_write;
 use crate::AppState;
@@ -34,6 +38,11 @@ struct Plan {
     /// card id, new en_name, new card_data id
     card_updates: Vec<(i64, String, Option<i64>)>,
     unresolved: Vec<String>,
+    /// Step 6: names to put in the language of their code.
+    translations: Vec<Translation>,
+    /// Step 6: cards named in English with another language in their code,
+    /// for which ygoprodeck has no translation ("Name (code)").
+    untranslated: Vec<String>,
 }
 
 pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
@@ -63,6 +72,14 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     let deleted = delete_orphan_proxies(&mut tx).await?;
     let rarities = rarities_from_names(&mut tx).await?;
 
+    for t in &plan.translations {
+        sqlx::query("UPDATE card SET name = ? WHERE id = ?")
+            .bind(&t.to)
+            .bind(t.card_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
     finish(tx, dry_run).await?;
 
     println!("card data renamed: {}", plan.data_renames.len());
@@ -70,6 +87,23 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     println!("proxies replaced by owned copies: {replaced}");
     println!("unused proxies deleted: {deleted}");
     println!("rarities taken from card names: {rarities}");
+    for t in &plan.translations {
+        println!(
+            "card {} ({}): {:?} -> {:?}",
+            t.card_id, t.code, t.from, t.to
+        );
+    }
+    println!(
+        "names put in the language of their code: {}",
+        plan.translations.len()
+    );
+    if !plan.untranslated.is_empty() {
+        println!(
+            "{} cards named in English without a translation at ygoprodeck: {}",
+            plan.untranslated.len(),
+            plan.untranslated.join("; ")
+        );
+    }
     if !plan.unresolved.is_empty() {
         let why = if dry_run {
             "not known locally"
@@ -152,6 +186,10 @@ async fn plan(state: &AppState, dry_run: bool) -> anyhow::Result<Plan> {
             plan.card_updates.push((id, normalized, new_link));
         }
     }
+
+    let (translations, untranslated) = plan_translations(&state.pool, &state.http, None).await?;
+    plan.translations = translations;
+    plan.untranslated = untranslated;
 
     Ok(plan)
 }
@@ -378,6 +416,28 @@ mod tests {
             ("Kept (V.1 - Rare)".into(), Some("Super Rare".into())),
             "a card with a rarity is left alone"
         );
+    }
+
+    #[tokio::test]
+    async fn names_already_in_their_language_are_kept() {
+        let t = TestApp::new().await;
+        // no card here needs a translation, so nothing calls ygoprodeck
+        sqlx::query(
+            "INSERT INTO card_data (id, en_name, ygopro_id, json_data)
+                 VALUES (3, 'tri-horned dragon', 39111158, '{\"name\": \"Tri-Horned Dragon\"}');
+             INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES
+                 (1, 'Dragon à Trois Cornes', 'tri-horned dragon', 'RA05-FR001', 3, 0),
+                 (2, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-EN001', 3, 0),
+                 (3, 'Tri-Horned Dragon', 'tri-horned dragon', 'SDY-001', 3, 0);",
+        )
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+
+        let (translations, untranslated) = plan_translations(&t.state.pool, &t.state.http, None)
+            .await
+            .unwrap();
+        assert!(translations.is_empty() && untranslated.is_empty());
     }
 
     #[tokio::test]

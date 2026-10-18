@@ -1,6 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, imageUrl } from '../deck.js';
+    import { banStatus, englishName, imageUrl } from '../deck.js';
 
     export let card;
     /** zone the card is in ("main", "reserve", …); null = not draggable */
@@ -17,6 +17,7 @@
 
     $: src = imageUrl(card);
     $: ban = banStatus(card, banListId);
+    $: title = englishName(card) ? `${card.name} (${englishName(card)})` : card.name;
 </script>
 
 <button
@@ -26,7 +27,7 @@
     draggable={from !== null}
     data-is_proxy={card.is_proxy}
     data-ban_status={ban}
-    title={card.name}
+    {title}
     on:dragstart={dragStart}
     on:click={() => dispatch('select', card)}
 >

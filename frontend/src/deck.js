@@ -28,6 +28,13 @@ export function banStatus(card, banListId) {
     return banListId == null ? undefined : card.ban?.[String(banListId)];
 }
 
+/** The English name, when it isn't the name already shown (a French card). */
+export function englishName(card) {
+    const english = card.name_en;
+
+    return english && english.toLowerCase() !== card.name.trim().toLowerCase() ? english : null;
+}
+
 export function imageUrl(card) {
     return card.card_data_id ? `/card-image/${card.card_data_id}` : null;
 }

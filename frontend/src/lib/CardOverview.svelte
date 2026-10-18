@@ -1,5 +1,5 @@
 <script>
-    import { banStatus, imageUrl } from '../deck.js';
+    import { banStatus, englishName, imageUrl } from '../deck.js';
 
     export let card;
     export let banListId = null;
@@ -41,8 +41,8 @@
 {#if card}
     {#if imageUrl(card)}<img src={imageUrl(card)} alt={card.name} />{/if}
     <div class="overview-text">
-        <h4><a href="/cards/{card.id}" target="_blank" rel="noopener">{card.en_name || card.name}</a></h4>
-        <p>Name: {card.name}</p>
+        <h4><a href="/cards/{card.id}" target="_blank" rel="noopener">{card.name}</a></h4>
+        {#if englishName(card)}<p class="english-name">{englishName(card)}</p>{/if}
         <p>Type: {card.card_type || '—'}</p>
         <p>Code: {card.code || '—'}</p>
         <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
@@ -131,6 +131,13 @@
 
     .category-selector input[type="checkbox"] {
         display: none;
+    }
+
+    /* The English name under a French one. */
+    .english-name {
+        margin-bottom: 6px;
+        font-style: italic;
+        opacity: 0.85;
     }
 
     /* "Click a card to see its details.": centred in the empty panel. */
