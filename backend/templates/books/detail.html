@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }}{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="card-list">
+  <div class="card">
+    <div class="card-title">{{ book.title }}</div>
+    {% if !authors.is_empty() %}
+    <div class="book-by">
+      by {% for (author_id, name) in authors %}{% if !loop.first %}, {% endif %}<a href="/books/authors/{{ author_id }}">{{ name }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% match book.series_id %}{% when Some with (series_id) %}
+    <div class="card-subtitle">Series: <a href="/books/series/{{ series_id }}" class="on-card">{{ self.series_text() }}</a></div>
+    {% when None %}{% endmatch %}
+    {% match book.publisher %}{% when Some with (publisher) %}<div class="card-subtitle">Publisher: {{ publisher }}</div>{% when None %}{% endmatch %}
+    {% match book.published_year %}{% when Some with (year) %}<div class="card-subtitle">Year: {{ year }}</div>{% when None %}{% endmatch %}
+    {% match book.format %}{% when Some with (format) %}<div class="card-subtitle">Format: {{ format }}</div>{% when None %}{% endmatch %}
+    {% match book.page_count %}{% when Some with (pages) %}<div class="card-subtitle">Pages: {{ pages }}</div>{% when None %}{% endmatch %}
+    {% match book.language %}{% when Some with (language) %}<div class="card-subtitle">Language: {{ language }}</div>{% when None %}{% endmatch %}
+    {% match book.isbn %}{% when Some with (isbn) %}<div class="card-subtitle">ISBN: {{ isbn }}</div>{% when None %}{% endmatch %}
+    <div class="card-subtitle">Added on {{ book.added_on }} · book #{{ book.id }}</div>
+    {% match book.notes %}{% when Some with (notes) %}<p class="book-notes">{{ notes }}</p>{% when None %}{% endmatch %}
+    {% for (year, day) in calendar_days %}
+    <div class="card-subtitle">🎄 Day {{ day }} of the <a href="/books/advent-calendar/{{ year }}" class="on-card">{{ year }} advent calendar</a></div>
+    {% endfor %}
+    <div class="button-row"><a href="/books/{{ book.id }}/edit" class="btn">Edit</a></div>
+  </div>
+</div>
+{% endblock %}

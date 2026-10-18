@@ -1,0 +1,21 @@
+{% extends "list_base.html" %}
+
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block items %}
+  {% if authors.is_empty() %}
+    <p class="card-title">No author yet: they come with the books.</p>
+  {% else %}
+    <div class="card-list">
+      {% for author in authors %}
+      <a href="/books/authors/{{ author.id }}" class="card-link">
+        <div class="card">
+          <div class="card-title">{{ author.name }}</div>
+          <div class="card-meta-line"><div>{{ author.books }} book{% if author.books != 1 %}s{% endif %}</div></div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

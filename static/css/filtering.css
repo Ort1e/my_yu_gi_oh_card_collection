@@ -38,6 +38,9 @@
 .filter-content {
     width: 90%;
     max-width: 420px;
+    max-height: 90vh;           /* a long filter form scrolls on a small screen */
+    overflow-y: auto;
+    border-radius: 10px;
 }
 
 .filter-content form {
@@ -51,4 +54,15 @@
 /* Added by the page's script to hide the popup. */
 .hidden {
     display: none;
+}
+
+/* Phones: the top button would cover the page's title (the header isn't
+   fixed there): bottom left, across from "Filter". */
+@media (max-width: 760px) {
+    .floating-button.top {
+        top: auto;
+        right: auto;
+        bottom: 20px;
+        left: 20px;
+    }
 }

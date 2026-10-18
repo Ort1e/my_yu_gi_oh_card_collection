@@ -4,10 +4,12 @@
 //! backend, the importer and maintenance commands, and unit-tested directly.
 
 pub mod ban_list;
+pub mod book;
 pub mod budget;
 pub mod card;
 pub mod card_set;
 pub mod cardmarket;
+pub mod isbn;
 pub mod lot;
 pub mod monte_carlo;
 pub mod rarity;

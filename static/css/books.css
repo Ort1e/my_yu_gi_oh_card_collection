@@ -1,0 +1,133 @@
+/*
+ * The book pages (templates/books/, static/js/book_form.js). They use the
+ * same boxes and forms as the cards; this adds what only books have.
+ */
+
+/* The book pages: a paper-coloured background, to tell them from the cards. */
+body.books {
+    --bg-color: #f6eddc;
+}
+
+/* "by Robin Hobb, …" under a book's title. */
+.book-by {
+    margin-bottom: 0.4rem;
+    color: #fff;
+}
+
+.book-by a,
+.card a.on-card {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.book-authors {
+    color: var(--text-light);
+}
+
+.book-notes {
+    margin: 0.6rem 0 0;
+    white-space: pre-line;      /* keep the line breaks typed in the notes */
+}
+
+/* "Added: …" after saving a book. */
+.success {
+    padding: 0.75rem 1rem;
+    border: 1px solid #1b7f3a;
+    border-radius: var(--radius);
+    background-color: #e3f6e8;
+    color: #1b5e20;
+    font-weight: 600;
+}
+
+/* ---------- the ISBN field, its "Look up" and "Scan" buttons ---------- */
+
+.isbn-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.isbn-row input {
+    flex: 1 1 12rem;
+    margin: 0;
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+}
+
+/* The "Scan" label looks like a button and opens the hidden file input. */
+.scan-button {
+    margin: 0;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.isbn-status {
+    min-height: 1.4em;
+    margin: 0.4rem 0;
+    font-weight: 600;
+}
+
+.isbn-status.is-error {
+    color: #ffd6d6;
+}
+
+.isbn-status a {
+    color: #fff;
+    text-decoration: underline;
+}
+
+/* Hidden but still usable (the scan's file input, opened by its label). */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* The fields filled by a lookup: a short light flash. */
+.just-filled {
+    animation: just-filled 1.2s ease-out;
+}
+
+@keyframes just-filled {
+    from { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8); }
+    to   { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0); }
+}
+
+/* "Publisher, year, format, notes…": folded until needed. */
+.book-more {
+    margin-bottom: 1.5rem;
+}
+
+.book-more summary {
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ---------- series ---------- */
+
+.missing {
+    color: #ffe0a3;
+    font-weight: 600;
+}
+
+.missing-volumes {
+    max-width: 900px;
+    margin: 0 auto 1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.missing-volumes .btn {
+    margin: 0.2rem 0;
+}
+
+/* The advent calendar's book: no picture, so a bit more room for the text. */
+.advent-book {
+    min-height: 3.5rem;
+}

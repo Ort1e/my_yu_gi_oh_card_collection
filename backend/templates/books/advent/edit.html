@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Edit the book advent calendar {{ year }}{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/advent.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container advent">
+  <h1>Edit the book advent calendar {{ year }}</h1>
+  <p class="back-link"><a href="/books/advent-calendar/{{ year }}">← Back to the calendar</a> · <a href="/books/advent-calendar">All calendars</a></p>
+
+  {% include "partials/form_errors.html" %}
+
+  <datalist id="free-books">
+    {% for (book_id, title) in free_books %}<option value="#{{ book_id }}" label="{{ title }}"></option>{% endfor %}
+  </datalist>
+
+  <p class="advent-help">
+    For each day: its book, by its <strong>ISBN</strong> (the 13 digits under the barcode, on the back),
+    or <code>#id</code> for a book already in the list (they are suggested in the field); and its photo
+    (JPEG, PNG or WebP). A book not in the list yet is looked up and added.
+    Photos are turned upright, resized and cleaned of their metadata; the original is kept.
+    A photo still sideways: turn it with ↺ ↻.
+  </p>
+
+  <div class="advent-edit-grid">
+    {% for door in doors %}
+    <section class="advent-edit-day" id="day-{{ door.day }}">
+      <h2>Day {{ door.day }}</h2>
+      {% match door.entry %}
+      {% when Some with (e) %}
+        {% match e.photo %}{% when Some with (photo) %}
+        <img src="/media/{{ photo }}" alt="Day {{ door.day }}" class="advent-edit-photo" loading="lazy">
+        <div class="button-row">
+          <form method="post" action="/books/advent-calendar/{{ year }}/days/{{ door.day }}/rotate" class="inline">
+            <input type="hidden" name="direction" value="left">
+            <button type="submit" class="btn-small btn-secondary" title="Turn a quarter turn left">↺</button>
+          </form>
+          <form method="post" action="/books/advent-calendar/{{ year }}/days/{{ door.day }}/rotate" class="inline">
+            <input type="hidden" name="direction" value="right">
+            <button type="submit" class="btn-small btn-secondary" title="Turn a quarter turn right">↻</button>
+          </form>
+        </div>
+        {% when None %}<p class="advent-help">No photo yet.</p>{% endmatch %}
+        <p class="advent-edit-card">
+          <a href="/books/{{ e.book_id }}">{{ e.title }}</a>
+          <small>#{{ e.book_id }} {{ e.authors_text() }}</small>
+        </p>
+      {% when None %}
+        <p class="advent-help">Empty.</p>
+      {% endmatch %}
+
+      <form method="post" action="/books/advent-calendar/{{ year }}/days/{{ door.day }}" enctype="multipart/form-data" class="plain advent-edit-form">
+        <label for="book-{{ door.day }}">Book (ISBN or #id)</label>
+        <input type="text" id="book-{{ door.day }}" name="book" list="free-books" placeholder="{% if door.entry.is_some() %}keep the current book{% else %}e.g. 9780553573398{% endif %}" autocomplete="off">
+        <label for="photo-{{ door.day }}">Photo</label>
+        <input type="file" id="photo-{{ door.day }}" name="photo" accept="image/jpeg,image/png,image/webp">
+        <button type="submit">Save day {{ door.day }}</button>
+      </form>
+
+      {% if door.entry.is_some() %}
+      <form method="post" action="/books/advent-calendar/{{ year }}/days/{{ door.day }}/delete" class="inline" data-confirm="Empty day {{ door.day }}? Its photo is deleted (the book stays in the list).">
+        <button type="submit" class="btn-small btn-danger">Empty this day</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/advent_edit.js"></script>
+{% endblock %}

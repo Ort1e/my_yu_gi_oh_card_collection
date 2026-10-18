@@ -7,6 +7,7 @@
  *   form.css       forms, fields, buttons, the on/off switch      (every page)
  *   card.css       the green "card" boxes of the lists            (list and detail pages)
  *   filtering.css  the floating buttons and the filter popup      (list pages)
+ *   books.css      what only the book pages have                  (every page)
  * The deck builder has its own: frontend/src/deck_builder.css.
  *
  * How to read these files:
@@ -17,6 +18,8 @@
  *   they match, it only makes them weak: any rule with a class wins over them, so
  *   a class can always override the defaults (the deck builder relies on it).
  * - Sizes in `rem` are multiples of the base font size (1rem ≈ 16px).
+ * - `@media (max-width: 760px) { … }` at the end of a file: the rules for
+ *   phones (narrow screens), which change the ones above.
  */
 
 /* ------------------------------------------------------------------ */
@@ -240,3 +243,30 @@ form tbody tr:nth-child(even) {
     text-align: center;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Phones                                                               */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+    /* The header scrolls away with the page (header.css): no room to keep
+       for it. Room at the bottom for the floating buttons. */
+    .container {
+        padding: 0 0.75rem 5rem;
+    }
+
+    :where(h1) {
+        font-size: 1.5rem;
+    }
+
+    /* Wide tables scroll sideways instead of widening the page. */
+    :where(table) {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    :where(th, td) {
+        padding: 0.3rem 0.5rem;
+    }
+}

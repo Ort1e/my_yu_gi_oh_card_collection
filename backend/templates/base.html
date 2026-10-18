@@ -2,16 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Card Collection{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/header.css">
     <link rel="stylesheet" href="/static/css/form.css">
+    <link rel="stylesheet" href="/static/css/books.css">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <div class="container">
       <header class="site-header">
         <nav class="navbar">
+          {% block nav %}
           <div class="logo">
             <a href="/">My yu-gi-oh Cards</a>
           </div>
@@ -23,8 +26,10 @@
             <li><a href="/decks">Decks</a></li>
             <li><a href="/rarities">Rarities</a></li>
             <li><a href="/advent-calendar">Advent</a></li>
+            <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
             <li><a href="/login">Account</a></li>
           </ul>
+          {% endblock %}
         </nav>
       </header>
 

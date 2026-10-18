@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Add a book{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Add a book</h1>
+<p class="back-link"><a href="/books">← Back to the books</a></p>
+
+{% match added %}{% when Some with (book) %}
+<p class="success">Added: <a href="/books/{{ book.id }}">{{ book.title }}</a>. Next one?</p>
+{% when None %}{% endmatch %}
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/books/add" id="book-form">
+  {% include "books/fields.html" %}
+  <input type="submit" value="Add the book">
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/book_form.js"></script>
+{% endblock %}

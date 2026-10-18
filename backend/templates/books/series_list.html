@@ -1,0 +1,25 @@
+{% extends "list_base.html" %}
+
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block items %}
+  {% if series.is_empty() %}
+    <p class="card-title">No series yet: give a book its series in its form.</p>
+  {% else %}
+    <div class="card-list">
+      {% for s in series %}
+      <a href="/books/series/{{ s.id }}" class="card-link">
+        <div class="card">
+          <div class="card-title">{{ s.name }}</div>
+          <div class="card-meta-line">
+            {% match s.author %}{% when Some with (author) %}<div>{{ author }}</div>{% when None %}{% endmatch %}
+            <div>{{ s.books }} book{% if s.books != 1 %}s{% endif %}</div>
+            {% if !s.missing().is_empty() %}<div class="missing">Missing: {{ s.missing_text() }}</div>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

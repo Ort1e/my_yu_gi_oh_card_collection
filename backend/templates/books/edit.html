@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ values.title }}{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Edit the book</h1>
+<p class="back-link"><a href="/books/{{ id }}">← Back to the book</a></p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/books/{{ id }}/edit" id="book-form" data-keep-filled>
+  {% include "books/fields.html" %}
+  <input type="submit" value="Save">
+</form>
+
+<form method="post" action="/books/{{ id }}/delete" class="inline" data-confirm="Delete this book from the list?">
+  <button type="submit" class="btn-danger">Delete this book</button>
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/book_form.js"></script>
+{% endblock %}

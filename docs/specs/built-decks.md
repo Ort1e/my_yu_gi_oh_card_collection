@@ -56,7 +56,7 @@ Settled:
   free owned copies, so running it puts real cards back in those decks
   (nothing to remember about the swaps).
 
-## 1. The column (migration `0007`)
+## 1. The column (migration `0008`, 0007 = books)
 
 ```sql
 ALTER TABLE deck_version ADD COLUMN is_built INTEGER NOT NULL DEFAULT 0

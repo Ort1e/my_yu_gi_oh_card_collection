@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ name }}{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1 class="card-title">{{ name }} ({{ books.len() }} book{% if books.len() != 1 %}s{% endif %})</h1>
+  <p class="back-link"><a href="/books/series">← All series</a></p>
+
+  {% if !missing.is_empty() %}
+  <div class="missing-volumes">
+    <strong>Missing volume{% if missing.len() != 1 %}s{% endif %}: {{ self.missing_text() }}.</strong>
+    Got one? Add it:
+    {% for volume in missing %}<a href="{{ self.add_href(volume) }}" class="btn btn-small btn-secondary">#{{ volume }}</a> {% endfor %}
+    <br><small>Only the gaps up to the last volume you have: the series may have more.</small>
+  </div>
+  {% endif %}
+
+  <div class="card-list">
+    {% for book in books %}
+      {% include "partials/book_item.html" %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

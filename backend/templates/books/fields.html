@@ -1,0 +1,81 @@
+{# The fields of the add and edit forms (BookValues). #}
+<fieldset>
+  <legend>ISBN</legend>
+  <div class="isbn-row">
+    <input type="text" name="isbn" id="isbn" value="{{ values.isbn }}" inputmode="numeric" autocomplete="off"
+           placeholder="978… (13 digits, on the back)" aria-label="ISBN">
+    <button type="button" id="isbn-lookup">Look up</button>
+    <label class="btn btn-secondary scan-button" for="isbn-photo">📷 Scan</label>
+    <input type="file" id="isbn-photo" accept="image/*" capture="environment" class="visually-hidden">
+  </div>
+  <p id="isbn-status" class="isbn-status" role="status" aria-live="polite"></p>
+  <small>"Look up" fills the fields below from Open Library. "Scan": take a photo of the barcode.
+    A book without an ISBN: leave it empty and fill the fields by hand.</small>
+</fieldset>
+
+<fieldset>
+  <legend>Book</legend>
+  <p>
+    <label for="title">Title:</label>
+    <input type="text" name="title" id="title" value="{{ values.title }}" required>
+  </p>
+  <p>
+    <label for="authors">Authors:</label>
+    <input type="text" name="authors" id="authors" value="{{ values.authors }}" list="author-names" autocomplete="off" placeholder="Neil Gaiman, Terry Pratchett">
+    <small>Several authors: separate them with commas.</small>
+  </p>
+  <div class="field-row">
+    <div class="wide">
+      <label for="series">Series:</label>
+      <input type="text" name="series" id="series" value="{{ values.series }}" list="series-names" autocomplete="off">
+    </div>
+    <div>
+      <label for="volume">Volume:</label>
+      <input type="number" name="volume" id="volume" value="{{ values.volume }}" min="1" max="999" inputmode="numeric">
+    </div>
+  </div>
+</fieldset>
+
+<details class="book-more" {% if !values.publisher.is_empty() || !values.year.is_empty() || !values.pages.is_empty() || !values.format.is_empty() || !values.language.is_empty() || !values.notes.is_empty() %}open{% endif %}>
+  <summary>Publisher, year, format, notes…</summary>
+  <fieldset>
+    <p>
+      <label for="publisher">Publisher:</label>
+      <input type="text" name="publisher" id="publisher" value="{{ values.publisher }}">
+    </p>
+    <div class="field-row">
+      <div>
+        <label for="year">Year:</label>
+        <input type="number" name="year" id="year" value="{{ values.year }}" min="1000" max="2100" inputmode="numeric">
+      </div>
+      <div>
+        <label for="pages">Pages:</label>
+        <input type="number" name="pages" id="pages" value="{{ values.pages }}" min="1" inputmode="numeric">
+      </div>
+      <div>
+        <label for="language">Language:</label>
+        <input type="text" name="language" id="language" value="{{ values.language }}" maxlength="10" placeholder="en">
+      </div>
+      <div>
+        <label for="format">Format:</label>
+        <select name="format" id="format">
+          <option value="">—</option>
+          {% for format in values.formats() %}
+          <option value="{{ format.label() }}" {% if values.format_is(format.label()) %}selected{% endif %}>{{ format.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <p>
+      <label for="notes">Notes:</label>
+      <textarea name="notes" id="notes" rows="3">{{ values.notes }}</textarea>
+    </p>
+  </fieldset>
+</details>
+
+<datalist id="series-names">
+  {% for name in series_names %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>
+<datalist id="author-names">
+  {% for name in author_names %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>

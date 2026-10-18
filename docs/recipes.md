@@ -6,6 +6,8 @@ from the repo root.
 
 - [Daily workflow](#daily-workflow)
 - [Save your data to git](#save-your-data-to-git)
+- [Use the app from a phone](#use-the-app-from-a-phone)
+- [Add books](#add-books)
 - [Add a read-only page](#add-a-read-only-page)
 - [Add a form that changes data](#add-a-form-that-changes-data)
 - [Change the database schema](#change-the-database-schema)
@@ -61,6 +63,85 @@ If `data/app.db-wal` still exists after the server stopped (killed with
 
 Never delete or regenerate `data/app.db`: the importer only works on an
 empty DB, and the Django dump is older than your Rust-era changes.
+
+## Use the app from a phone
+
+The phone talks to the server running on the PC, over the home Wi-Fi. By
+default the server only answers the PC itself (`127.0.0.1`).
+
+**Once:**
+
+1. **Open port 3000 in the NixOS firewall.** In
+   `/etc/nixos/configuration.nix`, next to `networking.networkmanager.enable`:
+   ```nix
+   networking.firewall.allowedTCPPorts = [ 3000 ];
+   ```
+   then apply it: `sudo nixos-rebuild switch --flake /etc/nixos` (or your
+   usual rebuild command).
+2. **Give the PC a fixed address.** In the internet box's admin page
+   (often `http://192.168.1.1`), look for "DHCP" → "static lease" /
+   "reservation" and reserve the PC's current address for it. To see
+   that address: `hostname -I`, the first `192.168.…` one (the `172.…`
+   ones are Docker's). Without this, the address may change some day and
+   the phone's bookmark stops working.
+3. **Listen on the network, with a password.** Add to `.env` (gitignored,
+   read at startup):
+   ```bash
+   BIND_ADDR=0.0.0.0:3000
+   APP_PASSWORD=<a password>
+   ```
+   The server refuses a network address without `APP_PASSWORD`: without
+   login, anyone on the Wi-Fi could edit the collection and read the
+   shipment PDFs.
+
+**Each time:**
+
+1. `cargo run -p backend` on the PC; the log says
+   `listening on 0.0.0.0:3000, login enabled`.
+2. On the phone, **on the home Wi-Fi** (not mobile data):
+   `http://<PC address>:3000`, e.g. `http://192.168.1.51:3000`. Bookmark
+   it, or "Add to home screen" for an app-like icon.
+3. Reading pages works directly; editing asks for the password once (the
+   session lasts, restarts included).
+
+**If the page doesn't load:** the server running? Phone on the same
+Wi-Fi (some boxes have a separate guest network that can't see the PC)?
+Port open (`sudo iptables -L nixos-fw -n | grep 3000`)? From the PC itself,
+`http://192.168.1.51:3000` must work too.
+
+**Limits:** it's plain HTTP. Fine at home, but the password crosses the
+Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
+book barcode scan takes a photo instead). Don't forward port 3000 on the
+box to reach it from outside. For outside access and HTTPS, the clean way
+is Tailscale (`services.tailscale.enable = true;` on the PC, the app on the
+phone, then `tailscale serve`); not set up yet.
+
+To go back to PC-only: remove `BIND_ADDR` from `.env`.
+
+## Add books
+
+In the app: **Books** in the menu (or `/books`) → **Add**.
+
+1. The ISBN: type it (13 digits under the barcode; hyphens are fine, an old
+   10-digit one too), or **📷 Scan** on a phone (take the photo close,
+   flat and well lit), or a USB barcode scanner on the PC.
+2. "Look up" fills title, authors, publisher, year, pages, language, often
+   the series (check it: the catalogues write it in many ways). "Already in
+   the list" means this edition is there; another edition or format has
+   its own ISBN.
+3. Fix what needs it, **Add the book**: the empty form comes back for the
+   next one.
+
+A book without an ISBN: fill the fields by hand. A series page lists the
+missing volumes, each with a link to add it. A book given away: its edit
+page → **Delete this book** (refused while it is behind an advent calendar
+door: empty that day first).
+
+**Book advent calendar:** Books → **Advent** → **Add calendar**, then for
+each day its book (its ISBN: a book not in the list yet is looked up and
+added; or `#id`) and its photo. Photos in
+`data/media/book_advent_calendar_photos/<year>/`: commit them with the
+data, like the card calendars.
 
 ## Add a read-only page
 

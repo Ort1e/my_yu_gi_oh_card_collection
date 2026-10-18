@@ -14,6 +14,7 @@ Suggested reading order, about an hour with the code open next to it:
 6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
 7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data.rs`
 8. [Tests](#tests): `backend/src/tests/`
+9. [The books](#the-books): `backend/src/routes/books/`, a second, smaller collection
 
 ## The big picture
 
@@ -288,16 +289,50 @@ or `#id`) and a photo. `store/photos.rs` makes the copy shown on the page
 (upright from the EXIF orientation, 1600 px, re-encoded without metadata)
 and keeps the original in `originals/`; ↺ ↻ turn a photo that came out
 sideways. Each save writes new file names, so browsers never show an old
-photo, and deletes the previous files. A calendar can have its own lot
+photo, and deletes the previous files (`store/calendar_photos.rs`, shared
+with the book calendars). A calendar can have its own lot
 (`advent_calendar.lot_id`, migration 0006, "Create its lot" on the edit
 page): its cards are added on the usual lot page, then suggested in the
 day fields; the lot page links back to the calendar.
+
+## The books
+
+A second collection in the same app and database, with nothing in common
+with the cards: the novels at home. Every route starts with `/books`
+(`routes/books/`, `templates/books/`); the book templates swap the
+navigation bar (`{% block nav %}` → `partials/books_nav.html`) and the page
+background (`body.books`, `static/css/books.css`). No prices, lots or
+pictures.
+
+| Piece | Where |
+|---|---|
+| tables (`book`, `book_author`, `book_book_author`, `book_series`, `book_data`, `book_advent_calendar[_entry]`) | `migrations/0007_books.sql` |
+| ISBN parsing, check digits, ISBN-10 → 13 | `domain/src/isbn.rs` |
+| lookup answers → `BookInfo`, series text → name + volume, author sort names, missing volumes | `domain/src/book.rs` |
+| writes: a book with its authors (in order) and series, created on the way; orphans deleted | `store/books.rs` |
+| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data` | `store/book_data.rs` |
+| list (filters, sort by title / surname / added), detail | `routes/books/mod.rs` |
+| add, edit, delete (refused while behind an advent door) | `routes/books/form.rs` |
+| `GET /books/api/isbn/:isbn`, the lookup as JSON | `routes/books/api.rs` |
+| authors, series (with the missing volumes) | `routes/books/authors.rs`, `series.rs` |
+| the book advent calendars (a twin of the card ones, own tables and photo folder) | `routes/books/advent/` |
+
+The add form (`static/js/book_form.js`): "Look up" (or Enter, which USB
+barcode scanners send) calls the API and fills the fields; "Scan" opens the
+phone's camera through a file input and reads the barcode **in the
+browser**: `BarcodeDetector` where the browser has it (HTTPS only), else the
+ZXing library loaded from jsDelivr, trying the photo as taken and turned a
+quarter turn. Plain HTTP on the home network can't use the live camera
+(browsers keep it to HTTPS), hence the photo.
+
+Like ygoprodeck: the lookup happens **before** any write transaction, and
+tests never call it (they insert `book_data` rows).
 
 ## Login
 
 `web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the
 shipment PDFs require a session cookie. Pages redirect to
-`/login?next=…`, the API answers 401. Reading stays public. The cookie is
+`/login?next=…`, the APIs (`/api/*`, `/books/api/*`) answer 401. Reading stays public. The cookie is
 an expiry date signed with a key stored in the `app_secret` table, so a
 restart doesn't log you out. Without `APP_PASSWORD` there is no login, and
 the server refuses to listen anywhere but `127.0.0.1`.

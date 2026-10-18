@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Book advent calendar {{ year }}{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/advent.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container advent" id="advent" data-year="{{ year }}" data-storage-key="book-advent-calendar-{{ year }}-opened">
+  <h1>Book advent calendar {{ year }}</h1>
+
+  <div class="advent-toolbar">
+    <a href="/books/advent-calendar/{{ year }}/edit" class="btn">Edit this calendar</a>
+    <button type="button" id="advent-open-all" class="btn-secondary">Open every door</button>
+    <button type="button" id="advent-close-all" class="btn-secondary">Close them again</button>
+    <small>{{ self.book_count() }} books behind the doors. Tap a door to open it, a photo to see it large.</small>
+  </div>
+
+  <div class="advent-grid">
+    {% for door in doors %}
+    {% match door.entry %}
+    {% when Some with (e) %}
+    <div class="door" data-day="{{ door.day }}">
+      <div class="door-inside">
+        {% match e.photo %}{% when Some with (photo) %}
+        <button type="button" class="advent-photo" data-full="/media/{{ photo }}" title="See the photo large">
+          <img src="/media/{{ photo }}" alt="Day {{ door.day }}" loading="lazy">
+        </button>
+        {% when None %}{% endmatch %}
+        <a class="advent-card advent-book" href="/books/{{ e.book_id }}">
+          <span class="advent-card-text">
+            <strong>{{ e.title }}</strong>
+            {% if !e.authors_text().is_empty() %}<span>{{ e.authors_text() }}</span>{% endif %}
+            {% if !e.series_text().is_empty() %}<span class="advent-card-meta">{{ e.series_text() }}</span>{% endif %}
+          </span>
+        </a>
+      </div>
+      <button type="button" class="door-front" aria-label="Open day {{ door.day }}">
+        <span class="door-number">{{ door.day }}</span>
+      </button>
+    </div>
+    {% when None %}
+    <div class="door door-empty" title="Nothing behind this door"><span class="door-number">{{ door.day }}</span></div>
+    {% endmatch %}
+    {% endfor %}
+  </div>
+
+  <dialog id="advent-lightbox" class="advent-lightbox">
+    <form method="dialog"><button type="submit" class="btn-small" aria-label="Close">✕</button></form>
+    <img alt="">
+  </dialog>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/advent_calendar.js"></script>
+{% endblock %}

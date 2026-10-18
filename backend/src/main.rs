@@ -124,7 +124,7 @@ async fn shutdown_signal() {
 pub fn app(state: AppState) -> Router {
     let login_required = from_fn_with_state(state.clone(), auth::require_login);
     // personal files: the shipment PDFs (names, addresses) and the advent
-    // calendar photos (handwritten notes)
+    // calendar photos, cards and books (handwritten notes)
     let private_files = Router::new()
         .nest_service(
             "/media/shipment_files",
@@ -133,6 +133,10 @@ pub fn app(state: AppState) -> Router {
         .nest_service(
             "/media/advent_calendar_photos",
             ServeDir::new(state.media_dir.join("advent_calendar_photos")),
+        )
+        .nest_service(
+            "/media/book_advent_calendar_photos",
+            ServeDir::new(state.media_dir.join("book_advent_calendar_photos")),
         )
         .layer(login_required.clone());
 

@@ -1,0 +1,51 @@
+{% extends "list_base.html" %}
+
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block items %}
+  {% if books.is_empty() %}
+    <p class="card-title">{% if total == 0 %}No book yet: add the first one with "Add a book".{% else %}No book matches these filters.{% endif %}</p>
+  {% else %}
+    <div class="card-list">
+      {% for book in books %}
+        {% include "partials/book_item.html" %}
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block add_button %}
+  <a href="/books/add" title="Add a book" class="btn floating-button top">Add a book</a>
+{% endblock %}
+
+{% block filter %}
+<button id="filter-badge" class="floating-button">Filter</button>
+<div id="filter-modal" class="filter-modal hidden">
+  <div class="filter-content">
+    <form method="get">
+      <h2>Filter books</h2>
+      <label for="title">Title:</label>
+      <input type="search" name="title" id="title" value="{{ self.title_value() }}" placeholder="A word of the title">
+
+      <label for="author">Author:</label>
+      <input type="search" name="author" id="author" value="{{ self.author_value() }}" placeholder="A part of the name">
+
+      <label for="series">Series:</label>
+      <input type="search" name="series" id="series" value="{{ self.series_value() }}" placeholder="A part of the series name">
+
+      <label for="sort">Sort by:</label>
+      <select name="sort" id="sort">
+        <option value="title" {% if self.sort_is("title") %}selected{% endif %}>Title</option>
+        <option value="author" {% if self.sort_is("author") %}selected{% endif %}>Author (surname), then series</option>
+        <option value="added" {% if self.sort_is("added") %}selected{% endif %}>Latest added first</option>
+      </select>
+
+      <div class="button-row">
+        <button type="submit">Apply</button>
+        <a href="/books" class="btn btn-secondary">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -117,7 +117,7 @@ async fn the_calendar_and_its_photos_need_the_login() {
 // ---------- filling the days ----------
 
 /// POST a multipart form: text fields, then an optional file `photo`.
-async fn multipart(
+pub(super) async fn multipart(
     t: &TestApp,
     uri: &str,
     fields: &[(&str, &str)],

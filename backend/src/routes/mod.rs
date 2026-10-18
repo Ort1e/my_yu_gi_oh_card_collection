@@ -4,6 +4,7 @@
 //! reads in `private_router()` (behind the login too).
 
 mod advent;
+mod books;
 mod budget;
 mod cards;
 mod dashboard;
@@ -32,6 +33,12 @@ pub fn router() -> Router<AppState> {
         .route("/decks/:id", get(decks::detail))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))
+        .route("/books", get(books::list))
+        .route("/books/:id", get(books::detail))
+        .route("/books/authors", get(books::authors::list))
+        .route("/books/authors/:id", get(books::authors::detail))
+        .route("/books/series", get(books::series::list))
+        .route("/books/series/:id", get(books::series::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))
         .route("/api/deck-versions/:id", get(decks::api::get_version))
         .route("/api/deck-versions/:id/reserve", post(decks::api::reserve))
@@ -62,6 +69,12 @@ pub fn private_router() -> Router<AppState> {
         .route("/advent-calendar", get(advent::list))
         .route("/advent-calendar/:year", get(advent::calendar))
         .route("/advent-calendar/:year/edit", get(advent::form::edit_page))
+        .route("/books/advent-calendar", get(books::advent::list))
+        .route("/books/advent-calendar/:year", get(books::advent::calendar))
+        .route(
+            "/books/advent-calendar/:year/edit",
+            get(books::advent::form::edit_page),
+        )
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
@@ -84,6 +97,32 @@ pub fn write_router() -> Router<AppState> {
         .route(
             "/advent-calendar/:year/days/:day/delete",
             post(advent::form::remove_day),
+        )
+        .route(
+            "/books/add",
+            get(books::form::add_page).post(books::form::create),
+        )
+        .route(
+            "/books/:id/edit",
+            get(books::form::edit_page).post(books::form::update),
+        )
+        .route("/books/:id/delete", post(books::form::delete))
+        .route("/books/api/isbn/:isbn", get(books::api::isbn))
+        .route(
+            "/books/advent-calendar/add",
+            get(books::advent::form::add_page).post(books::advent::form::create),
+        )
+        .route(
+            "/books/advent-calendar/:year/days/:day",
+            post(books::advent::form::save_day).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
+        )
+        .route(
+            "/books/advent-calendar/:year/days/:day/rotate",
+            post(books::advent::form::rotate),
+        )
+        .route(
+            "/books/advent-calendar/:year/days/:day/delete",
+            post(books::advent::form::remove_day),
         )
         .route("/lots/add", get(lots::form::page).post(lots::form::create))
         .route(

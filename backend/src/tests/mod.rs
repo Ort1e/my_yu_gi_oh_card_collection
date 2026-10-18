@@ -5,6 +5,8 @@
 
 mod advent;
 mod auth;
+mod book_advent;
+mod books;
 mod budget;
 mod deck_api;
 mod decks;

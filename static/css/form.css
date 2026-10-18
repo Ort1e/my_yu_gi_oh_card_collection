@@ -424,3 +424,33 @@ legend {
     color: #fff;
     text-decoration: underline;
 }
+
+/* ------------------------------------------------------------------ */
+/* Phones                                                               */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+    :where(form) {
+        padding: 1rem;
+    }
+
+    fieldset {
+        padding: 0.75rem;
+    }
+
+    /* 16px at least: phones zoom into smaller fields when they get focus. */
+    :where(
+        input[type="text"],
+        input[type="password"],
+        input[type="email"],
+        input[type="url"],
+        input[type="search"],
+        input[type="number"],
+        input[type="date"],
+        input[type="month"],
+        textarea,
+        select
+    ) {
+        font-size: 1rem;
+    }
+}

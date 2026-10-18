@@ -262,3 +262,32 @@
     align-items: center;
     gap: 0.6rem;
 }
+
+/* Phones: two doors per row, shorter, so the 24 days aren't a long scroll. */
+@media (max-width: 760px) {
+    .advent-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.6rem;
+    }
+
+    .door {
+        min-height: 230px;
+    }
+
+    .door-number {
+        font-size: 2.4rem;
+    }
+
+    .advent-photo img {
+        max-height: 120px;
+    }
+
+    .advent-card img {
+        width: 36px;
+    }
+
+    .advent-card-text {
+        font-size: 0.8rem;
+        overflow-wrap: anywhere;
+    }
+}

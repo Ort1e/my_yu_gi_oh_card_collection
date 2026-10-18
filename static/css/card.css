@@ -211,3 +211,31 @@ a.rarity-badge:hover {
 .rarity.highlighted {
     outline: 3px solid var(--primary);
 }
+
+/* ------------------------------------------------------------------ */
+/* Phones                                                               */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+    .card {
+        padding: 0.75rem 1rem;
+    }
+
+    .card-title {
+        font-size: 1.2rem;
+    }
+
+    .card.with-image {
+        gap: 0.75rem;
+    }
+
+    .card-photo {
+        width: 100px;
+        height: 80px;
+    }
+
+    /* No mouse to hover with, and no room beside the picture. */
+    .image-wrapper:hover .image-popup {
+        display: none;
+    }
+}

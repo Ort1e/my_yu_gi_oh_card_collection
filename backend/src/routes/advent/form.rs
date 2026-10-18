@@ -2,15 +2,12 @@
 //! the login). A day is a card of the collection, given by its code
 //! (`MAMO-FR023`) or `#id`, and a photo.
 //!
-//! Photos (`store::photos`): the copy shown on the page is upright, at most
-//! 1600 px and without metadata; the original is kept in `originals/`. Each
-//! save writes new file names (`03-<token>.jpg`), so browsers never show an
-//! old photo from their cache, and deletes the previous files.
+//! Photos (`store::calendar_photos`): the copy shown on the page is upright,
+//! at most 1600 px and without metadata; the original is kept in
+//! `originals/`.
 //!
 //! A calendar can have its own lot (a 0 € gift lot, created here): its cards
 //! are added on the usual lot page, then suggested for the days.
-
-use std::path::{Path as FsPath, PathBuf};
 
 use askama::Template;
 use axum::extract::{Multipart, Path, State};
@@ -20,8 +17,8 @@ use chrono::Datelike;
 use sqlx::SqliteConnection;
 
 use super::{calendar_id, calendar_lot, load_doors, Door};
+use crate::store::calendar_photos;
 use crate::store::db::{begin_write, Pool};
-use crate::store::photos;
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
@@ -236,68 +233,6 @@ async fn find_card(conn: &mut SqliteConnection, text: &str) -> AppResult<Result<
     )))
 }
 
-/// The files of a photo: its copy (`advent_calendar_photos/2025/03-ab12.jpg`,
-/// relative to the media dir) and the originals with the same name.
-fn photo_files(media: &FsPath, copy: &str) -> Vec<PathBuf> {
-    let copy_path = media.join(copy);
-    let mut files = vec![copy_path.clone()];
-    if let (Some(stem), Some(dir)) = (copy_path.file_stem(), copy_path.parent()) {
-        if let Ok(originals) = std::fs::read_dir(dir.join("originals")) {
-            files.extend(
-                originals
-                    .flatten()
-                    .map(|e| e.path())
-                    .filter(|p| p.file_stem() == Some(stem)),
-            );
-        }
-    }
-    files
-}
-
-async fn remove_files(files: &[PathBuf]) {
-    for file in files {
-        let _ = tokio::fs::remove_file(file).await;
-    }
-}
-
-/// A new photo, written to disk: its copy (relative path, as stored) and
-/// every file written (to delete if saving fails).
-struct NewPhoto {
-    relative: String,
-    files: Vec<PathBuf>,
-}
-
-async fn write_photo(
-    media: &FsPath,
-    year: i64,
-    day: i64,
-    copy: &[u8],
-    original: Option<(&[u8], &str)>,
-) -> AppResult<NewPhoto> {
-    let io = |e: std::io::Error| AppError::Internal(format!("saving a photo: {e}"));
-    let name = format!("{day:02}-{:08x}", rand::random::<u32>());
-    let folder = media.join(PHOTO_FOLDER).join(year.to_string());
-    tokio::fs::create_dir_all(folder.join("originals"))
-        .await
-        .map_err(io)?;
-
-    let copy_path = folder.join(format!("{name}.jpg"));
-    tokio::fs::write(&copy_path, copy).await.map_err(io)?;
-    let mut files = vec![copy_path];
-    if let Some((bytes, extension)) = original {
-        let path = folder.join("originals").join(format!("{name}.{extension}"));
-        if let Err(e) = tokio::fs::write(&path, bytes).await {
-            remove_files(&files).await;
-            return Err(io(e));
-        }
-        files.push(path);
-    }
-    Ok(NewPhoto {
-        relative: format!("{PHOTO_FOLDER}/{year}/{name}.jpg"),
-        files,
-    })
-}
-
 async fn current_photo(pool: &Pool, calendar_id: i64, day: i64) -> sqlx::Result<Option<String>> {
     Ok(sqlx::query_scalar::<_, Option<String>>(
         "SELECT photo FROM advent_calendar_entry WHERE calendar_id = ? AND day = ?",
@@ -358,18 +293,10 @@ pub async fn save_day(
     };
     drop(conn);
 
-    // the photo: copy made off the async threads (CPU work)
     let processed = if photo.is_empty() {
         None
     } else {
-        let result = tokio::task::spawn_blocking(move || {
-            let extension = photos::extension(&photo)?;
-            let copy = photos::web_copy(&photo)?;
-            Ok::<_, photos::PhotoError>((photo, extension, copy))
-        })
-        .await
-        .map_err(|e| AppError::Internal(format!("processing a photo: {e}")))?;
-        match result {
+        match calendar_photos::process(photo).await? {
             Ok(processed) => Some(processed),
             Err(why) => {
                 errors.push(format!("Day {day}: {why}."));
@@ -386,16 +313,9 @@ pub async fn save_day(
 
     let old_photo = current_photo(&state.pool, calendar, day).await?;
     let new_photo = match &processed {
-        Some((original, extension, copy)) => Some(
-            write_photo(
-                &state.media_dir,
-                year,
-                day,
-                copy,
-                Some((original, extension)),
-            )
-            .await?,
-        ),
+        Some(photo) => {
+            Some(calendar_photos::write(&state.media_dir, PHOTO_FOLDER, year, day, photo).await?)
+        }
         None => None,
     };
 
@@ -419,12 +339,12 @@ pub async fn save_day(
     .await;
     if let Err(e) = saved {
         if let Some(new_photo) = &new_photo {
-            remove_files(&new_photo.files).await;
+            calendar_photos::remove(&new_photo.files).await;
         }
         return Err(e.into());
     }
     if let (Some(old), Some(_)) = (&old_photo, &new_photo) {
-        remove_files(&photo_files(&state.media_dir, old)).await;
+        calendar_photos::remove(&calendar_photos::files(&state.media_dir, old)).await;
     }
 
     tracing::info!(
@@ -450,36 +370,15 @@ pub async fn rotate(
     let clockwise = FormData::new(pairs).get("direction") == Some("right");
     let old = current_photo(&state.pool, calendar, day).await?.or_404()?;
 
-    let bytes = tokio::fs::read(state.media_dir.join(&old))
-        .await
-        .map_err(|e| AppError::Internal(format!("reading a photo: {e}")))?;
-    let turned = tokio::task::spawn_blocking(move || photos::rotate(&bytes, clockwise))
-        .await
-        .map_err(|e| AppError::Internal(format!("rotating a photo: {e}")))?
-        .map_err(|e| AppError::Internal(format!("rotating a photo: {e}")))?;
-
-    // the new copy takes the name of the original, so they stay paired
-    let new = write_photo(&state.media_dir, year, day, &turned, None).await?;
-    let old_path = state.media_dir.join(&old);
-    let new_path = state.media_dir.join(&new.relative);
-    let originals: Vec<PathBuf> = photo_files(&state.media_dir, &old)
-        .into_iter()
-        .filter(|p| p != &old_path)
-        .collect();
-    for original in &originals {
-        if let (Some(ext), Some(stem)) = (original.extension(), new_path.file_stem()) {
-            let renamed = original.with_file_name(stem).with_extension(ext);
-            let _ = tokio::fs::rename(original, renamed).await;
-        }
-    }
-
+    let new =
+        calendar_photos::rotate(&state.media_dir, PHOTO_FOLDER, year, day, &old, clockwise).await?;
     sqlx::query("UPDATE advent_calendar_entry SET photo = ? WHERE calendar_id = ? AND day = ?")
-        .bind(&new.relative)
+        .bind(&new)
         .bind(calendar)
         .bind(day)
         .execute(&state.pool)
         .await?;
-    let _ = tokio::fs::remove_file(old_path).await;
+    calendar_photos::remove(&[state.media_dir.join(&old)]).await;
 
     tracing::info!(year, day, clockwise, "advent photo rotated");
     Ok(back_to(year, day))
@@ -501,7 +400,7 @@ pub async fn remove_day(
         .execute(&state.pool)
         .await?;
     if let Some(photo) = photo {
-        remove_files(&photo_files(&state.media_dir, &photo)).await;
+        calendar_photos::remove(&calendar_photos::files(&state.media_dir, &photo)).await;
     }
 
     tracing::info!(year, day, "advent day emptied");

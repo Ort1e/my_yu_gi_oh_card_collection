@@ -1,11 +1,13 @@
-// The advent calendar page (templates/advent/calendar.html): doors that open
+// The advent calendar pages (templates/advent/calendar.html,
+// templates/books/advent/calendar.html): doors that open
 // on a click (remembered in this browser), "open / close every door", and the
 // photo shown large.
 
 const calendar = document.getElementById('advent');
 const year = calendar.dataset.year;
 const doors = [...calendar.querySelectorAll('.door[data-day]')];
-const storageKey = `advent-calendar-${year}-opened`;
+// the book calendars have their own key (data-storage-key)
+const storageKey = calendar.dataset.storageKey ?? `advent-calendar-${year}-opened`;
 
 /** The days opened before, in this browser (a convenience: may be empty). */
 function openedDays() {

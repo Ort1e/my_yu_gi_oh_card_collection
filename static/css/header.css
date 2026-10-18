@@ -48,3 +48,41 @@
     color: #fff;
     text-decoration: underline;
 }
+
+/* The other collection (Books / Cards): set apart from the other links. */
+.nav-links a.section-switch {
+    padding: 0.1rem 0.6rem;
+    border: 1px solid var(--text-light);
+    border-radius: 1rem;
+}
+
+/* Phones: the header is not fixed (it would hide half the screen), and its
+   links wrap under the logo. */
+@media (max-width: 760px) {
+    .site-header {
+        position: static;
+        width: auto;
+        margin: 0 -0.75rem 1rem;    /* full width, over the page's side padding */
+        padding: 0.5rem 0.75rem;
+    }
+
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+
+    .logo a {
+        font-size: 1.2rem;
+    }
+
+    .nav-links {
+        flex-wrap: wrap;
+        gap: 0.2rem 1rem;
+    }
+
+    .nav-links a {
+        display: inline-block;
+        padding: 0.25rem 0;     /* easier to tap */
+    }
+}
