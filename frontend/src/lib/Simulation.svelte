@@ -129,3 +129,53 @@
 {/if}
 
 <CategoryForm {api} {categories} on:added={reloadCategories} />
+
+<style>
+    .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .controls input {
+        width: 8rem;
+        padding: 8px 10px;
+        font-size: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text-light);
+    }
+
+    .controls button {
+        padding: 8px 14px;
+        font-size: 1rem;
+        border-radius: 6px;
+        background: var(--primary);
+        color: var(--text-light);
+        border: none;
+        cursor: pointer;
+    }
+
+    .controls button:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .bordered-table {
+        border-collapse: collapse;
+    }
+
+    .bordered-table th,
+    .bordered-table td {
+        border: 1px solid var(--border-color);
+        padding: 4px 8px;
+    }
+
+    /* The rule of a conditional category, under its name in the statistics. */
+    .rule {
+        font-size: 0.8rem;
+        font-style: italic;
+        color: var(--text-muted);
+    }
+</style>

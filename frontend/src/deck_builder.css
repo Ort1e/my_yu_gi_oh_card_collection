@@ -84,67 +84,6 @@
     border-radius: 8px;
 }
 
-#card-overview img {
-    width: 120px;
-    height: auto;
-    flex-shrink: 0;
-    border-radius: 6px;
-    object-fit: cover;
-}
-
-#card-overview .overview-text {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    flex: 1;
-    min-width: 0;               /* long names wrap instead of widening the panel */
-}
-
-#card-overview .overview-text h4 {
-    margin: 0 0 8px;
-    font-size: 1.2em;
-}
-
-#card-overview .overview-text p {
-    margin: 0;
-    font-size: 0.95em;
-}
-
-.category-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 0.5rem;
-    color: var(--text-dark);
-}
-
-.category-selector label {
-    display: inline-flex;
-    align-items: center;
-    background-color: var(--hover-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 20px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    user-select: none;
-    transition: background-color 0.2s, transform 0.15s;
-}
-
-.category-selector label:hover {
-    background-color: var(--bg-color);
-}
-
-.category-selector label.checked {
-    border-color: var(--primary);
-    font-weight: bold;
-    transform: scale(1.05);
-}
-
-.category-selector input[type="checkbox"] {
-    display: none;
-}
-
 /* ====================== Actions ====================== */
 
 /* The control panel: version, ban list, save. One labelled block each. */
@@ -157,64 +96,6 @@
     color: var(--text-light);
 }
 
-#actions-area .control select {
-    max-width: none;
-}
-
-#actions-area .button-row {
-    margin: 0;
-}
-
-#actions-area .save-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-/* Import / copy YDKE, under the title. */
-.toolbar {
-    display: flex;
-    justify-content: center;
-    gap: 0.75rem;
-    margin: -1rem 0 1rem;
-}
-
-.copy-wrapper {
-    position: relative;
-}
-
-/* The "Copy YDKE" choices: a small menu under the button. */
-.copy-popup {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    min-width: 100%;
-    padding: 4px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-.copy-popup button {
-    padding: 6px 10px;
-    border-radius: 4px;
-    background: none;
-    color: var(--primary);
-    font-weight: normal;
-    text-align: left;
-    white-space: nowrap;
-}
-
-.copy-popup button:hover {
-    background: #e3e8ff;
-}
-
 /* ====================== Reserve ====================== */
 
 #reserve-area {
@@ -225,21 +106,10 @@
     gap: 0.5rem;
 }
 
-#reserve {
-    max-height: 500px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 6px;
-}
+/* ====================== Drop zones ====================== */
 
-/* The reserve's search fields: the look comes from static/css/form.css, they
-   only take the whole width of the panel. */
-.deck-builder-input {
-    max-width: none;
-    margin-bottom: 0;
-}
-
-/* ====================== Drop zones and cards ====================== */
+/* DeckZone.svelte and the test hand of Simulation.svelte. The other
+   components keep their own styles in their <style> block. */
 
 .dropzone {
     display: flex;
@@ -258,95 +128,6 @@
     background: var(--hover-bg);
 }
 
-.deck-card {
-    position: relative;
-    width: 65px;
-    height: 90px;
-    padding: 0;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--card-bg);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    cursor: grab;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.deck-card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.deck-card .no-image {
-    display: block;
-    padding: 4px;
-    font-size: 0.6rem;
-    color: var(--text-light);
-    word-break: break-word;
-}
-
-.deck-card:active {
-    cursor: grabbing;
-}
-
-.deck-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7);
-}
-
-.deck-card.selected {
-    outline: 3px solid var(--primary);
-}
-
-/* proxy cards: red border and badge (bottom-left) */
-.deck-card[data-is_proxy="true"] {
-    border: 2px solid red;
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
-}
-
-.deck-card[data-is_proxy="true"]::after {
-    content: "Proxy";
-    position: absolute;
-    bottom: 2px;
-    left: 4px;
-    background: rgba(255, 0, 0, 0.8);
-    color: white;
-    font-size: 0.7rem;
-    padding: 2px 4px;
-    border-radius: 4px;
-    pointer-events: none;
-    z-index: 10;
-}
-
-/* ban status badge (top-right) */
-.deck-card[data-ban_status]::before {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    color: white;
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    pointer-events: none;
-    z-index: 10;
-}
-
-.deck-card[data-ban_status="Limited"]::before {
-    content: "1";
-    background: #ffc107;
-}
-
-.deck-card[data-ban_status="Semi-Limited"]::before {
-    content: "2";
-    background: #17a2b8;
-}
-
-.deck-card[data-ban_status="Banned"]::before {
-    content: "X";
-    background: #dc3545;
-}
-
 /* ====================== Tournament and test draw ====================== */
 
 #tournament-area,
@@ -356,81 +137,4 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-}
-
-#test-draw-area .controls {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-#test-draw-area .controls input {
-    width: 8rem;
-    padding: 8px 10px;
-    font-size: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--card-bg);
-    color: var(--text-light);
-}
-
-#test-draw-area .controls button {
-    padding: 8px 14px;
-    font-size: 1rem;
-    border-radius: 6px;
-    background: var(--primary);
-    color: var(--text-light);
-    border: none;
-    cursor: pointer;
-}
-
-#test-draw-area .controls button:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
-.bordered-table {
-    border-collapse: collapse;
-}
-
-.bordered-table th,
-.bordered-table td {
-    border: 1px solid var(--border-color);
-    padding: 4px 8px;
-}
-
-/* The rule of a conditional category, under its name in the statistics. */
-.rule {
-    font-size: 0.8rem;
-    font-style: italic;
-    color: var(--text-muted);
-}
-
-/* The simulation chart, on a white panel so its text is readable. */
-.sim-chart {
-    margin: 1rem 0;
-    padding: 0.75rem;
-    border-radius: 8px;
-    background: #fff;
-}
-
-/* The "new category" form, under the statistics. */
-.category-form {
-    margin-top: 1rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.category-form h4 {
-    margin: 0.5rem 0;
-}
-
-/* The tournament notes take the width of the fields row above them. */
-.tournament-form textarea {
-    max-width: none;
-}
-
-/* "Click a card to see its details.": centred in the empty panel. */
-#card-overview > p.overview-text {
-    align-self: center;
 }

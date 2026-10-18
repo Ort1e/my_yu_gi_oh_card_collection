@@ -1,11 +1,14 @@
 <script>
     import { onMount } from 'svelte';
-    import { deckApi, importYdke } from './api.js';
-    import { ZONES, euros, sortCards, ydkeUrl, zonePrice } from './deck.js';
+    import { deckApi } from './api.js';
+    import { ZONES, euros, sortCards, zonePrice } from './deck.js';
     import CardOverview from './lib/CardOverview.svelte';
     import DeckZone from './lib/DeckZone.svelte';
+    import ReserveSearch from './lib/ReserveSearch.svelte';
     import Simulation from './lib/Simulation.svelte';
     import Tournament from './lib/Tournament.svelte';
+    import VersionPanel from './lib/VersionPanel.svelte';
+    import YdkeToolbar from './lib/YdkeToolbar.svelte';
 
     export let deckVersionId;
 
@@ -20,11 +23,6 @@
     let selected = null;
     let categories = [];
     let categoriesVersion = 0;
-    let copyOpen = false;
-    let copied = '';
-
-    let filters = { name: '', code: '', card_type: '' };
-    let reserveMessage = 'Please enter at least one filter to search cards.';
 
     function setDeck(data) {
         deck = data;
@@ -114,42 +112,7 @@
         }
     }
 
-    // ---------- reserve search ----------
-
-    let searchTimer;
-    let searchId = 0;
-
-    function scheduleSearch() {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(search, 250);
-    }
-
-    async function search() {
-        const active = filters.name.trim() || filters.code.trim() || filters.card_type;
-
-        if (!active) {
-            zones.reserve = [];
-            reserveMessage = 'Please enter at least one filter to search cards.';
-
-            return;
-        }
-
-        const id = ++searchId;
-
-        try {
-            const cards = await api.reserve(filters);
-
-            if (id !== searchId) return; // a newer search started
-            // cards moved into the deck but not saved yet are still in the results
-            const inDeck = new Set(ZONES.flatMap((z) => zones[z].map((c) => c.id)));
-            zones.reserve = sortCards(cards.filter((c) => !inDeck.has(c.id)));
-            reserveMessage = 'No card found.';
-        } catch (e) {
-            reserveMessage = `Search failed: ${e.message}`;
-        }
-    }
-
-    // ---------- actions ----------
+    // ---------- saving ----------
 
     async function save() {
         try {
@@ -167,88 +130,6 @@
         }
     }
 
-    async function rename() {
-        const name = prompt('Enter new version name:', deck.version_name);
-
-        if (!name?.trim()) return;
-
-        try {
-            const updated = await api.update({ version_name: name.trim() });
-            deck.version_name = updated.version_name;
-            deck.versions = updated.versions;
-        } catch (e) {
-            alert(`Rename failed: ${e.message}`);
-        }
-    }
-
-    async function newVersion() {
-        if (dirty && !confirm('The new version is a copy of the saved deck: unsaved changes are not included. Continue?')) return;
-
-        const name = prompt('Enter name for the new version:', `${deck.version_name} (copy)`);
-
-        if (!name?.trim()) return;
-
-        try {
-            const { id } = await api.clone(name.trim());
-            dirty = false;
-            location.href = `/deck-builder/${id}`;
-        } catch (e) {
-            alert(`Could not create the version: ${e.message}`);
-        }
-    }
-
-    async function remove() {
-        if (!confirm('Are you sure you want to delete this deck version?')) return;
-
-        try {
-            const { deck_id } = await api.remove();
-            dirty = false;
-            location.href = deck_id ? `/decks/${deck_id}` : '/decks';
-        } catch (e) {
-            alert(`Delete failed: ${e.message}`);
-        }
-    }
-
-    async function doImport() {
-        if (!deck.deck_id) return alert('This version has no deck to import into.');
-        const ydke = prompt('Paste your YDKE string:');
-
-        if (!ydke?.trim()) return;
-
-        const name = prompt('Name of the new version:', 'Imported');
-
-        if (name === null) return;
-
-        try {
-            const { id } = await importYdke(deck.deck_id, ydke.trim(), name);
-            location.href = `/deck-builder/${id}`;
-        } catch (e) {
-            alert(`Import failed: ${e.message}`);
-        }
-    }
-
-    const variants = {
-        'With Proxies': () => true,
-        'Without Proxies': (c) => !c.is_proxy,
-        'Only Proxies': (c) => c.is_proxy,
-    };
-
-    async function copy(label) {
-        copyOpen = false;
-
-        try {
-            await navigator.clipboard.writeText(ydkeUrl(zones, variants[label]));
-            copied = label;
-            setTimeout(() => (copied = ''), 2000);
-        } catch (e) {
-            alert(`Failed to copy: ${e.message}`);
-        }
-    }
-
-    function switchVersion(e) {
-        location.href = `/deck-builder/${e.target.value}`;
-    }
-
     function beforeUnload(e) {
         if (dirty) e.preventDefault();
     }
@@ -257,9 +138,11 @@
 
     $: total = zonePrice(zones.main) + zonePrice(zones.extra) + zonePrice(zones.side);
     $: title = deck ? `${deck.deck_name ?? 'No Deck'} - ${deck.version_name}` : '';
+    $: deckCardIds = new Set(ZONES.flatMap((z) => zones[z].map((c) => c.id)));
 </script>
 
-<svelte:window on:dragover|preventDefault on:drop={dropOutside} on:beforeunload={beforeUnload} on:click={() => (copyOpen = false)} />
+
+<svelte:window on:dragover|preventDefault on:drop={dropOutside} on:beforeunload={beforeUnload} />
 
 {#if loadError}
     <p class="error">Could not load the deck: {loadError}</p>
@@ -269,21 +152,7 @@
         {#if dirty}<span class="unsaved">● unsaved</span>{/if}
     </h2>
 
-    <div class="toolbar">
-        <button type="button" class="btn-secondary" on:click={doImport}>Import YDKE</button>
-        <span class="copy-wrapper">
-            <button type="button" class="btn-secondary" on:click|stopPropagation={() => (copyOpen = !copyOpen)}>
-                {copied ? `Copied ${copied}!` : 'Copy YDKE ▾'}
-            </button>
-            {#if copyOpen}
-                <div class="copy-popup">
-                    {#each Object.keys(variants) as label}
-                        <button type="button" on:click|stopPropagation={() => copy(label)}>{label}</button>
-                    {/each}
-                </div>
-            {/if}
-        </span>
-    </div>
+    <YdkeToolbar deckId={deck.deck_id} {zones} />
 
     <div class="builder-container">
         <div id="deck-area">
@@ -310,63 +179,21 @@
         </div>
 
         <div id="actions-area">
-            <div class="control">
-                <label for="version-select">Version</label>
-                <select id="version-select" value={deckVersionId} on:change={switchVersion}>
-                    {#each deck.versions as version (version.id)}
-                        <option value={version.id}>{version.version_name}</option>
-                    {/each}
-                </select>
-                <div class="button-row">
-                    <button type="button" class="btn-secondary" on:click={rename}>Rename</button>
-                    <button type="button" class="btn-secondary" on:click={newVersion}>Copy as new version</button>
-                    <button type="button" class="btn-danger" on:click={remove}>Delete</button>
-                </div>
-            </div>
-
-            <div class="control">
-                <label for="ban-list-select">Ban list</label>
-                <select id="ban-list-select" bind:value={banListId} on:change={() => (dirty = true)}>
-                    {#each deck.ban_lists as banList, i (banList.id)}
-                        <option value={banList.id}>{banList.date}{i === 0 ? ' (latest)' : ''}</option>
-                    {/each}
-                    <option value={null}>No ban list</option>
-                </select>
-                <span class="hint">Limits shown on the cards. Saved with the deck.</span>
-            </div>
-
-            <div class="control save-row">
-                <button type="button" on:click={save}>Save the deck</button>
-                {#if dirty}
-                    <span class="warning">Unsaved changes</span>
-                {:else}
-                    <span class="hint">Everything is saved</span>
-                {/if}
-            </div>
+            <VersionPanel {api} {deckVersionId} bind:deck bind:banListId bind:dirty on:save={save} />
         </div>
 
         <div id="reserve-area" class="area">
             <h3>Reserve</h3>
-            <input type="text" class="deck-builder-input" placeholder="Search cards..." bind:value={filters.name} on:input={scheduleSearch} />
-            <input type="text" class="deck-builder-input" placeholder="Search by code..." bind:value={filters.code} on:input={scheduleSearch} />
-            <select class="deck-builder-input" bind:value={filters.card_type} on:change={scheduleSearch}>
-                <option value="">Card Type (any)</option>
-                {#each deck.card_types as cardType}
-                    <option value={cardType}>{cardType}</option>
-                {/each}
-            </select>
-            <div id="reserve">
-                <DeckZone
-                    zone="reserve"
-                    cards={zones.reserve}
-                    {banListId}
-                    selectedId={selected?.id}
-                    on:move={({ detail }) => move(detail)}
-                    on:select={select}
-                >
-                    <span slot="empty" class="hint">{reserveMessage}</span>
-                </DeckZone>
-            </div>
+            <ReserveSearch
+                {api}
+                cardTypes={deck.card_types}
+                bind:cards={zones.reserve}
+                {deckCardIds}
+                {banListId}
+                selectedId={selected?.id}
+                on:move={({ detail }) => move(detail)}
+                on:select={select}
+            />
         </div>
 
         <div id="tournament-area" class="area">

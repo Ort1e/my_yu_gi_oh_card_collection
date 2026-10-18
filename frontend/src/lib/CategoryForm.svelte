@@ -107,3 +107,16 @@
 
     <button type="submit">Add the category</button>
 </form>
+
+<style>
+    /* The "new category" form, under the statistics. */
+    .category-form {
+        margin-top: 1rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .category-form h4 {
+        margin: 0.5rem 0;
+    }
+</style>

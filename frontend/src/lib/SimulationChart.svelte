@@ -128,3 +128,13 @@
 <div class="sim-chart" style="height: {90 + result.categories.length * 30}px">
     <canvas bind:this={canvas}></canvas>
 </div>
+
+<style>
+    /* The simulation chart, on a white panel so its text is readable. */
+    .sim-chart {
+        margin: 1rem 0;
+        padding: 0.75rem;
+        border-radius: 8px;
+        background: #fff;
+    }
+</style>

@@ -47,3 +47,10 @@
         {#if message}<span class="hint">{message}</span>{/if}
     </div>
 </form>
+
+<style>
+    /* The tournament notes take the width of the fields row above them. */
+    .tournament-form textarea {
+        max-width: none;
+    }
+</style>
