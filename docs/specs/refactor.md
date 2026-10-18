@@ -6,8 +6,8 @@ SQL or checks that are copied where they could be shared. Nothing here
 changes behaviour: `cargo test --workspace` must pass unchanged after each
 step (except for moved tests).
 
-Backend steps are **for the owner** (ordered by value; each one is a separate
-commit). Frontend steps are done by Claude.
+**Status: done (2026-10-18)**, all steps below, one commit each (the backend
+too, exceptionally by Claude). Kept as the record of what moved where.
 
 ## Backend (owner)
 

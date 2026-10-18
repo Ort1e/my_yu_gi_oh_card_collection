@@ -36,4 +36,5 @@
       build several decks at the same time from one shared collection,
       without overlap (each card owned is used by only one of the linked
       decks), and track the cards still missing across all of them.
-- [ ] Refactor the code base to make it easier to read.
+- [x] Refactor the code base to make it easier to read: plan and what was
+      done in `docs/specs/refactor.md`.
