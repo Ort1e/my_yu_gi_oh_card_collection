@@ -1,0 +1,189 @@
+/* ------------------------------------------------------------------ */
+/* Advent calendar (templates/advent/calendar.html,                     */
+/* static/js/advent_calendar.js): a grid of doors that open on the     */
+/* photo and the card of the day.                                      */
+/* ------------------------------------------------------------------ */
+
+.advent-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.advent-toolbar select {
+    width: auto;
+    margin: 0 0 0 0.4rem;
+}
+
+.advent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+/* A door: the inside (photo + card) under a front panel that swings open
+   on its left hinge. */
+.door {
+    position: relative;
+    min-height: 340px;
+    perspective: 1200px;
+    border-radius: 10px;
+    background: #2b1d14;                /* the dark hole behind the door */
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.6);
+}
+
+.door-inside {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+    padding: 0.6rem;
+    box-sizing: border-box;
+}
+
+.door-front {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0;
+    border: 3px dashed rgba(255, 255, 255, 0.55);
+    border-radius: 10px;
+    background:
+        radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.18) 0 2px, transparent 3px) 0 0 / 34px 34px,
+        linear-gradient(145deg, #b3261e, #7f1712);
+    color: #fff;
+    transform-origin: left center;
+    transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1), box-shadow 0.8s;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    backface-visibility: hidden;
+}
+
+/* every other door green, like wrapping paper */
+.door:nth-child(even) .door-front {
+    background:
+        radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.18) 0 2px, transparent 3px) 0 0 / 34px 34px,
+        linear-gradient(145deg, var(--secondary), #03543f);
+}
+
+.door-front:hover {
+    transform: rotateY(-12deg);
+}
+
+.door.open .door-front {
+    transform: rotateY(-105deg);
+    box-shadow: none;
+    pointer-events: none;
+}
+
+.door-number {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 3.2rem;
+    font-weight: 700;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.door-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* the inside: the photo, then the card */
+.advent-photo {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    overflow: hidden;
+    background: none;
+    cursor: zoom-in;
+}
+
+.advent-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 190px;
+    object-fit: cover;
+}
+
+.advent-card {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.4rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text-dark);
+    text-decoration: none;
+}
+
+.advent-card:hover {
+    background: #fff;
+}
+
+.advent-card img {
+    width: 48px;
+    flex-shrink: 0;
+    border-radius: 3px;
+}
+
+.advent-card-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 0.85rem;
+}
+
+.advent-card-text strong {
+    color: var(--primary);
+}
+
+.advent-card-meta {
+    margin-top: 0.15rem;
+    color: #555;
+}
+
+.advent-card-meta .rarity-badge {
+    margin-left: 0.3rem;
+    font-size: 0.7rem;
+}
+
+/* the photo, large */
+.advent-lightbox {
+    max-width: min(92vw, 1100px);
+    padding: 0.5rem;
+    border: none;
+    border-radius: 10px;
+    background: #111;
+}
+
+.advent-lightbox::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.advent-lightbox img {
+    display: block;
+    max-width: 100%;
+    max-height: 85vh;
+    margin: 0 auto;
+}
+
+.advent-lightbox form {
+    text-align: right;
+    margin: 0 0 0.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .door-front {
+        transition: none;
+    }
+}

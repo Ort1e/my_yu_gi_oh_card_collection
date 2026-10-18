@@ -123,16 +123,23 @@ async fn shutdown_signal() {
 
 pub fn app(state: AppState) -> Router {
     let login_required = from_fn_with_state(state.clone(), auth::require_login);
-    let shipments = Router::new()
+    // personal files: the shipment PDFs (names, addresses) and the advent
+    // calendar photos (handwritten notes)
+    let private_files = Router::new()
         .nest_service(
             "/media/shipment_files",
             ServeDir::new(state.media_dir.join("shipment_files")),
+        )
+        .nest_service(
+            "/media/advent_calendar_photos",
+            ServeDir::new(state.media_dir.join("advent_calendar_photos")),
         )
         .layer(login_required.clone());
 
     Router::new()
         .merge(routes::router())
-        .merge(routes::write_router().route_layer(login_required))
+        .merge(routes::write_router().route_layer(login_required.clone()))
+        .merge(routes::private_router().route_layer(login_required))
         .route("/login", get(auth::page).post(auth::login))
         .route("/logout", post(auth::logout))
         // One INFO line per page or API call: method, path, status and time.
@@ -144,7 +151,7 @@ pub fn app(state: AppState) -> Router {
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
         .merge(routes::files_router())
-        .merge(shipments)
+        .merge(private_files)
         // CSS and the deck builder bundle: `no-cache` makes browsers check for
         // a newer file on each page load (a 304 when unchanged) instead of
         // reusing a stale copy after an update.

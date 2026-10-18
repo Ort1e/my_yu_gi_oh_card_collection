@@ -271,6 +271,17 @@ the app shows to you.
 During frontend work, `npm run dev` serves the app with hot reload on
 `:5173` and forwards `/api` to the backend on `:3000`.
 
+## The advent calendar
+
+`/advent-calendar/:year` (`routes/advent/`, `templates/advent/calendar.html`,
+`static/js/advent_calendar.js`, `static/css/advent.css`): 24 doors that open
+on the photo and the card of the day. The tables `advent_calendar` (one per
+year) and `advent_calendar_entry` (day, card, photo) come from Django, which
+had no page for them. The photos are in `media/advent_calendar_photos/<year>/`
+(upright, 1600 px, metadata stripped; the full-size originals in
+`originals/`). They show handwritten notes, so the page and the photos are
+behind the login (`routes::private_router`, `private_files` in `main.rs`).
+
 ## Login
 
 `web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the

@@ -3,6 +3,7 @@
 //!
 //! `TestApp` and the shared fixtures are here, the tests in one file per area.
 
+mod advent;
 mod auth;
 mod budget;
 mod deck_api;
@@ -185,19 +186,28 @@ impl TestApp {
     async fn deck_fixture(&self) -> (i64, Vec<i64>) {
         self.post("/decks/add", &[("name", "Test"), ("version_name", "v1")])
             .await;
-        self.post("/lots/add", LOT).await;
+        // the lot of `LOT`, inserted directly: saving it through the form
+        // would start the background task (link, translate, replace proxies),
+        // which would race with the test
+        sqlx::query(
+            "INSERT INTO seller (name, is_person, source_id) VALUES ('New Shop', 0, 1);
+             INSERT INTO lot (lot_type, price, buy_date, seller_id, no_card_price)
+                 VALUES ('purchase', '10.50', '2025-06-12', 1, '0.00');
+             INSERT INTO card (name, en_name, code, last_known_status, card_data_id, is_proxy) VALUES
+                 ('Magicien Sombre', 'dark magician', 'LOB-FR005', 'NM', 1, 0),
+                 ('Magicien Sombre', 'dark magician', 'LOB-FR005', 'NM', 1, 0),
+                 ('Kuriboh', 'kuriboh', NULL, NULL, 2, 1);
+             INSERT INTO unite (price, lot_id, card_id)
+                 SELECT CASE WHEN is_proxy THEN NULL ELSE '2.25' END, 1, id FROM card ORDER BY id;",
+        )
+        .execute(&self.state.pool)
+        .await
+        .unwrap();
         let version = self.scalar("SELECT id FROM deck_version").await;
         let cards = sqlx::query_scalar("SELECT id FROM card ORDER BY id")
             .fetch_all(&self.state.pool)
             .await
             .unwrap();
-        // link card data now rather than waiting for the background task
-        sqlx::query(
-            "UPDATE card SET card_data_id = CASE WHEN en_name = 'kuriboh' THEN 2 ELSE 1 END",
-        )
-        .execute(&self.state.pool)
-        .await
-        .unwrap();
         (version, cards)
     }
 }

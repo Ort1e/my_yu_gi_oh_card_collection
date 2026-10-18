@@ -1,7 +1,9 @@
 //! One folder per area of the app: `mod.rs` has its pages (list, detail),
 //! `form.rs` its create/edit forms. Read-only routes go in `router()`, every
-//! write route in `write_router()` (behind the login).
+//! write route in `write_router()` (behind the login), and the few private
+//! reads in `private_router()` (behind the login too).
 
+mod advent;
 mod budget;
 mod cards;
 mod dashboard;
@@ -51,6 +53,14 @@ pub fn router() -> Router<AppState> {
 /// a deck builder page loads dozens of card images).
 pub fn files_router() -> Router<AppState> {
     Router::new().route("/card-image/:card_data_id", get(cards::images::card_image))
+}
+
+/// Pages that only read but are private (personal content): behind the login
+/// like the write routes. Their files too (see `main::app`).
+pub fn private_router() -> Router<AppState> {
+    Router::new()
+        .route("/advent-calendar", get(advent::latest))
+        .route("/advent-calendar/:year", get(advent::calendar))
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
