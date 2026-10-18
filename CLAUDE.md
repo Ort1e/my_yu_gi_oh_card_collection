@@ -16,7 +16,7 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
 
 The port is finished; the project now serves as Rust practice for the owner.
 - **Frontend: Claude implements.** Templates (`backend/templates/`), CSS (`static/css/`), the deck
-  builder (`frontend/`), inline JS.
+  builder (`frontend/`), page scripts (`static/js/`).
 - **Backend: the owner implements the substantial work, Claude suggests.** Rust in `backend/src/`,
   `domain/`, `migrations/`, `importer/`: for new features, data model, API design or real logic, explain,
   review and propose (route, JSON in/out, where the code goes, similar code to copy from), then build the
@@ -29,20 +29,20 @@ The port is finished; the project now serves as Rust practice for the owner.
 |---|---|
 | HTTP | axum 0.7, tower-http (ServeDir, trace) |
 | DB | SQLite (WAL) via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
-| Pages | askama 0.12 + askama_axum templates, a little inline JS, Chart.js from a CDN on the dashboard |
+| Pages | askama 0.12 + askama_axum templates, scripts in `static/js/` (no inline JS), Chart.js from a CDN on the dashboard |
 | Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), built to `static/deck-builder/` (gitignored), talks only to `/api/*` |
 | Env | Nix flake (`flake.nix`, `.envrc` → `use flake`), Rust 1.88.0 pinned in `rust-toolchain.toml` |
 
 Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
 - `backend/` — web server **and** maintenance commands (one binary):
   - `main.rs` (`AppState`: pool, reqwest client, media/uploads dirs, Cardmarket account, `Auth`; dispatches `commands::Command`; `app()` wires the routers and the login layer), `auth.rs` (single-password login: `require_login` middleware, `/login`, `/logout`, HMAC-signed session cookie, key in table `app_secret`), `db.rs` (pool, `begin_write`, `Money`), `error.rs` (`AppError`/`AppResult`, `.or_404()`, `bad_request`), `filters.rs` (askama filters), `pagination.rs`, `models.rs` (row types shared by pages), `forms.rs` (`FormData`: raw form pairs → validated values + errors; card rows `cards-<i>-<field>`), `card_data.rs` (ygoprodeck lookups with a shared rate limiter, background card→card_data linking), `cards.rs` (card-row writes and shared SQL: `Zone`, `SOLD_EXISTS`, `IN_ANY_DECK`, `insert_lot_cards`, `new_proxy`, `delete_orphan_proxies`), `tests.rs` (`TestApp`: handler tests on a temp migrated DB, no network).
-  - `routes/<domain>.rs`: one module per page group (row structs, queries, `#[derive(Template)]` structs, handlers). Read-only routes in `routes::router()`, **every write route in `routes::write_router()`** (behind the login layer). Forms: `lot_form.rs` (create + edit), `deck_form.rs` (create, edit, delete, new version), `card_form.rs`, `seller_form.rs` (edit), `budget_form.rs`; deck builder JSON API: `deck_api.rs`.
+  - `routes/<domain>.rs`: one module per page group (row structs, queries, `#[derive(Template)]` structs, handlers). Read-only routes in `routes::router()`, **every write route in `routes::write_router()`** (behind the login layer). Forms: `lot_form.rs` (create + edit), `deck_form.rs` (create, edit, delete, new version), `card_form.rs`, `seller_form.rs` (edit), `budget_form.rs`; deck builder JSON API: `deck_api/` (one file per route group, shared `ApiCard` in `mod.rs`).
   - `commands/`: `scrap-ban-list`, `clean-cards` (Django's management commands).
   - `templates/`: `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), partials prefixed `_`. CSS from Django in `static/css/`.
 - `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
 - `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, embedded by both binaries (`sqlx::migrate!("../migrations")`).
-- `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte`, `api.js` = HTTP client, `deck.js` = pure helpers).
+- `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte` with their own `<style>`, `api.js` = HTTP client, `deck.js` = pure helpers).
 - `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): **`app.db` (the live database, tracked)**, `media/card_images/`, `media/shipment_files/`, and the Django leftovers `data.json` (dump `app.db` was imported from) and `db.sqlite3` (Django DB). Its `.gitignore` excludes `*.db-wal`/`-shm`/`-journal`.
 
 ## Commands
@@ -77,7 +77,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (uns
 - `/card-image/:card_data_id` serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing. `/static`, `/media` are plain file servers, except `/media/shipment_files` (login required).
 - Login (`auth.rs`): with `APP_PASSWORD` set, `write_router()` and the shipment PDFs need the session cookie: pages redirect to `/login?next=…`, `/api/*` answers 401 `{"error": …}`. Reads stay public. New write routes must go in `write_router()`.
 - Lot creation: `POST /lots/add/shipment` parses a Cardmarket PDF and re-renders the form pre-filled; the PDF waits as `uploads/pending-<token>.pdf` (deleted after 24 h) and moves to `media/shipment_files/shipment_<lot id>.pdf` on save. New cards are linked to card data by a background task.
-- Deck builder API (`routes/deck_api.rs`): `/api/deck-versions/:id` `GET`/`PATCH`/`DELETE`, `…/clone`, `…/proxies[/:card_id]`, `…/reserve`, `…/categories[/:category_id]`, `…/cards/:card_id/categories[/:category_id]`, `…/monte-carlo`, `…/tournament`, and `/api/decks/:id/import-ydke`. Zone edits stay local in the app until "Save"; proxies, categories and the tournament save immediately; YDKE copy is computed client-side.
+- Deck builder API (`routes/deck_api/`): `/api/deck-versions/:id` `GET`/`PATCH`/`DELETE`, `…/clone`, `…/proxies[/:card_id]`, `…/reserve`, `…/categories[/:category_id]`, `…/cards/:card_id/categories[/:category_id]`, `…/monte-carlo`, `…/tournament`, and `/api/decks/:id/import-ydke`. Zone edits stay local in the app until "Save"; proxies, categories and the tournament save immediately; YDKE copy is computed client-side.
 
 ## Database conventions (`migrations/0002_ygo_schema.sql`)
 

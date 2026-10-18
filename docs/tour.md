@@ -11,7 +11,7 @@ Suggested reading order, about an hour with the code open next to it:
 3. [Following a form](#following-a-form): `backend/src/routes/seller_form.rs`, then `lot_form.rs::create`
 4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
-6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/deck_api.rs`
+6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/deck_api/`
 7. [Tests](#tests): `backend/src/tests.rs`
 
 ## The big picture
@@ -58,7 +58,7 @@ Plus `frontend/` (the Svelte deck builder, built by npm, not Cargo) and
 | class-based views | `async fn` handlers in `routes/<domain>.rs` |
 | Django templates | askama templates in `backend/templates/`, nearly identical syntax |
 | `forms.py` | `forms.rs` (`FormData`) + validation in each `*_form.rs` |
-| DRF API + serializers | `routes/deck_api.rs` + `#[derive(Serialize)]` structs |
+| DRF API + serializers | `routes/deck_api/` + `#[derive(Serialize)]` structs |
 | `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
@@ -253,10 +253,10 @@ bundle. The app then only talks JSON to `/api/*`:
 | Frontend | Backend |
 |---|---|
 | `src/main.js`: mounts `App` with the version id | |
-| `src/App.svelte`: state of the zones, drag & drop, save | |
-| `src/api.js`: one function per endpoint | `routes/deck_api.rs`: one handler per endpoint |
+| `src/App.svelte`: state of the zones, drag & drop, save | `deck_api/version.rs`: load, save, delete, copy |
+| `src/api.js`: one function per endpoint | `routes/deck_api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.js`: pure helpers (sorting, prices, YDKE URL) | |
-| `src/lib/*.svelte`: zone, card tile, card overview, simulation, tournament | |
+| `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
 Moving cards between zones only changes the app's local state until
 **Save** (`PATCH /api/deck-versions/:id` with the three zones). Proxies,

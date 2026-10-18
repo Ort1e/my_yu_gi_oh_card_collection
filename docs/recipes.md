@@ -217,7 +217,8 @@ goes in `domain/`:
 
 ## Add a deck builder feature
 
-1. **Endpoint** in `routes/deck_api.rs`: input as a `#[derive(Deserialize)]`
+1. **Endpoint** in `routes/deck_api/` (the file of its group, or a new one
+   declared and re-exported in `deck_api/mod.rs`): input as a `#[derive(Deserialize)]`
    struct taken with `Json(body): Json<MyInput>`, output as
    `Json<MyOutput>` with `#[derive(Serialize)]`. Bad input →
    `return bad_request("why")` (the app shows the message). Money
@@ -226,8 +227,8 @@ goes in `domain/`:
    changes anything, `router()` if it only reads.
 3. **Client** in `frontend/src/api.js`: one line in `deckApi(id)`, e.g.
    `myThing: (x) => request('POST', \`${base}/my-thing\`, { x }),`.
-4. **UI** in `App.svelte` or a component in `src/lib/`. Pure helpers go in
-   `src/deck.js`. Style: 4-space indent, blank lines between logical blocks.
+4. **UI** in a component in `src/lib/` (with its CSS in its `<style>`
+   block), wired in `App.svelte`. Pure helpers go in `src/deck.js`. Style: 4-space indent, blank lines between logical blocks.
 5. Test the endpoint in `tests.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
 

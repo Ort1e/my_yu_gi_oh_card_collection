@@ -1,7 +1,7 @@
 <script>
     // Adds a category to the deck version: a plain one, or a conditional one
     // (a card that counts as one category or another depending on the rest
-    // of the hand, see ApiCondition in backend/src/routes/deck_api.rs).
+    // of the hand, see ApiCondition in backend/src/routes/deck_api/categories.rs).
     import { createEventDispatcher } from 'svelte';
 
     export let api;
