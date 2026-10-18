@@ -12,7 +12,8 @@ Suggested reading order, about an hour with the code open next to it:
 4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/store/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
 6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
-7. [Tests](#tests): `backend/src/tests/`
+7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data.rs`
+8. [Tests](#tests): `backend/src/tests/`
 
 ## The big picture
 
@@ -165,7 +166,9 @@ Things to notice:
   commit fails;
 - after the commit, `spawn_link_cards` starts a **background task** that
   links the new cards to their ygoprodeck `card_data` (fetching unknown
-  names from the API). The redirect doesn't wait for it.
+  names from the API), puts their names in the language of their code, then
+  swaps deck proxies for the new owned copies. The redirect doesn't wait
+  for it (see [Talking to ygoprodeck](#talking-to-ygoprodeck)).
 
 ### The shipment PDF flow
 
@@ -281,8 +284,36 @@ the server refuses to listen anywhere but `127.0.0.1`.
 
 `backend/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`)
 and `clean-cards` (normalise names, relink card data, swap proxies for owned
-copies, delete unused proxies). Both accept `--dry-run`: they run in a
-transaction that is rolled back.
+copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
+language of their code). Both accept `--dry-run`: they run in a transaction
+that is rolled back.
+
+You rarely need `clean-cards` by hand: the server runs it in the background
+5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, one
+summary line in the log), and the actions that make a cleanup necessary do
+their part themselves (saving deck zones deletes unused proxies, saving new
+cards links, translates and swaps proxies).
+
+## Talking to ygoprodeck
+
+All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
+are in `backend/src/store/card_data.rs`. It allows about 20 requests per
+second and blocks the IP for an hour above that: `throttle()` keeps every
+call of the server 60 ms apart, and what can be remembered is.
+
+| What | Call | Remembered in |
+|---|---|---|
+| a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
+| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`) |
+| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
+| a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
+
+Two rules: call ygoprodeck **before** opening a write transaction (the calls
+write through the pool), and only through these functions. Tests never call
+it: `TestApp` pre-inserts the card data they need (and translations, in
+`card_translation`). The shapes ygoprodeck answers are reshaped in pure
+functions in `domain/` (`card_set`, `rarity::Rarity::from_label` for its
+rarity names), which are unit-tested on small synthetic JSON.
 
 ## Tests
 

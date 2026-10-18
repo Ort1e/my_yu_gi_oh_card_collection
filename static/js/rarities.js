@@ -8,7 +8,7 @@
 // ygoprodeck uses. `aliases`: other names of the same look. Looks have
 // changed over the years and between releases: when in doubt, compare with a
 // card whose rarity you know. Names match the rarity list of the app
-// (docs/specs/rarity.md).
+// (domain/src/rarity.rs, the list the forms validate against).
 
 const RARITIES = [
     {

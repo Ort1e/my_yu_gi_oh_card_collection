@@ -1,5 +1,5 @@
 //! Set lookup for the "quick add from a set" panel of the lot forms
-//! (`static/js/card_rows.js`). Spec: `docs/specs/set-lookup.md`.
+//! (`static/js/card_rows.js`). See docs/tour.md, "Talking to ygoprodeck".
 
 use axum::extract::{Path, State};
 use axum::Json;

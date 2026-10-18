@@ -1,5 +1,5 @@
 //! The cards of a set, from ygoprodeck's answers, for the "quick add from a
-//! set" panel of the lot forms. Spec: `docs/specs/set-lookup.md`.
+//! set" panel of the lot forms (`GET /api/sets/:code`).
 //!
 //! Pure: the backend fetches the JSON (`card_data::fetch_set`), this module
 //! only reshapes it.

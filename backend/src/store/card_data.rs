@@ -177,7 +177,7 @@ async fn fetch(http: &reqwest::Client, query: &[(&str, &str)]) -> AppResult<Opti
 
 /// The ygoprodeck answers for one set prefix (`"RA05"`), for
 /// `domain::card_set::set_cards`. Several sets can share a prefix: their
-/// cards are put together. Spec: `docs/specs/set-lookup.md`.
+/// cards are put together.
 #[derive(Debug, Clone)]
 pub struct FetchedSet {
     /// Name of the biggest set with that prefix (`"Rarity Collection 5"`).

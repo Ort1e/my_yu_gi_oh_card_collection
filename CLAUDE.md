@@ -11,6 +11,7 @@ monthly budget, decks (versions, categories, YDKE import/export, draw simulation
   `git ls-tree -r --name-only django-final`, or `git archive django-final my_ygo_cards | tar -x -C <scratch dir>`.
   Its `deck_builder_frontend/` is an abandoned React stub.
 - Human-oriented docs: `docs/tour.md` (architecture), `docs/recipes.md` (how to change things). Keep them in sync.
+- `docs/specs/`: specs of work **not done yet** (handed to the owner or to Claude). Delete a spec once it's implemented, after moving what's still useful into the code's doc comments or the docs (git history keeps it).
 
 ## Division of work — read first
 
@@ -76,12 +77,13 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (uns
 
 ## Routes
 
-- Pages: `/` dashboard, `/budget` (+ `/budget/manage`), `/cards` (filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (filters), `/lots/:id`, `/lots/add`, `/decks`, `/decks/:id`, `/decks/add`, `/deck-builder/:id`.
+- Pages: `/` dashboard, `/budget` (+ `/budget/manage`), `/cards` (filters), `/cards/:id`, `/sellers`, `/sellers/:id`, `/lots` (filters), `/lots/:id`, `/lots/add`, `/decks`, `/decks/:id`, `/decks/add`, `/deck-builder/:id`, `/rarities` (rarity guide).
 - Edition: `/{cards,sellers,lots,decks}/:id/edit` (GET form, POST save); `POST /decks/:id/delete` (versions cascade, orphan proxies removed), `POST /decks/:id/versions` (new empty version → deck builder).
 - **Cards, unites, lots and sellers are never deleted** (they are the collection's history): no delete routes for them. Deck versions are edited/deleted only in the deck builder.
 - `/card-image/:card_data_id` serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing. `/static`, `/media` are plain file servers, except `/media/shipment_files` (login required).
 - Login (`web/auth.rs`): with `APP_PASSWORD` set, `write_router()` and the shipment PDFs need the session cookie: pages redirect to `/login?next=…`, `/api/*` answers 401 `{"error": …}`. Reads stay public. New write routes must go in `write_router()`.
 - Lot creation: `POST /lots/add/shipment` parses a Cardmarket PDF and re-renders the form pre-filled; the PDF waits as `uploads/pending-<token>.pdf` (deleted after 24 h) and moves to `media/shipment_files/shipment_<lot id>.pdf` on save. New cards are linked to card data by a background task, which then puts English names of cards coded in another language (`-FR`) in that language (ygoprodeck; recent sets may have no translation yet), and replaces deck proxies by the new owned copies (unused proxies deleted). Saving deck zones also deletes the proxies left unused.
+- `GET /api/sets/:code` (`routes/reference/sets.rs`): the cards of a set for the quick-add panel (ygoprodeck, cached; see docs/tour.md, "Talking to ygoprodeck").
 - Deck builder API (`routes/decks/api/`): `/api/deck-versions/:id` `GET`/`PATCH`/`DELETE`, `…/clone`, `…/proxies[/:card_id]`, `…/reserve`, `…/categories[/:category_id]`, `…/cards/:card_id/categories[/:category_id]`, `…/monte-carlo`, `…/tournament`, and `/api/decks/:id/import-ydke`. Zone edits stay local in the app until "Save"; proxies, categories and the tournament save immediately; YDKE copy is computed client-side.
 
 ## Database conventions (`migrations/0002_ygo_schema.sql`)
