@@ -9,6 +9,7 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 use domain::card::{normalize_card_name, CardStatus};
+use domain::rarity::Rarity;
 
 use crate::store::card_data::spawn_link_cards;
 use crate::store::db::begin_write;
@@ -23,6 +24,7 @@ pub struct CardValues {
     en_name: String,
     code: String,
     status: String,
+    rarity: String,
     is_proxy: bool,
 }
 
@@ -38,12 +40,16 @@ impl EditCardPage {
     fn statuses(&self) -> [CardStatus; 5] {
         CardStatus::ALL
     }
+
+    fn rarities(&self) -> [Rarity; 34] {
+        Rarity::ALL
+    }
 }
 
 pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<EditCardPage> {
     let card = sqlx::query_as(
         "SELECT name, coalesce(en_name, '') AS en_name, coalesce(code, '') AS code,
-            coalesce(last_known_status, '') AS status, is_proxy
+            coalesce(last_known_status, '') AS status, coalesce(rarity, '') AS rarity, is_proxy
          FROM card WHERE id = ?",
     )
     .bind(id)
@@ -76,6 +82,17 @@ pub async fn update(
         }
     };
 
+    let rarity = match form.get("rarity") {
+        None => None,
+        Some(label) => {
+            let rarity = Rarity::from_label(label);
+            if rarity.is_none() {
+                form.errors.push("Unknown rarity.".into());
+            }
+            rarity
+        }
+    };
+
     let (Some(name), true) = (name, form.errors.is_empty()) else {
         return Ok(EditCardPage {
             id,
@@ -84,6 +101,7 @@ pub async fn update(
                 en_name: form.text("en_name"),
                 code: form.text("code"),
                 status: form.text("status"),
+                rarity: form.text("rarity"),
                 is_proxy: form.checked("is_proxy"),
             },
             errors: form.errors,
@@ -103,7 +121,8 @@ pub async fn update(
     let renamed = old_en_name.as_deref() != Some(en_name.as_str());
 
     sqlx::query(
-        "UPDATE card SET name = ?, en_name = ?, code = ?, last_known_status = ?, is_proxy = ?,
+        "UPDATE card SET name = ?, en_name = ?, code = ?, last_known_status = ?, rarity = ?,
+            is_proxy = ?,
             card_data_id = CASE WHEN ? THEN NULL ELSE card_data_id END
          WHERE id = ?",
     )
@@ -111,6 +130,7 @@ pub async fn update(
     .bind(&en_name)
     .bind(form.get("code"))
     .bind(status.map(|s| s.code()))
+    .bind(rarity.map(|r| r.label()))
     .bind(form.checked("is_proxy"))
     .bind(renamed)
     .bind(id)

@@ -4,9 +4,10 @@
 //!
 //!   cargo test -p domain --test real_shipments -- --ignored
 //!
-//! The PDFs contain personal data: this test only reports counts and lot
-//! ids, never extracted text or names.
+//! The PDFs contain personal data: this test only reports counts, lot ids
+//! and rarity codes (`UR`…), never extracted text or names.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use domain::cardmarket::parse_shipment_pdf;
@@ -34,6 +35,9 @@ async fn real_shipments_match_their_lots() {
 
     let (mut parsed, mut total_ok, mut type_ok, mut date_ok, mut cards_ok) = (0, 0, 0, 0, 0);
     let mut failures = Vec::new();
+    // rarity code -> (cards, recognised)
+    let mut rarity_codes: BTreeMap<String, (usize, bool)> = BTreeMap::new();
+    let mut without_rarity = 0;
     for lot in &lots {
         let id: i64 = lot.get("id");
         let file: String = lot.get("shipment_file");
@@ -49,6 +53,18 @@ async fn real_shipments_match_their_lots() {
             }
         };
         parsed += 1;
+        for card in &shipment.cards {
+            if let Some(code) = &card.rarity_code {
+                let entry = rarity_codes.entry(code.clone()).or_insert((
+                    0,
+                    domain::rarity::Rarity::from_cardmarket_code(code).is_some(),
+                ));
+                entry.0 += 1;
+            }
+            if card.rarity.is_none() {
+                without_rarity += 1;
+            }
+        }
 
         let price: Decimal = lot.get::<String, _>("price").parse().unwrap();
         let lot_type = LotType::from_code(lot.get("lot_type")).unwrap();
@@ -63,7 +79,11 @@ async fn real_shipments_match_their_lots() {
                 &mut date_ok,
                 "date",
             ),
-            (shipment.cards.len() as i64 == unites, &mut cards_ok, "cards"),
+            (
+                shipment.cards.len() as i64 == unites,
+                &mut cards_ok,
+                "cards",
+            ),
         ];
         let mut wrong = Vec::new();
         for (ok, counter, name) in checks {
@@ -74,9 +94,9 @@ async fn real_shipments_match_their_lots() {
             }
         }
         if !wrong.is_empty() {
-            let days = shipment.paid.map(|d| {
-                (d - buy_date.parse::<chrono::NaiveDate>().unwrap()).num_days()
-            });
+            let days = shipment
+                .paid
+                .map(|d| (d - buy_date.parse::<chrono::NaiveDate>().unwrap()).num_days());
             failures.push(format!(
                 "lot {id} ({}): mismatch {wrong:?} — total diff {}, paid date diff {days:?} days, cards {} vs {unites}",
                 lot_type.code(),
@@ -92,6 +112,8 @@ async fn real_shipments_match_their_lots() {
     for f in &failures {
         eprintln!("  {f}");
     }
+    eprintln!("rarity codes (cards, recognised): {rarity_codes:?}");
+    eprintln!("cards without a rarity: {without_rarity}");
     // Totals, dates and card counts can legitimately differ: some lots were
     // edited by hand after import, and some PDFs have no paid/arrived date.
     assert_eq!(parsed, n, "some PDFs could not be parsed");

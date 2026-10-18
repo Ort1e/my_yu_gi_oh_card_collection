@@ -21,6 +21,8 @@ pub struct CardFilter {
     pub name: Option<String>,
     pub code: Option<String>,
     pub status: Option<String>,
+    /// A rarity label, matched exactly.
+    pub rarity: Option<String>,
     pub card_type: Option<String>,
     pub proxy: Option<String>,
     pub sold: Option<String>,
@@ -45,6 +47,9 @@ impl CardFilter {
         if let Some(status) = Self::text(&self.status) {
             qb.push(" AND card.last_known_status = ")
                 .push_bind(status.to_uppercase());
+        }
+        if let Some(rarity) = Self::text(&self.rarity) {
+            qb.push(" AND card.rarity = ").push_bind(rarity.to_string());
         }
         if let Some(proxy) = Self::flag(&self.proxy) {
             qb.push(" AND card.is_proxy = ").push_bind(proxy);
@@ -81,6 +86,7 @@ impl CardFilter {
             ("name", self.name.as_deref()),
             ("code", self.code.as_deref()),
             ("status", self.status.as_deref()),
+            ("rarity", self.rarity.as_deref()),
             ("card_type", self.card_type.as_deref()),
             ("proxy", self.proxy.as_deref()),
             ("sold", self.sold.as_deref()),
@@ -119,6 +125,10 @@ pub struct CardsList {
 impl CardsList {
     fn selected(&self, value: &Option<String>, option: &str) -> bool {
         value.as_deref().unwrap_or("") == option
+    }
+
+    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
+        domain::rarity::Rarity::ALL
     }
 }
 

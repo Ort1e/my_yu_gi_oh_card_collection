@@ -47,6 +47,7 @@
         <p>Code: {card.code || '—'}</p>
         <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
         <p>Ban Status: {banStatus(card, banListId) || 'Unlimited'}</p>
+        <p>Rarity: {#if card.rarity}<a href="/rarities?rarity={encodeURIComponent(card.rarity)}" target="_blank" rel="noopener">{card.rarity}</a>{:else}—{/if}</p>
         <p>Proxy: {card.is_proxy ? 'Yes' : 'No'}</p>
         <div class="category-selector">
             <strong>Categories:</strong>

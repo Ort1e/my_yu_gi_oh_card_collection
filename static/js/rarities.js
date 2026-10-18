@@ -198,7 +198,8 @@ const UNDESCRIBED = [
 /** The rarity of a name, ignoring case and punctuation ("PLatinum Secret Rare",
  * "Collectors Rare") and accepting its aliases. */
 function findRarity(name) {
-    const key = (text) => text.toLowerCase().replace(/[^a-z]/g, '');
+    // digits count: "10000 Secret Rare" is not "Secret Rare"
+    const key = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
     const wanted = key(name);
 
     return RARITIES.find((r) => [r.name, ...(r.aliases ?? [])].some((n) => key(n) === wanted)) ?? null;

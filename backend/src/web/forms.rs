@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
 use domain::card::{normalize_card_name, CardStatus};
+use domain::rarity::Rarity;
 use rust_decimal::Decimal;
 
 pub type Pairs = Vec<(String, String)>;
@@ -119,6 +120,7 @@ impl FormData {
                     en_name: field("en_name"),
                     code: field("code"),
                     status: field("status"),
+                    rarity: field("rarity"),
                     is_proxy: self.checked(&format!("cards-{i}-is_proxy")),
                     price: field("price"),
                     quantity: field("quantity"),
@@ -148,6 +150,17 @@ impl FormData {
                         ok = false;
                     }
                     status
+                }
+            };
+            let rarity = match row.rarity.as_str() {
+                "" => None,
+                label => {
+                    let rarity = Rarity::from_label(label);
+                    if rarity.is_none() {
+                        self.errors.push(format!("Card {n}: unknown rarity."));
+                        ok = false;
+                    }
+                    rarity
                 }
             };
             let price = match row.price.as_str() {
@@ -185,6 +198,7 @@ impl FormData {
                     en_name: normalize_card_name(en_name),
                     code: Some(row.code.clone()).filter(|c| !c.is_empty()),
                     status,
+                    rarity,
                     is_proxy: row.is_proxy,
                     price,
                     quantity,
@@ -207,6 +221,8 @@ pub struct CardRowValues {
     pub en_name: String,
     pub code: String,
     pub status: String,
+    /// A rarity label (`Ultra Rare`), or empty.
+    pub rarity: String,
     pub is_proxy: bool,
     pub price: String,
     pub quantity: String,
@@ -229,6 +245,7 @@ pub struct NewCards {
     pub en_name: String,
     pub code: Option<String>,
     pub status: Option<CardStatus>,
+    pub rarity: Option<Rarity>,
     pub is_proxy: bool,
     pub price: Option<Decimal>,
     pub quantity: u32,

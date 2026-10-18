@@ -32,19 +32,20 @@
   <h2>Cards</h2>
   <table class="numbers">
     <thead>
-      <tr><th>Card</th><th>Price</th></tr>
+      <tr><th>Card</th><th>Rarity</th><th>Price</th></tr>
     </thead>
     <tbody>
       {% for unite in unites %}
       <tr>
         <td><a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a></td>
+        <td>{% match unite.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}—{% endmatch %}</td>
         <td>{% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="2">No cards in this lot.</td></tr>
+      <tr><td colspan="3">No cards in this lot.</td></tr>
       {% endfor %}
       <tr class="total-row">
-        <td>Total</td>
+        <td colspan="2">Total</td>
         <td>{{ total_price }} €</td>
       </tr>
     </tbody>

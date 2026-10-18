@@ -5,8 +5,10 @@
 //! returned fields — never store, log or embed the text itself.
 //!
 //! Differences from Django: the account name is a parameter instead of a
-//! constant, a missing total is an error instead of a crash, and Cardmarket
-//! conditions are mapped to [`CardStatus`].
+//! constant, a missing total is an error instead of a crash, Cardmarket
+//! conditions are mapped to [`CardStatus`], and the rarity is read (from the
+//! rarity code of the line, else from the `(V.x - …)` suffix of the name,
+//! which is stripped).
 
 use std::fmt;
 use std::sync::LazyLock;
@@ -17,6 +19,7 @@ use rust_decimal::Decimal;
 
 use crate::card::CardStatus;
 use crate::lot::LotType;
+use crate::rarity::{split_cardmarket_name, Rarity};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shipment {
@@ -33,9 +36,13 @@ pub struct Shipment {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShipmentCard {
+    /// Without Cardmarket's `(V.x - <rarity>)` suffix.
     pub name: String,
     /// e.g. `RA03-EN012`
     pub code: String,
+    pub rarity: Option<Rarity>,
+    /// The rarity code of the line as written (`UR`…), to report unknown ones.
+    pub rarity_code: Option<String>,
     /// Raw Cardmarket condition (MT, NM, EX, GD, LP, PL, PO).
     pub condition: String,
     pub price: Decimal,
@@ -79,7 +86,7 @@ static TOTAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Total\s+([\d,]+)\s
 // the PDF library a card is one line (pypdf) or one line per cell (lopdf).
 static CARD: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>[0-9a-zA-Z]{3})\s+(?P<lang>EN|FR)\s+(?P<status>[A-Z]{2})\s+(?P<set>[A-Z0-9]+)\s+.*?(?P<price>[\d,]+)\s+EUR",
+        r"(?P<qty>\d+)\s+(?P<name>.+?)\s+X?(?P<code>[0-9a-zA-Z]{3})\s+(?P<lang>EN|FR)\s+(?P<status>[A-Z]{2})\s+(?P<set>[A-Z0-9]+)\s+(?:(?P<rarity>[0-9A-Za-z]+)\s+)?.*?(?P<price>[\d,]+)\s+EUR",
     )
     .unwrap()
 });
@@ -112,9 +119,8 @@ pub fn parse_shipment(text: &str, account: &str) -> Result<Shipment, ShipmentErr
         (LotType::Purchase, seller)
     };
 
-    let date = |re: &Regex| {
-        capture(re).and_then(|d| NaiveDate::parse_from_str(&d, "%d.%m.%Y").ok())
-    };
+    let date =
+        |re: &Regex| capture(re).and_then(|d| NaiveDate::parse_from_str(&d, "%d.%m.%Y").ok());
 
     let total = capture(&TOTAL)
         .and_then(|t| parse_eur(&t))
@@ -140,9 +146,16 @@ fn parse_cards(text: &str) -> Vec<ShipmentCard> {
         let (Ok(qty), Some(price)) = (c["qty"].parse::<usize>(), parse_eur(&c["price"])) else {
             continue;
         };
+        let (name, suffix_rarity) = split_cardmarket_name(c["name"].trim());
+        let rarity_code = c.name("rarity").map(|m| m.as_str().to_string());
         let card = ShipmentCard {
-            name: c["name"].trim().to_string(),
+            name: name.to_string(),
             code: format!("{}-{}{}", &c["set"], &c["lang"], &c["code"]),
+            rarity: rarity_code
+                .as_deref()
+                .and_then(Rarity::from_cardmarket_code)
+                .or(suffix_rarity),
+            rarity_code,
             condition: c["status"].to_string(),
             price,
         };
@@ -171,8 +184,8 @@ Paid: 12.06.2025
 Arrived 19.06.2025
 Total 18,17 EUR
 Yugioh Singles:
-2 Ash Blossom & Joyous Spring 012 EN NM RA03 Rare 1,50 EUR
-1 Dark Magician X001 FR GD LOB Ultra Rare 3,00 EUR
+2 Ash Blossom & Joyous Spring 012 EN NM RA03 SER 1,50 EUR
+1 Dark Magician X001 FR GD LOB UR First Edition 3,00 EUR
 not a card line
 ";
 
@@ -191,7 +204,9 @@ not a card line
         assert_eq!(s.cards[0].code, "RA03-EN012");
         assert_eq!(s.cards[0].price, dec!(1.50));
         assert_eq!(s.cards[0].status(), Some(CardStatus::NearMint));
+        assert_eq!(s.cards[0].rarity, Some(Rarity::SecretRare));
         assert_eq!(s.cards[2].code, "LOB-FR001");
+        assert_eq!(s.cards[2].rarity, Some(Rarity::UltraRare));
         assert_eq!(s.cards[2].status(), Some(CardStatus::Good));
     }
 
@@ -200,10 +215,30 @@ not a card line
         let text = "Total 3,00 EUR\nYugioh Singles:\n1\nDark Magician (V.1 - Ultra Rare)\n001\nEN\nNM\nLOB\nUR\nFirst Edition\n1,00 EUR\n2\nKuriboh\n123\nFR\nEX\nMRD1\nC\nUnlimited\n1,00 EUR\n";
         let s = parse_shipment(text, "me").unwrap();
         assert_eq!(s.cards.len(), 3);
-        assert_eq!(s.cards[0].name, "Dark Magician (V.1 - Ultra Rare)");
+        assert_eq!(s.cards[0].name, "Dark Magician");
         assert_eq!(s.cards[0].code, "LOB-EN001");
+        assert_eq!(s.cards[0].rarity, Some(Rarity::UltraRare));
         assert_eq!(s.cards[2].code, "MRD1-FR123");
+        assert_eq!(s.cards[2].rarity, Some(Rarity::Common));
         assert_eq!(s.cards[2].price, dec!(1.00));
+    }
+
+    #[test]
+    fn rarity_from_the_name_suffix_when_the_code_is_unknown() {
+        let text = "Total 1,00 EUR\nYugioh Singles:\n1 Raigeki (V.4 - Ultra Rare) 012 EN NM RA03 XYZ 1,00 EUR\n";
+        let s = parse_shipment(text, "me").unwrap();
+        assert_eq!(s.cards[0].name, "Raigeki");
+        assert_eq!(s.cards[0].rarity_code.as_deref(), Some("XYZ"));
+        assert_eq!(s.cards[0].rarity, Some(Rarity::UltraRare));
+    }
+
+    #[test]
+    fn line_without_a_rarity_code() {
+        let text = "Total 1,00 EUR\nYugioh Singles:\n1 Raigeki 012 EN NM RA03 1,00 EUR\n";
+        let s = parse_shipment(text, "me").unwrap();
+        assert_eq!(s.cards.len(), 1);
+        assert_eq!(s.cards[0].rarity_code, None);
+        assert_eq!(s.cards[0].price, rust_decimal_macros::dec!(1.00));
     }
 
     #[test]

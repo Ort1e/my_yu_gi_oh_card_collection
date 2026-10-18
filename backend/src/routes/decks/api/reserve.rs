@@ -36,6 +36,7 @@ pub async fn reserve(
         proxy: Some("false".into()),
         sold: Some("false".into()),
         status: None,
+        rarity: None,
     };
     let in_version = version_card_ids(&mut conn, id).await?;
 

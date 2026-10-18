@@ -1,5 +1,20 @@
 # Spec: card rarity (backend)
 
+**Status: done (2026-10-18)**, by Claude this time. What differs from the
+plan below:
+- the Cardmarket codes are **not** ygoprodeck's for six rarities:
+  `SUR` Super Rare, `SER` Secret Rare, `QSCR` Quarter Century Secret Rare,
+  `PSCR` Platinum Secret Rare, `SLR` Starlight Rare, `PGR` Premium Gold
+  Rare (`Rarity::from_cardmarket_code`). Found by pairing each code with the
+  `(V.x - …)` suffix of the same lines, and with the set rarity stored in
+  `card_data` for the codes that never had one; 625 of the 626 cards of the
+  real shipments get a rarity (the last one has a stray `T`). `PIR` really
+  is Platinum Rare (ygoprodeck writes `(PIR)`);
+- the Duel Terminal parallel rares are four variants;
+- a shipment card keeps its raw `rarity_code` too, for the warning;
+- `split_cardmarket_name` returns `(&str, Option<Rarity>)`; 176 cards had
+  the suffix on 2026-10-18.
+
 Each physical card gets a rarity ("Ultra Rare"…). Decided on 2026-10-13:
 - stored as **text** in a new nullable column, **no CHECK constraint**; the known
   rarities are a list in `domain/` that the forms validate against;

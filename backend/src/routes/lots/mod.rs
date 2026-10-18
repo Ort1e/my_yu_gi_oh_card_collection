@@ -102,6 +102,7 @@ pub async fn list(
 pub struct UniteRow {
     card_id: i64,
     card_name: String,
+    rarity: Option<String>,
     price: Option<Money>,
 }
 
@@ -125,6 +126,10 @@ impl LotDetail {
     fn statuses(&self) -> [domain::card::CardStatus; 5] {
         domain::card::CardStatus::ALL
     }
+
+    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
+        domain::rarity::Rarity::ALL
+    }
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
@@ -146,7 +151,7 @@ pub async fn load_detail(
         .await?
         .or_404()?;
     let unites: Vec<UniteRow> = sqlx::query_as(
-        "SELECT unite.card_id, card.name AS card_name, unite.price
+        "SELECT unite.card_id, card.name AS card_name, card.rarity, unite.price
          FROM unite JOIN card ON card.id = unite.card_id
          WHERE unite.lot_id = ? ORDER BY unite.id",
     )

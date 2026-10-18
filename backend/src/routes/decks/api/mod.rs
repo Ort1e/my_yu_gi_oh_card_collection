@@ -44,6 +44,7 @@ pub struct ApiCard {
     en_name: Option<String>,
     code: Option<String>,
     status: Option<String>,
+    rarity: Option<String>,
     is_proxy: bool,
     /// Cheapest price paid for this card (Django's deck price used the min).
     price: Option<Money>,
@@ -61,6 +62,7 @@ struct CardRecord {
     en_name: Option<String>,
     code: Option<String>,
     last_known_status: Option<String>,
+    rarity: Option<String>,
     is_proxy: bool,
     card_data_id: Option<i64>,
     card_type: Option<String>,
@@ -89,7 +91,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
         .collect();
 
     let mut qb = QueryBuilder::new(
-        "SELECT card.id, card.name, card.en_name, card.code, card.last_known_status,
+        "SELECT card.id, card.name, card.en_name, card.code, card.last_known_status, card.rarity,
                 card.is_proxy, card.card_data_id, card_data.card_type, card_data.ygopro_id
          FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN ",
     );
@@ -140,6 +142,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                 en_name: r.en_name,
                 code: r.code,
                 status: r.last_known_status,
+                rarity: r.rarity,
                 is_proxy: r.is_proxy,
                 card_data_id: r.card_data_id,
                 card_type: r.card_type,

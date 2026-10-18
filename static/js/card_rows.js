@@ -135,7 +135,18 @@ function addCard(card) {
     field(row, 'status').value = statusSelect.value;
     field(row, 'quantity').value = 1;
 
+    // a code printed in one rarity only: that's the one
+    if (card.rarities?.length === 1) selectRarity(field(row, 'rarity'), card.rarities[0]);
+
     return row;
+}
+
+/** Select the option of `select` matching a ygoprodeck rarity name (any spelling). */
+function selectRarity(select, name) {
+    const key = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const option = [...select.options].find((o) => o.value && key(o.value) === key(name));
+
+    if (option) select.value = option.value;
 }
 
 /**

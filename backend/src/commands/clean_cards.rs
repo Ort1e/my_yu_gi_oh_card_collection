@@ -4,15 +4,20 @@
 //! 2. link every card to the card data of its name (fetched if unknown);
 //! 3. in each deck version, replace proxies by an owned copy of the same
 //!    card that isn't in that version yet, moving its category assignments;
-//! 4. delete the proxies that are left unused.
+//! 4. delete the proxies that are left unused;
+//! 5. move the rarity out of Cardmarket names (`Raigeki (V.4 - Ultra Rare)`
+//!    → name `Raigeki`, rarity `Ultra Rare`) for the cards without a rarity.
 //!
 //! Differences from Django: sold cards are never used as replacements,
 //! category assignments follow the replacement, proxies bought in a lot are
-//! kept, and a rename that would clash with another card data is skipped.
+//! kept, a rename that would clash with another card data is skipped, and
+//! step 5 is new (Django had no rarity).
 
 use std::collections::HashMap;
 
 use domain::card::{clean_card_name, normalize_card_name};
+use domain::rarity::split_cardmarket_name;
+use sqlx::SqliteConnection;
 
 use super::finish;
 use crate::store::card_data::get_or_fetch;
@@ -56,6 +61,7 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
 
     let replaced = replace_proxies(&mut tx).await?;
     let deleted = delete_orphan_proxies(&mut tx).await?;
+    let rarities = rarities_from_names(&mut tx).await?;
 
     finish(tx, dry_run).await?;
 
@@ -63,6 +69,7 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     println!("cards renamed or relinked: {}", plan.card_updates.len());
     println!("proxies replaced by owned copies: {replaced}");
     println!("unused proxies deleted: {deleted}");
+    println!("rarities taken from card names: {rarities}");
     if !plan.unresolved.is_empty() {
         let why = if dry_run {
             "not known locally"
@@ -217,6 +224,33 @@ async fn replace_proxies(conn: &mut sqlx::SqliteConnection) -> anyhow::Result<us
     Ok(replaced)
 }
 
+/// Set the rarity of the cards named like `Raigeki (V.4 - Ultra Rare)` and
+/// strip that suffix from their name. Returns how many cards changed.
+async fn rarities_from_names(conn: &mut SqliteConnection) -> anyhow::Result<usize> {
+    let cards: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, name FROM card WHERE rarity IS NULL AND name LIKE '%(V.%' ORDER BY id",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut changed = 0;
+    for (id, name) in &cards {
+        let (short, rarity) = split_cardmarket_name(name);
+        let Some(rarity) = rarity else {
+            println!("card {id}: {name:?} has a version suffix with an unknown rarity, skipped");
+            continue;
+        };
+        sqlx::query("UPDATE card SET name = ?, rarity = ? WHERE id = ?")
+            .bind(short)
+            .bind(rarity.label())
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        changed += 1;
+    }
+    Ok(changed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,6 +331,53 @@ mod tests {
         // a second run changes nothing
         clean(&t.state, false).await.unwrap();
         assert_eq!(t.scalar("SELECT count(*) FROM card").await, 5);
+    }
+
+    #[tokio::test]
+    async fn moves_the_rarity_out_of_cardmarket_names() {
+        let t = TestApp::new().await;
+        sqlx::query(
+            "INSERT INTO card (id, name, en_name, card_data_id, rarity, is_proxy) VALUES
+                 (1, 'Raigeki (V.4 - Ultra Rare)', 'raigeki', NULL, NULL, 0),
+                 (2, 'Kuriboh (V.6 - Collectors Rare)', 'kuriboh', 2, NULL, 0),
+                 (3, 'Odd (V.1 - Shiny)', 'odd', NULL, NULL, 0),
+                 (4, 'Kept (V.1 - Rare)', 'kept', NULL, 'Super Rare', 0);",
+        )
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+
+        clean(&t.state, true).await.unwrap();
+        assert_eq!(
+            t.text("SELECT name FROM card WHERE id = 1")
+                .await
+                .as_deref(),
+            Some("Raigeki (V.4 - Ultra Rare)"),
+            "dry run"
+        );
+
+        clean(&t.state, false).await.unwrap();
+        let card = |id: i64| {
+            sqlx::query_as::<_, (String, Option<String>)>(
+                "SELECT name, rarity FROM card WHERE id = ?",
+            )
+            .bind(id)
+            .fetch_one(&t.state.pool)
+        };
+        assert_eq!(
+            card(1).await.unwrap(),
+            ("Raigeki".into(), Some("Ultra Rare".into()))
+        );
+        assert_eq!(
+            card(2).await.unwrap(),
+            ("Kuriboh".into(), Some("Collector's Rare".into()))
+        );
+        assert_eq!(card(3).await.unwrap(), ("Odd (V.1 - Shiny)".into(), None));
+        assert_eq!(
+            card(4).await.unwrap(),
+            ("Kept (V.1 - Rare)".into(), Some("Super Rare".into())),
+            "a card with a rarity is left alone"
+        );
     }
 
     #[tokio::test]

@@ -43,7 +43,7 @@ Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
   - `tests/` — `mod.rs`: `TestApp` (handler tests on a temp migrated DB, no network) + shared fixtures `LOT`, `json`, `deck_fixture`; one file per area: `pages`, `lots`, `decks`, `budget`, `deck_api`, `edit_forms`, `auth`.
   - `templates/` — same folders as `routes/` (`lots/list.html`, `lots/detail.html`, `lots/add.html`, `lots/edit.html`, …), `partials/` for the included pieces, and at the root `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), `dashboard.html`, `login.html`. CSS from Django in `static/css/`.
   - **Don't pile files in one folder**: new code and templates go in the folder of their area (or a new one), never loose at the root of `src/`, `routes/` or `templates/`.
-- `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
+- `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `rarity` (rarity list, Cardmarket codes, `(V.x - …)` name suffix), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
 - `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, embedded by both binaries (`sqlx::migrate!("../migrations")`).
 - `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte` with their own `<style>`, `api.js` = HTTP client, `deck.js` = pure helpers).
@@ -62,7 +62,7 @@ cargo test -p domain --test real_shipments -- --ignored --nocapture   # parser v
 
 cargo run -p backend                          # web server, http://127.0.0.1:3000; runs migrations on startup
 cargo run -p backend -- scrap-ban-list        # import new/current Konami ban lists (--all, --dry-run)
-cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies (--dry-run)
+cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies, rarity from (V.x - …) names (--dry-run)
 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)
 
@@ -91,6 +91,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (uns
 - Dates are ISO `YYYY-MM-DD` TEXT. Booleans are INTEGER 0/1.
 - Django M2M → join tables `deck_version_{main,extra,side}_deck` (see `cards::Zone`), `card_category_condition`.
 - Django MTI `CardConditionalCategory(CardCategory)` → **flattened** into `card_category` with nullable `condition_description`, `categorie_true_id`, `categorie_false_id`. "Is conditional" = `condition_description IS NOT NULL`.
+- `card.rarity` (0004): the label of `domain::rarity::Rarity` (`Ultra Rare`), NULL when unknown; no CHECK, the forms validate against `Rarity::ALL`.
 - Domain names are kept from Django (some French): `unite` (one card in a lot), `apport` (one-off budget contribution), `categorie_true/false`.
 - `0002` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
 - `sqlx::migrate!` checksums applied migrations. Cutover is done: **never edit an existing migration**, only add new numbered files (`0004_…sql`). They run on `data/app.db` at the next startup.

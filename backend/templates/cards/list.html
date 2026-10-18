@@ -32,6 +32,14 @@
         {% endfor %}
       </select>
 
+      <label for="rarity">Rarity:</label>
+      <select name="rarity" id="rarity">
+        <option value="" {% if self.selected(filter.rarity, "") %}selected{% endif %}>All</option>
+        {% for rarity in self.rarities() %}
+        <option value="{{ rarity.label() }}" {% if self.selected(filter.rarity, rarity.label()) %}selected{% endif %}>{{ rarity.label() }}</option>
+        {% endfor %}
+      </select>
+
       <label for="card_type">Card Type:</label>
       <select name="card_type" id="card_type">
         <option value="" {% if self.selected(filter.card_type, "") %}selected{% endif %}>All types</option>

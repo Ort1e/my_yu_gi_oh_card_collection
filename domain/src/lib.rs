@@ -10,4 +10,5 @@ pub mod card_set;
 pub mod cardmarket;
 pub mod lot;
 pub mod monte_carlo;
+pub mod rarity;
 pub mod ydke;

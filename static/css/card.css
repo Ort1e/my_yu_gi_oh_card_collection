@@ -105,6 +105,26 @@
 .status-badge.g  { background-color: #ffc107; color: #000; }   /* Good */
 .status-badge.p  { background-color: #f44336; color: #fff; }   /* Poor */
 
+/* Rarity badge: one look for every rarity. A link to how to recognise it
+   (<a class="rarity-badge" href="/rarities?rarity=…">) except in the card
+   lists, where the whole card is already a link (<span class="rarity-badge">). */
+.rarity-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+    text-decoration: none;
+}
+
+a.rarity-badge:hover {
+    text-decoration: underline;
+}
+
 /* ------------------------------------------------------------------ */
 /* Card pictures                                                        */
 /* ------------------------------------------------------------------ */
@@ -168,7 +188,9 @@
     color: var(--text-light);
 }
 
-/* The box opened from a link (/rarities#ultra-rare) is outlined. */
-.rarity:target {
+/* The box opened from a link (/rarities#ultra-rare, or a rarity badge:
+   /rarities?rarity=…) is outlined. */
+.rarity:target,
+.rarity.highlighted {
     outline: 3px solid var(--primary);
 }

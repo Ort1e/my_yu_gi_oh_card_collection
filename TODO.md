@@ -21,16 +21,15 @@
     - [ ] backend endpoint `GET /api/sets/:code`, spec in
           `docs/specs/set-lookup.md` (owner): until then the panel says the
           set can't be loaded.
-- [ ] Manage the rarity of the cards (Common, Super, Ultra, Secret, Quarter
-      Century…). Today it only ends up in the card name (`Raigeki (V.4 - Ultra
-      Rare)`, from Cardmarket). Decided: a nullable text column + a list in
-      `domain/`, and the suffix stripped from those names.
-  - [ ] backend (owner): column, rarity list, forms, shipment import, filling
-        the 172 existing cards; spec in `docs/specs/rarity.md`;
-  - [x] recognition guide: `/rarities` page, and the rarities of a code with
-        several, listed in the quick-add panel (`static/js/rarities.js`);
-  - [ ] frontend once the column exists: rarity field in the card rows (quick
-        add: offer only the code's rarities), badges, `/cards` filter.
+- [x] Manage the rarity of the cards (Common, Super, Ultra, Secret, Quarter
+      Century…): column `card.rarity` (migration 0004), list in
+      `domain/src/rarity.rs`, read from the shipments (Cardmarket codes
+      checked on the real PDFs), filled from the `(V.x - …)` names by
+      `clean-cards`, field in the forms, badges, `/cards` filter. Spec and
+      notes: `docs/specs/rarity.md`.
+  - [ ] once `GET /api/sets/:code` exists: in the quick-add panel, offer
+        only the code's rarities (today a code with a single rarity fills it
+        in, several are listed under the panel).
 - [ ] Link decks together. Today each deck version uses the whole
       collection, so the same card can be in several versions at once. Goal:
       build several decks at the same time from one shared collection,

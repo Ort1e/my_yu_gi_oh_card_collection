@@ -34,6 +34,16 @@
         {% endfor %}
       </select>
     </p>
+    <p>
+      <label for="rarity">Rarity:</label>
+      <select name="rarity" id="rarity">
+        <option value="">---------</option>
+        {% for rarity in self.rarities() %}
+        <option value="{{ rarity.label() }}" {% if card.rarity == rarity.label() %}selected{% endif %}>{{ rarity.label() }}</option>
+        {% endfor %}
+      </select>
+      <small><a href="/rarities" target="_blank">How to recognise a rarity</a></small>
+    </p>
     <label class="switch"><input type="checkbox" name="is_proxy" {% if card.is_proxy %}checked{% endif %}> Proxy card</label>
   </fieldset>
 

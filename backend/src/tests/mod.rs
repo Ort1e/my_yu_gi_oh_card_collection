@@ -10,6 +10,7 @@ mod decks;
 mod edit_forms;
 mod lots;
 mod pages;
+mod rarity;
 
 use std::path::PathBuf;
 

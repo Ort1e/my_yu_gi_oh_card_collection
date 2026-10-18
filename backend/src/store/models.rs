@@ -11,13 +11,14 @@ pub struct CardRow {
     pub name: String,
     pub code: Option<String>,
     pub last_known_status: Option<String>,
+    pub rarity: Option<String>,
     pub is_proxy: bool,
     pub card_data_id: Option<i64>,
 }
 
 impl CardRow {
-    pub const COLUMNS: &'static str =
-        "card.id, card.name, card.code, card.last_known_status, card.is_proxy, card.card_data_id";
+    pub const COLUMNS: &'static str = "card.id, card.name, card.code, card.last_known_status, \
+         card.rarity, card.is_proxy, card.card_data_id";
 
     pub fn status(&self) -> Option<CardStatus> {
         self.last_known_status

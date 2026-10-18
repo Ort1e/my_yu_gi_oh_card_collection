@@ -20,5 +20,16 @@ for (const rarity of RARITIES) {
 document.querySelector('#rarity-undescribed small').textContent =
     `Not described yet: ${UNDESCRIBED.join(', ')}.`;
 
-// opened from a link like /rarities#ultra-rare: the box exists only now
-document.getElementById(location.hash.slice(1))?.scrollIntoView();
+// Opened from a link like /rarities#ultra-rare, or from a rarity badge,
+// /rarities?rarity=Super%20Short%20Print (any spelling or alias): the box
+// exists only now.
+const wanted = new URLSearchParams(location.search).get('rarity');
+const target = wanted ? findRarity(wanted) : null;
+const box = target
+    ? document.getElementById(rarityAnchor(target.name))
+    : document.getElementById(location.hash.slice(1));
+
+if (box) {
+    box.classList.toggle('highlighted', Boolean(target));
+    box.scrollIntoView();
+}

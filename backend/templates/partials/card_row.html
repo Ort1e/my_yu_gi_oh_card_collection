@@ -29,6 +29,15 @@
       </select>
     </div>
     <div>
+      <label for="cards-{{ i }}-rarity">Rarity:</label>
+      <select name="cards-{{ i }}-rarity" id="cards-{{ i }}-rarity">
+        <option value="">---------</option>
+        {% for rarity in self.rarities() %}
+        <option value="{{ rarity.label() }}" {% if row.rarity == rarity.label() %}selected{% endif %}>{{ rarity.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
       <label for="cards-{{ i }}-price">Price:</label>
       <input type="text" inputmode="decimal" name="cards-{{ i }}-price" id="cards-{{ i }}-price" value="{{ row.price }}">
     </div>

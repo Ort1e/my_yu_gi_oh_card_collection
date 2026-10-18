@@ -133,6 +133,10 @@ impl AddLotPage {
         domain::card::CardStatus::ALL
     }
 
+    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
+        domain::rarity::Rarity::ALL
+    }
+
     fn lot_type_is(&self, code: &str) -> bool {
         self.lot.lot_type == code
     }
@@ -239,18 +243,28 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
             .status()
             .map(|s| s.code().to_string())
             .unwrap_or_default();
+        if card.rarity.is_none() {
+            if let Some(code) = &card.rarity_code {
+                // a code, not personal data
+                tracing::warn!(code, "unknown Cardmarket rarity code");
+            }
+        }
         let row = CardRowValues {
             name: card.name.clone(),
             en_name: card.name,
             code: card.code,
             status,
+            rarity: card
+                .rarity
+                .map(|r| r.label().to_string())
+                .unwrap_or_default(),
             is_proxy: false,
             price: card.price.to_string(),
             quantity: String::new(),
         };
         match rows.iter_mut().find(|(r, _)| {
-            (&r.name, &r.code, &r.status, &r.price)
-                == (&row.name, &row.code, &row.status, &row.price)
+            (&r.name, &r.code, &r.status, &r.rarity, &r.price)
+                == (&row.name, &row.code, &row.status, &row.rarity, &row.price)
         }) {
             Some((_, n)) => *n += 1,
             None => rows.push((row, 1)),
