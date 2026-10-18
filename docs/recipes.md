@@ -109,7 +109,7 @@ Example: a `/tournaments` list.
 
 4. **Link** it from `templates/base.html` (the navigation) if needed.
 
-5. Add the URL to the `pages_render` test in `tests.rs`.
+5. Add the URL to the `pages_render` test in `tests/pages.rs`.
 
 A row type needed by several pages goes in `models.rs`. A value the template
 must compute is best a method on the struct (`fn full_name(&self) -> String`)
@@ -228,13 +228,15 @@ goes in `domain/`:
 3. **Client** in `frontend/src/api.js`: one line in `deckApi(id)`, e.g.
    `myThing: (x) => request('POST', \`${base}/my-thing\`, { x }),`.
 4. **UI** in a component in `src/lib/` (with its CSS in its `<style>`
-   block), wired in `App.svelte`. Pure helpers go in `src/deck.js`. Style: 4-space indent, blank lines between logical blocks.
-5. Test the endpoint in `tests.rs` (`t.json(…)`, see
+   block), wired in `App.svelte`. Pure helpers go in `src/deck.js`.
+   Style: 4-space indent, blank lines between logical blocks.
+5. Test the endpoint in `tests/deck_api.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
 
 ## Write a handler test
 
-In `backend/src/tests.rs`. `TestApp::new()` gives a fresh migrated DB with
+In `backend/src/tests/`, in the file of its area (`TestApp` and the shared
+fixtures are in `tests/mod.rs`). `TestApp::new()` gives a fresh migrated DB with
 two `card_data` rows (dark magician, kuriboh), so no test calls
 ygoprodeck:
 

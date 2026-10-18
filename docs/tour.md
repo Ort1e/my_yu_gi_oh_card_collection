@@ -12,7 +12,7 @@ Suggested reading order, about an hour with the code open next to it:
 4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
 6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/deck_api/`
-7. [Tests](#tests): `backend/src/tests.rs`
+7. [Tests](#tests): `backend/src/tests/`
 
 ## The big picture
 
@@ -287,7 +287,7 @@ transaction that is rolled back.
 ## Tests
 
 - `domain/`: plain unit tests on values.
-- `backend/src/tests.rs`: `TestApp` creates a migrated SQLite DB in a
+- `backend/src/tests/` (one file per area, helpers in `mod.rs`): `TestApp` creates a migrated SQLite DB in a
   temporary directory (with two fake `card_data` rows, so nothing calls
   ygoprodeck) and sends real HTTP requests to `app()`. Each test reads like
   a scenario: POST a form, check the redirect, check the rows with
