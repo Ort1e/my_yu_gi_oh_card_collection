@@ -40,3 +40,5 @@ html-escape = "0.2"
 hmac = "0.12"
 sha2 = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+# advent calendar photos: EXIF orientation, resize, re-encode without metadata
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }

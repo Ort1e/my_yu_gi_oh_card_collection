@@ -129,6 +129,8 @@ pub struct LotDetail {
     /// least one row).
     errors: Vec<String>,
     rows: Vec<CardRowValues>,
+    /// The advent calendar whose lot this is, if any.
+    calendar_year: Option<i64>,
 }
 
 impl LotDetail {
@@ -176,11 +178,17 @@ pub async fn load_detail(
     .await?;
     let total_price = Money(unites.iter().filter_map(|u| u.price).map(|p| p.0).sum());
 
+    let calendar_year = sqlx::query_scalar("SELECT year FROM advent_calendar WHERE lot_id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+
     Ok(LotDetail {
         lot,
         unites,
         total_price,
         errors,
         rows,
+        calendar_year,
     })
 }

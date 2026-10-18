@@ -234,6 +234,25 @@ goes in `domain/`:
 5. Test the endpoint in `tests/deck_api.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
 
+## Add next year's advent calendar
+
+All in the app, behind the login:
+
+1. **Advent** in the menu (the list of calendars) → **Add calendar** → the
+   year → **Create the calendar**: its edit page opens.
+2. **Create its lot** (top of the edit page): a gift lot (0 €, December 1st,
+   seller "Advent calendar") linked to the calendar. Its page opens: add the
+   cards there (the quick add takes a set code and numbers). Cards bought
+   in other lots (Cardmarket orders) don't need to be in it.
+3. Back on the edit page (the lot page links to it), for each day: its card
+   (the lot's cards not used yet are suggested in the field; else its code,
+   `MAMO-FR023`, or `#id`, the number in the card's page address) and its
+   photo. Save. Days can be filled one at a time, through December.
+4. A photo still sideways (some phones don't record the orientation): ↺ ↻.
+
+Then commit the data (stop the server first): `app.db` and the photos in
+`data/media/advent_calendar_photos/<year>/` (`media/.gitignore` keeps them).
+
 ## Write a handler test
 
 In `backend/src/tests/`, in the file of its area (`TestApp` and the shared

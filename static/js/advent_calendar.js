@@ -1,6 +1,6 @@
 // The advent calendar page (templates/advent/calendar.html): doors that open
-// on a click (remembered in this browser), "open / close every door", the
-// photo shown large, and the year switcher.
+// on a click (remembered in this browser), "open / close every door", and the
+// photo shown large.
 
 const calendar = document.getElementById('advent');
 const year = calendar.dataset.year;
@@ -67,10 +67,4 @@ calendar.addEventListener('click', (e) => {
 // a click on the dark backdrop closes it too
 lightbox.addEventListener('click', (e) => {
     if (e.target === lightbox) lightbox.close();
-});
-
-// ---------- year ----------
-
-document.getElementById('advent-year')?.addEventListener('change', (e) => {
-    location.href = `/advent-calendar/${e.target.value}`;
 });

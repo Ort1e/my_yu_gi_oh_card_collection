@@ -12,11 +12,6 @@
     margin-bottom: 1.5rem;
 }
 
-.advent-toolbar select {
-    width: auto;
-    margin: 0 0 0 0.4rem;
-}
-
 .advent-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -186,4 +181,84 @@
     .door-front {
         transition: none;
     }
+}
+
+/* ---------- the edit page (templates/advent/edit.html) ---------- */
+
+.advent-help {
+    font-size: 0.9rem;
+}
+
+.advent-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.advent-edit-day {
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    background: var(--secondary);
+    color: var(--text-light);
+}
+
+.advent-edit-day h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+}
+
+.advent-edit-photo {
+    display: block;
+    width: 100%;
+    max-height: 180px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.advent-edit-day .button-row {
+    margin: 0.4rem 0;
+}
+
+.advent-edit-day .button-row form,
+.advent-edit-day > form {
+    margin: 0;
+}
+
+.advent-edit-card {
+    margin: 0.4rem 0;
+}
+
+.advent-edit-card a {
+    color: #fff;
+}
+
+.advent-edit-form input {
+    max-width: none;
+}
+
+/* "Empty this day", under "Save": a separate, smaller action */
+.advent-edit-day > form.inline {
+    display: block;
+    margin-top: 0.6rem;
+}
+
+/* the calendar's lot, at the top of the edit page */
+.advent-lot {
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.advent-lot p,
+.advent-lot form {
+    margin: 0;
+}
+
+.advent-lot form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
 }

@@ -1,9 +1,10 @@
 //! Data shared by the routes and the commands: the SQLite pool and `Money`,
-//! row types, card-row writes and shared SQL, ygoprodeck card data, and the
-//! shipment PDF files.
+//! row types, card-row writes and shared SQL, ygoprodeck card data, the
+//! shipment PDF files and uploaded photos.
 
 pub mod card_data;
 pub mod cards;
 pub mod db;
 pub mod models;
+pub mod photos;
 pub mod shipment_files;

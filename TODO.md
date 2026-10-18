@@ -21,6 +21,7 @@
 - [x] Names in the language of their code (ygoprodeck, remembered in
       `card_translation`); English name shown under the French one.
 - [x] Advent calendar page (`/advent-calendar`): the 2025 handmade
-      calendar, 24 doors with the photo and the card of each day.
+      calendar, 24 doors with the photo and the card of each day; new
+      calendars created and filled in the app (recipe in docs/recipes.md).
 - [x] Cleanups run by themselves: proxies, card data links and names after
       new cards, unused proxies when saving zones, a daily `clean-cards`.

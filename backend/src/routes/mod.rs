@@ -59,14 +59,32 @@ pub fn files_router() -> Router<AppState> {
 /// like the write routes. Their files too (see `main::app`).
 pub fn private_router() -> Router<AppState> {
     Router::new()
-        .route("/advent-calendar", get(advent::latest))
+        .route("/advent-calendar", get(advent::list))
         .route("/advent-calendar/:year", get(advent::calendar))
+        .route("/advent-calendar/:year/edit", get(advent::form::edit_page))
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
 /// here in one place (see CLAUDE.md, "Auth").
 pub fn write_router() -> Router<AppState> {
     Router::new()
+        .route(
+            "/advent-calendar/add",
+            get(advent::form::add_page).post(advent::form::create),
+        )
+        .route(
+            "/advent-calendar/:year/days/:day",
+            post(advent::form::save_day).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
+        )
+        .route("/advent-calendar/:year/lot", post(advent::form::create_lot))
+        .route(
+            "/advent-calendar/:year/days/:day/rotate",
+            post(advent::form::rotate),
+        )
+        .route(
+            "/advent-calendar/:year/days/:day/delete",
+            post(advent::form::remove_day),
+        )
         .route("/lots/add", get(lots::form::page).post(lots::form::create))
         .route(
             "/lots/add/shipment",

@@ -141,6 +141,16 @@ a.rarity-badge:hover {
     height: auto;
 }
 
+/* A photo in place of a card picture (the advent calendars list). */
+.card-photo {
+    display: block;
+    width: 160px;
+    height: 110px;
+    flex-shrink: 0;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
 /* The big picture shown when the mouse is over a small one (card list). */
 .image-wrapper {
     position: relative;

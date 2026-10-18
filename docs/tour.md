@@ -282,6 +282,17 @@ had no page for them. The photos are in `media/advent_calendar_photos/<year>/`
 `originals/`). They show handwritten notes, so the page and the photos are
 behind the login (`routes::private_router`, `private_files` in `main.rs`).
 
+Calendars are listed at `/advent-calendar`, added at `/advent-calendar/add`
+like the other lists, and filled on their edit page (`routes/advent/form.rs`): for each day, a card of the collection (by code
+or `#id`) and a photo. `store/photos.rs` makes the copy shown on the page
+(upright from the EXIF orientation, 1600 px, re-encoded without metadata)
+and keeps the original in `originals/`; ↺ ↻ turn a photo that came out
+sideways. Each save writes new file names, so browsers never show an old
+photo, and deletes the previous files. A calendar can have its own lot
+(`advent_calendar.lot_id`, migration 0006, "Create its lot" on the edit
+page): its cards are added on the usual lot page, then suggested in the
+day fields; the lot page links back to the calendar.
+
 ## Login
 
 `web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the

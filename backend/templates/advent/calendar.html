@@ -12,13 +12,8 @@
   <h1>Advent calendar {{ year }}</h1>
 
   <div class="advent-toolbar">
-    {% if years.len() > 1 %}
-    <label>Year
-      <select id="advent-year">
-        {% for y in years %}<option value="{{ y }}" {% if self.is_year(y) %}selected{% endif %}>{{ y }}</option>{% endfor %}
-      </select>
-    </label>
-    {% endif %}
+    <a href="/advent-calendar/{{ year }}/edit" class="btn">Edit this calendar</a>
+    {% match lot_id %}{% when Some with (lot) %}<a href="/lots/{{ lot }}" class="btn btn-secondary">Its lot</a>{% when None %}{% endmatch %}
     <button type="button" id="advent-open-all" class="btn-secondary">Open every door</button>
     <button type="button" id="advent-close-all" class="btn-secondary">Close them again</button>
     <small>{{ self.card_count() }} cards behind the doors. Click a door to open it, a photo to see it large.</small>

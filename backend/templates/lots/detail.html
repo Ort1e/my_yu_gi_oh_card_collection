@@ -24,6 +24,9 @@
       {% endmatch %}
     </div>
     <div><strong>Cards in Lot:</strong> {{ lot.card_count }}</div>
+    {% match calendar_year %}{% when Some with (year) %}
+    <div><strong>Advent calendar:</strong> <a href="/advent-calendar/{{ year }}">{{ year }}</a> (<a href="/advent-calendar/{{ year }}/edit">fill its days</a>)</div>
+    {% when None %}{% endmatch %}
     {% match lot.shipment_file %}{% when Some with (file) %}
     <div><a href="/media/{{ file }}">Shipment file</a></div>
     {% when None %}{% endmatch %}

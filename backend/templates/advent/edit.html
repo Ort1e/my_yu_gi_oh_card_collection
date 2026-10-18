@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Edit the advent calendar {{ year }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/advent.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container advent">
+  <h1>Edit the advent calendar {{ year }}</h1>
+  <p class="back-link"><a href="/advent-calendar/{{ year }}">← Back to the calendar</a> · <a href="/advent-calendar">All calendars</a></p>
+
+  {% include "partials/form_errors.html" %}
+
+  <div class="advent-lot">
+    {% match lot_id %}
+    {% when Some with (lot) %}
+      <p>
+        <strong>Its lot:</strong> <a href="/lots/{{ lot }}">lot {{ lot }}</a>: add the calendar's cards there
+        (the quick add takes a set code and numbers).
+        {% if lot_cards.is_empty() %}Every card of the lot is behind a door.{% else %}Its {{ lot_cards.len() }} cards not behind a door yet are suggested in the card fields.{% endif %}
+      </p>
+    {% when None %}
+      <form method="post" action="/advent-calendar/{{ year }}/lot" class="inline">
+        <span>No dedicated lot for this calendar.</span>
+        <button type="submit" class="btn-secondary">Create its lot</button>
+        <small>A gift lot (0 €, December 1st): add the cards there, they are then suggested for the days.</small>
+      </form>
+    {% endmatch %}
+  </div>
+
+  <datalist id="lot-cards">
+    {% for card in lot_cards %}<option value="#{{ card.id }}" label="{{ card.name }} {{ card.code_text() }}"></option>{% endfor %}
+  </datalist>
+
+  <p class="advent-help">
+    For each day: its card, by its code as printed (<code>MAMO-FR023</code>), or <code>#id</code>
+    to choose one copy (the number in the card's page address); and its photo (JPEG, PNG or WebP).
+    The card must be in the collection: <a href="/lots/add">add it to a lot</a> first if needed.
+    Photos are turned upright, resized and cleaned of their metadata; the original is kept.
+    A photo still sideways: turn it with ↺ ↻.
+  </p>
+
+  <div class="advent-edit-grid">
+    {% for door in doors %}
+    <section class="advent-edit-day" id="day-{{ door.day }}">
+      <h2>Day {{ door.day }}</h2>
+      {% match door.entry %}
+      {% when Some with (e) %}
+        {% match e.photo %}{% when Some with (photo) %}
+        <img src="/media/{{ photo }}" alt="Day {{ door.day }}" class="advent-edit-photo" loading="lazy">
+        <div class="button-row">
+          <form method="post" action="/advent-calendar/{{ year }}/days/{{ door.day }}/rotate" class="inline">
+            <input type="hidden" name="direction" value="left">
+            <button type="submit" class="btn-small btn-secondary" title="Turn a quarter turn left">↺</button>
+          </form>
+          <form method="post" action="/advent-calendar/{{ year }}/days/{{ door.day }}/rotate" class="inline">
+            <input type="hidden" name="direction" value="right">
+            <button type="submit" class="btn-small btn-secondary" title="Turn a quarter turn right">↻</button>
+          </form>
+        </div>
+        {% when None %}<p class="advent-help">No photo yet.</p>{% endmatch %}
+        <p class="advent-edit-card">
+          <a href="/cards/{{ e.card_id }}">{{ e.name }}</a>
+          <small>#{{ e.card_id }} {{ e.code.as_deref().unwrap_or("") }}</small>
+        </p>
+      {% when None %}
+        <p class="advent-help">Empty.</p>
+      {% endmatch %}
+
+      <form method="post" action="/advent-calendar/{{ year }}/days/{{ door.day }}" enctype="multipart/form-data" class="plain advent-edit-form">
+        <label for="card-{{ door.day }}">Card (code or #id)</label>
+        <input type="text" id="card-{{ door.day }}" name="card" list="lot-cards" placeholder="{% if door.entry.is_some() %}keep the current card{% else %}e.g. MAMO-FR023{% endif %}" autocomplete="off">
+        <label for="photo-{{ door.day }}">Photo</label>
+        <input type="file" id="photo-{{ door.day }}" name="photo" accept="image/jpeg,image/png,image/webp">
+        <button type="submit">Save day {{ door.day }}</button>
+      </form>
+
+      {% if door.entry.is_some() %}
+      <form method="post" action="/advent-calendar/{{ year }}/days/{{ door.day }}/delete" class="inline" data-confirm="Empty day {{ door.day }}? Its photo is deleted (the card stays in the collection).">
+        <button type="submit" class="btn-small btn-danger">Empty this day</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/advent_edit.js"></script>
+{% endblock %}
