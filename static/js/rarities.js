@@ -1,5 +1,5 @@
 // How to recognise each Yu-Gi-Oh! rarity on a physical card. Used by the
-// /rarities page (templates/rarities.html) and the quick-add panel
+// /rarities page (templates/reference/rarities.html) and the quick-add panel
 // (static/js/card_rows.js).
 //
 // Compiled in October 2026 from TCGplayer's "Understanding Yu-Gi-Oh!

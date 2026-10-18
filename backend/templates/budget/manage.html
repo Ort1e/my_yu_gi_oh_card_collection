@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Budget{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <h1>Manage Budget</h1>
+  <p class="back-link"><a href="/budget">← Budget overview</a></p>
+
+  {% include "partials/form_errors.html" %}
+
+  <form method="post" action="/budget/manage/budget">
+    <fieldset>
+      <legend>Set the monthly budget</legend>
+      <p><small>The amount applies from this month on, until a later month sets another one.</small></p>
+      <div class="field-row">
+        <div>
+          <label for="month">Month:</label>
+          <input type="month" name="month" id="month" required>
+        </div>
+        <div>
+          <label for="amount">Amount (€):</label>
+          <input type="text" inputmode="decimal" name="amount" id="amount" required>
+        </div>
+      </div>
+    </fieldset>
+    <input type="submit" value="Save the budget">
+  </form>
+
+  {% if !budgets.is_empty() %}
+  <form method="post" action="/budget/manage/apports">
+    <fieldset>
+      <legend>Add an apport (one-off contribution)</legend>
+      <div class="field-row">
+        <div>
+          <label for="budget_id">Budget month:</label>
+          <select name="budget_id" id="budget_id" required>
+            {% for budget in budgets %}
+            <option value="{{ budget.id }}">{{ budget.month_label() }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="apport_date">Date:</label>
+          <input type="date" name="date" id="apport_date" required>
+        </div>
+        <div>
+          <label for="apport_amount">Amount (€):</label>
+          <input type="text" inputmode="decimal" name="amount" id="apport_amount" required>
+        </div>
+      </div>
+      <label for="apport_description">Description:</label>
+      <input type="text" name="description" id="apport_description" maxlength="255">
+    </fieldset>
+    <input type="submit" value="Add the apport">
+  </form>
+  {% endif %}
+
+  <h2>Budgets</h2>
+  <table class="numbers">
+    <thead>
+      <tr><th>Month</th><th>Amount (€)</th><th>Apports</th></tr>
+    </thead>
+    <tbody>
+      {% for budget in budgets %}
+      <tr>
+        <td>{{ budget.month_label() }}</td>
+        <td>{{ budget.amount }}</td>
+        <td class="apports">
+          {% for apport in self.apports_of(budget.id) %}
+          <div>
+            {{ apport.date }}: {{ apport.amount }} € {{ apport.description }}
+            <form method="post" action="/budget/manage/apports/{{ apport.id }}/delete" class="inline">
+              <button type="submit" class="btn-small btn-danger" title="Delete this apport" onclick="return confirm('Delete this apport?')">✕</button>
+            </form>
+          </div>
+          {% endfor %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">No budget yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

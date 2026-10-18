@@ -66,14 +66,15 @@ empty DB, and the Django dump is older than your Rust-era changes.
 
 Example: a `/tournaments` list.
 
-1. **Handler + template struct**: new file `backend/src/routes/tournaments.rs`
-   (copy `sellers.rs` as a starting point):
+1. **Handler + template struct**: new folder `backend/src/routes/tournaments/`
+   with a `mod.rs` (copy `sellers/mod.rs` as a starting point; a new area
+   gets its own folder, never a loose file in `routes/`):
 
    ```rust
    use askama::Template;
    use axum::extract::State;
 
-   use crate::error::AppResult;
+   use crate::web::error::AppResult;
    use crate::AppState;
 
    #[derive(Debug, sqlx::FromRow)]
@@ -83,7 +84,7 @@ Example: a `/tournaments` list.
    }
 
    #[derive(Template)]
-   #[template(path = "tournaments_list.html")]
+   #[template(path = "tournaments/list.html")]
    pub struct TournamentsList {
        tournaments: Vec<TournamentRow>,
    }
@@ -100,7 +101,7 @@ Example: a `/tournaments` list.
    expects but the SQL doesn't return is an error at request time (the
    compiler doesn't check SQL).
 
-2. **Template**: `backend/templates/tournaments_list.html`, extending
+2. **Template**: `backend/templates/tournaments/list.html`, extending
    `base.html` (or `list_base.html` for a paginated list). Every field of
    the struct is a variable; `{% for t in tournaments %}…{% endfor %}`.
 
@@ -111,15 +112,15 @@ Example: a `/tournaments` list.
 
 5. Add the URL to the `pages_render` test in `tests/pages.rs`.
 
-A row type needed by several pages goes in `models.rs`. A value the template
+A row type needed by several pages goes in `store/models.rs`. A value the template
 must compute is best a method on the struct (`fn full_name(&self) -> String`)
 called as `{{ row.full_name() }}`: askama is awkward with method arguments
 (see CLAUDE.md, "Askama quirks").
 
 ## Add a form that changes data
 
-Copy `seller_form.rs` (one entity) or `deck_form.rs` (create + edit +
-delete). The shape:
+Copy `sellers/form.rs` (one entity) or `decks/form.rs` (create + edit +
+delete), as `form.rs` in the folder of its area. The shape:
 
 ```rust
 pub async fn update(
@@ -154,7 +155,7 @@ Then:
 
 - register the route in **`write_router()`** (not `router()`), which puts it
   behind the login;
-- render errors in the template with `{% include "_form_errors.html" %}`;
+- render errors in the template with `{% include "partials/form_errors.html" %}`;
 - if the form creates cards, use `cards::insert_lot_cards` and then
   `card_data::spawn_link_cards(state, card_ids)` after the commit;
 - if it needs ygoprodeck (`card_data::get_or_fetch`), call it **before**
@@ -210,15 +211,15 @@ goes in `domain/`:
    ```
 
 3. call it from the handler, which loads the rows, calls the function and
-   renders the result. `routes/budget.rs` + `domain/src/budget.rs` is the
+   renders the result. `routes/budget/mod.rs` + `domain/src/budget.rs` is the
    model to follow.
 
 `cargo test -p domain` runs these in a second.
 
 ## Add a deck builder feature
 
-1. **Endpoint** in `routes/deck_api/` (the file of its group, or a new one
-   declared and re-exported in `deck_api/mod.rs`): input as a `#[derive(Deserialize)]`
+1. **Endpoint** in `routes/decks/api/` (the file of its group, or a new one
+   declared and re-exported in `api/mod.rs`): input as a `#[derive(Deserialize)]`
    struct taken with `Json(body): Json<MyInput>`, output as
    `Json<MyOutput>` with `#[derive(Serialize)]`. Bad input →
    `return bad_request("why")` (the app shows the message). Money

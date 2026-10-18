@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ card.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="card-list">
+  <div class="card with-image">
+    {% match card.card_data_id %}{% when Some with (data_id) %}
+    <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-image" width="120px"/>
+    {% when None %}{% endmatch %}
+    <div class="card-content">
+      <div class="card-title">{{ card.name }}</div>
+      <div class="card-meta-line">
+        <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}</div>
+        <div class="card-subtitle">
+          Status:
+          {% match card.status() %}
+          {% when Some with (status) %}
+            <span class="status-badge {{ status.code()|lower }}">{{ status.label() }}</span>
+          {% when None %}
+            Unknown
+          {% endmatch %}
+        </div>
+        <div class="card-subtitle">Proxy: {{ card.is_proxy|yes_no }}</div>
+        {% match price %}{% when Some with (price) %}
+        <div class="card-subtitle">Price: {{ price }} €</div>
+        {% when None %}{% endmatch %}
+      </div>
+      <div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>
+    </div>
+  </div>
+
+  {% match lot %}{% when Some with (lot) %}
+  <h2 class="card-title">Lot Details : </h2>
+  {% include "partials/lot_item.html" %}
+  {% when None %}{% endmatch %}
+
+  <h2 class="card-title">Deck Versions : </h2>
+  {% for version in versions %}
+    {% include "partials/deck_version_item.html" %}
+  {% else %}
+    <p>No deck versions include this card.</p>
+  {% endfor %}
+</div>
+{% endblock %}

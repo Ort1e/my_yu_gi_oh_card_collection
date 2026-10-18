@@ -88,9 +88,9 @@ Names the frontend will use, so they must match:
 | Where | Name |
 |---|---|
 | card row of the lot forms | field `cards-<i>-rarity` → `CardRowValues.rarity`, `NewCards.rarity: Option<Rarity>` (validated like `status`), written by `cards::insert_lot_cards` |
-| card edit form | field `rarity` (`card_form.rs`) |
+| card edit form | field `rarity` (`cards/form.rs`) |
 | page row structs | `CardRow.rarity: Option<String>` (+ `CardRow::COLUMNS`), lot detail's `UniteRow` |
-| deck builder API | `ApiCard.rarity: Option<String>` (`deck_api/mod.rs`) |
+| deck builder API | `ApiCard.rarity: Option<String>` (`decks/api/mod.rs`) |
 | cards filter | `CardFilter.rarity` (`/cards?rarity=Ultra%20Rare`), exact match |
 | templates | a `fn rarities(&self)` on the page structs that show the select, like `statuses()` |
 

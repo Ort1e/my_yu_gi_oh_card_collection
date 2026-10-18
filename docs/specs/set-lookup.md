@@ -74,8 +74,8 @@ with an `#[allow(...)] // TODO: remove once …` to delete when it's done.
 |---|---|---|
 | Number rule | `domain/src/card_set.rs`: `pub fn card_number(code: &str) -> Option<String>` | its doc comment lists the cases |
 | Reshaping the JSON | `domain/src/card_set.rs`: `pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard>` (`SetCard` is defined) | `domain/src/ban_list.rs` (also parses JSON) |
-| The HTTP calls | `backend/src/card_data.rs`: `pub async fn fetch_set(http: &reqwest::Client, prefix: &str) -> AppResult<Option<FetchedSet>>` (`FetchedSet { name, en, fr }` is defined) | `fetch()` in the same file (throttle, error mapping, 400 handling) |
-| The handler | `backend/src/routes/sets.rs`: `pub async fn set_cards(State(state), Path(code)) -> AppResult<Json<SetResponse>>`, route `/api/sets/:code` already in `routes::router()` | `deck_api::categories` for a small JSON handler |
+| The HTTP calls | `backend/src/store/card_data.rs`: `pub async fn fetch_set(http: &reqwest::Client, prefix: &str) -> AppResult<Option<FetchedSet>>` (`FetchedSet { name, en, fr }` is defined) | `fetch()` in the same file (throttle, error mapping, 400 handling) |
+| The handler | `backend/src/routes/reference/sets.rs`: `pub async fn set_cards(State(state), Path(code)) -> AppResult<Json<SetResponse>>`, route `/api/sets/:code` already in `routes::router()` | `decks::api::categories` for a small JSON handler |
 
 Until it's implemented, calling the route panics on the `todo!()` (the
 request fails, the server keeps running) and the panel says it can't load
@@ -91,7 +91,7 @@ French name, a code from another set to be ignored, a `…-ENSE1` and an old
 
 - **Cache** the result per prefix in memory (a set doesn't change): a
   `Mutex<HashMap<String, SetResponse>>` in `AppState`, or a `static` like
-  `LAST_REQUEST` in `card_data.rs`. Without it, each panel load costs
+  `LAST_REQUEST` in `store/card_data.rs`. Without it, each panel load costs
   3 requests per set (more when several sets share the prefix), which is fine
   to start with.
 - `cardsets.php` is ~1000 sets: it could be cached too, or the frontend could

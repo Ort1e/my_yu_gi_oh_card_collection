@@ -17,7 +17,7 @@
     quantity and status).
   - Status: the "Quick add from a set" panel is done on "Add a lot" and on a
     lot's page, which now takes several cards at once (frontend:
-    `_quick_add.html`, `static/js/card_rows.js`).
+    `partials/quick_add.html`, `static/js/card_rows.js`).
     - [ ] backend endpoint `GET /api/sets/:code`, spec in
           `docs/specs/set-lookup.md` (owner): until then the panel says the
           set can't be loaded.

@@ -86,7 +86,7 @@ async fn deck_edit_versions_and_delete() {
 
     // a proxy only used by this deck goes with it; owned cards stay
     let mut conn = t.state.pool.acquire().await.unwrap();
-    let proxy = crate::cards::new_proxy(&mut conn, "Exodia", None)
+    let proxy = crate::store::cards::new_proxy(&mut conn, "Exodia", None)
         .await
         .unwrap();
     drop(conn);

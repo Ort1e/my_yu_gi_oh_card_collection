@@ -1,0 +1,79 @@
+//! Rows shared by several pages, with the display helpers the templates use.
+
+use domain::card::CardStatus;
+
+use crate::store::db::Money;
+
+/// A card as shown in lists.
+#[derive(Debug, sqlx::FromRow)]
+pub struct CardRow {
+    pub id: i64,
+    pub name: String,
+    pub code: Option<String>,
+    pub last_known_status: Option<String>,
+    pub is_proxy: bool,
+    pub card_data_id: Option<i64>,
+}
+
+impl CardRow {
+    pub const COLUMNS: &'static str =
+        "card.id, card.name, card.code, card.last_known_status, card.is_proxy, card.card_data_id";
+
+    pub fn status(&self) -> Option<CardStatus> {
+        self.last_known_status
+            .as_deref()
+            .and_then(CardStatus::from_code)
+    }
+}
+
+/// A lot as shown in lists.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LotRow {
+    pub id: i64,
+    pub lot_type: String,
+    pub price: Money,
+    pub buy_date: String,
+    pub received_date: Option<String>,
+    pub seller_id: Option<i64>,
+    pub seller: Option<String>,
+    pub shipment_file: Option<String>,
+    pub card_count: i64,
+}
+
+impl LotRow {
+    pub const SELECT: &'static str = "SELECT lot.id, lot.lot_type, lot.price, lot.buy_date,
+            lot.received_date, lot.seller_id, seller.name AS seller, lot.shipment_file,
+            (SELECT count(*) FROM unite WHERE unite.lot_id = lot.id) AS card_count
+        FROM lot LEFT JOIN seller ON seller.id = lot.seller_id";
+
+    pub fn seller_name(&self) -> &str {
+        self.seller.as_deref().unwrap_or("No Seller")
+    }
+
+    pub fn title(&self) -> String {
+        format!("Lot {} - {}", self.buy_date, self.seller_name())
+    }
+}
+
+/// A deck version as shown in lists.
+#[derive(Debug, sqlx::FromRow)]
+pub struct DeckVersionRow {
+    pub id: i64,
+    pub version_name: String,
+    pub deck_name: Option<String>,
+}
+
+impl DeckVersionRow {
+    pub const SELECT: &'static str = "SELECT deck_version.id, deck_version.version_name,
+            deck.name AS deck_name
+        FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id";
+
+    /// "Deck - version", as Django's `DeckVersion.name`.
+    pub fn full_name(&self) -> String {
+        format!(
+            "{} - {}",
+            self.deck_name.as_deref().unwrap_or("No Deck"),
+            self.version_name
+        )
+    }
+}

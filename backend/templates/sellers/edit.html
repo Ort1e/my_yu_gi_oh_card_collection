@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ seller.name }}{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Edit Seller</h1>
+<p class="back-link"><a href="/sellers/{{ id }}">← Back to the seller</a></p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/sellers/{{ id }}/edit">
+  <fieldset>
+    <legend>Seller</legend>
+    <p>
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" value="{{ seller.name }}" maxlength="255" required>
+    </p>
+    <label class="switch"><input type="checkbox" name="is_person" {% if seller.is_person %}checked{% endif %}> Is a person</label>
+    <p>
+      <label for="source">Source:</label>
+      <select name="source" id="source">
+        <option value="">---------</option>
+        {% for (source_id, source_name) in sources %}
+        <option value="{{ source_id }}" {% if self.source_is(source_id) %}selected{% endif %}>{{ source_name }}</option>
+        {% endfor %}
+      </select>
+    </p>
+  </fieldset>
+
+  <input type="submit" value="Save">
+</form>
+</div>
+{% endblock %}

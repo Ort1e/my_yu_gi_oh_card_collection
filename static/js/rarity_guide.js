@@ -1,4 +1,4 @@
-// The /rarities page (templates/rarities.html): one box per rarity, from
+// The /rarities page (templates/reference/rarities.html): one box per rarity, from
 // static/js/rarities.js.
 
 const list = document.getElementById('rarity-list');

@@ -1,4 +1,4 @@
-// Client of the backend deck builder API (backend/src/routes/deck_api/).
+// Client of the backend deck builder API (backend/src/routes/decks/api/).
 
 async function request(method, url, body) {
     const init = { method, headers: {} };

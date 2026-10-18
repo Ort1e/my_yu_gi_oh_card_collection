@@ -9,8 +9,8 @@ use rust_decimal::Decimal;
 use serde_json::json;
 
 use super::budget::{today, BudgetData};
-use crate::error::AppResult;
-use crate::filters;
+use crate::web::error::AppResult;
+use crate::web::filters;
 use crate::AppState;
 
 const MONTHS_TO_DISPLAY: usize = 5;

@@ -44,7 +44,7 @@ impl TestApp {
         let dir = std::env::temp_dir().join(format!("ygo-test-{:016x}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         let options =
-            crate::db::connect_options(&format!("sqlite:{}", dir.join("app.db").display()));
+            crate::store::db::connect_options(&format!("sqlite:{}", dir.join("app.db").display()));
         let pool = SqlitePoolOptions::new()
             .connect_with(options)
             .await
@@ -60,7 +60,7 @@ impl TestApp {
         .await
         .unwrap();
 
-        let auth = crate::auth::Auth::load(&pool, password.map(str::to_string))
+        let auth = crate::web::auth::Auth::load(&pool, password.map(str::to_string))
             .await
             .unwrap();
         TestApp {

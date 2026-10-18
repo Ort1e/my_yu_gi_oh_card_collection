@@ -8,6 +8,9 @@ step (except for moved tests).
 
 **Status: done (2026-10-18)**, all steps below, one commit each (the backend
 too, exceptionally by Claude). Kept as the record of what moved where.
+The paths below are the ones before the folder reorganisation that came
+right after (`web/`, `store/`, `routes/<area>/`, `templates/<area>/`, see
+CLAUDE.md).
 
 ## Backend (owner)
 

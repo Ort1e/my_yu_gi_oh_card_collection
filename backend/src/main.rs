@@ -1,17 +1,9 @@
-mod auth;
-mod card_data;
-mod cards;
 mod commands;
-mod db;
-mod error;
-mod filters;
-mod forms;
-mod models;
-mod pagination;
 mod routes;
-mod shipment_files;
+mod store;
 #[cfg(test)]
 mod tests;
+mod web;
 
 use std::path::PathBuf;
 
@@ -20,12 +12,14 @@ use axum::middleware::from_fn_with_state;
 use axum::routing::{get, post};
 use axum::Router;
 use commands::Command;
+use store::db;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeader;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::level_filters::LevelFilter;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
+use web::auth;
 
 /// Shared state handed to every handler.
 #[derive(Clone)]

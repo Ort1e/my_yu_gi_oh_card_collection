@@ -7,11 +7,11 @@ everything went. For step-by-step changes, see [recipes.md](recipes.md).
 Suggested reading order, about an hour with the code open next to it:
 
 1. [The big picture](#the-big-picture) (this file)
-2. [Following a page request](#following-a-page-request): `backend/src/routes/sellers.rs`
-3. [Following a form](#following-a-form): `backend/src/routes/seller_form.rs`, then `lot_form.rs::create`
-4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/db.rs`
+2. [Following a page request](#following-a-page-request): `backend/src/routes/sellers/mod.rs`
+3. [Following a form](#following-a-form): `backend/src/routes/sellers/form.rs`, then `lots/form.rs::create`
+4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/store/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
-6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/deck_api/`
+6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
 7. [Tests](#tests): `backend/src/tests/`
 
 ## The big picture
@@ -52,17 +52,17 @@ Plus `frontend/` (the Svelte deck builder, built by npm, not Cargo) and
 | Django | Rust |
 |---|---|
 | `models/*.py` (schema) | `migrations/0002_ygo_schema.sql`, plain SQL |
-| `models/*.py` (methods) | `domain/` for pure logic, SQL in `routes/` or `cards.rs` |
+| `models/*.py` (methods) | `domain/` for pure logic, SQL in `routes/` or `store/cards.rs` |
 | ORM queries | raw SQL strings run by `sqlx` (`query_as`, `query_scalar`) |
 | `urls.py` | `routes/mod.rs`: `router()` (reads) and `write_router()` (writes) |
-| class-based views | `async fn` handlers in `routes/<domain>.rs` |
-| Django templates | askama templates in `backend/templates/`, nearly identical syntax |
-| `forms.py` | `forms.rs` (`FormData`) + validation in each `*_form.rs` |
-| DRF API + serializers | `routes/deck_api/` + `#[derive(Serialize)]` structs |
+| class-based views | `async fn` handlers in `routes/<area>/` (`mod.rs` pages, `form.rs` forms) |
+| Django templates | askama templates in `backend/templates/<area>/`, nearly identical syntax |
+| `forms.py` | `web/forms.rs` (`FormData`) + validation in each `routes/<area>/form.rs` |
+| DRF API + serializers | `routes/decks/api/` + `#[derive(Serialize)]` structs |
 | `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
-| Django auth | `auth.rs`: one password (`APP_PASSWORD`), signed cookie |
+| Django auth | `web/auth.rs`: one password (`APP_PASSWORD`), signed cookie |
 | `runserver` | `cargo run -p backend` |
 
 ### Startup (`backend/src/main.rs`)
@@ -89,7 +89,7 @@ commit, with named fields: `tracing::info!(lot_id, cards = n, "lot created")`.
 
 ## Following a page request
 
-`GET /sellers?page=2`, in `backend/src/routes/sellers.rs`:
+`GET /sellers?page=2`, in `backend/src/routes/sellers/mod.rs`:
 
 ```rust
 pub async fn list(
@@ -113,7 +113,7 @@ Things to notice:
   `Multipart`. axum fills them in, and rejects the request with a 4xx if
   one can't be parsed (e.g. `/sellers/abc`).
 - **The response type is the template**. `SellersList` has
-  `#[derive(Template)] #[template(path = "sellers_list.html")]`; returning
+  `#[derive(Template)] #[template(path = "sellers/list.html")]`; returning
   it renders the HTML. The template's variables are the struct's fields, and
   it can call the struct's methods.
 - **Templates are compiled.** askama turns each template into Rust code at
@@ -122,24 +122,24 @@ Things to notice:
   no hot reload of templates).
 - **Row structs** (`SellerRow`) are filled by name from the SQL columns
   (`#[derive(sqlx::FromRow)]`). Rows used by several pages live in
-  `models.rs` (`CardRow`, `LotRow`, `DeckVersionRow`), with their `SELECT`
+  `store/models.rs` (`CardRow`, `LotRow`, `DeckVersionRow`), with their `SELECT`
   as a constant next to them.
-- **Errors** (`error.rs`): handlers return `AppResult<T>`. `?` turns a
+- **Errors** (`web/error.rs`): handlers return `AppResult<T>`. `?` turns a
   `sqlx::Error` into a 500 (logged), `.or_404()` turns a missing row
   (`Option::None`) into a 404, `bad_request("…")` gives a 400 with a JSON
   `{"error": …}` for the API.
-- **Pagination** (`pagination.rs`): `Page::new(requested, count, querystring)`
-  and `page.offset()`; `_pagination.html` renders the links. Filter pages
+- **Pagination** (`web/pagination.rs`): `Page::new(requested, count, querystring)`
+  and `page.offset()`; `partials/pagination.html` renders the links. Filter pages
   (`/cards`, `/lots`) keep their filters in the page links with
   `querystring(…)`.
 - **Template inheritance** works like Django's: `base.html` → `list_base.html`
-  (blocks `items`, `filter`, `add_button`) → `sellers_list.html`. Partials
-  start with `_` and are pulled in with `{% include %}`. Filters such as
-  `|money` or `|yes_no` are plain functions in `filters.rs`.
+  (blocks `items`, `filter`, `add_button`) → `sellers/list.html`. Partials
+  live in `partials/` and are pulled in with `{% include %}`. Filters such as
+  `|money` or `|yes_no` are plain functions in `web/filters.rs`.
 
 ## Following a form
 
-`POST /sellers/:id/edit`, in `backend/src/routes/seller_form.rs`:
+`POST /sellers/:id/edit`, in `backend/src/routes/sellers/form.rs`:
 
 1. The body arrives as raw `(name, value)` pairs (`Form<Pairs>`) and is
    wrapped in `FormData`, which collects validation errors as it reads:
@@ -153,7 +153,7 @@ Things to notice:
 4. Otherwise: `begin_write(&pool)` opens a write transaction, the
    `UPDATE`/`INSERT`s run on it, `tx.commit()`, then `Redirect::to(…)`.
 
-`lot_form.rs::create` is the same pattern at full size:
+`lots/form.rs::create` is the same pattern at full size:
 
 - a lot plus repeated card rows (`cards-0-name`, `cards-0-code`, …, read by
   `form.card_rows()` / `form.new_cards()`);
@@ -175,7 +175,7 @@ rendered pre-filled with the dates, total, seller and card lines. The file
 waits in `uploads/pending-<token>.pdf` (deleted after 24 h), and the form
 carries the token in a hidden `pending` field. On save, `create` moves it to
 `media/shipment_files/shipment_<lot id>.pdf`. The file moves are in
-`backend/src/shipment_files.rs`.
+`backend/src/store/shipment_files.rs`.
 
 The PDFs contain names and addresses: their text is never stored, logged or
 printed, only the parsed fields. Keep it that way (CLAUDE.md, "Privacy
@@ -212,7 +212,7 @@ and applies the new ones at startup, recording a checksum of each. So an
 applied migration must **never be edited** (startup would fail on the
 checksum): changes are new files, `0004_….sql`, and so on.
 
-**Writing safely** (`db.rs`): SQLite allows one writer at a time. Every
+**Writing safely** (`store/db.rs`): SQLite allows one writer at a time. Every
 transaction that writes starts with `db::begin_write(&pool)` (not
 `pool.begin()`), which takes the write lock up front so concurrent writers
 wait instead of failing with "database is locked". Get new ids with
@@ -248,14 +248,14 @@ file (`#[cfg(test)] mod tests`).
 
 A Svelte 4 app in `frontend/`, built by Vite into `static/deck-builder/`
 (`bundle.js`, `bundle.css`). The page `/deck-builder/:id`
-(`templates/deck_builder.html`) is just a `<div id="app">` that loads the
+(`templates/decks/builder.html`) is just a `<div id="app">` that loads the
 bundle. The app then only talks JSON to `/api/*`:
 
 | Frontend | Backend |
 |---|---|
 | `src/main.js`: mounts `App` with the version id | |
-| `src/App.svelte`: state of the zones, drag & drop, save | `deck_api/version.rs`: load, save, delete, copy |
-| `src/api.js`: one function per endpoint | `routes/deck_api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
+| `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
+| `src/api.js`: one function per endpoint | `routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.js`: pure helpers (sorting, prices, YDKE URL) | |
 | `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
@@ -270,7 +270,7 @@ During frontend work, `npm run dev` serves the app with hot reload on
 
 ## Login
 
-`auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the
+`web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the
 shipment PDFs require a session cookie. Pages redirect to
 `/login?next=…`, the API answers 401. Reading stays public. The cookie is
 an expiry date signed with a key stored in the `app_secret` table, so a

@@ -1,5 +1,5 @@
-// Card rows of the lot form (templates/add_lot.html): add / remove rows, and
-// the "Quick add from a set" panel (templates/_quick_add.html), which fills
+// Card rows of the lot form (templates/lots/add.html): add / remove rows, and
+// the "Quick add from a set" panel (templates/partials/quick_add.html), which fills
 // rows from a set code and card numbers using GET /api/sets/:code
 // (docs/specs/set-lookup.md).
 

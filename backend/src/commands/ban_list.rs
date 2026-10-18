@@ -12,8 +12,8 @@ use chrono::NaiveDate;
 use domain::ban_list::{list_url, parse_list, parse_options, BanList, OPTIONS_URL};
 
 use super::finish;
-use crate::card_data::{find, get_or_fetch};
-use crate::db::begin_write;
+use crate::store::card_data::{find, get_or_fetch};
+use crate::store::db::begin_write;
 use crate::AppState;
 
 pub async fn scrap(state: &AppState, all: bool, dry_run: bool) -> anyhow::Result<()> {
