@@ -298,3 +298,8 @@ transaction that is rolled back.
 `cargo test --workspace` runs everything but the last one. Tests never
 touch `data/app.db`, apart from that ignored test, which opens it
 read-only.
+
+`cargo cov` (an alias in `.cargo/config.toml`, for `cargo-llvm-cov`) runs
+the same tests and writes a coverage report to
+`target/llvm-cov/html/index.html`: open it to see, line by line, the code
+no test runs.

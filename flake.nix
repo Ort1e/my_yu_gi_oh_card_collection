@@ -38,6 +38,7 @@
             # Rust tools (ALL SAME VERSION as toolchain)
             #############################################
             fullToolchain
+            cargo-llvm-cov   # test coverage (needs llvm-tools-preview, rust-toolchain.toml)
 
             ###############################
             # Python + scientific stack

@@ -1,0 +1,5 @@
+[alias]
+# Test coverage of the workspace (cargo-llvm-cov, from the Nix shell). The
+# report is written to target/llvm-cov/html/index.html; the one-off importer
+# and the standard library are left out.
+cov = ["llvm-cov", "--workspace", "--html", "--ignore-filename-regex", "(importer/|/nix/store/)"]

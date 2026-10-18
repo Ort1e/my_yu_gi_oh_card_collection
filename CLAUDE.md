@@ -57,6 +57,7 @@ All inside the Nix shell (`nix develop`, or automatic with direnv). Run from the
 cargo check --workspace
 cargo test --workspace
 cargo clippy --workspace --all-targets
+cargo cov                                     # test coverage → target/llvm-cov/html/index.html (alias in .cargo/config.toml; cargo llvm-cov --workspace --summary-only for a table)
 cargo test -p domain --test real_shipments -- --ignored --nocapture   # parser vs the real PDFs (prints counts/lot ids only)
 
 cargo run -p backend                          # web server, http://127.0.0.1:3000; runs migrations on startup
