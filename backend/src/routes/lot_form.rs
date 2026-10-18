@@ -2,13 +2,9 @@
 //! (Django: admin only). Lots and their unites are never deleted.
 //!
 //! A Cardmarket shipment PDF can be uploaded first: it is parsed in memory to
-//! pre-fill the form and kept as a *pending* file in the uploads directory,
-//! then moved to `<media>/shipment_files/shipment_<lot id>.pdf` when the lot is
-//! saved. The PDF text (personal data) is never stored or logged.
-
-use std::path::{Path as FsPath, PathBuf};
-use std::sync::LazyLock;
-use std::time::{Duration, SystemTime};
+//! pre-fill the form and kept as a *pending* file (`crate::shipment_files`)
+//! until the lot is saved. The PDF text (personal data) is never stored or
+//! logged.
 
 use askama::Template;
 use axum::extract::{Multipart, Path, State};
@@ -16,7 +12,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 use domain::cardmarket::{parse_shipment_pdf, Shipment};
 use domain::lot::LotType;
-use regex::Regex;
+use sqlx::SqliteConnection;
 
 use crate::card_data::spawn_link_cards;
 use crate::cards::insert_lot_cards;
@@ -24,6 +20,7 @@ use crate::db::{begin_write, exists, Money};
 use crate::error::{AppError, AppResult, OrNotFound};
 use crate::forms::{CardRowValues, FormData, Pairs};
 use crate::routes::lots;
+use crate::shipment_files::{self, pending_path};
 use crate::AppState;
 
 /// Lot fields as typed.
@@ -122,9 +119,7 @@ impl AddLotPage {
             seller_select: String::new(),
             new_seller: SellerValues::default(),
             rows: vec![CardRowValues::default()],
-            sellers: sqlx::query_as("SELECT id, name FROM seller ORDER BY name COLLATE NOCASE")
-                .fetch_all(&state.pool)
-                .await?,
+            sellers: sellers(state).await?,
             sources: sqlx::query_as("SELECT id, name FROM seller_source ORDER BY name")
                 .fetch_all(&state.pool)
                 .await?,
@@ -157,33 +152,6 @@ pub async fn page(State(state): State<AppState>) -> AppResult<AddLotPage> {
 }
 
 // ---------- shipment upload ----------
-
-static TOKEN: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[0-9a-f]{16}$").unwrap());
-const PENDING_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
-
-fn pending_path(uploads: &FsPath, token: &str) -> Option<PathBuf> {
-    TOKEN
-        .is_match(token)
-        .then(|| uploads.join(format!("pending-{token}.pdf")))
-}
-
-/// Remove pending uploads that were never turned into a lot.
-async fn remove_stale_uploads(uploads: &FsPath) {
-    let Ok(mut dir) = tokio::fs::read_dir(uploads).await else {
-        return;
-    };
-    while let Ok(Some(entry)) = dir.next_entry().await {
-        let stale = entry
-            .metadata()
-            .await
-            .and_then(|m| m.modified())
-            .map(|t| SystemTime::now().duration_since(t).unwrap_or_default() > PENDING_MAX_AGE)
-            .unwrap_or(false);
-        if stale && entry.file_name().to_string_lossy().starts_with("pending-") {
-            let _ = tokio::fs::remove_file(entry.path()).await;
-        }
-    }
-}
 
 pub async fn upload(
     State(state): State<AppState>,
@@ -221,14 +189,7 @@ pub async fn upload(
         }
     };
 
-    remove_stale_uploads(&state.uploads_dir).await;
-    let token = format!("{:016x}", rand::random::<u64>());
-    let path = pending_path(&state.uploads_dir, &token).expect("valid token");
-    let io = |e: std::io::Error| AppError::Internal(format!("saving upload: {e}"));
-    tokio::fs::create_dir_all(&state.uploads_dir)
-        .await
-        .map_err(io)?;
-    tokio::fs::write(&path, &pdf).await.map_err(io)?;
+    let token = shipment_files::save_pending(&state.uploads_dir, &pdf).await?;
 
     // counts only: the PDF holds personal data (CLAUDE.md, "Privacy rule")
     tracing::info!(
@@ -310,6 +271,51 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
 
 // ---------- lot creation ----------
 
+/// The seller of a new lot: one picked in the list, or a new name.
+enum SellerChoice {
+    Existing(i64),
+    New {
+        name: String,
+        is_person: bool,
+        source: Option<i64>,
+    },
+}
+
+impl SellerChoice {
+    /// The seller's id; a new name that already exists reuses that seller.
+    async fn find_or_create(self, conn: &mut SqliteConnection) -> AppResult<i64> {
+        match self {
+            SellerChoice::Existing(id) => {
+                exists(conn, "seller", id).await?;
+                Ok(id)
+            }
+            SellerChoice::New {
+                name,
+                is_person,
+                source,
+            } => {
+                let existing: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM seller WHERE name = ?")
+                        .bind(&name)
+                        .fetch_optional(&mut *conn)
+                        .await?;
+                if let Some(id) = existing {
+                    return Ok(id);
+                }
+                Ok(
+                    sqlx::query("INSERT INTO seller (name, is_person, source_id) VALUES (?, ?, ?)")
+                        .bind(&name)
+                        .bind(is_person)
+                        .bind(source)
+                        .execute(&mut *conn)
+                        .await?
+                        .last_insert_rowid(),
+                )
+            }
+        }
+    }
+}
+
 pub async fn create(
     State(state): State<AppState>,
     Form(pairs): Form<Pairs>,
@@ -321,10 +327,19 @@ pub async fn create(
     let seller_name = form.get("seller_name").map(str::to_string);
     let seller_source = form.id("seller_source", "Seller source");
     let cards = form.new_cards();
-    if seller_id.is_none() && seller_name.is_none() {
-        form.errors
-            .push("Select a seller or enter a new seller name.".into());
-    }
+    let seller = match (seller_id, seller_name) {
+        (Some(id), _) => Some(SellerChoice::Existing(id)),
+        (None, Some(name)) => Some(SellerChoice::New {
+            name,
+            is_person: form.checked("seller_is_person"),
+            source: seller_source,
+        }),
+        (None, None) => {
+            form.errors
+                .push("Select a seller or enter a new seller name.".into());
+            None
+        }
+    };
     let pending = form.get("pending").map(str::to_string);
     let pending_file = match &pending {
         Some(token) => match pending_path(&state.uploads_dir, token) {
@@ -338,7 +353,7 @@ pub async fn create(
         None => None,
     };
 
-    let (Some(lot), true) = (lot, form.errors.is_empty()) else {
+    let (Some(lot), Some(seller), true) = (lot, seller, form.errors.is_empty()) else {
         let mut page = AddLotPage::new(&state).await?;
         page.lot = LotValues::from_form(&form);
         page.seller_select = form.text("seller_select");
@@ -358,31 +373,7 @@ pub async fn create(
 
     let mut tx = begin_write(&state.pool).await?;
 
-    let seller_id = match (seller_id, seller_name) {
-        (Some(id), _) => {
-            exists(&mut tx, "seller", id).await?;
-            id
-        }
-        (None, Some(name)) => {
-            let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM seller WHERE name = ?")
-                .bind(&name)
-                .fetch_optional(&mut *tx)
-                .await?;
-            match existing {
-                Some(id) => id,
-                None => {
-                    sqlx::query("INSERT INTO seller (name, is_person, source_id) VALUES (?, ?, ?)")
-                        .bind(&name)
-                        .bind(form.checked("seller_is_person"))
-                        .bind(seller_source)
-                        .execute(&mut *tx)
-                        .await?
-                        .last_insert_rowid()
-                }
-            }
-        }
-        (None, None) => unreachable!("validated above"),
-    };
+    let seller_id = seller.find_or_create(&mut tx).await?;
 
     let lot_id: i64 = sqlx::query(
         "INSERT INTO lot (lot_type, price, buy_date, received_date, seller_id, no_card_price)
@@ -401,27 +392,26 @@ pub async fn create(
     let card_ids = insert_lot_cards(&mut tx, lot_id, &cards).await?;
 
     // Move the PDF last, right before committing; put it back if that fails.
-    let moved = match pending_file {
+    let attached = match pending_file {
         Some(from) => {
-            let (relative, to) = shipment_destination(&state.media_dir, lot_id);
-            let io = |e: std::io::Error| AppError::Internal(format!("moving shipment file: {e}"));
-            tokio::fs::create_dir_all(to.parent().unwrap())
-                .await
-                .map_err(io)?;
-            tokio::fs::rename(&from, &to).await.map_err(io)?;
-            sqlx::query("UPDATE lot SET shipment_file = ? WHERE id = ?")
-                .bind(relative)
+            let attached = shipment_files::attach(&state.media_dir, lot_id, from).await?;
+            let saved = sqlx::query("UPDATE lot SET shipment_file = ? WHERE id = ?")
+                .bind(&attached.relative)
                 .bind(lot_id)
                 .execute(&mut *tx)
-                .await?;
-            Some((from, to))
+                .await;
+            if let Err(e) = saved {
+                attached.undo().await;
+                return Err(e.into());
+            }
+            Some(attached)
         }
         None => None,
     };
-    let with_shipment = moved.is_some();
+    let with_shipment = attached.is_some();
     if let Err(e) = tx.commit().await {
-        if let Some((from, to)) = moved {
-            let _ = tokio::fs::rename(to, from).await;
+        if let Some(attached) = attached {
+            attached.undo().await;
         }
         return Err(e.into());
     }
@@ -435,25 +425,6 @@ pub async fn create(
 
     spawn_link_cards(state, card_ids);
     Ok(Redirect::to(&format!("/lots/{lot_id}")).into_response())
-}
-
-/// `shipment_files/shipment_<lot id>.pdf` (relative to the media dir, as
-/// stored in `lot.shipment_file`) and its absolute path; a numeric suffix is
-/// added if that file already exists.
-fn shipment_destination(media: &FsPath, lot_id: i64) -> (String, PathBuf) {
-    let mut n = 1;
-    loop {
-        let relative = if n == 1 {
-            format!("shipment_files/shipment_{lot_id}.pdf")
-        } else {
-            format!("shipment_files/shipment_{lot_id}_{n}.pdf")
-        };
-        let path = media.join(&relative);
-        if !path.exists() {
-            return (relative, path);
-        }
-        n += 1;
-    }
 }
 
 // ---------- lot edition ----------
@@ -645,17 +616,4 @@ pub async fn add_cards(
 
     spawn_link_cards(state, card_ids);
     Ok(Redirect::to(&format!("/lots/{lot_id}")).into_response())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pending_tokens_are_validated() {
-        let dir = FsPath::new("/tmp/uploads");
-        assert!(pending_path(dir, "0123456789abcdef").is_some());
-        assert!(pending_path(dir, "../../etc/passwd").is_none());
-        assert!(pending_path(dir, "0123456789ABCDEF").is_none());
-    }
 }

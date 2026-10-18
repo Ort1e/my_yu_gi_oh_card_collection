@@ -157,7 +157,7 @@ Things to notice:
 
 - a lot plus repeated card rows (`cards-0-name`, `cards-0-code`, …, read by
   `form.card_rows()` / `form.new_cards()`);
-- an existing seller **or** a new one created on the fly;
+- an existing seller **or** a new one created on the fly (`SellerChoice`);
 - `cards::insert_lot_cards` creates each card `quantity` times with its
   `unite`;
 - an optional shipment PDF (see below) moved into
@@ -174,7 +174,8 @@ memory** (`domain::cardmarket::parse_shipment_pdf`), and the form is
 rendered pre-filled with the dates, total, seller and card lines. The file
 waits in `uploads/pending-<token>.pdf` (deleted after 24 h), and the form
 carries the token in a hidden `pending` field. On save, `create` moves it to
-`media/shipment_files/shipment_<lot id>.pdf`.
+`media/shipment_files/shipment_<lot id>.pdf`. The file moves are in
+`backend/src/shipment_files.rs`.
 
 The PDFs contain names and addresses: their text is never stored, logged or
 printed, only the parsed fields. Keep it that way (CLAUDE.md, "Privacy

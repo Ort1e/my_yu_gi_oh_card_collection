@@ -9,6 +9,7 @@ mod forms;
 mod models;
 mod pagination;
 mod routes;
+mod shipment_files;
 #[cfg(test)]
 mod tests;
 
