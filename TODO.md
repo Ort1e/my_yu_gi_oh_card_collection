@@ -31,3 +31,9 @@
         several, listed in the quick-add panel (`static/js/rarities.js`);
   - [ ] frontend once the column exists: rarity field in the card rows (quick
         add: offer only the code's rarities), badges, `/cards` filter.
+- [ ] Link decks together. Today each deck version uses the whole
+      collection, so the same card can be in several versions at once. Goal:
+      build several decks at the same time from one shared collection,
+      without overlap (each card owned is used by only one of the linked
+      decks), and track the cards still missing across all of them.
+- [ ] Refactor the code base to make it easier to read.
