@@ -353,3 +353,82 @@ async fn tournament_and_ydke_import() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(error["error"], "Invalid YDKE URL");
 }
+
+#[tokio::test]
+async fn saving_zones_deletes_unused_proxies() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    // no owned Kuriboh: only saving the zones can remove this proxy
+    let (status, proxy) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{version}/proxies"),
+            json!({ "name": "Kuriboh", "zone": "main" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let proxy = proxy["id"].as_i64().unwrap();
+
+    let (status, _) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{version}"),
+            json!({ "main": [] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        t.scalar(&format!("SELECT count(*) FROM card WHERE id = {proxy}"))
+            .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn new_cards_replace_deck_proxies_in_the_background() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{version}/proxies"),
+            json!({ "name": "Dark Magician", "zone": "main" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // by name, not by id: SQLite reuses the id of a deleted card
+    let proxies_in_main = format!(
+        "SELECT count(*) FROM deck_version_main_deck m JOIN card ON card.id = m.card_id
+         WHERE m.deck_version_id = {version} AND card.is_proxy = 1 AND card.card_data_id = 1"
+    );
+    assert_eq!(t.scalar(&proxies_in_main).await, 1);
+
+    // saving new cards runs the background task: link, translate, then
+    // replace the proxy by an owned Dark Magician and delete it
+    t.post("/lots/add", LOT).await;
+    for _ in 0..100 {
+        if t.scalar(&proxies_in_main).await == 0 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert_eq!(t.scalar(&proxies_in_main).await, 0, "proxy replaced");
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT count(*) FROM deck_version_main_deck m JOIN card ON card.id = m.card_id
+             WHERE m.deck_version_id = {version} AND card.is_proxy = 0 AND card.card_data_id = 1"
+        ))
+        .await,
+        1,
+        "by an owned copy"
+    );
+    assert_eq!(
+        t.scalar(
+            "SELECT count(*) FROM card WHERE is_proxy = 1 AND card_data_id = 1
+             AND id NOT IN (SELECT card_id FROM unite)"
+        )
+        .await,
+        0,
+        "the unused proxy is deleted"
+    );
+}

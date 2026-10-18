@@ -18,6 +18,7 @@
 //! steps 5 and 6 are new (Django had no rarity, and kept the names as typed).
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use domain::card::{clean_card_name, normalize_card_name};
 use domain::rarity::split_cardmarket_name;
@@ -25,7 +26,7 @@ use sqlx::SqliteConnection;
 
 use super::finish;
 use crate::store::card_data::{get_or_fetch, plan_translations, Translation};
-use crate::store::cards::{delete_orphan_proxies, version_card_ids, Zone, SOLD_EXISTS};
+use crate::store::cards::{delete_orphan_proxies, replace_proxies};
 use crate::store::db::begin_write;
 use crate::AppState;
 
@@ -45,7 +46,40 @@ struct Plan {
     untranslated: Vec<String>,
 }
 
+/// What a run did (or would do, for a dry run).
+struct Report {
+    plan: Plan,
+    replaced: usize,
+    deleted: u64,
+    rarities: usize,
+}
+
+/// The `clean-cards` command: run, then print what was done.
 pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
+    run(state, dry_run).await?.print(dry_run);
+    Ok(())
+}
+
+/// The background cleanup: a few minutes after the server starts, then once
+/// a day. New cards are already cleaned when they are saved; this catches the
+/// rest, mainly names ygoprodeck has translated since. Logs a summary.
+pub fn spawn_daily(state: AppState) {
+    tokio::spawn(async move {
+        tokio::time::sleep(DAILY_START_DELAY).await;
+        loop {
+            match run(&state, false).await {
+                Ok(report) => report.log(),
+                Err(e) => tracing::warn!("background clean-cards: {e:#}"),
+            }
+            tokio::time::sleep(DAILY_INTERVAL).await;
+        }
+    });
+}
+
+const DAILY_START_DELAY: Duration = Duration::from_secs(5 * 60);
+const DAILY_INTERVAL: Duration = Duration::from_secs(24 * 3600);
+
+async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
     let plan = plan(state, dry_run).await?;
     let pool = &state.pool;
 
@@ -82,44 +116,76 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
 
     finish(tx, dry_run).await?;
 
-    println!("card data renamed: {}", plan.data_renames.len());
-    println!("cards renamed or relinked: {}", plan.card_updates.len());
-    println!("proxies replaced by owned copies: {replaced}");
-    println!("unused proxies deleted: {deleted}");
-    println!("rarities taken from card names: {rarities}");
-    for t in &plan.translations {
+    Ok(Report {
+        plan,
+        replaced,
+        deleted,
+        rarities,
+    })
+}
+
+impl Report {
+    fn print(&self, dry_run: bool) {
+        let Report {
+            plan,
+            replaced,
+            deleted,
+            rarities,
+        } = self;
+
+        println!("card data renamed: {}", plan.data_renames.len());
+        println!("cards renamed or relinked: {}", plan.card_updates.len());
+        println!("proxies replaced by owned copies: {replaced}");
+        println!("unused proxies deleted: {deleted}");
+        println!("rarities taken from card names: {rarities}");
+        for t in &plan.translations {
+            println!(
+                "card {} ({}): {:?} -> {:?}",
+                t.card_id, t.code, t.from, t.to
+            );
+        }
         println!(
-            "card {} ({}): {:?} -> {:?}",
-            t.card_id, t.code, t.from, t.to
+            "names put in the language of their code: {}",
+            plan.translations.len()
+        );
+        if !plan.untranslated.is_empty() {
+            println!(
+                "{} cards named in English without a translation at ygoprodeck: {}",
+                plan.untranslated.len(),
+                plan.untranslated.join("; ")
+            );
+        }
+        if !plan.unresolved.is_empty() {
+            let why = if dry_run {
+                "not known locally"
+            } else {
+                "no card data found"
+            };
+            println!(
+                "{} names {why}: {}",
+                plan.unresolved.len(),
+                plan.unresolved.join("; ")
+            );
+        }
+        if dry_run {
+            println!("dry run: nothing was saved");
+        }
+    }
+
+    /// One log line, with the counts only.
+    fn log(&self) {
+        tracing::info!(
+            card_data_renamed = self.plan.data_renames.len(),
+            cards_relinked = self.plan.card_updates.len(),
+            proxies_replaced = self.replaced,
+            proxies_deleted = self.deleted,
+            rarities = self.rarities,
+            names_translated = self.plan.translations.len(),
+            without_translation = self.plan.untranslated.len(),
+            unresolved = self.plan.unresolved.len(),
+            "background clean-cards done"
         );
     }
-    println!(
-        "names put in the language of their code: {}",
-        plan.translations.len()
-    );
-    if !plan.untranslated.is_empty() {
-        println!(
-            "{} cards named in English without a translation at ygoprodeck: {}",
-            plan.untranslated.len(),
-            plan.untranslated.join("; ")
-        );
-    }
-    if !plan.unresolved.is_empty() {
-        let why = if dry_run {
-            "not known locally"
-        } else {
-            "no card data found"
-        };
-        println!(
-            "{} names {why}: {}",
-            plan.unresolved.len(),
-            plan.unresolved.join("; ")
-        );
-    }
-    if dry_run {
-        println!("dry run: nothing was saved");
-    }
-    Ok(())
 }
 
 async fn plan(state: &AppState, dry_run: bool) -> anyhow::Result<Plan> {
@@ -192,74 +258,6 @@ async fn plan(state: &AppState, dry_run: bool) -> anyhow::Result<Plan> {
     plan.untranslated = untranslated;
 
     Ok(plan)
-}
-
-/// Replace proxies in deck zones by owned, unsold copies of the same card
-/// not already in that version. Returns the number of replacements.
-async fn replace_proxies(conn: &mut sqlx::SqliteConnection) -> anyhow::Result<usize> {
-    let mut replaced = 0;
-
-    for zone in Zone::ALL {
-        let proxies: Vec<(i64, i64, i64)> = sqlx::query_as(&format!(
-            "SELECT z.deck_version_id, z.card_id, card.card_data_id
-             FROM {} z JOIN card ON card.id = z.card_id
-             WHERE card.is_proxy = 1 AND card.card_data_id IS NOT NULL
-             ORDER BY z.deck_version_id, z.card_id",
-            zone.table()
-        ))
-        .fetch_all(&mut *conn)
-        .await?;
-
-        for (version_id, proxy_id, card_data_id) in proxies {
-            let in_version = version_card_ids(conn, version_id).await?;
-
-            let owned: Vec<i64> = sqlx::query_scalar(&format!(
-                "SELECT id FROM card WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}
-                 ORDER BY id"
-            ))
-            .bind(card_data_id)
-            .fetch_all(&mut *conn)
-            .await?;
-
-            let Some(replacement) = owned.into_iter().find(|id| !in_version.contains(id)) else {
-                continue;
-            };
-
-            sqlx::query(&format!(
-                "UPDATE {} SET card_id = ? WHERE deck_version_id = ? AND card_id = ?",
-                zone.table()
-            ))
-            .bind(replacement)
-            .bind(version_id)
-            .bind(proxy_id)
-            .execute(&mut *conn)
-            .await?;
-
-            // the replacement takes the proxy's categories in this version
-            let categories = "SELECT id FROM card_category WHERE deck_version_id = ?";
-            sqlx::query(&format!(
-                "INSERT OR IGNORE INTO card_category_assignment (category_id, card_id)
-                 SELECT category_id, ? FROM card_category_assignment
-                 WHERE card_id = ? AND category_id IN ({categories})"
-            ))
-            .bind(replacement)
-            .bind(proxy_id)
-            .bind(version_id)
-            .execute(&mut *conn)
-            .await?;
-            sqlx::query(&format!(
-                "DELETE FROM card_category_assignment WHERE card_id = ? AND category_id IN ({categories})"
-            ))
-            .bind(proxy_id)
-            .bind(version_id)
-            .execute(&mut *conn)
-            .await?;
-
-            replaced += 1;
-        }
-    }
-
-    Ok(replaced)
 }
 
 /// Set the rarity of the cards named like `Raigeki (V.4 - Ultra Rare)` and
@@ -438,6 +436,59 @@ mod tests {
             .await
             .unwrap();
         assert!(translations.is_empty() && untranslated.is_empty());
+    }
+
+    /// A French-coded card still named in English, and its card data.
+    async fn english_named_french_card(t: &TestApp) {
+        sqlx::query(
+            "INSERT INTO card_data (id, en_name, ygopro_id, json_data)
+                 VALUES (3, 'tri-horned dragon', 39111158, '{\"name\": \"Tri-Horned Dragon\"}');
+             INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy)
+                 VALUES (1, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-FR001', 3, 0);",
+        )
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    }
+
+    fn today() -> String {
+        chrono::Local::now().date_naive().to_string()
+    }
+
+    #[tokio::test]
+    async fn remembered_translations_are_used_without_asking_ygoprodeck() {
+        let t = TestApp::new().await;
+        english_named_french_card(&t).await;
+        sqlx::query("INSERT INTO card_translation VALUES (39111158, 'fr', 'Dragon à Trois Cornes', '2020-01-01')")
+            .execute(&t.state.pool)
+            .await
+            .unwrap();
+
+        clean(&t.state, false).await.unwrap();
+        assert_eq!(
+            t.text("SELECT name FROM card WHERE id = 1")
+                .await
+                .as_deref(),
+            Some("Dragon à Trois Cornes"),
+            "a name found, however old, is not asked again"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_recent_missing_translation_is_not_asked_again() {
+        let t = TestApp::new().await;
+        english_named_french_card(&t).await;
+        sqlx::query("INSERT INTO card_translation (ygopro_id, language, name, checked_at) VALUES (39111158, 'fr', NULL, ?)")
+            .bind(today())
+            .execute(&t.state.pool)
+            .await
+            .unwrap();
+
+        let (translations, untranslated) = plan_translations(&t.state.pool, &t.state.http, None)
+            .await
+            .unwrap();
+        assert!(translations.is_empty());
+        assert_eq!(untranslated, ["Tri-Horned Dragon (RA05-FR001)"]);
     }
 
     #[tokio::test]

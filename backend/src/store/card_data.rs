@@ -9,7 +9,8 @@ use domain::rarity::split_cardmarket_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::store::db::Pool;
+use crate::store::cards::{delete_orphan_proxies, replace_proxies};
+use crate::store::db::{begin_write, Pool};
 use crate::web::error::{AppError, AppResult};
 use crate::AppState;
 
@@ -80,9 +81,70 @@ pub async fn get_or_fetch_by_ygopro_id(
     Ok(Some((id, name)))
 }
 
+/// How long "ygoprodeck has no translation" is believed before asking again
+/// (recent sets get their translations after a while).
+const RECHECK_MISSING_TRANSLATION_DAYS: i64 = 7;
+
 /// The name of a card in another language (ygoprodeck's `language`
-/// parameter: `"fr"`), `None` when ygoprodeck has no translation.
-pub async fn fetch_translated_name(
+/// parameter: `"fr"`), `None` when ygoprodeck has no translation. Answers are
+/// remembered in `card_translation` (migration 0005): a name found is never
+/// asked again, a missing one only after
+/// [`RECHECK_MISSING_TRANSLATION_DAYS`].
+pub async fn translated_name(
+    pool: &Pool,
+    http: &reqwest::Client,
+    ygopro_id: i64,
+    language: &str,
+) -> AppResult<Option<String>> {
+    let known: Option<(Option<String>, String)> = sqlx::query_as(
+        "SELECT name, checked_at FROM card_translation WHERE ygopro_id = ? AND language = ?",
+    )
+    .bind(ygopro_id)
+    .bind(language)
+    .fetch_optional(pool)
+    .await?;
+    let today = chrono::Local::now().date_naive();
+    if let Some((name, checked_at)) = known {
+        let recent = checked_at
+            .parse::<chrono::NaiveDate>()
+            .is_ok_and(|d| (today - d).num_days() < RECHECK_MISSING_TRANSLATION_DAYS);
+        if name.is_some() || recent {
+            return Ok(name);
+        }
+    }
+
+    let name = fetch_translated_name(http, ygopro_id, language).await?;
+    remember_translation(pool, ygopro_id, language, name.as_deref()).await?;
+    Ok(name)
+}
+
+/// Store an answer of ygoprodeck in `card_translation`. A name already known
+/// is never replaced by "no translation".
+async fn remember_translation(
+    pool: &Pool,
+    ygopro_id: i64,
+    language: &str,
+    name: Option<&str>,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO card_translation (ygopro_id, language, name, checked_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (ygopro_id, language) DO UPDATE
+             SET name = coalesce(excluded.name, card_translation.name),
+                 checked_at = excluded.checked_at",
+    )
+    .bind(ygopro_id)
+    .bind(language)
+    .bind(name)
+    .bind(chrono::Local::now().date_naive().to_string())
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// The name of a card in another language, asked to ygoprodeck (use
+/// [`translated_name`], which remembers the answers).
+async fn fetch_translated_name(
     http: &reqwest::Client,
     ygopro_id: i64,
     language: &str,
@@ -134,8 +196,13 @@ static SET_CACHE: Mutex<BTreeMap<String, FetchedSet>> = Mutex::const_new(BTreeMa
 /// Fetch every card of the sets whose code is `prefix`, `None` for an
 /// unknown prefix. Calls `cardsets.php`, then `cardinfo.php` in English and
 /// French for each matching set; `throttle()` before each request. Answers
-/// are cached ([`SET_CACHE`]).
-pub async fn fetch_set(http: &reqwest::Client, prefix: &str) -> AppResult<Option<FetchedSet>> {
+/// are cached ([`SET_CACHE`]), and the French names of a new fetch are
+/// remembered as translations (`card_translation`) for free.
+pub async fn fetch_set(
+    pool: &Pool,
+    http: &reqwest::Client,
+    prefix: &str,
+) -> AppResult<Option<FetchedSet>> {
     let prefix = prefix.trim().to_uppercase();
     // not held during the requests: two loads of a new set at once fetch it twice
     if let Some(set) = SET_CACHE.lock().await.get(&prefix) {
@@ -194,8 +261,24 @@ pub async fn fetch_set(http: &reqwest::Client, prefix: &str) -> AppResult<Option
         "set fetched from ygoprodeck"
     );
 
+    remember_set_translations(pool, &set).await?;
     SET_CACHE.lock().await.insert(prefix, set.clone());
     Ok(Some(set))
+}
+
+/// The French names of a fetched set as translations; a card of the English
+/// answer missing from the French one has no translation (yet).
+async fn remember_set_translations(pool: &Pool, set: &FetchedSet) -> sqlx::Result<()> {
+    let french: HashMap<i64, &str> = set
+        .fr
+        .iter()
+        .filter_map(|c| Some((c["id"].as_i64()?, c["name"].as_str()?)))
+        .collect();
+    let ids: HashSet<i64> = set.en.iter().filter_map(|c| c["id"].as_i64()).collect();
+    for id in ids {
+        remember_translation(pool, id, "fr", french.get(&id).copied()).await?;
+    }
+    Ok(())
 }
 
 /// The cards of one set (`cardinfo.php?cardset=<name>`, in `language` when
@@ -276,9 +359,10 @@ pub struct Translation {
 /// name in that language from ygoprodeck (the code is the truth). Also
 /// returns the cards for which ygoprodeck has no translation ("Name (code)").
 ///
-/// Only those cards are looked up, once per card and language; ygoprodeck is
-/// only read. Cards must be linked to their card data (for the English name
-/// and the ygopro id).
+/// Only those cards are looked up, through [`translated_name`] (answers
+/// remembered in `card_translation`: even a dry run of `clean-cards` fills
+/// it). Cards must be linked to their card data (for the English name and
+/// the ygopro id).
 pub async fn plan_translations(
     pool: &Pool,
     http: &reqwest::Client,
@@ -316,7 +400,7 @@ pub async fn plan_translations(
         let to = match fetched.get(&(ygopro_id, param)) {
             Some(to) => to.clone(),
             None => {
-                let to = fetch_translated_name(http, ygopro_id, param).await?;
+                let to = translated_name(pool, http, ygopro_id, param).await?;
                 fetched.insert((ygopro_id, param), to.clone());
                 to
             }
@@ -336,9 +420,10 @@ pub async fn plan_translations(
     Ok((translations, untranslated))
 }
 
-/// Link the given cards to their `card_data` (fetching it if needed), then
-/// put their names in the language of their code, in the background, so form
-/// submissions don't wait on the API.
+/// In the background, so form submissions don't wait on the API: link the
+/// given cards to their `card_data` (fetching it if needed), put their names
+/// in the language of their code, then replace deck proxies by the new owned
+/// copies and delete the proxies left unused.
 pub fn spawn_link_cards(state: AppState, card_ids: Vec<i64>) {
     if card_ids.is_empty() {
         return;
@@ -350,7 +435,23 @@ pub fn spawn_link_cards(state: AppState, card_ids: Vec<i64>) {
         if let Err(e) = translate_names(&state, &card_ids).await {
             tracing::warn!("translating card names: {e:?}");
         }
+        if let Err(e) = tidy_proxies(&state.pool).await {
+            tracing::warn!("replacing proxies: {e:?}");
+        }
     });
+}
+
+/// Replace deck proxies by owned copies (some may just have arrived), then
+/// delete the proxies left unused.
+async fn tidy_proxies(pool: &Pool) -> AppResult<()> {
+    let mut tx = begin_write(pool).await?;
+    let replaced = replace_proxies(&mut tx).await?;
+    let deleted = delete_orphan_proxies(&mut tx).await?;
+    tx.commit().await?;
+    if replaced > 0 || deleted > 0 {
+        tracing::info!(replaced, deleted, "deck proxies replaced by owned cards");
+    }
+    Ok(())
 }
 
 /// Put the names of these cards in the language of their code.

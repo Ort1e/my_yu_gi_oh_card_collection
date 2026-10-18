@@ -229,6 +229,7 @@ pub async fn update_version(
             zone.insert(&mut tx, id, card_id).await?;
         }
     }
+    let mut proxies_deleted = 0;
     if zones_changed {
         sqlx::query(&format!(
             "DELETE FROM card_category_assignment
@@ -238,11 +239,14 @@ pub async fn update_version(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+        // a proxy taken out of the deck and in no other one is not kept
+        proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     }
     tx.commit().await?;
     tracing::info!(
         version_id = id,
         zones_changed,
+        proxies_deleted,
         renamed,
         ban_list_changed,
         "deck version saved"

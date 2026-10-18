@@ -2,9 +2,14 @@
 
 - [x] Clean up the interface artifacts.
 - [x] Add logs.
-- [ ] Run cleanups automatically instead of by hand (`clean-cards`), in the
-      background or as part of the action that needs them:
-  - [ ] remove unused proxies automatically;
+- [x] Run cleanups automatically instead of by hand (`clean-cards`), in the
+      background or as part of the action that needs them (the command
+      stays for a manual run):
+  - [x] remove unused proxies automatically: when saving zones, and after
+        new cards replace deck proxies;
+  - [x] the whole `clean-cards` in the background, 5 minutes after the
+        server starts then once a day (mainly: names ygoprodeck translated
+        since);
   - [x] update the cards imported when a lot is added: card data links,
         then names in the language of their code (background task after
         saving).

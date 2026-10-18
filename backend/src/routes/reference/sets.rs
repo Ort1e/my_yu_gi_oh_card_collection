@@ -26,7 +26,7 @@ pub async fn set_cards(
     Path(code): Path<String>,
 ) -> AppResult<Json<SetResponse>> {
     let code = code.trim().to_uppercase();
-    let Some(set) = fetch_set(&state.http, &code).await? else {
+    let Some(set) = fetch_set(&state.pool, &state.http, &code).await? else {
         return bad_request(format!("Unknown set code {code}."));
     };
 

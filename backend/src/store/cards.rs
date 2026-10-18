@@ -158,3 +158,73 @@ pub async fn delete_orphan_proxies(conn: &mut SqliteConnection) -> sqlx::Result<
     .await?
     .rows_affected())
 }
+
+/// Replace proxies in deck zones by owned, unsold copies of the same card
+/// not already in that version, moving their category assignments. Returns
+/// the number of replacements. Run by `clean-cards` and after new cards are
+/// saved (`card_data::spawn_link_cards`).
+pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize> {
+    let mut replaced = 0;
+
+    for zone in Zone::ALL {
+        let proxies: Vec<(i64, i64, i64)> = sqlx::query_as(&format!(
+            "SELECT z.deck_version_id, z.card_id, card.card_data_id
+             FROM {} z JOIN card ON card.id = z.card_id
+             WHERE card.is_proxy = 1 AND card.card_data_id IS NOT NULL
+             ORDER BY z.deck_version_id, z.card_id",
+            zone.table()
+        ))
+        .fetch_all(&mut *conn)
+        .await?;
+
+        for (version_id, proxy_id, card_data_id) in proxies {
+            let in_version = version_card_ids(conn, version_id).await?;
+
+            let owned: Vec<i64> = sqlx::query_scalar(&format!(
+                "SELECT id FROM card WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}
+                 ORDER BY id"
+            ))
+            .bind(card_data_id)
+            .fetch_all(&mut *conn)
+            .await?;
+
+            let Some(replacement) = owned.into_iter().find(|id| !in_version.contains(id)) else {
+                continue;
+            };
+
+            sqlx::query(&format!(
+                "UPDATE {} SET card_id = ? WHERE deck_version_id = ? AND card_id = ?",
+                zone.table()
+            ))
+            .bind(replacement)
+            .bind(version_id)
+            .bind(proxy_id)
+            .execute(&mut *conn)
+            .await?;
+
+            // the replacement takes the proxy's categories in this version
+            let categories = "SELECT id FROM card_category WHERE deck_version_id = ?";
+            sqlx::query(&format!(
+                "INSERT OR IGNORE INTO card_category_assignment (category_id, card_id)
+                 SELECT category_id, ? FROM card_category_assignment
+                 WHERE card_id = ? AND category_id IN ({categories})"
+            ))
+            .bind(replacement)
+            .bind(proxy_id)
+            .bind(version_id)
+            .execute(&mut *conn)
+            .await?;
+            sqlx::query(&format!(
+                "DELETE FROM card_category_assignment WHERE card_id = ? AND category_id IN ({categories})"
+            ))
+            .bind(proxy_id)
+            .bind(version_id)
+            .execute(&mut *conn)
+            .await?;
+
+            replaced += 1;
+        }
+    }
+
+    Ok(replaced)
+}

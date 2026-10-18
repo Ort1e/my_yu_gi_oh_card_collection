@@ -9,6 +9,8 @@
 mod ban_list;
 mod clean_cards;
 
+pub use clean_cards::spawn_daily as spawn_daily_cleanup;
+
 use crate::AppState;
 
 pub const USAGE: &str = "usage:
