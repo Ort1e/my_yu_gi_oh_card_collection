@@ -28,7 +28,7 @@ use crate::cards::{
     delete_orphan_proxies, new_proxy, version_card_ids, Zone, IN_VERSION, SOLD_EXISTS,
 };
 use crate::db::{begin_write, exists, row_exists, Money, Pool};
-use crate::error::{bad_request, AppError, AppResult, OrNotFound};
+use crate::error::{bad_request, non_blank, required, AppError, AppResult, OrNotFound};
 use crate::routes::cards::{card_types, CardFilter};
 use crate::AppState;
 
@@ -320,10 +320,7 @@ pub async fn update_version(
     exists(&mut tx, "deck_version", id).await?;
 
     if let Some(name) = &update.version_name {
-        let name = name.trim();
-        if name.is_empty() {
-            return bad_request("The version name can't be empty.");
-        }
+        let name = required(name, "The version name can't be empty.")?;
         sqlx::query("UPDATE deck_version SET version_name = ? WHERE id = ?")
             .bind(name)
             .bind(id)
@@ -444,10 +441,7 @@ pub async fn clone_version(
     Path(id): Path<i64>,
     Json(input): Json<NameInput>,
 ) -> AppResult<(StatusCode, Json<Created>)> {
-    let name = input.name.trim();
-    if name.is_empty() {
-        return bad_request("The version name can't be empty.");
-    }
+    let name = required(&input.name, "The version name can't be empty.")?;
     let mut tx = begin_write(&state.pool).await?;
     exists(&mut tx, "deck_version", id).await?;
     let new_id: i64 = sqlx::query(
@@ -505,10 +499,7 @@ pub async fn add_proxy(
     Path(id): Path<i64>,
     Json(input): Json<ProxyInput>,
 ) -> AppResult<(StatusCode, Json<ApiCard>)> {
-    let name = input.name.trim();
-    if name.is_empty() {
-        return bad_request("The card name can't be empty.");
-    }
+    let name = required(&input.name, "The card name can't be empty.")?;
     exists(&mut *state.pool.acquire().await?, "deck_version", id).await?;
     // network call, before the transaction
     let card_data_id = get_or_fetch(&state.pool, &state.http, name).await?;
@@ -690,16 +681,10 @@ pub async fn add_category(
     Path(id): Path<i64>,
     Json(input): Json<CategoryInput>,
 ) -> AppResult<(StatusCode, Json<ApiCategory>)> {
-    let name = input.name.trim().to_string();
-    if name.is_empty() {
-        return bad_request("The category name can't be empty.");
-    }
+    let name = required(&input.name, "The category name can't be empty.")?.to_string();
     let mut condition = input.condition;
     if let Some(c) = &mut condition {
-        c.description = c.description.trim().to_string();
-        if c.description.is_empty() {
-            return bad_request("Describe the condition.");
-        }
+        c.description = required(&c.description, "Describe the condition.")?.to_string();
         if c.if_any_of.is_empty() {
             return bad_request("Choose at least one category for the condition.");
         }
@@ -930,20 +915,15 @@ pub async fn save_tournament(
     Path(id): Path<i64>,
     Json(input): Json<TournamentInput>,
 ) -> AppResult<Json<Tournament>> {
-    let name = input.name.trim().to_string();
-    if name.is_empty() {
-        return bad_request("The tournament name is required.");
-    }
+    let name = required(&input.name, "The tournament name is required.")?.to_string();
     let Ok(date) = input.date.trim().parse::<chrono::NaiveDate>() else {
         return bad_request("The tournament date is not a valid date.");
     };
-    let blank_to_none =
-        |s: Option<String>| s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let tournament = Tournament {
         name,
         date: date.to_string(),
-        location: blank_to_none(input.location),
-        notes: blank_to_none(input.notes),
+        location: non_blank(input.location),
+        notes: non_blank(input.notes),
     };
 
     let mut tx = begin_write(&state.pool).await?;
@@ -1009,11 +989,7 @@ pub async fn import_ydke(
         Err(e) => return bad_request(e.to_string()),
     };
     exists(&mut *state.pool.acquire().await?, "deck", deck_id).await?;
-    let name = input
-        .name
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| "Imported".to_string());
+    let name = non_blank(input.name).unwrap_or_else(|| "Imported".to_string());
 
     // Resolve card data first (network), outside the transaction.
     let mut data: HashMap<u32, Option<(i64, String)>> = HashMap::new();

@@ -69,3 +69,16 @@ impl<T> OrNotFound<T> for Option<T> {
 pub fn bad_request<T>(msg: impl Into<String>) -> AppResult<T> {
     Err(AppError::BadRequest(msg.into()))
 }
+
+/// API input: `text` trimmed, or a 400 with `message` when it is blank.
+pub fn required<'a>(text: &'a str, message: &str) -> AppResult<&'a str> {
+    match text.trim() {
+        "" => bad_request(message),
+        text => Ok(text),
+    }
+}
+
+/// API input: `text` trimmed, `None` when absent or blank.
+pub fn non_blank(text: Option<String>) -> Option<String> {
+    text.map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+}
