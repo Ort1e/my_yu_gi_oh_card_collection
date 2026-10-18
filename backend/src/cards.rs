@@ -1,6 +1,8 @@
 //! Writes on `card` rows shared by the forms, the deck builder API and the
 //! maintenance commands, and the SQL fragments they share.
 
+use std::collections::HashSet;
+
 use domain::card::normalize_card_name;
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
@@ -27,6 +29,39 @@ impl Zone {
             Zone::Side => "deck_version_side_deck",
         }
     }
+
+    /// The cards of this zone of a version, in the order they were added.
+    pub async fn card_ids(
+        self,
+        conn: &mut SqliteConnection,
+        version_id: i64,
+    ) -> sqlx::Result<Vec<i64>> {
+        sqlx::query_scalar(&format!(
+            "SELECT card_id FROM {} WHERE deck_version_id = ? ORDER BY rowid",
+            self.table()
+        ))
+        .bind(version_id)
+        .fetch_all(&mut *conn)
+        .await
+    }
+
+    /// Put a card in this zone of a version.
+    pub async fn insert(
+        self,
+        conn: &mut SqliteConnection,
+        version_id: i64,
+        card_id: i64,
+    ) -> sqlx::Result<()> {
+        sqlx::query(&format!(
+            "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
+            self.table()
+        ))
+        .bind(version_id)
+        .bind(card_id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(())
+    }
 }
 
 /// SQL condition on `card`: it is in a non-cancelled sale lot.
@@ -37,6 +72,24 @@ pub const SOLD_EXISTS: &str = "EXISTS (SELECT 1 FROM unite JOIN lot ON lot.id = 
 pub const IN_ANY_DECK: &str = "SELECT card_id FROM deck_version_main_deck
     UNION SELECT card_id FROM deck_version_extra_deck
     UNION SELECT card_id FROM deck_version_side_deck";
+
+/// SQL subquery: ids of the cards in any zone of the deck version bound as `?1`.
+pub const IN_VERSION: &str = "SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
+    UNION SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
+    UNION SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1";
+
+/// The cards in any zone of a deck version.
+pub async fn version_card_ids(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+) -> sqlx::Result<HashSet<i64>> {
+    Ok(sqlx::query_scalar(IN_VERSION)
+        .bind(version_id)
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .collect())
+}
 
 /// Create the cards of `rows` (each `quantity` times) with one unite each in
 /// `lot_id`. Returns the new card ids.

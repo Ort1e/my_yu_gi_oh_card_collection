@@ -10,13 +10,13 @@
 //! category assignments follow the replacement, proxies bought in a lot are
 //! kept, and a rename that would clash with another card data is skipped.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use domain::card::{clean_card_name, normalize_card_name};
 
 use super::finish;
 use crate::card_data::get_or_fetch;
-use crate::cards::{delete_orphan_proxies, Zone, SOLD_EXISTS};
+use crate::cards::{delete_orphan_proxies, version_card_ids, Zone, SOLD_EXISTS};
 use crate::db::begin_write;
 use crate::AppState;
 
@@ -166,16 +166,7 @@ async fn replace_proxies(conn: &mut sqlx::SqliteConnection) -> anyhow::Result<us
         .await?;
 
         for (version_id, proxy_id, card_data_id) in proxies {
-            let in_version: HashSet<i64> = sqlx::query_scalar(
-                "SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
-                 UNION SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
-                 UNION SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1",
-            )
-            .bind(version_id)
-            .fetch_all(&mut *conn)
-            .await?
-            .into_iter()
-            .collect();
+            let in_version = version_card_ids(conn, version_id).await?;
 
             let owned: Vec<i64> = sqlx::query_scalar(&format!(
                 "SELECT id FROM card WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}

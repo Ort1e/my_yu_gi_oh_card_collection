@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 
 use crate::cards::delete_orphan_proxies;
-use crate::db::begin_write;
+use crate::db::{begin_write, exists};
 use crate::error::{AppError, AppResult, OrNotFound};
 use crate::forms::{FormData, Pairs};
 use crate::routes::decks;
@@ -160,11 +160,7 @@ pub async fn add_version(
     };
 
     let mut tx = begin_write(&state.pool).await?;
-    sqlx::query_scalar::<_, i64>("SELECT id FROM deck WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .or_404()?;
+    exists(&mut tx, "deck", id).await?;
     let version_id = sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
         .bind(id)
         .bind(&version_name)

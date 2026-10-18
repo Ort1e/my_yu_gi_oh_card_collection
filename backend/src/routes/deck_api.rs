@@ -24,8 +24,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
 
 use crate::card_data::{get_or_fetch, get_or_fetch_by_ygopro_id};
-use crate::cards::{delete_orphan_proxies, new_proxy, Zone, SOLD_EXISTS};
-use crate::db::{begin_write, Money, Pool};
+use crate::cards::{
+    delete_orphan_proxies, new_proxy, version_card_ids, Zone, IN_VERSION, SOLD_EXISTS,
+};
+use crate::db::{begin_write, exists, row_exists, Money, Pool};
 use crate::error::{bad_request, AppError, AppResult, OrNotFound};
 use crate::routes::cards::{card_types, CardFilter};
 use crate::AppState;
@@ -147,20 +149,6 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
     Ok(ids.iter().filter_map(|id| by_id.remove(id)).collect())
 }
 
-async fn zone_card_ids(
-    conn: &mut SqliteConnection,
-    version_id: i64,
-    zone: Zone,
-) -> AppResult<Vec<i64>> {
-    Ok(sqlx::query_scalar(&format!(
-        "SELECT card_id FROM {} WHERE deck_version_id = ? ORDER BY rowid",
-        zone.table()
-    ))
-    .bind(version_id)
-    .fetch_all(&mut *conn)
-    .await?)
-}
-
 // ---------- deck version ----------
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -260,9 +248,9 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         None => None,
     };
 
-    let main_ids = zone_card_ids(&mut conn, id, Zone::Main).await?;
-    let extra_ids = zone_card_ids(&mut conn, id, Zone::Extra).await?;
-    let side_ids = zone_card_ids(&mut conn, id, Zone::Side).await?;
+    let main_ids = Zone::Main.card_ids(&mut conn, id).await?;
+    let extra_ids = Zone::Extra.card_ids(&mut conn, id).await?;
+    let side_ids = Zone::Side.card_ids(&mut conn, id).await?;
     let main = load_cards(&mut conn, &main_ids).await?;
     let extra = load_cards(&mut conn, &extra_ids).await?;
     let side = load_cards(&mut conn, &side_ids).await?;
@@ -383,25 +371,15 @@ pub async fn update_version(
         .execute(&mut *tx)
         .await?;
         for card_id in ids {
-            sqlx::query(&format!(
-                "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
-                zone.table()
-            ))
-            .bind(id)
-            .bind(card_id)
-            .execute(&mut *tx)
-            .await?;
+            zone.insert(&mut tx, id, card_id).await?;
         }
     }
     if zones_changed {
-        sqlx::query(
+        sqlx::query(&format!(
             "DELETE FROM card_category_assignment
              WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?1)
-               AND card_id NOT IN (
-                   SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
-                   UNION SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
-                   UNION SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1)",
-        )
+               AND card_id NOT IN ({IN_VERSION})"
+        ))
         .bind(id)
         .execute(&mut *tx)
         .await?;
@@ -416,22 +394,6 @@ pub async fn update_version(
     );
 
     Ok(Json(load_version(&state.pool, id).await?))
-}
-
-async fn row_exists(conn: &mut SqliteConnection, table: &str, id: i64) -> AppResult<bool> {
-    let found: Option<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE id = ?"))
-        .bind(id)
-        .fetch_optional(&mut *conn)
-        .await?;
-    Ok(found.is_some())
-}
-
-async fn exists(conn: &mut SqliteConnection, table: &str, id: i64) -> AppResult<()> {
-    if row_exists(conn, table, id).await? {
-        Ok(())
-    } else {
-        Err(AppError::NotFound)
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -500,7 +462,7 @@ pub async fn clone_version(
     .last_insert_rowid();
 
     for zone in Zone::ALL {
-        for card_id in zone_card_ids(&mut tx, id, zone).await? {
+        for card_id in zone.card_ids(&mut tx, id).await? {
             let is_proxy: bool = sqlx::query_scalar("SELECT is_proxy FROM card WHERE id = ?")
                 .bind(card_id)
                 .fetch_one(&mut *tx)
@@ -518,14 +480,7 @@ pub async fn clone_version(
             } else {
                 card_id
             };
-            sqlx::query(&format!(
-                "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
-                zone.table()
-            ))
-            .bind(new_id)
-            .bind(card_id)
-            .execute(&mut *tx)
-            .await?;
+            zone.insert(&mut tx, new_id, card_id).await?;
         }
     }
     tx.commit().await?;
@@ -560,14 +515,7 @@ pub async fn add_proxy(
 
     let mut tx = begin_write(&state.pool).await?;
     let card_id = new_proxy(&mut tx, name, card_data_id).await?;
-    sqlx::query(&format!(
-        "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
-        input.zone.table()
-    ))
-    .bind(id)
-    .bind(card_id)
-    .execute(&mut *tx)
-    .await?;
+    input.zone.insert(&mut tx, id, card_id).await?;
     let card = load_cards(&mut tx, &[card_id])
         .await?
         .pop()
@@ -633,19 +581,16 @@ pub async fn reserve(
         sold: Some("false".into()),
         status: None,
     };
+    let in_version = version_card_ids(&mut conn, id).await?;
+
     let mut qb = QueryBuilder::new("SELECT card.id FROM card");
     filter.push_where(&mut qb);
-    qb.push(
-        " AND card.id NOT IN (
-            SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ",
-    )
-    .push_bind(id)
-    .push(" UNION SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ")
-    .push_bind(id)
-    .push(" UNION SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ")
-    .push_bind(id)
-    .push(") ORDER BY card.en_name, card.id LIMIT ")
-    .push_bind(RESERVE_LIMIT);
+    if !in_version.is_empty() {
+        qb.push(" AND card.id NOT IN ");
+        push_ids(&mut qb, in_version);
+    }
+    qb.push(" ORDER BY card.en_name, card.id LIMIT ")
+        .push_bind(RESERVE_LIMIT);
     let ids: Vec<i64> = qb.build_query_scalar().fetch_all(&mut *conn).await?;
     Ok(Json(load_cards(&mut conn, &ids).await?))
 }
@@ -929,7 +874,7 @@ pub async fn monte_carlo(
     }
     let mut conn = state.pool.acquire().await?;
     exists(&mut conn, "deck_version", id).await?;
-    let main = zone_card_ids(&mut conn, id, Zone::Main).await?;
+    let main = Zone::Main.card_ids(&mut conn, id).await?;
 
     let categories = load_categories(&mut conn, id).await?;
     let assignments: Vec<(i64, i64)> = sqlx::query_as(
@@ -1118,14 +1063,7 @@ pub async fn import_ydke(
                 }
             };
             used.insert(card_id);
-            sqlx::query(&format!(
-                "INSERT INTO {} (deck_version_id, card_id) VALUES (?, ?)",
-                zone.table()
-            ))
-            .bind(version_id)
-            .bind(card_id)
-            .execute(&mut *tx)
-            .await?;
+            zone.insert(&mut tx, version_id, card_id).await?;
         }
     }
     tx.commit().await?;

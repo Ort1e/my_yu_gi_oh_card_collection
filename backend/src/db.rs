@@ -2,7 +2,9 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
-use sqlx::{Sqlite, Transaction};
+use sqlx::{Sqlite, SqliteConnection, Transaction};
+
+use crate::error::{AppError, AppResult};
 
 pub type Pool = SqlitePool;
 
@@ -36,6 +38,24 @@ pub async fn begin_write(pool: &Pool) -> sqlx::Result<Transaction<'static, Sqlit
         .execute(&mut *tx)
         .await?;
     Ok(tx)
+}
+
+/// Whether `table` has a row with this id.
+pub async fn row_exists(conn: &mut SqliteConnection, table: &str, id: i64) -> sqlx::Result<bool> {
+    let found: Option<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE id = ?"))
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(found.is_some())
+}
+
+/// A 404 unless `table` has a row with this id.
+pub async fn exists(conn: &mut SqliteConnection, table: &str, id: i64) -> AppResult<()> {
+    if row_exists(conn, table, id).await? {
+        Ok(())
+    } else {
+        Err(AppError::NotFound)
+    }
 }
 
 pub async fn init_pool() -> Pool {

@@ -20,7 +20,7 @@ use regex::Regex;
 
 use crate::card_data::spawn_link_cards;
 use crate::cards::insert_lot_cards;
-use crate::db::{begin_write, Money};
+use crate::db::{begin_write, exists, Money};
 use crate::error::{AppError, AppResult, OrNotFound};
 use crate::forms::{CardRowValues, FormData, Pairs};
 use crate::routes::lots;
@@ -359,11 +359,10 @@ pub async fn create(
     let mut tx = begin_write(&state.pool).await?;
 
     let seller_id = match (seller_id, seller_name) {
-        (Some(id), _) => sqlx::query_scalar::<_, i64>("SELECT id FROM seller WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or(AppError::NotFound)?,
+        (Some(id), _) => {
+            exists(&mut tx, "seller", id).await?;
+            id
+        }
         (None, Some(name)) => {
             let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM seller WHERE name = ?")
                 .bind(&name)
@@ -585,11 +584,7 @@ pub async fn update(
 
     let mut tx = begin_write(&state.pool).await?;
     if let Some(seller_id) = seller_id {
-        sqlx::query_scalar::<_, i64>("SELECT id FROM seller WHERE id = ?")
-            .bind(seller_id)
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or(AppError::NotFound)?;
+        exists(&mut tx, "seller", seller_id).await?;
     }
     let updated = sqlx::query(
         "UPDATE lot SET lot_type = ?, price = ?, buy_date = ?, received_date = ?,
@@ -643,11 +638,7 @@ pub async fn add_cards(
     }
 
     let mut tx = begin_write(&state.pool).await?;
-    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM lot WHERE id = ?")
-        .bind(lot_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-    exists.ok_or(AppError::NotFound)?;
+    exists(&mut tx, "lot", lot_id).await?;
     let card_ids = insert_lot_cards(&mut tx, lot_id, &cards).await?;
     tx.commit().await?;
     tracing::info!(lot_id, cards = card_ids.len(), "cards added to lot");
