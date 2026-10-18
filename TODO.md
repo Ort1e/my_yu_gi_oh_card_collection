@@ -30,10 +30,11 @@
   - [ ] once `GET /api/sets/:code` exists: in the quick-add panel, offer
         only the code's rarities (today a code with a single rarity fills it
         in, several are listed under the panel).
-- [ ] Link decks together. Today each deck version uses the whole
-      collection, so the same card can be in several versions at once. Goal:
-      build several decks at the same time from one shared collection,
-      without overlap (each card owned is used by only one of the linked
-      decks), and track the cards still missing across all of them.
+- [ ] Link decks together: a *built* flag on deck versions; the cards of a
+      built version are locked (gone from the collection for every other
+      deck; where other decks used them, they become proxies there), and
+      `/decks/built` lists the built versions and their missing cards.
+      Design: `docs/specs/built-decks.md` (deck box and sleeves too);
+      backend (owner), then frontend.
 - [x] Refactor the code base to make it easier to read: plan and what was
       done in `docs/specs/refactor.md`.
