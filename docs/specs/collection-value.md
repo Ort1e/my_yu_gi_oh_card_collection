@@ -3,8 +3,16 @@
 What the owned collection is worth at market prices, compared with what it
 cost, and how that value moves over time.
 
-**Status: designed (2026-10-19), all decisions settled. Backend for the owner
-(Claude reviews and suggests), frontend for Claude once the queries exist.
+**Status: designed (2026-10-19), all decisions settled.**
+
+**Who writes what** (CLAUDE.md, "Division of work"):
+- **the owner**: `domain::valuation` (section 3: `copy_value`, the cost of a
+  copy with its share of the shipping) and the history (section 4: who is
+  owned on a date, value and cost per refresh date). Claude leaves the stubs
+  and their unit tests;
+- **Claude**: everything else: the migration, the refresh (fetch, parsing,
+  command, weekly task), the queries that load the rows, the pages, the
+  dashboard tile, the handler tests.
 
 ## The price source
 

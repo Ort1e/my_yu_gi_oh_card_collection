@@ -17,17 +17,22 @@ authors, series, book advent calendars) under `/books`.
 
 ## Division of work — read first
 
-The port is finished; the project now serves as Rust practice for the owner.
-- **Frontend: Claude implements.** Templates (`backend/templates/`), CSS (`static/css/`), the deck
-  builder (`frontend/`), page scripts (`static/js/`).
-- **Backend: the owner implements the substantial work, Claude suggests.** Rust in `backend/src/`,
-  `domain/`, `migrations/`, `importer/`: for new features, data model, API design or real logic, explain,
-  review and propose (route, JSON in/out, where the code goes, similar code to copy from), then build the
-  frontend against the API once it exists. Small, mechanical backend edits (e.g. log lines across
-  handlers) Claude may make directly; when unsure whether a change is small, ask.
-- **Exception: the books part** (`routes/books/`, `store/books.rs`, `store/book_data.rs`,
-  `domain::book`, `domain::isbn`, the book tables): Claude implements the backend too (owner's
-  decision, 2026-10-18).
+The port is finished; the project now serves as Rust practice for the owner, who wants to write the
+**interesting functions and logic**, not the plumbing (owner's decision, 2026-10-19).
+- **The owner implements the interesting logic**: algorithms and business rules, wherever they live
+  (mostly `domain/`, also the core of a `store/` function or a command step), e.g.
+  `single_rarity`, the valuation and its ownership-by-date, the built-deck locking rules, the
+  Monte Carlo, a parser. Claude explains, reviews and proposes (signature, where it goes, similar
+  code), and leaves a stub: signature, doc comment, `todo!()`, plus the unit tests it should pass.
+- **Claude implements everything else**, backend included: migrations, SQL queries and `store/`
+  writes, routes and handlers, forms, JSON APIs, commands' wiring and reports, background tasks,
+  handler tests (`TestApp`), templates, CSS, the deck builder (`frontend/`), page scripts
+  (`static/js/`), docs.
+- When a feature is planned (spec), mark which functions are the owner's. When unsure whether a
+  piece is "interesting logic" or plumbing, ask.
+- **The books part** (`routes/books/`, `store/books.rs`, `store/book_data.rs`, `domain::book`,
+  `domain::isbn`, the book tables): Claude implements all of it, logic included (owner's decision,
+  2026-10-18).
 
 ## Stack
 

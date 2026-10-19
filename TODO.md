@@ -5,7 +5,7 @@
       deck; where other decks used them, they become proxies there), and
       `/decks/built` lists the built versions and their missing cards.
       Design: `docs/specs/built-decks.md` (deck box and sleeves too);
-      backend (owner), then frontend.
+      the building rule (owner), the rest (Claude).
 - [ ] Structured tournament results instead of the free `tournament.notes`
       (the notes are already written the same way each time). Per
       tournament: rounds, each with the opponent's deck, die won/lost, the
@@ -21,7 +21,7 @@
       deck version, per label (matchups: "against K9", "with Orcust"), die
       and first/second). The 7
       existing tournaments' notes to move over (by hand or a one-off
-      parse). Spec first, then backend (owner), then frontend.
+      parse). Spec first (marking the owner's logic: stats, notes parsing), then the rest (Claude).
 - [ ] `scrap-ban-list` misses the new lists: Konami's EU JSON
       (`_data/fllists/options.json`, `current.json`) stopped at May 2026
       (18/05/2026; list 73 is a 404), while September 21 and October 19,
@@ -36,12 +36,13 @@
       Advanced column: Forbidden → Banned, Limited, Semi-Limited;
       "Unlimited" rows skipped); `commands/ban_list.rs` imports the dates
       not imported yet. Check the card data lookup (`find`/`get_or_fetch`)
-      matches upper-case names. Backend (owner).
+      matches upper-case names. The page parsing in `domain` (owner), the
+      fetching and import (Claude).
 - [ ] Collection value: weekly market prices from ygoprodeck kept as a
       history (`card_price`), value vs cost of the owned copies (condition
       and language factors), `/collection/value` page, price line on card
       pages, dashboard tile. Design: `docs/specs/collection-value.md`;
-      backend (owner), then frontend.
+      `domain::valuation` (owner), the rest (Claude).
 
 ## Done
 

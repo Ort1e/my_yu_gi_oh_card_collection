@@ -5,8 +5,18 @@ collection: the same owned card can be in several versions at once. Goal:
 build several decks at the same time from one collection, each physical card
 in only one of them, and see what is still missing.
 
-**Status: designed (2026-10-18), all decisions settled.** Backend for the owner (Claude reviews
-and suggests), frontend for Claude once the API exists.
+**Status: designed (2026-10-18), all decisions settled.**
+
+**Who writes what** (CLAUDE.md, "Division of work"):
+- **the owner**: the building rule (section 3, steps 1 and 2) as a pure
+  function, e.g. `domain::built_deck::plan_build`: given the version's real
+  cards, the cards locked elsewhere and the other versions using each card,
+  which cards get a proxy here and which get one in which other version
+  (first built, first served). Claude leaves the stub and its unit tests;
+- **Claude**: everything else: the migration, the shared SQL
+  (`LOCKED_ELSEWHERE`, `proxy_copy`, `swap_card`), applying the plan in the
+  `PATCH`, the build report, the collection reads (section 4) and the saving
+  error, `/decks/built`, the deck builder, the tests.
 
 ## The idea
 
