@@ -43,7 +43,7 @@ async fn values_the_collection_from_lot_prices() {
 
     let (status, body) = t.get("/collection/value").await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(body.contains("last refresh 2026-10-01"), "{body}");
+    assert!(body.contains("Market prices of 2026-10-01"), "{body}");
     // 2 French NM copies at 6.00 × 0.9; the proxy isn't owned
     assert!(body.contains("10.80 €"), "{body}");
     assert!(body.contains("2 copies"), "{body}");
@@ -84,9 +84,10 @@ async fn the_card_page_shows_its_market_price() {
     let (status, body) = t.get(&format!("/cards/{}", cards[0])).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert!(
-        body.contains("Market: 6.00 € on 2026-10-01 (this copy ≈ 5.40 €)"),
+        body.contains("6.00 € on 2026-10-01 (this copy ≈ 5.40 €)"),
         "{body}"
     );
+    assert!(body.contains("Market (estimate):"), "{body}");
     assert!(body.contains("<polyline"), "{body}");
 }
 

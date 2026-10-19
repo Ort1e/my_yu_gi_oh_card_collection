@@ -1,5 +1,6 @@
 //! `refresh-prices`: today's market prices from ygoprodeck into `card_price`
-//! (`store::card_prices`). The server also runs it by itself every week
+//! (`store::card_prices`), then Cardmarket's price guide
+//! (`store::cardmarket`). The server also runs it by itself every week
 //! ([`spawn_weekly`]).
 
 use std::time::Duration;
@@ -7,6 +8,7 @@ use std::time::Duration;
 use chrono::NaiveDate;
 
 use crate::store::card_prices::{latest_refresh, refresh_prices};
+use crate::store::cardmarket;
 use crate::AppState;
 
 pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
@@ -16,6 +18,9 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
          {} unknown to ygoprodeck",
         report.asked, report.written, report.without_price, report.missing
     );
+    let report = cardmarket::refresh(&state.pool, &state.http, today(), dry_run).await?;
+    println!("{}", report.summary());
+
     if dry_run {
         println!("dry run: nothing was saved");
     }
@@ -30,16 +35,26 @@ pub fn spawn_weekly(state: AppState) {
         tokio::time::sleep(START_DELAY).await;
         loop {
             match due(&state).await {
-                Ok(true) => match refresh_prices(&state.pool, &state.http, today(), false).await {
-                    Ok(report) => report.log(),
-                    Err(e) => tracing::warn!("background price refresh: {e}"),
-                },
+                Ok(true) => refresh_in_background(&state).await,
                 Ok(false) => {}
                 Err(e) => tracing::warn!("background price refresh: {e}"),
             }
             tokio::time::sleep(CHECK_INTERVAL).await;
         }
     });
+}
+
+/// Both refreshes; Cardmarket's even when ygoprodeck's failed (they are
+/// independent).
+async fn refresh_in_background(state: &AppState) {
+    match refresh_prices(&state.pool, &state.http, today(), false).await {
+        Ok(report) => report.log(),
+        Err(e) => tracing::warn!("background price refresh: {e}"),
+    }
+    match cardmarket::refresh(&state.pool, &state.http, today(), false).await {
+        Ok(report) => tracing::info!("{}", report.summary()),
+        Err(e) => tracing::warn!("background Cardmarket refresh: {e}"),
+    }
 }
 
 /// After `clean-cards` (5 minutes), which links new cards to their card data.
@@ -95,7 +110,7 @@ mod tests {
 
         let by_date = prices_by_date(&t.state.pool).await.unwrap();
         assert_eq!(by_date.len(), 1);
-        assert_eq!(by_date.values().next().unwrap()[&1], dec!(0.25));
+        assert_eq!(by_date.values().next().unwrap().cards[&1], dec!(0.25));
         assert_eq!(
             latest_refresh(&t.state.pool).await.unwrap(),
             Some(super::today())

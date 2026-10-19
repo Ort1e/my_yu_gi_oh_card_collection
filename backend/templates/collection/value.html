@@ -16,10 +16,11 @@
     (or now with <code>cargo run -p backend -- refresh-prices</code>).</p>
   {% when Some with (_date) %}
   <p class="value-note">
-    Market prices from ygoprodeck (Cardmarket, last refresh {{ self.last_refresh_str() }}).
-    They are an <strong>estimate</strong>: one price per card name, the cheapest printing's,
-    so old or high rarity copies are usually worth more. Condition (EX ×0.8, G ×0.6, P ×0.4)
-    and language (non-English ×0.9) lower a copy's value.
+    Market prices of {{ self.last_refresh_str() }}. A copy linked to its Cardmarket printing
+    (set and rarity) is valued at that printing's trend price, every language and edition together;
+    the others at ygoprodeck's <strong>estimate</strong>, one price per card name, the cheapest printing's.
+    A wrong or missing printing can be set on the card's edit page.
+    Condition (EX ×0.8, G ×0.6, P ×0.4) and language (non-English ×0.9) lower a copy's value.
   </p>
 
   <div class="value-tiles">

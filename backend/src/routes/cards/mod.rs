@@ -185,6 +185,11 @@ pub struct CardDetail {
 pub struct MarketPrice {
     price: Money,
     date: String,
+    /// From the card's Cardmarket product (its printing), else ygoprodeck's
+    /// price of the card name (an estimate, the cheapest printing).
+    from_cardmarket: bool,
+    /// The card's Cardmarket product, `None` when not known.
+    product_id: Option<i64>,
     /// The price × this copy's condition and language factors.
     copy_value: Money,
     /// SVG polyline points of the price history, `None` with one refresh.
@@ -282,7 +287,12 @@ async fn market_price(
     card: &CardRow,
     card_data_id: i64,
 ) -> sqlx::Result<Option<MarketPrice>> {
-    let history = card_history(&state.pool, card_data_id).await?;
+    let product_id: Option<i64> =
+        sqlx::query_scalar("SELECT cardmarket_product_id FROM card WHERE id = ?")
+            .bind(card.id)
+            .fetch_one(&state.pool)
+            .await?;
+    let (history, from_cardmarket) = card_history(&state.pool, card_data_id, product_id).await?;
     let Some((date, price)) = history.last().cloned() else {
         return Ok(None);
     };
@@ -295,6 +305,8 @@ async fn market_price(
     Ok(Some(MarketPrice {
         price,
         date,
+        from_cardmarket,
+        product_id,
         copy_value: Money(copy_value(price.0, card.status(), language).round_dp(2)),
         sparkline: sparkline(&prices),
     }))

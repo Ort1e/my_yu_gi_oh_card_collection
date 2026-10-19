@@ -47,6 +47,25 @@
     <label class="switch"><input type="checkbox" name="is_proxy" {% if card.is_proxy %}checked{% endif %}> Proxy card</label>
   </fieldset>
 
+  <fieldset>
+    <legend>Cardmarket product</legend>
+    {% if products.is_empty() %}
+    <p><small>No Cardmarket product with this card's name yet (they come with the weekly price refresh).</small></p>
+    {% else %}
+    <p>
+      <label for="cardmarket_product">Printing:</label>
+      <select name="cardmarket_product" id="cardmarket_product">
+        <option value="">{{ self.guess_label() }}</option>
+        {% for candidate in products %}
+        <option value="{{ candidate.id }}" {% if product == candidate.id.to_string() %}selected{% endif %}>{{ candidate.label() }}</option>
+        {% endfor %}
+      </select>
+      <small>Its market price values this copy. Automatic: guessed from the set code and the rarity at each price refresh.
+        Compare the prices with the card's versions on Cardmarket to pick the right one.</small>
+    </p>
+    {% endif %}
+  </fieldset>
+
   <input type="submit" value="Save">
 </form>
 </div>

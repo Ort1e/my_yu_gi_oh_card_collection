@@ -311,6 +311,50 @@ async fn fetch_set_cards(
     })
 }
 
+/// What ygoprodeck says about a set code, to find its Cardmarket expansion
+/// (`store::cardmarket`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SetInfo {
+    /// Its cards' names (`clean_card_name`), empty for an unknown code.
+    pub names: HashSet<String>,
+    pub release: Option<chrono::NaiveDate>,
+}
+
+/// [`SetInfo`] of each set code of `prefixes` (`"SUDA"`): `cardsets.php`
+/// once, then the English cards of each set with that code.
+pub async fn fetch_set_infos(
+    http: &reqwest::Client,
+    prefixes: &[String],
+) -> AppResult<HashMap<String, SetInfo>> {
+    let mut infos = HashMap::new();
+    if prefixes.is_empty() {
+        return Ok(infos);
+    }
+
+    let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
+    throttle().await;
+    let sets: Value = http
+        .get(SETS_URL)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(internal)?
+        .json()
+        .await
+        .map_err(internal)?;
+
+    for prefix in prefixes {
+        let (set_names, release) = domain::card_set::sets_with_code(&sets, prefix);
+        let mut cards = Vec::new();
+        for set_name in &set_names {
+            cards.extend(fetch_set_cards(http, set_name, None).await?);
+        }
+        let names = domain::card_set::set_card_names(prefix, &cards);
+        infos.insert(prefix.clone(), SetInfo { names, release });
+    }
+    Ok(infos)
+}
+
 /// Insert API data as a `card_data` row (or find the row it duplicates).
 async fn store(pool: &Pool, name: &str, data: &Value) -> AppResult<i64> {
     let ygopro_id = data["id"].as_i64();

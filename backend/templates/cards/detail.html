@@ -32,8 +32,13 @@
         <div class="card-subtitle">Price: {{ price }} €</div>
         {% when None %}{% endmatch %}
         {% match market %}{% when Some with (market) %}
-        <div class="card-subtitle" title="ygoprodeck's Cardmarket price, the cheapest printing's: an estimate">
-          Market: {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
+        <div class="card-subtitle">
+          {% if market.from_cardmarket %}
+          <span title="Cardmarket's trend price of this printing (product {% match market.product_id %}{% when Some with (id) %}{{ id }}{% when None %}{% endmatch %})">Market (Cardmarket):</span>
+          {% else %}
+          <span title="ygoprodeck's price of the card name, the cheapest printing's: an estimate. Pick the card's Cardmarket product on its edit page for a precise price.">Market (estimate):</span>
+          {% endif %}
+          {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
           {% match market.sparkline %}{% when Some with (points) %}
           <svg class="price-history" width="160" height="32" viewBox="-2 -2 164 36" role="img" aria-label="Price history">
             <polyline points="{{ points }}" fill="none" stroke="currentColor" stroke-width="2"/>

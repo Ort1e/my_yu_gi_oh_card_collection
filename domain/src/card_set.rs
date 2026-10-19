@@ -8,12 +8,14 @@
 //! Pure: the backend fetches the JSON (`card_data::fetch_set`), this module
 //! only reads it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use chrono::NaiveDate;
 
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::card::Language;
+use crate::card::{clean_card_name, Language};
 use crate::rarity::Rarity;
 
 /// One card number of a set, as sent to the panel.
@@ -118,6 +120,87 @@ pub fn single_rarity(json: &Value, code: &str) -> Option<Rarity> {
         }
     }
     found
+}
+
+/// Every rarity ygoprodeck lists for the code `code` in a card's JSON
+/// (`card_sets`), in the order listed, without repeats; unknown rarity names
+/// are skipped. `"SUDA-FR049"` matches `"SUDA-EN049"`.
+pub fn code_rarities(json: &Value, code: &str) -> Vec<Rarity> {
+    let Some(wanted) = code_without_language(code) else {
+        return Vec::new();
+    };
+
+    let mut rarities = Vec::new();
+    let sets = json.get("card_sets").and_then(Value::as_array);
+    for set in sets.into_iter().flatten() {
+        let same_code = set
+            .get("set_code")
+            .and_then(Value::as_str)
+            .and_then(code_without_language)
+            .is_some_and(|code| code == wanted);
+        let rarity = set
+            .get("set_rarity")
+            .and_then(Value::as_str)
+            .and_then(Rarity::from_label);
+
+        if let (true, Some(rarity)) = (same_code, rarity) {
+            if !rarities.contains(&rarity) {
+                rarities.push(rarity);
+            }
+        }
+    }
+    rarities
+}
+
+/// The sets of `cardsets.php` whose code is `prefix` (several: a set, its
+/// sneak peek, its special edition): their names, entities decoded
+/// (`Legendary 5D&apos;s Decks`), and the earliest TCG release date.
+pub fn sets_with_code(cardsets: &Value, prefix: &str) -> (Vec<String>, Option<NaiveDate>) {
+    let mut names = Vec::new();
+    let mut release: Option<NaiveDate> = None;
+
+    for set in cardsets.as_array().into_iter().flatten() {
+        let code = set
+            .get("set_code")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !code.eq_ignore_ascii_case(prefix) {
+            continue;
+        }
+
+        if let Some(name) = set.get("set_name").and_then(Value::as_str) {
+            names.push(html_escape::decode_html_entities(name).into_owned());
+        }
+        let date = set
+            .get("tcg_date")
+            .and_then(Value::as_str)
+            .and_then(|d| d.parse::<NaiveDate>().ok());
+        if let Some(date) = date {
+            release = Some(release.map_or(date, |r| r.min(date)));
+        }
+    }
+    (names, release)
+}
+
+/// The names (`clean_card_name`) of the cards printed in the set `prefix`,
+/// from `cardinfo.php?cardset=…` answers (the `data` arrays put together).
+pub fn set_card_names(prefix: &str, cards: &[Value]) -> HashSet<String> {
+    let in_set = |card: &&Value| {
+        let sets = card.get("card_sets").and_then(Value::as_array);
+        sets.into_iter().flatten().any(|set| {
+            set.get("set_code")
+                .and_then(Value::as_str)
+                .and_then(code_without_language)
+                .is_some_and(|(set, _)| set.eq_ignore_ascii_case(prefix))
+        })
+    };
+
+    cards
+        .iter()
+        .filter(in_set)
+        .filter_map(|card| card.get("name").and_then(Value::as_str))
+        .map(clean_card_name)
+        .collect()
 }
 
 /// The cards of the set `prefix` (`"RA05"`), sorted by number.
@@ -511,5 +594,48 @@ mod tests {
     #[test]
     fn no_card_no_entry() {
         assert!(set_cards("RA05", &[], &[]).is_empty());
+    }
+
+    #[test]
+    fn every_rarity_of_a_code() {
+        let json = printings(&[
+            ("SUDA-EN049", "Secret Rare"),
+            ("SUDA-EN049", "Quarter Century Secret Rare"),
+            ("SUDA-EN049", "Secret Rare"),
+            ("SUDA-EN050", "Common"),
+            ("SUDA-EN049", "New"),
+        ]);
+        assert_eq!(
+            code_rarities(&json, "SUDA-FR049"),
+            vec![Rarity::SecretRare, Rarity::QuarterCenturySecretRare]
+        );
+        assert_eq!(code_rarities(&json, "nope"), vec![]);
+    }
+
+    #[test]
+    fn sets_sharing_a_code() {
+        let sets = serde_json::json!([
+            {"set_name": "Soul Fusion", "set_code": "SOFU", "tcg_date": "2018-08-03"},
+            {"set_name": "Soul Fusion Sneak Peek Participation Card", "set_code": "SOFU", "tcg_date": "2018-07-28"},
+            {"set_name": "Legendary 5D&apos;s Decks", "set_code": "LED5"},
+            {"set_name": "Other", "set_code": "OTHR", "tcg_date": "2001-01-01"}
+        ]);
+        let (names, release) = sets_with_code(&sets, "sofu");
+        assert_eq!(names.len(), 2);
+        assert_eq!(release, NaiveDate::from_ymd_opt(2018, 7, 28));
+        assert_eq!(
+            sets_with_code(&sets, "LED5"),
+            (vec!["Legendary 5D's Decks".to_string()], None)
+        );
+    }
+
+    #[test]
+    fn names_of_a_sets_cards() {
+        let cards = [
+            serde_json::json!({"name": "Sage with Eyes of Blue", "card_sets": [{"set_code": "SDWD-EN013"}]}),
+            serde_json::json!({"name": "Kuriboh", "card_sets": [{"set_code": "LOB-E001"}]}),
+        ];
+        let names = set_card_names("SDWD", &cards);
+        assert_eq!(names, HashSet::from(["sage with eyes of blue".to_string()]));
     }
 }

@@ -1,5 +1,6 @@
 //! `/collection/value`: what the collection is worth at market prices
-//! (`domain::valuation`, prices from `store::card_prices`).
+//! (`domain::valuation`, prices from `store::card_prices` and
+//! `store::cardmarket`).
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -8,7 +9,7 @@ use axum::extract::State;
 use chrono::{Duration, NaiveDate};
 use domain::card::{CardStatus, Language};
 use domain::valuation::{
-    biggest_moves, copy_value, history, totals_on, unit_totals_on, Lot, Totals, UnitTotals,
+    biggest_moves, copy_value, history, totals_on, unit_totals_on, Lot, Prices, Totals, UnitTotals,
 };
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
@@ -31,9 +32,9 @@ const QUARTER_DAYS: i64 = 90;
 pub struct ValueData {
     pub copies: Vec<OwnedCopy>,
     pub lots: Vec<Lot>,
-    pub by_date: BTreeMap<NaiveDate, HashMap<i64, Decimal>>,
-    /// Each card's latest price.
-    pub latest: HashMap<i64, Decimal>,
+    pub by_date: BTreeMap<NaiveDate, Prices>,
+    /// Each card's and product's latest price.
+    pub latest: Prices,
 }
 
 impl ValueData {
@@ -81,42 +82,53 @@ impl ValueData {
         (before < latest).then_some((before, latest))
     }
 
-    /// The price moves of the cards owned now between two refreshes.
+    /// The price moves of the cards owned now between two refreshes: one
+    /// line per price (a Cardmarket product, else a card name), compared with
+    /// the same source on both dates.
     fn moves(&self, before: NaiveDate, after: NaiveDate) -> Vec<MoveLine> {
         let today = today();
-        let owned: HashMap<i64, &OwnedCopy> = self
-            .copies
-            .iter()
-            .filter(|c| c.copy.is_owned_on(today))
-            .filter_map(|c| Some((c.copy.card_data_id?, c)))
-            .collect();
-        let only_owned = |prices: &HashMap<i64, Decimal>| -> HashMap<i64, Decimal> {
-            prices
+        let (before, after) = (&self.by_date[&before], &self.by_date[&after]);
+
+        // one copy per price source, and its prices on both dates
+        let mut sources: HashMap<(bool, i64), &OwnedCopy> = HashMap::new();
+        for c in self.copies.iter().filter(|c| c.copy.is_owned_on(today)) {
+            let product = c
+                .copy
+                .cardmarket_product_id
+                .filter(|id| before.products.contains_key(id) && after.products.contains_key(id));
+            let key = match (product, c.copy.card_data_id) {
+                (Some(id), _) => (true, id),
+                (None, Some(id)) => (false, id),
+                (None, None) => continue,
+            };
+            sources.entry(key).or_insert(c);
+        }
+        let prices_on = |prices: &Prices| -> HashMap<i64, Decimal> {
+            sources
                 .iter()
-                .filter(|(id, _)| owned.contains_key(id))
-                .map(|(id, price)| (*id, *price))
+                .filter_map(|(&(is_product, id), c)| {
+                    let price = if is_product {
+                        prices.products.get(&id)
+                    } else {
+                        prices.cards.get(&id)
+                    };
+                    Some((c.card_id, *price?))
+                })
                 .collect()
         };
+        let cards: HashMap<i64, &OwnedCopy> = sources.values().map(|c| (c.card_id, *c)).collect();
 
-        biggest_moves(
-            &only_owned(&self.by_date[&before]),
-            &only_owned(&self.by_date[&after]),
-            MOVE_FLOOR,
-            MOVES,
-        )
-        .into_iter()
-        .map(|price_move| {
-            let card = owned[&price_move.card_data_id];
-            MoveLine {
-                card_id: card.card_id,
-                name: card.name.clone(),
+        biggest_moves(&prices_on(before), &prices_on(after), MOVE_FLOOR, MOVES)
+            .into_iter()
+            .map(|price_move| MoveLine {
+                card_id: price_move.id,
+                name: cards[&price_move.id].name.clone(),
                 before: price_move.before,
                 after: price_move.after,
                 change: price_move.change(),
                 percent: percent(Some(price_move.percent())),
-            }
-        })
-        .collect()
+            })
+            .collect()
     }
 }
 
@@ -276,6 +288,7 @@ struct DeckCardRow {
     version: String,
     is_proxy: bool,
     card_data_id: Option<i64>,
+    cardmarket_product_id: Option<i64>,
     status: Option<String>,
     code: Option<String>,
 }
@@ -295,10 +308,11 @@ fn biggest_losses(copies: &[CopyLine]) -> Vec<CopyLine> {
 
 /// The value of each deck's latest version: its real cards, and its proxies
 /// (what the missing cards would cost).
-async fn deck_values(pool: &Pool, prices: &HashMap<i64, Decimal>) -> sqlx::Result<Vec<DeckLine>> {
+async fn deck_values(pool: &Pool, prices: &Prices) -> sqlx::Result<Vec<DeckLine>> {
     let rows: Vec<DeckCardRow> = sqlx::query_as(
         "SELECT deck.id, deck.name, deck_version.version_name AS version, card.is_proxy,
-                    card.card_data_id, card.last_known_status AS status, card.code
+                    card.card_data_id, card.cardmarket_product_id,
+                    card.last_known_status AS status, card.code
              FROM deck_version
              JOIN deck ON deck.id = deck_version.deck_id
              JOIN (SELECT deck_version_id, card_id FROM deck_version_main_deck
@@ -326,16 +340,14 @@ async fn deck_values(pool: &Pool, prices: &HashMap<i64, Decimal>) -> sqlx::Resul
             });
         }
         let deck = decks.last_mut().expect("just pushed");
-        let value = row
-            .card_data_id
-            .and_then(|id| prices.get(&id))
-            .map(|price| {
-                copy_value(
-                    *price,
-                    row.status.as_deref().and_then(CardStatus::from_code),
-                    row.code.as_deref().and_then(Language::of_code),
-                )
-            });
+        let price = prices.of(row.card_data_id, row.cardmarket_product_id);
+        let value = price.map(|price| {
+            copy_value(
+                price,
+                row.status.as_deref().and_then(CardStatus::from_code),
+                row.code.as_deref().and_then(Language::of_code),
+            )
+        });
 
         if row.is_proxy {
             deck.proxies += 1;

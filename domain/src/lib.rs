@@ -9,6 +9,7 @@ pub mod budget;
 pub mod card;
 pub mod card_set;
 pub mod cardmarket;
+pub mod cardmarket_catalog;
 pub mod isbn;
 pub mod lot;
 pub mod monte_carlo;

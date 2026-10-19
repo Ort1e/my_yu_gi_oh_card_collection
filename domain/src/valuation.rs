@@ -1,13 +1,14 @@
 //! What the collection is worth at market prices, compared with what it cost.
 //!
-//! Prices are ygoprodeck's `cardmarket_price` (EUR), **one per card name**:
-//! it follows the cheapest printing, so a value is an estimate, usually too
-//! low for old or high rarity copies. They are refreshed weekly into
-//! `card_price` (one row per card data and refresh date), so the value can be
-//! followed over time.
+//! Prices ([`Prices`]), refreshed weekly and kept as a history:
+//! - a copy linked to its Cardmarket product (its printing: set and rarity,
+//!   `domain::cardmarket_catalog`) is valued at that product's price;
+//! - the others at ygoprodeck's `cardmarket_price`, **one per card name**,
+//!   which follows the cheapest printing: an estimate, usually too low for
+//!   old or high rarity copies.
 //!
-//! - A copy's value is its card's price × a condition factor × a language
-//!   factor ([`copy_value`]); totals are rounded to the cent at the end.
+//! - A copy's value is its price × a condition factor × a language factor
+//!   ([`copy_value`]); totals are rounded to the cent at the end.
 //! - A copy counts on a date when it was bought on or before it and not sold
 //!   by then ([`Copy::is_owned_on`]).
 //! - The gain/loss uses the **lot prices** (`lot.price`, what was paid, with
@@ -68,6 +69,8 @@ pub fn copy_value(
 #[derive(Debug, Clone, PartialEq)]
 pub struct Copy {
     pub card_data_id: Option<i64>,
+    /// Its Cardmarket product (`card.cardmarket_product_id`), when known.
+    pub cardmarket_product_id: Option<i64>,
     pub status: Option<CardStatus>,
     pub language: Option<Language>,
     /// `buy_date` of its purchase lot.
@@ -85,10 +88,28 @@ impl Copy {
         self.bought <= date && self.sold.is_none_or(|sold| sold > date)
     }
 
-    /// Its value with `prices` (by card data id), `None` without a price.
-    pub fn value(&self, prices: &HashMap<i64, Decimal>) -> Option<Decimal> {
-        let price = prices.get(&self.card_data_id?)?;
-        Some(copy_value(*price, self.status, self.language))
+    /// Its value with `prices`, `None` without a price.
+    pub fn value(&self, prices: &Prices) -> Option<Decimal> {
+        let price = prices.of(self.card_data_id, self.cardmarket_product_id)?;
+        Some(copy_value(price, self.status, self.language))
+    }
+}
+
+/// The market prices of one refresh (or each card's latest).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Prices {
+    /// ygoprodeck's, by card data id.
+    pub cards: HashMap<i64, Decimal>,
+    /// Cardmarket's, by product id.
+    pub products: HashMap<i64, Decimal>,
+}
+
+impl Prices {
+    /// The product's price, else the card's.
+    pub fn of(&self, card_data_id: Option<i64>, product_id: Option<i64>) -> Option<Decimal> {
+        let product = product_id.and_then(|id| self.products.get(&id));
+        let card = || card_data_id.and_then(|id| self.cards.get(&id));
+        product.or_else(card).copied()
     }
 }
 
@@ -132,14 +153,8 @@ impl Totals {
     }
 }
 
-/// The collection on `date`, with `prices` by card data id. Rounded to the
-/// cent.
-pub fn totals_on(
-    copies: &[Copy],
-    lots: &[Lot],
-    date: NaiveDate,
-    prices: &HashMap<i64, Decimal>,
-) -> Totals {
+/// The collection on `date`, with `prices`. Rounded to the cent.
+pub fn totals_on(copies: &[Copy], lots: &[Lot], date: NaiveDate, prices: &Prices) -> Totals {
     let mut totals = Totals {
         date,
         copies: 0,
@@ -193,11 +208,7 @@ impl UnitTotals {
 }
 
 /// [`UnitTotals`] on `date`, rounded to the cent.
-pub fn unit_totals_on(
-    copies: &[Copy],
-    date: NaiveDate,
-    prices: &HashMap<i64, Decimal>,
-) -> UnitTotals {
+pub fn unit_totals_on(copies: &[Copy], date: NaiveDate, prices: &Prices) -> UnitTotals {
     let mut totals = UnitTotals {
         copies: 0,
         value: Decimal::ZERO,
@@ -221,7 +232,7 @@ pub fn unit_totals_on(
 pub fn history(
     copies: &[Copy],
     lots: &[Lot],
-    prices_by_date: &BTreeMap<NaiveDate, HashMap<i64, Decimal>>,
+    prices_by_date: &BTreeMap<NaiveDate, Prices>,
 ) -> Vec<Totals> {
     prices_by_date
         .iter()
@@ -229,10 +240,11 @@ pub fn history(
         .collect()
 }
 
-/// A card's price change between two refreshes.
+/// A price change between two refreshes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PriceMove {
-    pub card_data_id: i64,
+    /// The key of the `before`/`after` maps.
+    pub id: i64,
     pub before: Decimal,
     pub after: Decimal,
 }
@@ -248,7 +260,7 @@ impl PriceMove {
     }
 }
 
-/// The cards whose price moved most between `before` and `after`, in %,
+/// The prices that moved most between `before` and `after` (by any key), in %,
 /// biggest first, at most `limit`. Only the cards priced in both and whose
 /// price moved by at least `floor` € (so €0.02 → €0.05 isn't a +150% move).
 pub fn biggest_moves(
@@ -262,7 +274,7 @@ pub fn biggest_moves(
         .filter_map(|(id, after)| {
             let before = *before.get(id)?;
             let price_move = PriceMove {
-                card_data_id: *id,
+                id: *id,
                 before,
                 after: *after,
             };
@@ -276,7 +288,7 @@ pub fn biggest_moves(
         b.percent()
             .abs()
             .cmp(&a.percent().abs())
-            .then(a.card_data_id.cmp(&b.card_data_id))
+            .then(a.id.cmp(&b.id))
     });
     moves.truncate(limit);
     moves
@@ -296,6 +308,7 @@ mod tests {
             card_data_id: Some(card_data_id),
             status: Some(CardStatus::NearMint),
             language: Some(Language::English),
+            cardmarket_product_id: None,
             bought,
             sold: None,
             paid: None,
@@ -332,6 +345,33 @@ mod tests {
         assert!(!c.is_owned_on(date(6, 1)), "sold that day");
     }
 
+    /// ygoprodeck prices only.
+    fn cards<const N: usize>(prices: [(i64, Decimal); N]) -> Prices {
+        Prices {
+            cards: HashMap::from(prices),
+            products: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn a_product_price_comes_first() {
+        let prices = Prices {
+            cards: HashMap::from([(1, dec!(0.41))]),
+            products: HashMap::from([(806175, dec!(48.18))]),
+        };
+        assert_eq!(prices.of(Some(1), Some(806175)), Some(dec!(48.18)));
+        // a product without a price this time: the card's
+        assert_eq!(prices.of(Some(1), Some(7)), Some(dec!(0.41)));
+        assert_eq!(prices.of(Some(1), None), Some(dec!(0.41)));
+        assert_eq!(prices.of(None, None), None);
+
+        let mut c = copy(1, date(1, 1));
+        c.cardmarket_product_id = Some(806175);
+        c.status = Some(CardStatus::Excellent);
+        c.language = Some(Language::French);
+        assert_eq!(c.value(&prices), Some(dec!(34.6896)));
+    }
+
     fn lot(date: NaiveDate, is_sale: bool, price: Decimal) -> Lot {
         Lot {
             date,
@@ -342,7 +382,7 @@ mod tests {
 
     #[test]
     fn totals_of_a_date() {
-        let prices = HashMap::from([(1, dec!(10.00)), (2, dec!(0.333))]);
+        let prices = cards([(1, dec!(10.00)), (2, dec!(0.333))]);
         let mut sold = copy(1, date(1, 1));
         sold.sold = Some(date(3, 1));
         let copies = [
@@ -372,7 +412,7 @@ mod tests {
 
     #[test]
     fn unit_totals_compare_priced_copies_only() {
-        let prices = HashMap::from([(1, dec!(3.00)), (2, dec!(0.50))]);
+        let prices = cards([(1, dec!(3.00)), (2, dec!(0.50))]);
         let paid = |card_data_id, paid| Copy {
             paid,
             ..copy(card_data_id, date(1, 1))
@@ -395,8 +435,8 @@ mod tests {
     fn a_copy_without_card_data_has_no_value() {
         let mut c = copy(1, date(1, 1));
         c.card_data_id = None;
-        assert_eq!(c.value(&HashMap::from([(1, dec!(5))])), None);
-        let totals = totals_on(&[c], &[], date(1, 2), &HashMap::new());
+        assert_eq!(c.value(&cards([(1, dec!(5))])), None);
+        let totals = totals_on(&[c], &[], date(1, 2), &Prices::default());
         assert_eq!(totals.without_price, 1);
         assert_eq!(totals.gain_percent(), None);
     }
@@ -409,8 +449,8 @@ mod tests {
             lot(date(2, 1), false, dec!(1)),
         ];
         let prices = BTreeMap::from([
-            (date(1, 7), HashMap::from([(1, dec!(2))])),
-            (date(2, 7), HashMap::from([(1, dec!(3))])),
+            (date(1, 7), cards([(1, dec!(2))])),
+            (date(2, 7), cards([(1, dec!(3))])),
         ]);
         let points: Vec<_> = history(&copies, &lots, &prices)
             .into_iter()
@@ -442,10 +482,7 @@ mod tests {
             (6, dec!(9)),    // new
         ]);
         let moves = biggest_moves(&before, &after, dec!(0.50), 10);
-        let ids: Vec<_> = moves
-            .iter()
-            .map(|m| (m.card_data_id, m.percent()))
-            .collect();
+        let ids: Vec<_> = moves.iter().map(|m| (m.id, m.percent())).collect();
         assert_eq!(ids, vec![(3, dec!(50.0)), (2, dec!(-20.0))]);
         assert_eq!(biggest_moves(&before, &after, dec!(0.50), 1).len(), 1);
     }

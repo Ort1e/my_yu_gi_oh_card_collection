@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::NaiveDate;
 use domain::card::{CardStatus, Language};
-use domain::valuation::{Copy, Lot};
+use domain::valuation::{Copy, Lot, Prices};
 use rust_decimal::Decimal;
 use serde_json::Value;
 
@@ -22,7 +22,7 @@ const BATCH_SIZE: usize = 100;
 
 /// The prices of one card on ygoprodeck.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Prices {
+pub struct YgoprodeckPrices {
     pub cardmarket: Option<Decimal>,
     pub tcgplayer: Option<Decimal>,
 }
@@ -73,7 +73,7 @@ pub async fn refresh_prices(
     .fetch_all(pool)
     .await?;
 
-    let mut found: HashMap<i64, Prices> = HashMap::new();
+    let mut found: HashMap<i64, YgoprodeckPrices> = HashMap::new();
     for batch in cards.chunks(BATCH_SIZE) {
         let ids: Vec<i64> = batch.iter().map(|(_, ygopro_id)| *ygopro_id).collect();
         found.extend(parse_prices(&fetch_batch(http, &ids).await?));
@@ -141,7 +141,7 @@ async fn fetch_batch(http: &reqwest::Client, ids: &[i64]) -> AppResult<Value> {
 /// The prices in a `cardinfo.php` answer, by ygopro id. A card is also
 /// listed under its other artworks' ids (`card_images[].id`), in case a
 /// card data row has one of them.
-pub fn parse_prices(body: &Value) -> HashMap<i64, Prices> {
+pub fn parse_prices(body: &Value) -> HashMap<i64, YgoprodeckPrices> {
     let mut prices = HashMap::new();
     let cards = body["data"]
         .as_array()
@@ -150,7 +150,7 @@ pub fn parse_prices(body: &Value) -> HashMap<i64, Prices> {
 
     for card in cards {
         let card_prices = &card["card_prices"][0];
-        let found = Prices {
+        let found = YgoprodeckPrices {
             cardmarket: price(&card_prices["cardmarket_price"]),
             tcgplayer: price(&card_prices["tcgplayer_price"]),
         };
@@ -178,50 +178,74 @@ pub async fn latest_refresh(pool: &Pool) -> sqlx::Result<Option<NaiveDate>> {
     Ok(date.and_then(|d| d.parse().ok()))
 }
 
-/// Every Cardmarket price, by refresh date then card data id.
-pub async fn prices_by_date(
-    pool: &Pool,
-) -> sqlx::Result<BTreeMap<NaiveDate, HashMap<i64, Decimal>>> {
-    let rows: Vec<(i64, String, Money)> = sqlx::query_as(
+/// Every price, by refresh date: ygoprodeck's by card data, Cardmarket's
+/// by product (`store::cardmarket`).
+pub async fn prices_by_date(pool: &Pool) -> sqlx::Result<BTreeMap<NaiveDate, Prices>> {
+    let cards: Vec<(i64, String, Money)> = sqlx::query_as(
         "SELECT card_data_id, date, cardmarket_price FROM card_price
          WHERE cardmarket_price IS NOT NULL",
     )
     .fetch_all(pool)
     .await?;
+    let products: Vec<(i64, String, Money)> =
+        sqlx::query_as("SELECT product_id, date, price FROM cardmarket_price")
+            .fetch_all(pool)
+            .await?;
 
-    let mut by_date: BTreeMap<NaiveDate, HashMap<i64, Decimal>> = BTreeMap::new();
-    for (card_data_id, date, price) in rows {
-        let Ok(date) = date.parse() else {
-            continue;
-        };
-        by_date
-            .entry(date)
-            .or_default()
-            .insert(card_data_id, price.0);
+    let mut by_date: BTreeMap<NaiveDate, Prices> = BTreeMap::new();
+    for (card_data_id, date, price) in cards {
+        if let Ok(date) = date.parse() {
+            let prices = by_date.entry(date).or_default();
+            prices.cards.insert(card_data_id, price.0);
+        }
+    }
+    for (product_id, date, price) in products {
+        if let Ok(date) = date.parse() {
+            let prices = by_date.entry(date).or_default();
+            prices.products.insert(product_id, price.0);
+        }
     }
     Ok(by_date)
 }
 
-/// Each card's most recent price.
-pub fn latest_prices(
-    by_date: &BTreeMap<NaiveDate, HashMap<i64, Decimal>>,
-) -> HashMap<i64, Decimal> {
-    let mut latest = HashMap::new();
+/// Each card's and product's most recent price.
+pub fn latest_prices(by_date: &BTreeMap<NaiveDate, Prices>) -> Prices {
+    let mut latest = Prices::default();
     for prices in by_date.values() {
-        latest.extend(prices.iter().map(|(id, price)| (*id, *price)));
+        latest.cards.extend(&prices.cards);
+        latest.products.extend(&prices.products);
     }
     latest
 }
 
-/// The price history of one card data: (date, Cardmarket price), oldest first.
-pub async fn card_history(pool: &Pool, card_data_id: i64) -> sqlx::Result<Vec<(String, Money)>> {
-    sqlx::query_as(
+/// The price history of a card: of its Cardmarket product when it has one
+/// with prices, else of its card data (ygoprodeck). (date, price), oldest
+/// first, and whether they are Cardmarket's.
+pub async fn card_history(
+    pool: &Pool,
+    card_data_id: i64,
+    product_id: Option<i64>,
+) -> sqlx::Result<(Vec<(String, Money)>, bool)> {
+    if let Some(product_id) = product_id {
+        let history: Vec<(String, Money)> = sqlx::query_as(
+            "SELECT date, price FROM cardmarket_price WHERE product_id = ? ORDER BY date",
+        )
+        .bind(product_id)
+        .fetch_all(pool)
+        .await?;
+        if !history.is_empty() {
+            return Ok((history, true));
+        }
+    }
+
+    let history = sqlx::query_as(
         "SELECT date, cardmarket_price FROM card_price
          WHERE card_data_id = ? AND cardmarket_price IS NOT NULL ORDER BY date",
     )
     .bind(card_data_id)
     .fetch_all(pool)
-    .await
+    .await?;
+    Ok((history, false))
 }
 
 /// An owned (or once owned) copy and the card it is.
@@ -239,6 +263,7 @@ struct CopyRow {
     name: String,
     code: Option<String>,
     card_data_id: Option<i64>,
+    cardmarket_product_id: Option<i64>,
     status: Option<String>,
     bought: String,
     paid: Option<Money>,
@@ -250,7 +275,7 @@ struct CopyRow {
 pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
     let rows: Vec<CopyRow> = sqlx::query_as(
         "SELECT card.id AS card_id, card.name, card.code, card.card_data_id,
-                card.last_known_status AS status, lot.buy_date AS bought, unite.price AS paid,
+                card.cardmarket_product_id, card.last_known_status AS status, lot.buy_date AS bought, unite.price AS paid,
                 (SELECT min(sale.buy_date) FROM unite AS sold_unite
                    JOIN lot AS sale ON sale.id = sold_unite.lot_id
                   WHERE sold_unite.card_id = card.id AND sale.lot_type = 'sale'
@@ -269,6 +294,7 @@ pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
         .filter_map(|row| {
             let copy = Copy {
                 card_data_id: row.card_data_id,
+                cardmarket_product_id: row.cardmarket_product_id,
                 status: row.status.as_deref().and_then(CardStatus::from_code),
                 language: row.code.as_deref().and_then(Language::of_code),
                 bought: row.bought.parse().ok()?,
@@ -327,7 +353,7 @@ mod tests {
         ]});
         let prices = parse_prices(&body);
 
-        let dark_magician = Prices {
+        let dark_magician = YgoprodeckPrices {
             cardmarket: Some(dec!(0.25)),
             tcgplayer: Some(dec!(0.54)),
         };
@@ -335,14 +361,14 @@ mod tests {
         assert_eq!(prices[&46986415], dark_magician);
         assert_eq!(
             prices[&40640057],
-            Prices {
+            YgoprodeckPrices {
                 cardmarket: None,
                 tcgplayer: Some(dec!(1.10)),
             }
         );
         assert_eq!(
             prices[&1],
-            Prices {
+            YgoprodeckPrices {
                 cardmarket: None,
                 tcgplayer: None,
             }
@@ -351,15 +377,22 @@ mod tests {
     }
 
     #[test]
-    fn latest_prices_keep_each_cards_last_one() {
+    fn latest_prices_keep_each_ones_last_price() {
         let d = |day| NaiveDate::from_ymd_opt(2026, 10, day).unwrap();
+        let prices = |cards: &[(i64, Decimal)], products: &[(i64, Decimal)]| Prices {
+            cards: cards.iter().copied().collect(),
+            products: products.iter().copied().collect(),
+        };
         let by_date = BTreeMap::from([
-            (d(5), HashMap::from([(1, dec!(1)), (2, dec!(2))])),
-            (d(12), HashMap::from([(1, dec!(3))])),
+            (
+                d(5),
+                prices(&[(1, dec!(1)), (2, dec!(2))], &[(9, dec!(40))]),
+            ),
+            (d(12), prices(&[(1, dec!(3))], &[])),
         ]);
         assert_eq!(
             latest_prices(&by_date),
-            HashMap::from([(1, dec!(3)), (2, dec!(2))])
+            prices(&[(1, dec!(3)), (2, dec!(2))], &[(9, dec!(40))])
         );
     }
 }
