@@ -22,22 +22,6 @@
       and first/second). The 7
       existing tournaments' notes to move over (by hand or a one-off
       parse). Spec first (marking the owner's logic: stats, notes parsing), then the rest (Claude).
-- [ ] `scrap-ban-list` misses the new lists: Konami's EU JSON
-      (`_data/fllists/options.json`, `current.json`) stopped at May 2026
-      (18/05/2026; list 73 is a 404), while September 21 and October 19,
-      2026 lists exist. The US site has them as HTML pages, linked from
-      `https://www.yugioh-card.com/en/limited/` as `list_YYYY-MM-DD/`
-      (September there on 2026-10-19, October not yet). A table, one
-      `<tr class="cardlist_…">` per card: type, name (upper case, extra
-      spaces: `AGIDO THE    ANCIENT SENTINEL`), Advanced Format status,
-      Traditional Format status, remarks. Add it as a second source:
-      `domain/src/ban_list.rs` parses the list links (date from the
-      address) and a page into the existing `BanList` (spaces collapsed,
-      Advanced column: Forbidden → Banned, Limited, Semi-Limited;
-      "Unlimited" rows skipped); `commands/ban_list.rs` imports the dates
-      not imported yet. Check the card data lookup (`find`/`get_or_fetch`)
-      matches upper-case names. The page parsing in `domain` (owner), the
-      fetching and import (Claude).
 - [ ] Collection value: weekly market prices from ygoprodeck kept as a
       history (`card_price`), value vs cost of the owned copies (condition
       and language factors), `/collection/value` page, price line on card
@@ -65,3 +49,6 @@
 - [x] Rarity from the card data (`clean-cards` step 7): cards without a
       rarity get the one of their code when it was printed in one rarity
       only (631 cards on 2026-10-19; 77 left to set by hand).
+- [x] Ban lists from the US site's pages when Konami's EU JSON lags behind
+      (it stopped at May 2026 for a while): `scrap-ban-list` falls back on
+      them for missing dates, `--date` for a list not linked yet.

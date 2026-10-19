@@ -339,7 +339,11 @@ the server refuses to listen anywhere but `127.0.0.1`.
 
 ## Maintenance commands
 
-`backend/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`)
+`backend/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`:
+the EU site's JSON, then the US site's pages for the dates still missing, a
+fallback for when the EU JSON lags behind; the US index only links the current
+list, so `--date 2026-10-19` fetches one not linked yet, and a US page whose table
+is still the previous list's is skipped)
 and `clean-cards` (normalise names, relink card data, swap proxies for owned
 copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
 language of their code, rarity from the card data when the code was printed in

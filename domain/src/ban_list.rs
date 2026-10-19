@@ -1,8 +1,20 @@
-//! Konami's EU Forbidden & Limited lists (Django: `scrap_ban_list` command).
+//! Konami's Forbidden & Limited lists (Django: `scrap_ban_list` command).
 //!
-//! `options.json` maps a list number to a human date (`{"1": "August 1999", …}`);
-//! each list is `<number>.json`, the latest one also being `current.json`:
-//! `{"from": "18/05/2026", "0": [banned…], "1": [limited…], "2": [semi-limited…]}`.
+//! Two sources:
+//! - the EU site's JSON (Django's only source, stopped at the May 18, 2026
+//!   list): `options.json` maps a list number to a human date
+//!   (`{"1": "August 1999", …}`); each list is `<number>.json`, the latest one
+//!   also being `current.json`:
+//!   `{"from": "18/05/2026", "0": [banned…], "1": [limited…], "2": [semi-limited…]}`.
+//! - the US site's HTML pages (added in the Rust app): [`US_INDEX_URL`] links
+//!   the current list as `list_YYYY-MM-DD/` (older and newer lists are served
+//!   at the same kind of address, but not always linked). A list page is a
+//!   few tables, one row per card:
+//!   `<tr class="cardlist_effect"><td>Monster/Effect</td><td>MAXX    &quot;C&quot;</td>`
+//!   `<td>Forbidden</td><td>Limited</td><td>New</td></tr>` (type, name in upper
+//!   case with runs of spaces, Advanced Format, Traditional Format, remarks),
+//!   each table starting with a `cardlist_atitle` header row. A list that
+//!   doesn't exist answers 200 with a page redirecting home (no card rows).
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -13,6 +25,7 @@ use serde::Deserialize;
 
 pub const OPTIONS_URL: &str = "https://www.yugioh-card.com/eu/_data/fllists/options.json";
 pub const LISTS_URL: &str = "https://img.yugioh-card.com/eu/_data/fllists/";
+pub const US_INDEX_URL: &str = "https://www.yugioh-card.com/en/limited/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BanStatus {
@@ -81,6 +94,11 @@ pub struct BanList {
 pub enum BanListError {
     Json(serde_json::Error),
     Date(String),
+    /// A US page without any card row (the site's answer for a missing list).
+    NotAList,
+    /// A US Advanced Format status that isn't Forbidden, Limited,
+    /// Semi-Limited or Unlimited.
+    Status(String),
 }
 
 impl std::fmt::Display for BanListError {
@@ -88,6 +106,8 @@ impl std::fmt::Display for BanListError {
         match self {
             BanListError::Json(e) => write!(f, "invalid ban list JSON: {e}"),
             BanListError::Date(d) => write!(f, "invalid ban list date {d:?}"),
+            BanListError::NotAList => write!(f, "no ban list on this page"),
+            BanListError::Status(s) => write!(f, "unknown ban list status {s:?}"),
         }
     }
 }
@@ -118,6 +138,75 @@ pub fn parse_list(json: &str) -> Result<BanList, BanListError> {
 
     Ok(BanList { date, entries })
 }
+
+/// Address of the US list that took effect on `date`.
+pub fn us_list_url(date: NaiveDate) -> String {
+    format!("{US_INDEX_URL}list_{}/", date.format("%Y-%m-%d"))
+}
+
+/// The dates of the US lists linked from a page (the index links the
+/// current list as `href="/en/limited/list_2026-09-21/"`), sorted, without
+/// duplicates. Links whose date isn't a real date are ignored.
+pub fn parse_us_list_dates(index_html: &str) -> Vec<NaiveDate> {
+    let mut dates: Vec<NaiveDate> = US_LIST_LINK
+        .captures_iter(index_html)
+        .filter_map(|c| c[1].parse().ok())
+        .collect();
+    dates.sort();
+    dates.dedup();
+    dates
+}
+
+/// A US list page into a [`BanList`] effective on `date` (the date of its
+/// address). Only the Advanced Format column counts: Forbidden → Banned,
+/// Limited, Semi-Limited (any case); Unlimited rows (cards just released)
+/// are skipped; the type, Traditional Format and remarks columns are ignored.
+/// Names go through [`clean_name`] (entities decoded, runs of spaces
+/// collapsed) and stay in upper case: card data lookups ignore case.
+///
+/// Errors: [`BanListError::NotAList`] when the page has no card row,
+/// [`BanListError::Status`] for an unknown Advanced Format status.
+pub fn parse_us_list(date: NaiveDate, html: &str) -> Result<BanList, BanListError> {
+    let mut entries = Vec::new();
+    let mut rows = 0;
+    for row in US_ROW.captures_iter(html) {
+        if &row[1] == "atitle" {
+            continue;
+        }
+        rows += 1;
+        let cells: Vec<String> = US_CELL
+            .captures_iter(&row[2])
+            .map(|c| clean_name(&c[1]))
+            .collect();
+        let [_, name, advanced, ..] = cells.as_slice() else {
+            continue;
+        };
+        let status = match advanced.to_lowercase().as_str() {
+            "forbidden" => BanStatus::Banned,
+            "limited" => BanStatus::Limited,
+            "semi-limited" => BanStatus::SemiLimited,
+            "unlimited" => continue,
+            _ => return Err(BanListError::Status(advanced.clone())),
+        };
+        if !name.is_empty() {
+            entries.push((name.clone(), status));
+        }
+    }
+
+    if rows == 0 {
+        return Err(BanListError::NotAList);
+    }
+    Ok(BanList { date, entries })
+}
+
+/// `href="…/limited/list_2026-09-21/"` (absolute or not).
+static US_LIST_LINK: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"href="[^"]*/limited/list_(\d{4}-\d{2}-\d{2})/""#).unwrap());
+/// A table row: `cardlist_effect`, `cardlist_spell`… or `cardlist_atitle`
+/// (the header).
+static US_ROW: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?s)<tr class="cardlist_(\w+)"[^>]*>(.*?)</tr>"#).unwrap());
+static US_CELL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)<td[^>]*>(.*?)</td>").unwrap());
 
 static TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").unwrap());
 static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
@@ -182,6 +271,126 @@ mod tests {
             Err(BanListError::Date(_))
         ));
         assert!(matches!(parse_list("[]"), Err(BanListError::Json(_))));
+    }
+
+    fn date(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    #[test]
+    fn us_list_url_uses_the_iso_date() {
+        assert_eq!(
+            us_list_url(date(2026, 9, 1)),
+            "https://www.yugioh-card.com/en/limited/list_2026-09-01/"
+        );
+    }
+
+    #[test]
+    fn finds_the_us_list_dates() {
+        let html = r#"
+            <li><a href="/en/limited/" aria-current="page">Deck Construction Rules</a></li>
+            <a class="wp-block-button__link" href="/en/limited/list_2026-09-21/">View the list here</a>
+            <a href="https://www.yugioh-card.com/en/limited/list_2026-05-18/">May</a>
+            <a href="/en/limited/list_2026-09-21/">again</a>
+            <a href="/en/limited/list_2026-13-01/">not a date</a>
+            <a href="/en/events/list_2026-01-01-results/">not a list</a>
+        "#;
+        assert_eq!(
+            parse_us_list_dates(html),
+            vec![date(2026, 5, 18), date(2026, 9, 21)]
+        );
+        assert_eq!(parse_us_list_dates("<p>nothing</p>"), vec![]);
+    }
+
+    /// The shape of a real list page (two of its tables), trimmed.
+    const US_LIST: &str = r#"
+        <p>PLEASE NOTE: The changes to "Some Card" from Forbidden to Unlimited do not take effect until later.</p>
+        <table class="cardlist centertable">
+          <tr align="center" class="cardlist_atitle">
+            <td width="137" height="40"><strong>Card Type</strong></td>
+            <td width="282"><strong>Card Name</strong></td>
+            <td width="139" align="center"><strong>Advanced Format</strong></td>
+            <td width="140" align="center"><strong>Traditional Format</strong></td>
+            <td width="180"><strong>Remarks</strong></td>
+            </tr>
+          <tr class="cardlist_effect">
+            <td>Monster/Effect</td>
+            <td>AGIDO THE    ANCIENT SENTINEL</td>
+            <td>Forbidden</td>
+            <td>Limited</td>
+            <td>&nbsp;</td>
+          </tr>  <tr class="cardlist_effect">
+            <td>Monster/Effect</td>
+            <td>MAXX    &quot;C&quot;</td>
+            <td>Limited</td>
+            <td>Limited</td>
+            <td>Was Forbidden</td>
+          </tr>  <tr class="cardlist_effect">
+            <td>Monster/Effect</td>
+            <td>MALISS    &lt;P&gt; DORMOUSE</td>
+            <td>Unlimited</td>
+            <td>Limited</td>
+            <td>Was Limited</td>
+          </tr>
+        </table>
+        <table class="cardlist centertable">
+          <tr align="center" class="cardlist_atitle">
+            <td><strong>Card Type</strong></td>
+            <td><strong>Card Name</strong></td>
+            <td><strong>Advanced Format</strong></td>
+            <td><strong>Traditional Format</strong></td>
+            <td><strong>Remarks</strong></td>
+            </tr>
+          <tr class="cardlist_spell">
+            <td>Spell</td>
+            <td>DROLL &amp; LOCK BIRD</td>
+            <td>Semi-limited</td>
+            <td>Unlimited</td>
+            <td>New</td>
+          </tr>  <tr class="cardlist_trap">
+            <td>Trap</td>
+            <td>&quot;A    CASE FOR K9&quot;</td>
+            <td>Semi-Limited</td>
+            <td>Semi-Limited</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+    "#;
+
+    #[test]
+    fn parses_a_us_list() {
+        let list = parse_us_list(date(2026, 9, 21), US_LIST).unwrap();
+        assert_eq!(list.date, date(2026, 9, 21));
+        assert_eq!(
+            list.entries,
+            vec![
+                ("AGIDO THE ANCIENT SENTINEL".to_string(), BanStatus::Banned),
+                ("MAXX \"C\"".to_string(), BanStatus::Limited),
+                ("DROLL & LOCK BIRD".to_string(), BanStatus::SemiLimited),
+                ("\"A CASE FOR K9\"".to_string(), BanStatus::SemiLimited),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_page_without_cards_is_not_a_list() {
+        // what the site answers for a list that doesn't exist
+        let redirect = r#"<html><head><meta http-equiv="refresh" content="0; url=https://www.yugioh-card.com/"></head></html>"#;
+        assert!(matches!(
+            parse_us_list(date(2026, 2, 2), redirect),
+            Err(BanListError::NotAList)
+        ));
+    }
+
+    #[test]
+    fn rejects_an_unknown_us_status() {
+        let html = r#"<table><tr class="cardlist_spell">
+            <td>Spell</td><td>POT OF GREED</td><td>Banished</td><td>Limited</td><td>&nbsp;</td>
+        </tr></table>"#;
+        assert!(matches!(
+            parse_us_list(date(2026, 9, 21), html),
+            Err(BanListError::Status(s)) if s == "Banished"
+        ));
     }
 
     #[test]
