@@ -1,0 +1,20 @@
+{# Owned copies and their value (collection/value.html): `lines`, CopyLine rows. #}
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th>Card</th><th>Code</th><th>Condition</th><th>Value (€)</th><th>Paid (€)</th><th>Gain (€)</th></tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td><a href="/cards/{{ line.card_id }}">{{ line.name }}</a></td>
+        <td>{{ line.code }}</td>
+        <td>{{ line.status }}</td>
+        <td>{{ line.value|money }}</td>
+        {% match line.paid %}{% when Some with (paid) %}<td>{{ paid|money }}</td>{% when None %}<td>—</td>{% endmatch %}
+        {% match line.gain %}{% when Some with (gain) %}<td>{{ gain|money }}</td>{% when None %}<td>—</td>{% endmatch %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>

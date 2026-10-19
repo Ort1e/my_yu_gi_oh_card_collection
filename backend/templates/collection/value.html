@@ -43,38 +43,22 @@
       <div class="value-amount {% if unit_gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ unit_gain|money }} €</div>
       <div class="value-detail">{{ units.copies }} copies: worth {{ units.value|money }} €, paid {{ units.paid|money }} € ({{ self.unit_gain_percent() }})</div>
     </div>
-    {% match biggest_loss %}{% when Some with (loss) %}
-    <a class="value-tile" href="/cards/{{ loss.card_id }}">
-      <div class="value-label">Biggest loss</div>
-      {% match loss.gain %}{% when Some with (gain) %}<div class="value-amount value-down">{{ gain|money }} €</div>{% when None %}{% endmatch %}
-      <div class="value-detail">{{ loss.name }} ({{ loss.code }}): paid {% match loss.paid %}{% when Some with (paid) %}{{ paid|money }}{% when None %}—{% endmatch %} €, worth {{ loss.value|money }} €</div>
-    </a>
-    {% when None %}{% endmatch %}
   </div>
 
   <canvas id="value_chart" width="400" height="160"></canvas>
 
   <h2>Most valuable copies</h2>
-  <div class="table-scroll">
-  <table class="numbers">
-    <thead>
-      <tr><th>Card</th><th>Code</th><th>Condition</th><th>Value (€)</th><th>Paid (€)</th><th>Gain (€)</th></tr>
-    </thead>
-    <tbody>
-      {% for line in top %}
-      <tr>
-        <td><a href="/cards/{{ line.card_id }}">{{ line.name }}</a></td>
-        <td>{{ line.code }}</td>
-        <td>{{ line.status }}</td>
-        <td>{{ line.value|money }}</td>
-        {% match line.paid %}{% when Some with (paid) %}<td>{{ paid|money }}</td>{% when None %}<td>—</td>{% endmatch %}
-        {% match line.gain %}{% when Some with (gain) %}<td>{{ gain|money }}</td>{% when None %}<td>—</td>{% endmatch %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
+  {% let lines = self.top_lines() %}
+  {% include "partials/copy_values_table.html" %}
   <p class="value-note">Paid: the card's price in its lot, without shipping; "—" when the lot was bought as a whole.</p>
+
+  <h2>Biggest losses</h2>
+  {% if losses.is_empty() %}
+  <p>No copy is worth less than its price in its lot.</p>
+  {% else %}
+  {% let lines = self.loss_lines() %}
+  {% include "partials/copy_values_table.html" %}
+  {% endif %}
 
   {% for period in moves %}
   <h2>Biggest moves: {{ period.title }}</h2>

@@ -168,9 +168,8 @@ pub struct ValuePage {
     units: UnitTotals,
     unit_gain: Decimal,
     top: Vec<CopyLine>,
-    /// The owned copy that lost the most against its unite price, `None`
-    /// when none lost anything.
-    biggest_loss: Option<CopyLine>,
+    /// The owned copies that lost the most against their unite price.
+    losses: Vec<CopyLine>,
     moves: Vec<Moves>,
     decks: Vec<DeckLine>,
     /// Chart.js data, serialised as JSON.
@@ -184,6 +183,15 @@ impl ValuePage {
 
     fn unit_gain_percent(&self) -> String {
         percent(self.units.gain_percent())
+    }
+
+    /// For `partials/copy_values_table.html` (`{% let %}` would move the field).
+    fn top_lines(&self) -> &[CopyLine] {
+        &self.top
+    }
+
+    fn loss_lines(&self) -> &[CopyLine] {
+        &self.losses
     }
 
     fn last_refresh_str(&self) -> String {
@@ -218,7 +226,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
             })
         })
         .collect();
-    let biggest_loss = biggest_loss(&top);
+    let losses = biggest_losses(&top);
     top.sort_by(|a, b| b.value.cmp(&a.value).then(a.card_id.cmp(&b.card_id)));
     top.truncate(TOP_COPIES);
 
@@ -253,7 +261,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         unit_gain: units.gain(),
         units,
         top,
-        biggest_loss,
+        losses,
         moves,
         decks: deck_values(pool, &data.latest).await?,
         // embedded in a <script>
@@ -272,14 +280,17 @@ struct DeckCardRow {
     code: Option<String>,
 }
 
-/// The copy with the most negative gain (value − unite price), the first
-/// card id on a tie.
-fn biggest_loss(copies: &[CopyLine]) -> Option<CopyLine> {
-    copies
+/// The copies with a negative gain (value − unite price), biggest loss
+/// first (then by card id), at most [`TOP_COPIES`].
+fn biggest_losses(copies: &[CopyLine]) -> Vec<CopyLine> {
+    let mut losses: Vec<CopyLine> = copies
         .iter()
         .filter(|c| c.gain.is_some_and(|gain| gain.is_sign_negative()))
-        .min_by(|a, b| a.gain.cmp(&b.gain).then(a.card_id.cmp(&b.card_id)))
         .cloned()
+        .collect();
+    losses.sort_by(|a, b| a.gain.cmp(&b.gain).then(a.card_id.cmp(&b.card_id)));
+    losses.truncate(TOP_COPIES);
+    losses
 }
 
 /// The value of each deck's latest version: its real cards, and its proxies
