@@ -37,6 +37,14 @@
       "Unlimited" rows skipped); `commands/ban_list.rs` imports the dates
       not imported yet. Check the card data lookup (`find`/`get_or_fetch`)
       matches upper-case names. Backend (owner).
+- [ ] `clean-cards` step 7: the rarity of rarity-less cards from their card
+      data, when their code has a single rarity (~650 of 708 cards).
+      Design: `docs/specs/rarity-from-card-data.md`; backend (owner).
+- [ ] Collection value: weekly market prices from ygoprodeck kept as a
+      history (`card_price`), value vs cost of the owned copies (condition
+      and language factors), `/collection/value` page, price line on card
+      pages, dashboard tile. Design: `docs/specs/collection-value.md`;
+      backend (owner), then frontend.
 
 ## Done
 
