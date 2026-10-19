@@ -7,6 +7,7 @@ mod advent;
 mod books;
 mod budget;
 mod cards;
+mod collection;
 mod dashboard;
 mod decks;
 mod lots;
@@ -25,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/budget", get(budget::overview))
         .route("/cards", get(cards::list))
         .route("/cards/:id", get(cards::detail))
+        .route("/collection/value", get(collection::page))
         .route("/sellers", get(sellers::list))
         .route("/sellers/:id", get(sellers::detail))
         .route("/lots", get(lots::list))

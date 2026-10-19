@@ -37,3 +37,4 @@ image = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
+rust_decimal_macros = { workspace = true }

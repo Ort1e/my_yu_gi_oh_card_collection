@@ -2,14 +2,17 @@
 //!
 //!   cargo run -p backend -- scrap-ban-list [--all] [--dry-run] [--date YYYY-MM-DD]…
 //!   cargo run -p backend -- clean-cards [--dry-run]
+//!   cargo run -p backend -- refresh-prices [--dry-run]
 //!
 //! `--dry-run` does the work in a transaction that is rolled back and makes
 //! no API call (names unknown locally are only reported).
 
 mod ban_list;
 mod clean_cards;
+mod prices;
 
 pub use clean_cards::spawn_daily as spawn_daily_cleanup;
+pub use prices::spawn_weekly as spawn_weekly_price_refresh;
 
 use chrono::NaiveDate;
 
@@ -24,7 +27,10 @@ pub const USAGE: &str = "usage:
       of that date, which the US index may not link yet)
   backend clean-cards [--dry-run]
       normalise card names, link cards to the right card data, replace
-      proxies in decks by owned copies and delete unused proxies";
+      proxies in decks by owned copies and delete unused proxies
+  backend refresh-prices [--dry-run]
+      fetch today's market prices of every card from ygoprodeck (the server
+      does it weekly)";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -36,6 +42,9 @@ pub enum Command {
         dates: Vec<NaiveDate>,
     },
     CleanCards {
+        dry_run: bool,
+    },
+    RefreshPrices {
         dry_run: bool,
     },
 }
@@ -55,7 +64,7 @@ impl Command {
         let allowed: &[&str] = match name.as_str() {
             "serve" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
-            "clean-cards" => &["--dry-run"],
+            "clean-cards" | "refresh-prices" => &["--dry-run"],
             other => return Err(format!("unknown command {other:?}")),
         };
         if let Some(bad) = flags.iter().find(|f| !allowed.contains(f)) {
@@ -69,6 +78,9 @@ impl Command {
                 dates,
             },
             "clean-cards" => Command::CleanCards {
+                dry_run: has("--dry-run"),
+            },
+            "refresh-prices" => Command::RefreshPrices {
                 dry_run: has("--dry-run"),
             },
             _ => Command::Serve,
@@ -100,6 +112,7 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
             dates,
         } => ban_list::scrap(state, all, dry_run, &dates).await,
         Command::CleanCards { dry_run } => clean_cards::clean(state, dry_run).await,
+        Command::RefreshPrices { dry_run } => prices::refresh(state, dry_run).await,
     }
 }
 
@@ -158,6 +171,10 @@ mod tests {
             Ok(Command::CleanCards { dry_run: false })
         );
         assert!(parse(&["clean-cards", "--all"]).is_err());
+        assert_eq!(
+            parse(&["refresh-prices", "--dry-run"]),
+            Ok(Command::RefreshPrices { dry_run: true })
+        );
         assert!(parse(&["nope"]).is_err());
     }
 }

@@ -8,6 +8,7 @@
  *   card.css       the green "card" boxes of the lists            (list and detail pages)
  *   filtering.css  the floating buttons and the filter popup      (list pages)
  *   books.css      what only the book pages have                  (every page)
+ *   collection.css the collection value page and its tiles         (value page, dashboard, card page)
  * The deck builder has its own: frontend/src/deck_builder.css.
  *
  * How to read these files:

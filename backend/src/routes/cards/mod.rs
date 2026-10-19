@@ -3,9 +3,13 @@ pub mod images;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
+use domain::card::Language;
+use domain::valuation::copy_value;
+use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
+use crate::store::card_prices::card_history;
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::models::{CardRow, DeckVersionRow, LotRow};
@@ -173,6 +177,51 @@ pub struct CardDetail {
     lot: Option<LotRow>,
     price: Option<Money>,
     versions: Vec<DeckVersionRow>,
+    /// `None` before the card's first price refresh.
+    market: Option<MarketPrice>,
+}
+
+/// The card's market price (`card_price`) and what this copy is worth.
+pub struct MarketPrice {
+    price: Money,
+    date: String,
+    /// The price × this copy's condition and language factors.
+    copy_value: Money,
+    /// SVG polyline points of the price history, `None` with one refresh.
+    sparkline: Option<String>,
+}
+
+const SPARKLINE_WIDTH: f64 = 160.0;
+const SPARKLINE_HEIGHT: f64 = 32.0;
+
+/// `points` of an SVG polyline drawing `prices` (oldest first) in a
+/// `SPARKLINE_WIDTH` × `SPARKLINE_HEIGHT` box; `None` for fewer than two.
+fn sparkline(prices: &[f64]) -> Option<String> {
+    if prices.len() < 2 {
+        return None;
+    }
+
+    let min = prices.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = prices.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let step = SPARKLINE_WIDTH / (prices.len() - 1) as f64;
+    let points: Vec<String> = prices
+        .iter()
+        .enumerate()
+        .map(|(i, price)| {
+            // a flat line in the middle when the price never moved
+            let height = if max > min {
+                (price - min) / (max - min)
+            } else {
+                0.5
+            };
+            format!(
+                "{:.1},{:.1}",
+                i as f64 * step,
+                SPARKLINE_HEIGHT * (1.0 - height)
+            )
+        })
+        .collect();
+    Some(points.join(" "))
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<CardDetail> {
@@ -214,17 +263,56 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     .fetch_all(pool)
     .await?;
 
+    let market = match card.card_data_id {
+        Some(card_data_id) => market_price(&state, &card, card_data_id).await?,
+        None => None,
+    };
+
     Ok(CardDetail {
         card,
         lot,
         price,
         versions,
+        market,
     })
+}
+
+async fn market_price(
+    state: &AppState,
+    card: &CardRow,
+    card_data_id: i64,
+) -> sqlx::Result<Option<MarketPrice>> {
+    let history = card_history(&state.pool, card_data_id).await?;
+    let Some((date, price)) = history.last().cloned() else {
+        return Ok(None);
+    };
+
+    let language = card.code.as_deref().and_then(Language::of_code);
+    let prices: Vec<f64> = history
+        .iter()
+        .map(|(_, price)| price.0.to_f64().unwrap_or_default())
+        .collect();
+    Ok(Some(MarketPrice {
+        price,
+        date,
+        copy_value: Money(copy_value(price.0, card.status(), language).round_dp(2)),
+        sparkline: sparkline(&prices),
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sparkline_scales_to_the_box() {
+        assert_eq!(sparkline(&[1.0]), None);
+        assert_eq!(
+            sparkline(&[1.0, 3.0, 2.0]).unwrap(),
+            "0.0,32.0 80.0,0.0 160.0,16.0"
+        );
+        assert_eq!(sparkline(&[2.0, 2.0]).unwrap(), "0.0,16.0 160.0,16.0");
+    }
 
     #[test]
     fn like_pattern_escapes_wildcards() {

@@ -14,7 +14,7 @@ use crate::store::db::{begin_write, Pool};
 use crate::web::error::{AppError, AppResult};
 use crate::AppState;
 
-const API_URL: &str = "https://db.ygoprodeck.com/api/v7/cardinfo.php";
+pub(crate) const API_URL: &str = "https://db.ygoprodeck.com/api/v7/cardinfo.php";
 const SETS_URL: &str = "https://db.ygoprodeck.com/api/v7/cardsets.php";
 
 /// ygoprodeck allows 20 requests per second; stay well below.
@@ -22,7 +22,7 @@ const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(60);
 static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
 
 /// Wait so that two API requests are at least `MIN_REQUEST_INTERVAL` apart.
-async fn throttle() {
+pub(crate) async fn throttle() {
     let mut last = LAST_REQUEST.lock().await;
     if let Some(at) = *last {
         tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;

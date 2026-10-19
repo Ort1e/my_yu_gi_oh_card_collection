@@ -1,0 +1,68 @@
+/*
+ * The collection value page (templates/collection/value.html) and the value
+ * tile of the dashboard.
+ */
+
+/* The totals at the top: boxes side by side, wrapping on narrow screens. */
+.value-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.value-tile {
+    background-color: var(--secondary);
+    color: var(--text-light);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+}
+
+/* A tile that is a link (the dashboard's). */
+a.value-tile {
+    display: block;
+    text-decoration: none;
+}
+
+a.value-tile:hover {
+    background-color: var(--hover-bg);
+}
+
+.value-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.value-amount {
+    font-size: 1.6rem;
+    font-weight: bold;
+}
+
+.value-detail {
+    font-size: 0.85rem;
+}
+
+/* Gains and losses; lighter shades inside the green tiles. */
+.value-up   { color: #1b7f3a; }
+.value-down { color: var(--danger); }
+
+.value-tile .value-up   { color: #b9f6ca; }
+.value-tile .value-down { color: #ffcdd2; }
+
+/* Explanations under the titles. */
+.value-note {
+    font-size: 0.9rem;
+    max-width: 60rem;
+}
+
+/* The price line of a card's page (templates/cards/detail.html). */
+.price-history {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 760px) {
+    .value-amount {
+        font-size: 1.3rem;
+    }
+}

@@ -22,12 +22,6 @@
       and first/second). The 7
       existing tournaments' notes to move over (by hand or a one-off
       parse). Spec first (marking the owner's logic: stats, notes parsing), then the rest (Claude).
-- [ ] Collection value: weekly market prices from ygoprodeck kept as a
-      history (`card_price`), value vs cost of the owned copies (condition
-      and language factors), `/collection/value` page, price line on card
-      pages, dashboard tile. Design: `docs/specs/collection-value.md`;
-      `domain::valuation` (owner), the rest (Claude).
-
 ## Done
 
 - [x] Clean up the interface artifacts.
@@ -52,3 +46,7 @@
 - [x] Ban lists from the US site's pages when Konami's EU JSON lags behind
       (it stopped at May 2026 for a while): `scrap-ban-list` falls back on
       them for missing dates, `--date` for a list not linked yet.
+- [x] Collection value (2026-10-19): weekly market prices from ygoprodeck
+      (`card_price`), `/collection/value` (value, gain from the lot prices,
+      copies with a unit price compared one by one, moves, by deck), price
+      line on card pages, dashboard tile.

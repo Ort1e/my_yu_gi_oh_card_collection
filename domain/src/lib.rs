@@ -13,4 +13,5 @@ pub mod isbn;
 pub mod lot;
 pub mod monte_carlo;
 pub mod rarity;
+pub mod valuation;
 pub mod ydke;

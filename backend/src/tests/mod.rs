@@ -8,6 +8,7 @@ mod auth;
 mod book_advent;
 mod books;
 mod budget;
+mod collection;
 mod deck_api;
 mod decks;
 mod edit_forms;

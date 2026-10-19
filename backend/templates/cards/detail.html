@@ -4,6 +4,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/collection.css">
 {% endblock %}
 
 {% block content %}
@@ -29,6 +30,16 @@
         <div class="card-subtitle">Proxy: {{ card.is_proxy|yes_no }}</div>
         {% match price %}{% when Some with (price) %}
         <div class="card-subtitle">Price: {{ price }} €</div>
+        {% when None %}{% endmatch %}
+        {% match market %}{% when Some with (market) %}
+        <div class="card-subtitle" title="ygoprodeck's Cardmarket price, the cheapest printing's: an estimate">
+          Market: {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
+          {% match market.sparkline %}{% when Some with (points) %}
+          <svg class="price-history" width="160" height="32" viewBox="-2 -2 164 36" role="img" aria-label="Price history">
+            <polyline points="{{ points }}" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          {% when None %}{% endmatch %}
+        </div>
         {% when None %}{% endmatch %}
       </div>
       <div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>

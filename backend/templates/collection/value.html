@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Collection value{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/collection.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Collection value</h1>
+
+  {% match last_refresh %}
+  {% when None %}
+  <p class="value-note">No price yet: the first refresh runs within a day of the server starting
+    (or now with <code>cargo run -p backend -- refresh-prices</code>).</p>
+  {% when Some with (_date) %}
+  <p class="value-note">
+    Market prices from ygoprodeck (Cardmarket, last refresh {{ self.last_refresh_str() }}).
+    They are an <strong>estimate</strong>: one price per card name, the cheapest printing's,
+    so old or high rarity copies are usually worth more. Condition (EX ×0.8, G ×0.6, P ×0.4)
+    and language (non-English ×0.9) lower a copy's value.
+  </p>
+
+  <div class="value-tiles">
+    <div class="value-tile">
+      <div class="value-label">Value today</div>
+      <div class="value-amount">{{ now.value|money }} €</div>
+      <div class="value-detail">{{ now.copies }} copies{% if now.without_price > 0 %}, {{ now.without_price }} without a price{% endif %}</div>
+    </div>
+    <div class="value-tile">
+      <div class="value-label">Spent (purchase lots)</div>
+      <div class="value-amount">{{ now.spent|money }} €</div>
+      <div class="value-detail">sold: {{ now.sold|money }} €</div>
+    </div>
+    <div class="value-tile">
+      <div class="value-label">Gain / loss</div>
+      <div class="value-amount {% if gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ gain|money }} €</div>
+      <div class="value-detail">{{ self.gain_percent() }} · value + sold − spent</div>
+    </div>
+    <div class="value-tile">
+      <div class="value-label">Copies with a unit price</div>
+      <div class="value-amount {% if unit_gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ unit_gain|money }} €</div>
+      <div class="value-detail">{{ units.copies }} copies: worth {{ units.value|money }} €, paid {{ units.paid|money }} € ({{ self.unit_gain_percent() }})</div>
+    </div>
+  </div>
+
+  <canvas id="value_chart" width="400" height="160"></canvas>
+
+  <h2>Most valuable copies</h2>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th>Card</th><th>Code</th><th>Condition</th><th>Value (€)</th><th>Paid (€)</th><th>Gain (€)</th></tr>
+    </thead>
+    <tbody>
+      {% for line in top %}
+      <tr>
+        <td><a href="/cards/{{ line.card_id }}">{{ line.name }}</a></td>
+        <td>{{ line.code }}</td>
+        <td>{{ line.status }}</td>
+        <td>{{ line.value|money }}</td>
+        {% match line.paid %}{% when Some with (paid) %}<td>{{ paid|money }}</td>{% when None %}<td>—</td>{% endmatch %}
+        {% match line.gain %}{% when Some with (gain) %}<td>{{ gain|money }}</td>{% when None %}<td>—</td>{% endmatch %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="value-note">Paid: the card's price in its lot, without shipping; "—" when the lot was bought as a whole.</p>
+
+  {% for period in moves %}
+  <h2>Biggest moves: {{ period.title }}</h2>
+  {% if period.lines.is_empty() %}
+  <p>No price of an owned card moved by 0.50 € or more.</p>
+  {% else %}
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th>Card</th><th>Before (€)</th><th>Now (€)</th><th>Change (€)</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      {% for line in period.lines %}
+      <tr>
+        <td><a href="/cards/{{ line.card_id }}">{{ line.name }}</a></td>
+        <td>{{ line.before|money }}</td>
+        <td>{{ line.after|money }}</td>
+        <td>{{ line.change|money }}</td>
+        <td class="{% if line.change.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ line.percent }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  <h2>By deck</h2>
+  <p class="value-note">Each deck's latest version. Proxies: what the missing cards would cost.</p>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th>Deck</th><th>Version</th><th>Cards</th><th>Value (€)</th><th>Proxies</th><th>Proxies (€)</th></tr>
+    </thead>
+    <tbody>
+      {% for deck in decks %}
+      <tr>
+        <td><a href="/decks/{{ deck.id }}">{{ deck.name }}</a></td>
+        <td>{{ deck.version }}</td>
+        <td>{{ deck.cards }}</td>
+        <td>{{ deck.value|money }}</td>
+        <td>{{ deck.proxies }}</td>
+        <td>{{ deck.proxies_value|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endmatch %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if last_refresh.is_some() %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script id="value-chart-data" type="application/json">{{ chart|safe }}</script>
+<script src="/static/js/collection_value.js"></script>
+{% endif %}
+{% endblock %}

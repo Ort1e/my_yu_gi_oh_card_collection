@@ -9,6 +9,7 @@ use rust_decimal::Decimal;
 use serde_json::json;
 
 use super::budget::{today, BudgetData};
+use super::collection::ValueData;
 use crate::web::error::AppResult;
 use crate::web::filters;
 use crate::AppState;
@@ -25,7 +26,18 @@ pub struct Dashboard {
     available_debt: Decimal,
     /// Chart.js data, serialised as JSON.
     charts: String,
+    /// `None` before the first price refresh.
+    value: Option<ValueTile>,
 }
+
+/// The collection value tile, linking to `/collection/value`.
+pub struct ValueTile {
+    value: Decimal,
+    /// Over the last 4 weeks of refreshes, `None` with a single refresh.
+    change: Option<Decimal>,
+}
+
+const VALUE_CHANGE_DAYS: i64 = 28;
 
 pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
     let data = BudgetData::load(&state.pool).await?;
@@ -63,6 +75,12 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
             .collect::<Vec<_>>(),
     });
 
+    let value_data = ValueData::load(&state.pool).await?;
+    let value = value_data.last_refresh().map(|_| ValueTile {
+        value: value_data.now().value,
+        change: value_data.change_over(VALUE_CHANGE_DAYS),
+    });
+
     let totals = BudgetTotals::compute(&recap);
     let shown = recap.len().saturating_sub(MONTHS_TO_DISPLAY);
     recap.drain(..shown);
@@ -74,5 +92,6 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
         // `</` can't appear in JSON numbers/our labels, but escape it anyway
         // since this is embedded in a <script>.
         charts: charts.to_string().replace("</", "<\\/"),
+        value,
     })
 }

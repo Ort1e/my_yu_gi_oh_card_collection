@@ -240,11 +240,12 @@ async fn same_as_previous(
     date: &str,
     entries: &[(i64, &str)],
 ) -> sqlx::Result<Option<String>> {
-    let previous: Option<(i64, String)> =
-        sqlx::query_as("SELECT id, date FROM advanced_ban_list WHERE date < ? ORDER BY date DESC LIMIT 1")
-            .bind(date)
-            .fetch_optional(&state.pool)
-            .await?;
+    let previous: Option<(i64, String)> = sqlx::query_as(
+        "SELECT id, date FROM advanced_ban_list WHERE date < ? ORDER BY date DESC LIMIT 1",
+    )
+    .bind(date)
+    .fetch_optional(&state.pool)
+    .await?;
     let Some((id, previous_date)) = previous else {
         return Ok(None);
     };

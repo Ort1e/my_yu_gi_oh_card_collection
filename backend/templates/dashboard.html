@@ -2,9 +2,31 @@
 
 {% block title %}my yu-gi-oh card{% endblock %}
 
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/collection.css">
+{% endblock %}
+
 {% block content %}
 <div class="inside-container">
   <h1>My Yu-Gi-Oh Card Collection</h1>
+
+  <div class="value-tiles">
+    <a class="value-tile" href="/collection/value">
+      <div class="value-label">Collection value (market estimate)</div>
+      {% match value %}
+      {% when Some with (tile) %}
+      <div class="value-amount">{{ tile.value|money }} €</div>
+      <div class="value-detail">
+        {% match tile.change %}
+        {% when Some with (change) %}<span class="{% if change.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ change|money }} €</span> over 4 weeks
+        {% when None %}first refresh: no change yet
+        {% endmatch %}
+      </div>
+      {% when None %}
+      <div class="value-detail">No price yet: the first refresh runs within a day.</div>
+      {% endmatch %}
+    </a>
+  </div>
 
   <h2>Recent Recap</h2>
   <div class="table-scroll">

@@ -6,6 +6,7 @@ pub mod book_data;
 pub mod books;
 pub mod calendar_photos;
 pub mod card_data;
+pub mod card_prices;
 pub mod cards;
 pub mod db;
 pub mod models;

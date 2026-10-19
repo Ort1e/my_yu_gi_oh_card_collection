@@ -240,7 +240,8 @@ HTTP. Each function gets plain values and returns plain values:
 | `ydke` | `YdkeDeck::parse` / `to_url` |
 | `monte_carlo` | opening-hand simulation, conditional categories included |
 | `cardmarket` | shipment text → `Shipment` (dates, total, seller, card lines) |
-| `ban_list` | Konami's ban-list JSON → entries |
+| `ban_list` | Konami's ban-list JSON and US pages → entries |
+| `valuation` | market value of the copies (condition/language factors), ownership by date, gain from lot prices, price moves |
 
 Each module's doc comment (`//!` at the top) says what it ports and lists
 the **deliberate differences from Django** (bugs fixed, crashes turned into
@@ -350,6 +351,11 @@ language of their code, rarity from the card data when the code was printed in
 one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
 
+`refresh-prices` fetches today's market price of every card data
+(`store/card_prices.rs`, batches of 100 ids) into `card_price`; the server
+does it weekly by itself (`prices::spawn_weekly`: checked every 6 hours, runs
+when the last refresh is 7 days old).
+
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, one
 summary line in the log), and the actions that make a cleanup necessary do
@@ -369,6 +375,7 @@ call of the server 60 ms apart, and what can be remembered is.
 | its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`) |
 | a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
 | a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
+| market prices, weekly (`store/card_prices.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
 
 Two rules: call ygoprodeck **before** opening a write transaction (the calls
 write through the pool), and only through these functions. Tests never call
@@ -376,6 +383,35 @@ it: `TestApp` pre-inserts the card data they need (and translations, in
 `card_translation`). The shapes ygoprodeck answers are reshaped in pure
 functions in `domain/` (`card_set`, `rarity::Rarity::from_label` for its
 rarity names), which are unit-tested on small synthetic JSON.
+
+## The collection value
+
+`/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
+and a "Market" line on card pages. Prices are ygoprodeck's Cardmarket price,
+**one per card name** (it follows the cheapest printing), so the value is an
+estimate, usually too low for old or high rarity copies. Cardmarket itself
+is not an option: its API takes no new users and scraping it is against its
+terms. The `card_prices` copy inside `card_data.json_data` is never used: it
+dates from when the card was linked.
+
+`domain::valuation` does the sums:
+- a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
+  × language (non-English 0.9), totals rounded to the cent;
+- a copy counts on date D when its purchase lot (not cancelled) is dated on
+  or before D and it has no sale lot by D; proxies never count;
+- the **gain/loss uses the lot prices** (`lot.price`, shipping included):
+  value of the copies owned + sale lots − purchase lots, up to D. Unite
+  prices can't do it: many lots were bought as a whole, without a price per
+  card;
+- beside it, the copies that do have a unite price are compared card by
+  card (value against that price, no shipping share);
+- price moves: since the previous refresh and over 3 months, cards owned
+  now, moves under 0.50 € left out.
+
+The page loads every row (`store::card_prices::owned_copies`, `lots`,
+`prices_by_date`) and computes in Rust: money is never summed in SQL. The
+chart is `static/js/collection_value.js`; the card page's price line is an
+SVG drawn by the server (`cards::sparkline`).
 
 ## Tests
 
