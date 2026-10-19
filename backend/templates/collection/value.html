@@ -43,6 +43,13 @@
       <div class="value-amount {% if unit_gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ unit_gain|money }} €</div>
       <div class="value-detail">{{ units.copies }} copies: worth {{ units.value|money }} €, paid {{ units.paid|money }} € ({{ self.unit_gain_percent() }})</div>
     </div>
+    {% match biggest_loss %}{% when Some with (loss) %}
+    <a class="value-tile" href="/cards/{{ loss.card_id }}">
+      <div class="value-label">Biggest loss</div>
+      {% match loss.gain %}{% when Some with (gain) %}<div class="value-amount value-down">{{ gain|money }} €</div>{% when None %}{% endmatch %}
+      <div class="value-detail">{{ loss.name }} ({{ loss.code }}): paid {% match loss.paid %}{% when Some with (paid) %}{{ paid|money }}{% when None %}—{% endmatch %} €, worth {{ loss.value|money }} €</div>
+    </a>
+    {% when None %}{% endmatch %}
   </div>
 
   <canvas id="value_chart" width="400" height="160"></canvas>

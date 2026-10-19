@@ -54,6 +54,8 @@ async fn values_the_collection_from_lot_prices() {
     assert!(body.contains("paid 4.50 €"), "{body}");
     assert!(body.contains("6.30 €"), "{body}");
     assert!(body.contains("(+140.0%)"), "{body}");
+    // nothing lost: no "Biggest loss" tile
+    assert!(!body.contains("Biggest loss"), "{body}");
     // Dark Magician moved +50%; Kuriboh more, but it's only a proxy
     assert!(body.contains(">+50.0%</td>"), "{body}");
     assert!(!body.contains("+900.0%"), "{body}");
@@ -86,4 +88,26 @@ async fn the_card_page_shows_its_market_price() {
         "{body}"
     );
     assert!(body.contains("<polyline"), "{body}");
+}
+
+#[tokio::test]
+async fn the_recap_shows_the_copy_that_lost_the_most() {
+    let t = TestApp::new().await;
+    let cards = priced_fixture(&t).await;
+    // the second Dark Magician cost 8.00: worth 5.40, so −2.60
+    sqlx::query("UPDATE unite SET price = '8.00' WHERE card_id = ?")
+        .bind(cards[1])
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+
+    let (status, body) = t.get("/collection/value").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains("Biggest loss"), "{body}");
+    assert!(
+        body.contains(&format!(r#"href="/cards/{}""#, cards[1])),
+        "{body}"
+    );
+    assert!(body.contains("-2.60 €"), "{body}");
+    assert!(body.contains("paid 8.00 €, worth 5.40 €"), "{body}");
 }

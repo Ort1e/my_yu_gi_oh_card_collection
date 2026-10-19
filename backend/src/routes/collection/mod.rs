@@ -120,6 +120,7 @@ impl ValueData {
     }
 }
 
+#[derive(Clone)]
 pub struct CopyLine {
     card_id: i64,
     name: String,
@@ -167,6 +168,9 @@ pub struct ValuePage {
     units: UnitTotals,
     unit_gain: Decimal,
     top: Vec<CopyLine>,
+    /// The owned copy that lost the most against its unite price, `None`
+    /// when none lost anything.
+    biggest_loss: Option<CopyLine>,
     moves: Vec<Moves>,
     decks: Vec<DeckLine>,
     /// Chart.js data, serialised as JSON.
@@ -214,6 +218,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
             })
         })
         .collect();
+    let biggest_loss = biggest_loss(&top);
     top.sort_by(|a, b| b.value.cmp(&a.value).then(a.card_id.cmp(&b.card_id)));
     top.truncate(TOP_COPIES);
 
@@ -248,6 +253,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         unit_gain: units.gain(),
         units,
         top,
+        biggest_loss,
         moves,
         decks: deck_values(pool, &data.latest).await?,
         // embedded in a <script>
@@ -264,6 +270,16 @@ struct DeckCardRow {
     card_data_id: Option<i64>,
     status: Option<String>,
     code: Option<String>,
+}
+
+/// The copy with the most negative gain (value − unite price), the first
+/// card id on a tie.
+fn biggest_loss(copies: &[CopyLine]) -> Option<CopyLine> {
+    copies
+        .iter()
+        .filter(|c| c.gain.is_some_and(|gain| gain.is_sign_negative()))
+        .min_by(|a, b| a.gain.cmp(&b.gain).then(a.card_id.cmp(&b.card_id)))
+        .cloned()
 }
 
 /// The value of each deck's latest version: its real cards, and its proxies
