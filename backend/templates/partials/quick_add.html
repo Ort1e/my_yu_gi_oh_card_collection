@@ -19,8 +19,8 @@
       </select>
     </div>
     <div>
-      <label for="qa-number">Number, then Enter</label>
-      <input type="text" id="qa-number" placeholder="e.g. 37" autocomplete="off" disabled>
+      <label for="qa-number">Number or code, then Enter</label>
+      <input type="text" id="qa-number" placeholder="e.g. 37 or MAMO-EN012" autocomplete="off">
     </div>
   </div>
 
@@ -28,11 +28,11 @@
 
   <div id="qa-rarities" class="qa-rarities" hidden></div>
 
-  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards, <strong>with the language</strong> (e.g. <code>RA05-FR</code>), then each card's number. A number printed in several rarities gets one row per copy: choose each one's rarity in its row.</small></p>
+  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards, <strong>with the language</strong> (e.g. <code>RA05-FR</code>), then each card's number. A full code (<code>MAMO-EN012</code>) is used as typed, whatever the set above. A number printed in several rarities gets one row per copy: choose each one's rarity in its row.</small></p>
 
   <details>
     <summary>Or paste a list of numbers or codes</summary>
-    <label for="qa-paste">One per line, or separated by spaces or commas (<code>37 41 41 102</code>, or full codes in the set's language: <code>RA05-FR037</code>)</label>
+    <label for="qa-paste">One per line, or separated by spaces or commas (numbers of the set above: <code>37 41 41 102</code>, or full codes of any set: <code>RA05-FR037 MAMO-EN012</code>)</label>
     <textarea id="qa-paste" rows="3"></textarea>
     <button type="button" id="qa-paste-add" class="btn-secondary">Add these cards</button>
   </details>

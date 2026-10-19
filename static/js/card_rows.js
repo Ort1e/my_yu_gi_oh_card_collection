@@ -1,7 +1,7 @@
 // Card rows of the lot form (templates/lots/add.html): add / remove rows, and
 // the "Quick add from a set" panel (templates/partials/quick_add.html), which fills
-// rows from a set code and card numbers using GET /api/sets/:code
-// (backend/src/routes/reference/sets.rs).
+// rows from card numbers of a default set, or full codes of any set, using
+// GET /api/sets/:code (backend/src/routes/reference/sets.rs).
 
 const rows = document.getElementById('card-rows');
 const addButton = document.getElementById('add-row');
@@ -47,30 +47,35 @@ const statusSelect = document.getElementById('qa-status');
 const numberInput = document.getElementById('qa-number');
 const info = document.getElementById('qa-info');
 const pasteArea = document.getElementById('qa-paste');
+const pasteButton = document.getElementById('qa-paste-add');
 const rarityHelp = document.getElementById('qa-rarities');
 
 /** The languages of the card codes (domain::card::Language). */
 const LANGUAGES = ['EN', 'FR', 'DE', 'IT', 'SP', 'PT'];
 
-/**
- * The loaded set: { code: "RA05", language: "FR", prefix: "RA05-FR", name,
- * cards: Map(number → card) }.
- */
-let set = null;
+/** The sets looked up so far, by set code: "RA05" → { code, name, cards: Map(number → card) }. */
+const sets = new Map();
 
 /**
- * The name of `card` in the language of the loaded set: English for an -EN
- * set, French for a -FR set (English when ygoprodeck has no French name).
- * The set lookup only has French names: for other languages the English name
- * is used, and the server puts it in the right language after saving.
+ * The default set, for the numbers typed alone ("37"): { set, language: "FR",
+ * prefix: "RA05-FR" }, null until one is loaded. A full code ("MAMO-EN012")
+ * uses its own set and language instead.
  */
-function localName(card) {
-    return set.language === 'FR' ? card.name_fr ?? card.name_en : card.name_en;
+let current = null;
+
+/**
+ * The name of `card` in `language`: English for -EN, French for -FR (English
+ * when ygoprodeck has no French name). The set lookup only has French names:
+ * for other languages the English name is used, and the server puts it in the
+ * right language after saving.
+ */
+function localName(card, language) {
+    return language === 'FR' ? card.name_fr ?? card.name_en : card.name_en;
 }
 
 /** "Dragon à Trois Cornes (Tri-Horned Dragon)", or the English name alone. */
-function names(card) {
-    const local = localName(card);
+function names(card, language) {
+    const local = localName(card, language);
 
     return local !== card.name_en ? `${local} (${card.name_en})` : card.name_en;
 }
@@ -100,74 +105,66 @@ function parseSetCode(text) {
     return { setCode, language, prefix: `${setCode}-${language}` };
 }
 
+/**
+ * "ra05-fr037" → { setCode: "RA05", language: "FR", number: "037" }; an error
+ * message when the language is missing or unknown.
+ */
+function parseCardCode(token) {
+    const code = token.trim().toUpperCase();
+    const [setCode, rest = '', ...more] = code.split('-');
+    const language = LANGUAGES.find((l) => rest.startsWith(l) && rest.length > l.length);
+
+    if (!setCode || !language || more.length > 0) {
+        return { error: `${code}: write the code with its language, e.g. ${setCode || 'RA05'}-FR037.` };
+    }
+
+    return { setCode, language, number: rest.slice(language.length) };
+}
+
+/** The set `setCode`, looked up once; throws an Error with the reason. */
+async function fetchSet(setCode) {
+    if (sets.has(setCode)) return sets.get(setCode);
+
+    const res = await fetch(`/api/sets/${encodeURIComponent(setCode)}`);
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        throw new Error(body.error ?? `the set lookup answered ${res.status} ${res.statusText}`);
+    }
+
+    const set = {
+        code: setCode,
+        name: body.name,
+        cards: new Map(body.cards.map((card) => [card.number.toUpperCase(), card])),
+    };
+    sets.set(setCode, set);
+
+    return set;
+}
+
 async function loadSet() {
     const parsed = parseSetCode(setInput.value);
-    set = null;
-    numberInput.disabled = true;
+    current = null;
 
     if (parsed.error) return say(parsed.error, Boolean(setInput.value.trim()));
 
     say(`Loading ${parsed.setCode}…`);
 
     try {
-        const res = await fetch(`/api/sets/${encodeURIComponent(parsed.setCode)}`);
-        const body = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-            const reason = body.error ?? `the set lookup answered ${res.status} ${res.statusText}`;
-
-            return say(`Could not load ${parsed.setCode}: ${reason}`, true);
-        }
-
-        set = {
-            code: parsed.setCode,
-            language: parsed.language,
-            prefix: parsed.prefix,
-            name: body.name,
-            cards: new Map(body.cards.map((card) => [card.number.toUpperCase(), card])),
-        };
+        const set = await fetchSet(parsed.setCode);
+        current = { set, language: parsed.language, prefix: parsed.prefix };
     } catch (e) {
         return say(`Could not load ${parsed.setCode}: ${e.message}`, true);
     }
 
-    numberInput.disabled = false;
     numberInput.focus();
-    say(`${set.name}: ${set.cards.size} cards. Type a number and press Enter.`);
+    say(`${current.set.name}: ${current.set.cards.size} cards. Type a number (or a full code of any set) and press Enter.`);
     suggestSetCodes();
 }
 
-/**
- * Why a full code can't be used with the loaded set, or null: it must be a
- * code of this set, in its language ("RA05-FR037" when RA05-FR is loaded).
- */
-function codeProblem(token) {
-    const code = token.trim().toUpperCase();
-
-    if (!code.includes('-')) return null;
-
-    if (code.startsWith(`${set.prefix}`) && code.length > set.prefix.length) return null;
-
-    const [setCode, rest = ''] = code.split('-');
-
-    if (setCode !== set.code) return `${token} is not a card of ${set.prefix}.`;
-
-    const language = LANGUAGES.find((l) => rest.startsWith(l) && rest.length > l.length);
-
-    if (language) return `${token} is in ${language}, the loaded set is ${set.prefix}.`;
-
-    return `${token}: write the code with its language, ${set.prefix}… (the loaded set).`;
-}
-
-/** The card of the loaded set for "37", "037", "SE1" or a full code "RA05-FR037". */
-function findCard(token) {
-    let number = token.trim().toUpperCase();
-
-    if (number.includes('-')) {
-        if (codeProblem(number)) return null;
-
-        // "RA05-FR037" → "037", "RA05-FRSE1" → "SE1"
-        number = number.slice(set.prefix.length);
-    }
+/** The card of `set` numbered "37", "037" or "SE1", or null. */
+function findInSet(set, number) {
+    number = number.trim().toUpperCase();
 
     if (set.cards.has(number)) return set.cards.get(number);
 
@@ -182,12 +179,45 @@ function findCard(token) {
 }
 
 /**
- * Add one copy of `card`. A code printed in a single rarity: +1 on the row
- * already holding it, if any. Several rarities: always a new row, since each
- * copy may be a different rarity (to choose in its row).
+ * The card for a number of the default set ("37") or a full code of any set
+ * ("RA05-FR037", "MAMO-EN012", looked up if needed):
+ * { card, set, language, prefix }, or { error }.
  */
-function addCard(card) {
-    const code = set.prefix + card.number;
+async function resolve(token) {
+    if (!token.includes('-')) {
+        if (!current) return { error: `${token}: load a set first, or type the full code (e.g. RA05-FR037).` };
+
+        const card = findInSet(current.set, token);
+
+        return card ? { ...current, card } : { error: `No card ${token} in ${current.set.name}.` };
+    }
+
+    const parsed = parseCardCode(token);
+
+    if (parsed.error) return parsed;
+
+    let set;
+
+    try {
+        set = await fetchSet(parsed.setCode);
+    } catch (e) {
+        return { error: `Could not load ${parsed.setCode}: ${e.message}` };
+    }
+
+    const card = findInSet(set, parsed.number);
+
+    if (!card) return { error: `No card ${token.trim().toUpperCase()} in ${set.name}.` };
+
+    return { set, language: parsed.language, prefix: `${parsed.setCode}-${parsed.language}`, card };
+}
+
+/**
+ * Add one copy of the card of `pick` (from resolve()). A code printed in a
+ * single rarity: +1 on the row already holding it, if any. Several rarities:
+ * always a new row, since each copy may be a different rarity (to choose in its row).
+ */
+function addCard({ card, language, prefix }) {
+    const code = prefix + card.number;
     const rowsNow = [...rows.querySelectorAll('.card-row')];
     const oneRarity = (card.rarities?.length ?? 0) <= 1;
     const existing = oneRarity
@@ -205,7 +235,7 @@ function addCard(card) {
     const empty = rowsNow.find((row) => !field(row, 'name').value && !field(row, 'code').value);
     const row = empty ?? addRow();
 
-    field(row, 'name').value = localName(card);
+    field(row, 'name').value = localName(card, language);
     field(row, 'en_name').value = card.name_en;
     field(row, 'code').value = code;
     field(row, 'status').value = statusSelect.value;
@@ -249,11 +279,12 @@ function limitRarities(select, names, code = '') {
 }
 
 /**
- * Under the message: the rarities the card exists in, when there are several,
- * each with how to recognise it (static/js/rarities.js) and a link to the guide.
+ * Under the message: the rarities the card of `pick` exists in, when there are
+ * several, each with how to recognise it (static/js/rarities.js) and a link to
+ * the guide. `pick` null hides them.
  */
-function showRarities(card) {
-    const rarities = card?.rarities ?? [];
+function showRarities(pick) {
+    const rarities = pick?.card.rarities ?? [];
 
     rarityHelp.hidden = rarities.length < 2;
 
@@ -267,7 +298,8 @@ function showRarities(card) {
         return `<li><strong>${known?.name ?? name}</strong>:${hint}${link}</li>`;
     });
 
-    rarityHelp.innerHTML = `<p>${set.prefix}${card.number} ${names(card)} exists in ${rarities.length} rarities:</p><ul>${items.join('')}</ul>`;
+    const { card, language, prefix } = pick;
+    rarityHelp.innerHTML = `<p>${prefix}${card.number} ${names(card, language)} exists in ${rarities.length} rarities:</p><ul>${items.join('')}</ul>`;
 }
 
 /** Briefly highlight a row that was just filled. */
@@ -277,21 +309,25 @@ function flash(row) {
     row.classList.add('just-added');
 }
 
-/** Add the cards of a list of numbers/codes; returns the tokens not found. */
-function addTokens(tokens) {
+/** Add the cards of a list of numbers/codes; returns { added, missing, errors }. */
+async function addTokens(tokens) {
+    let added = 0;
     const missing = [];
+    const errors = [];
 
     for (const token of tokens) {
-        const card = findCard(token);
+        const pick = await resolve(token);
 
-        if (card) {
-            flash(addCard(card));
-        } else {
+        if (pick.error) {
             missing.push(token);
+            errors.push(pick.error);
+        } else {
+            flash(addCard(pick));
+            added++;
         }
     }
 
-    return missing;
+    return { added, missing, errors };
 }
 
 // ---------- set code suggestions ----------
@@ -344,7 +380,7 @@ function suggestSetCodes() {
         button.type = 'button';
         button.className = 'btn-small btn-secondary';
         button.textContent = code;
-        button.classList.toggle('active', set?.prefix === code);
+        button.classList.toggle('active', current?.prefix === code);
         button.addEventListener('click', () => {
             setInput.value = code;
             loadSet();
@@ -371,46 +407,45 @@ setInput.addEventListener('keydown', (e) => {
     loadSet();
 });
 
-numberInput.addEventListener('keydown', (e) => {
+numberInput.addEventListener('keydown', async (e) => {
     if (e.key !== 'Enter') return;
 
     e.preventDefault();
 
     const token = numberInput.value.trim();
 
-    if (!token || !set) return;
+    if (!token) return;
 
-    const card = findCard(token);
+    const pick = await resolve(token);
 
-    if (!card) {
+    if (pick.error) {
         showRarities(null);
 
-        return say(codeProblem(token) ?? `No card ${token} in ${set.name}.`, true);
+        return say(pick.error, true);
     }
 
-    flash(addCard(card));
-    say(`Added ${set.prefix}${card.number} ${names(card)}.`);
+    flash(addCard(pick));
+    say(`Added ${pick.prefix}${pick.card.number} ${names(pick.card, pick.language)}.`);
     suggestSetCodes();
-    showRarities(card);
+    showRarities(pick);
     numberInput.value = '';
 });
 
-document.getElementById('qa-paste-add').addEventListener('click', () => {
-    if (!set) return say('Load a set first (set code above).', true);
-
+pasteButton.addEventListener('click', async () => {
     const tokens = pasteArea.value.split(/[\s,;]+/).filter(Boolean);
 
     if (tokens.length === 0) return;
 
-    const missing = addTokens(tokens);
-    const added = tokens.length - missing.length;
+    pasteButton.disabled = true;
+
+    const { added, missing, errors } = await addTokens(tokens);
+
+    pasteButton.disabled = false;
     suggestSetCodes();
     showRarities(null); // several cards: no single card's rarities to show
 
     if (missing.length > 0) {
-        const problems = missing.map(codeProblem).filter(Boolean);
-        const why = problems.length > 0 ? ` ${problems.join(' ')}` : '';
-        say(`Added ${added} cards. Not added: ${missing.join(', ')}.${why}`, true);
+        say(`Added ${added} cards. Not added: ${errors.join(' ')}`, true);
         pasteArea.value = missing.join('\n');
     } else {
         say(`Added ${added} cards.`);
