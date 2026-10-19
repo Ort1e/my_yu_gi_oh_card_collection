@@ -1,8 +1,12 @@
-//! The cards of a set, from ygoprodeck's answers, for the "quick add from a
-//! set" panel of the lot forms (`GET /api/sets/:code`).
+//! Card codes and ygoprodeck's `card_sets`:
+//!
+//! - the cards of a set, for the "quick add from a set" panel of the lot
+//!   forms (`GET /api/sets/:code`, [`set_cards`]);
+//! - the rarity of a card from its card data, when its code was printed in
+//!   one rarity only (`clean-cards` step 7, [`single_rarity`]).
 //!
 //! Pure: the backend fetches the JSON (`card_data::fetch_set`), this module
-//! only reshapes it.
+//! only reads it.
 
 use std::collections::HashMap;
 
@@ -10,6 +14,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::card::Language;
+use crate::rarity::Rarity;
 
 /// One card number of a set, as sent to the panel.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -51,6 +56,68 @@ pub fn card_number(code: &str) -> Option<String> {
     } else {
         Some(number.to_string())
     }
+}
+
+/// A code without its language, to compare a card with ygoprodeck's
+/// `set_code`s (always English) whatever its language:
+///
+/// - `"MAMO-FR023"` → `("MAMO", "023")`, like `"MAMO-EN023"`
+/// - `"LOB-F001"` → `("LOB", "001")` (old sets: one letter before a digit)
+/// - `"SDY-046"` → `("SDY", "046")` (no language)
+/// - `"ABPF-ENSE1"` → `("ABPF", "SE1")`
+///
+/// Case-insensitive (the parts come back in upper case). `None` without a
+/// `-`, or with an empty set or number.
+pub fn code_without_language(code: &str) -> Option<(String, String)> {
+    let code = code.trim().to_ascii_uppercase();
+    let (set, number) = code.split_once('-')?;
+
+    // the same rules as Language::of_code: a modern code first, then an old one
+    let number = match Language::of_code(&code) {
+        Some(language) => language
+            .spellings()
+            .iter()
+            .find_map(|s| number.strip_prefix(s).filter(|rest| !rest.is_empty()))
+            .or_else(|| number.strip_prefix(language.old_code()))
+            .unwrap_or(number),
+        None => number,
+    };
+
+    if set.is_empty() || number.is_empty() {
+        None
+    } else {
+        Some((set.to_string(), number.to_string()))
+    }
+}
+
+/// The rarity of a card coded `code`, from its ygoprodeck JSON (`card_sets`),
+/// when that code was printed in **one rarity only**: `"MAMO-FR023"` with only
+/// `{"set_code": "MAMO-EN023", "set_rarity": "Super Rare"}` → Super Rare.
+///
+/// `None` when the code isn't listed, when it was printed in several
+/// rarities, or when one of its rarities isn't a known name (`"2"`, `"New"`):
+/// the card can't be known for sure then.
+pub fn single_rarity(json: &Value, code: &str) -> Option<Rarity> {
+    let wanted = code_without_language(code)?;
+    let sets = json.get("card_sets")?.as_array()?;
+
+    let mut found: Option<Rarity> = None;
+    for set in sets {
+        let Some(set_code) = set.get("set_code").and_then(|c| c.as_str()) else {
+            continue;
+        };
+
+        if code_without_language(set_code).as_ref() != Some(&wanted) {
+            continue;
+        }
+
+        let rarity = Rarity::from_label(set.get("set_rarity")?.as_str()?)?;
+        match found {
+            Some(other) if other != rarity => return None,
+            _ => found = Some(rarity),
+        }
+    }
+    found
 }
 
 /// The cards of the set `prefix` (`"RA05"`), sorted by number.
@@ -213,6 +280,106 @@ mod tests {
             Some("E".to_string()),
             "a lone E stays"
         );
+    }
+
+    // ---------- code_without_language ----------
+
+    /// `"MAMO-FR023"` → `Some("MAMO 023")`, to compare in one string.
+    fn parts(code: &str) -> Option<String> {
+        code_without_language(code).map(|(set, number)| format!("{set} {number}"))
+    }
+
+    #[test]
+    fn codes_lose_their_language() {
+        assert_eq!(parts("MAMO-FR023").as_deref(), Some("MAMO 023"));
+        assert_eq!(parts("MAMO-EN023").as_deref(), Some("MAMO 023"));
+        assert_eq!(parts("RA05-DE037").as_deref(), Some("RA05 037"));
+    }
+
+    #[test]
+    fn old_codes_lose_their_letter() {
+        assert_eq!(parts("LOB-F001").as_deref(), Some("LOB 001"));
+        assert_eq!(parts("LOB-E001").as_deref(), Some("LOB 001"));
+    }
+
+    #[test]
+    fn codes_without_a_language_are_kept() {
+        assert_eq!(parts("SDY-046").as_deref(), Some("SDY 046"));
+        assert_eq!(parts("ABPF-ENSE1").as_deref(), Some("ABPF SE1"));
+        assert_eq!(parts("XYZ-SE1").as_deref(), Some("XYZ SE1"), "not Spanish");
+    }
+
+    #[test]
+    fn codes_are_compared_in_upper_case() {
+        assert_eq!(parts(" mamo-fr023 ").as_deref(), Some("MAMO 023"));
+    }
+
+    #[test]
+    fn broken_codes_have_no_parts() {
+        assert_eq!(parts("nonsense"), None);
+        assert_eq!(parts("MAMO-"), None);
+        assert_eq!(parts("-FR023"), None);
+    }
+
+    // ---------- single_rarity ----------
+
+    fn printings(sets: &[(&str, &str)]) -> Value {
+        card(1, "Card", sets)
+    }
+
+    #[test]
+    fn the_only_rarity_of_the_code() {
+        let json = printings(&[("MAMO-EN023", "Super Rare"), ("RA05-EN023", "Secret Rare")]);
+        assert_eq!(
+            single_rarity(&json, "MAMO-FR023"),
+            Some(Rarity::SuperRare),
+            "a French card, an English printing"
+        );
+    }
+
+    #[test]
+    fn the_same_rarity_twice_is_one_rarity() {
+        let json = printings(&[
+            ("MAMO-EN023", "Platinum Secret Rare"),
+            ("MAMO-EN023", "PLatinum Secret Rare"),
+        ]);
+        assert_eq!(
+            single_rarity(&json, "MAMO-EN023"),
+            Some(Rarity::PlatinumSecretRare)
+        );
+    }
+
+    #[test]
+    fn several_rarities_give_none() {
+        let json = printings(&[
+            ("RA05-EN001", "Starlight Rare"),
+            ("RA05-EN001", "Secret Rare"),
+        ]);
+        assert_eq!(single_rarity(&json, "RA05-FR001"), None);
+    }
+
+    #[test]
+    fn a_code_not_listed_gives_none() {
+        let json = printings(&[("RA05-EN001", "Common")]);
+        assert_eq!(single_rarity(&json, "RA05-FR002"), None);
+        assert_eq!(single_rarity(&json, "RA050-FR001"), None);
+        assert_eq!(single_rarity(&json!({}), "RA05-FR001"), None);
+    }
+
+    #[test]
+    fn an_unknown_rarity_gives_none() {
+        assert_eq!(
+            single_rarity(&printings(&[("RA05-EN001", "2")]), "RA05-EN001"),
+            None
+        );
+        let json = printings(&[("RA05-EN001", "Common"), ("RA05-EN001", "New")]);
+        assert_eq!(single_rarity(&json, "RA05-EN001"), None);
+    }
+
+    #[test]
+    fn old_codes_match_modern_printings() {
+        let json = printings(&[("LOB-EN005", "Ultra Rare")]);
+        assert_eq!(single_rarity(&json, "LOB-F005"), Some(Rarity::UltraRare));
     }
 
     // ---------- set_cards ----------

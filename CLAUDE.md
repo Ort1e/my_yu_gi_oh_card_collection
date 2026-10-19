@@ -49,7 +49,7 @@ Cargo workspace (`Cargo.toml`), shared deps under `[workspace.dependencies]`:
   - `tests/` — `mod.rs`: `TestApp` (handler tests on a temp migrated DB, no network) + shared fixtures `LOT`, `json`, `deck_fixture`; one file per area: `pages`, `lots`, `decks`, `budget`, `deck_api`, `edit_forms`, `auth`, `advent`, `books`, `book_advent`.
   - `templates/` — same folders as `routes/` (`lots/list.html`, `lots/detail.html`, `lots/add.html`, `lots/edit.html`, …), `partials/` for the included pieces, and at the root `base.html`, `list_base.html` (blocks `items`/`filter`/`add_button`), `dashboard.html`, `login.html`. CSS from Django in `static/css/`.
   - **Don't pile files in one folder**: new code and templates go in the folder of their area (or a new one), never loose at the root of `src/`, `routes/` or `templates/`.
-- `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `rarity` (rarity list, Cardmarket codes, `(V.x - …)` name suffix), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
+- `domain/` — pure, unit-tested business logic (no DB/HTTP): `card` (name normalisation, statuses), `card_set` (codes vs ygoprodeck's `card_sets`: quick-add set cards, single rarity), `rarity` (rarity list, Cardmarket codes, `(V.x - …)` name suffix), `ydke`, `lot`, `budget`, `monte_carlo`, `cardmarket` (shipment PDF parsing via lopdf), `ban_list` (Konami JSON). Each module's doc comment lists its deliberate differences from Django.
 - `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, embedded by both binaries (`sqlx::migrate!("../migrations")`).
 - `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte` with their own `<style>`, `api.js` = HTTP client, `deck.js` = pure helpers).
@@ -68,7 +68,7 @@ cargo test -p domain --test real_shipments -- --ignored --nocapture   # parser v
 
 cargo run -p backend                          # web server, http://127.0.0.1:3000; runs migrations on startup
 cargo run -p backend -- scrap-ban-list        # import new/current Konami ban lists (--all, --dry-run)
-cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies, rarity from (V.x - …) names, names in their code's language (--dry-run); the server also runs it in the background (5 min after start, then daily)
+cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies, rarity from (V.x - …) names, names in their code's language, rarity of single-rarity codes from card data (--dry-run); the server also runs it in the background (5 min after start, then daily)
 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)
 

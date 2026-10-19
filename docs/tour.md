@@ -342,7 +342,8 @@ the server refuses to listen anywhere but `127.0.0.1`.
 `backend/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`)
 and `clean-cards` (normalise names, relink card data, swap proxies for owned
 copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
-language of their code). Both accept `--dry-run`: they run in a transaction
+language of their code, rarity from the card data when the code was printed in
+one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
 
 You rarely need `clean-cards` by hand: the server runs it in the background

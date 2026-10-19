@@ -10,17 +10,24 @@
 //! 6. put names in the language of their code: a card coded in another
 //!    language than English (`MAMO-FR023`) but still named in English gets
 //!    its name in that language from ygoprodeck (the code is the truth).
-//!    ygoprodeck is only read, so a dry run looks the names up too.
+//!    ygoprodeck is only read, so a dry run looks the names up too;
+//! 7. give the cards still without a rarity the rarity of their code, when
+//!    their card data lists that code in one rarity only
+//!    ([`single_rarity`]: `MAMO-FR023` matches ygoprodeck's `MAMO-EN023`).
+//!    Codes printed in several rarities, or not listed, stay empty (to set
+//!    by hand); proxies are left alone. Runs after step 5: a `(V.x - …)`
+//!    name is more reliable than ygoprodeck.
 //!
 //! Differences from Django: sold cards are never used as replacements,
 //! category assignments follow the replacement, proxies bought in a lot are
 //! kept, a rename that would clash with another card data is skipped, and
-//! steps 5 and 6 are new (Django had no rarity, and kept the names as typed).
+//! steps 5 to 7 are new (Django had no rarity, and kept the names as typed).
 
 use std::collections::HashMap;
 use std::time::Duration;
 
 use domain::card::{clean_card_name, normalize_card_name};
+use domain::card_set::single_rarity;
 use domain::rarity::split_cardmarket_name;
 use sqlx::SqliteConnection;
 
@@ -52,6 +59,7 @@ struct Report {
     replaced: usize,
     deleted: u64,
     rarities: usize,
+    rarities_from_data: usize,
 }
 
 /// The `clean-cards` command: run, then print what was done.
@@ -105,6 +113,7 @@ async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
     let replaced = replace_proxies(&mut tx).await?;
     let deleted = delete_orphan_proxies(&mut tx).await?;
     let rarities = rarities_from_names(&mut tx).await?;
+    let rarities_from_data = rarities_from_card_data(&mut tx).await?;
 
     for t in &plan.translations {
         sqlx::query("UPDATE card SET name = ? WHERE id = ?")
@@ -121,6 +130,7 @@ async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
         replaced,
         deleted,
         rarities,
+        rarities_from_data,
     })
 }
 
@@ -131,6 +141,7 @@ impl Report {
             replaced,
             deleted,
             rarities,
+            rarities_from_data,
         } = self;
 
         println!("card data renamed: {}", plan.data_renames.len());
@@ -138,6 +149,7 @@ impl Report {
         println!("proxies replaced by owned copies: {replaced}");
         println!("unused proxies deleted: {deleted}");
         println!("rarities taken from card names: {rarities}");
+        println!("rarities taken from card data: {rarities_from_data}");
         for t in &plan.translations {
             println!(
                 "card {} ({}): {:?} -> {:?}",
@@ -180,6 +192,7 @@ impl Report {
             proxies_replaced = self.replaced,
             proxies_deleted = self.deleted,
             rarities = self.rarities,
+            rarities_from_data = self.rarities_from_data,
             names_translated = self.plan.translations.len(),
             without_translation = self.plan.untranslated.len(),
             unresolved = self.plan.unresolved.len(),
@@ -278,6 +291,38 @@ async fn rarities_from_names(conn: &mut SqliteConnection) -> anyhow::Result<usiz
         };
         sqlx::query("UPDATE card SET name = ?, rarity = ? WHERE id = ?")
             .bind(short)
+            .bind(rarity.label())
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        changed += 1;
+    }
+    Ok(changed)
+}
+
+/// Set the rarity of the cards without one whose code was printed in one
+/// rarity only, from their card data (step 7). Returns how many cards changed.
+async fn rarities_from_card_data(conn: &mut SqliteConnection) -> anyhow::Result<usize> {
+    let cards: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT c.id, c.code, d.json_data FROM card c JOIN card_data d ON d.id = c.card_data_id
+         WHERE c.rarity IS NULL AND c.is_proxy = 0 AND c.code IS NOT NULL ORDER BY c.id",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut changed = 0;
+    for (id, code, json) in &cards {
+        let json: serde_json::Value = match serde_json::from_str(json) {
+            Ok(json) => json,
+            Err(e) => {
+                println!("card {id}: unreadable card data ({e}), skipped");
+                continue;
+            }
+        };
+        let Some(rarity) = single_rarity(&json, code) else {
+            continue;
+        };
+        sqlx::query("UPDATE card SET rarity = ? WHERE id = ?")
             .bind(rarity.label())
             .bind(id)
             .execute(&mut *conn)
@@ -413,6 +458,53 @@ mod tests {
             card(4).await.unwrap(),
             ("Kept (V.1 - Rare)".into(), Some("Super Rare".into())),
             "a card with a rarity is left alone"
+        );
+    }
+
+    #[tokio::test]
+    async fn takes_the_rarity_of_single_rarity_codes_from_card_data() {
+        let t = TestApp::new().await;
+        sqlx::query(
+            r#"INSERT INTO card_data (id, en_name, ygopro_id, json_data) VALUES (3, 'tri-horned dragon', 39111158,
+                 '{"card_sets": [{"set_code": "RA05-EN001", "set_rarity": "Starlight Rare"},
+                                 {"set_code": "RA05-EN001", "set_rarity": "Secret Rare"},
+                                 {"set_code": "LOB-EN005", "set_rarity": "Ultra Rare"}]}');
+             INSERT INTO card (id, name, en_name, code, card_data_id, rarity, is_proxy) VALUES
+                 (1, 'Dragon à Trois Cornes', 'tri-horned dragon', 'LOB-F005', 3, NULL, 0),
+                 (2, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-EN001', 3, NULL, 0),
+                 (3, 'Tri-Horned Dragon', 'tri-horned dragon', 'LOB-EN005', 3, NULL, 1),
+                 (4, 'Tri-Horned Dragon', 'tri-horned dragon', 'LOB-EN005', 3, 'Common', 0),
+                 (5, 'Tri-Horned Dragon', 'tri-horned dragon', 'SDY-001', 3, NULL, 0);
+             -- a proxy in a lot, so that step 4 keeps it
+             INSERT INTO lot (id, lot_type, price, buy_date) VALUES (1, 'purchase', '1.00', '2025-01-01');
+             INSERT INTO unite (lot_id, card_id) VALUES (1, 3);"#,
+        )
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+
+        clean(&t.state, true).await.unwrap();
+        assert_eq!(
+            t.text("SELECT rarity FROM card WHERE id = 1").await,
+            None,
+            "dry run"
+        );
+
+        clean(&t.state, false).await.unwrap();
+        let rarities: Vec<Option<String>> =
+            sqlx::query_scalar("SELECT rarity FROM card ORDER BY id")
+                .fetch_all(&t.state.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            rarities,
+            [
+                Some("Ultra Rare".into()), // one rarity, old French code
+                None,                      // several rarities
+                None,                      // a proxy
+                Some("Common".into()),     // already set, kept
+                None,                      // code not listed
+            ]
         );
     }
 
