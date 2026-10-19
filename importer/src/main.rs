@@ -99,9 +99,7 @@ async fn import(pool: &SqlitePool, records: &[Record]) -> Result<()> {
             }
             "my_ygo_cards.banlistentry" => insert_ban_list_entry(&mut tx, r).await?,
             "my_ygo_cards.adventcalendar" => insert_advent_calendar(&mut tx, r).await?,
-            "my_ygo_cards.adventcalendarentry" => {
-                insert_advent_calendar_entry(&mut tx, r).await?
-            }
+            "my_ygo_cards.adventcalendarentry" => insert_advent_calendar_entry(&mut tx, r).await?,
             // handled in the second pass, after all card_category rows exist
             "my_ygo_cards.cardconditionalcategory" => {}
             other => eprintln!("skipping unknown model: {other}"),

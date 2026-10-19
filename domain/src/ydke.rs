@@ -68,9 +68,7 @@ fn decode_part(b64: &str) -> Result<Vec<u32>, YdkeError> {
     if b64.is_empty() {
         return Ok(Vec::new());
     }
-    let raw = STANDARD
-        .decode(b64)
-        .map_err(|_| YdkeError::InvalidBase64)?;
+    let raw = STANDARD.decode(b64).map_err(|_| YdkeError::InvalidBase64)?;
     if raw.len() % 4 != 0 {
         return Err(YdkeError::TruncatedId);
     }
@@ -124,6 +122,9 @@ mod tests {
             Err(YdkeError::InvalidBase64)
         );
         // "AQI=" = 2 bytes
-        assert_eq!(YdkeDeck::parse("ydke://AQI=!!!"), Err(YdkeError::TruncatedId));
+        assert_eq!(
+            YdkeDeck::parse("ydke://AQI=!!!"),
+            Err(YdkeError::TruncatedId)
+        );
     }
 }

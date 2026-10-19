@@ -281,16 +281,49 @@ mod tests {
             budget(2, date(2025, 3, 1), dec!(30.00), dec!(10.00)),
         ];
         let lots = [
-            lot(LotType::Purchase, false, date(2025, 1, 10), dec!(20.00), dec!(2.00)),
-            lot(LotType::Purchase, false, date(2025, 1, 20), dec!(10.00), dec!(1.00)),
-            lot(LotType::Purchase, true, date(2025, 2, 5), dec!(99.00), dec!(9.00)),
-            lot(LotType::Sale, false, date(2025, 2, 6), dec!(8.00), dec!(1.50)),
-            lot(LotType::Sale, true, date(2025, 3, 6), dec!(4.00), dec!(0.50)),
+            lot(
+                LotType::Purchase,
+                false,
+                date(2025, 1, 10),
+                dec!(20.00),
+                dec!(2.00),
+            ),
+            lot(
+                LotType::Purchase,
+                false,
+                date(2025, 1, 20),
+                dec!(10.00),
+                dec!(1.00),
+            ),
+            lot(
+                LotType::Purchase,
+                true,
+                date(2025, 2, 5),
+                dec!(99.00),
+                dec!(9.00),
+            ),
+            lot(
+                LotType::Sale,
+                false,
+                date(2025, 2, 6),
+                dec!(8.00),
+                dec!(1.50),
+            ),
+            lot(
+                LotType::Sale,
+                true,
+                date(2025, 3, 6),
+                dec!(4.00),
+                dec!(0.50),
+            ),
         ];
 
         let entries = recap(&lots, &budgets, date(2025, 3, 15), false);
         let months: Vec<_> = entries.iter().map(|e| e.month).collect();
-        assert_eq!(months, vec![date(2025, 3, 1), date(2025, 2, 1), date(2025, 1, 1)]);
+        assert_eq!(
+            months,
+            vec![date(2025, 3, 1), date(2025, 2, 1), date(2025, 1, 1)]
+        );
 
         let jan = &entries[2];
         assert_eq!(jan.spent, dec!(30.00));
@@ -331,7 +364,13 @@ mod tests {
 
     #[test]
     fn recap_without_budgets_starts_at_first_purchase() {
-        let lots = [lot(LotType::Purchase, false, date(2025, 1, 10), dec!(5), dec!(1))];
+        let lots = [lot(
+            LotType::Purchase,
+            false,
+            date(2025, 1, 10),
+            dec!(5),
+            dec!(1),
+        )];
         let entries = recap(&lots, &[], date(2025, 2, 1), false);
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[1].debt, dec!(5));

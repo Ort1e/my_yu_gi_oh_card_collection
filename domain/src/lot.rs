@@ -64,7 +64,10 @@ mod tests {
     #[test]
     fn lot_type_codes() {
         assert_eq!(LotType::from_code("sale"), Some(LotType::Sale));
-        assert_eq!(LotType::from_code(LotType::Purchase.code()), Some(LotType::Purchase));
+        assert_eq!(
+            LotType::from_code(LotType::Purchase.code()),
+            Some(LotType::Purchase)
+        );
         assert_eq!(LotType::from_code("other"), None);
     }
 }

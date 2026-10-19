@@ -169,12 +169,18 @@ mod tests {
     fn sections_are_optional() {
         // the 1999 list only has limited cards
         let list = parse_list(r#"{"from": "01/08/1999", "1": [{"nameeng": "Raigeki"}]}"#).unwrap();
-        assert_eq!(list.entries, vec![("Raigeki".to_string(), BanStatus::Limited)]);
+        assert_eq!(
+            list.entries,
+            vec![("Raigeki".to_string(), BanStatus::Limited)]
+        );
     }
 
     #[test]
     fn rejects_bad_dates() {
-        assert!(matches!(parse_list(r#"{"from": "2026-05-18"}"#), Err(BanListError::Date(_))));
+        assert!(matches!(
+            parse_list(r#"{"from": "2026-05-18"}"#),
+            Err(BanListError::Date(_))
+        ));
         assert!(matches!(parse_list("[]"), Err(BanListError::Json(_))));
     }
 

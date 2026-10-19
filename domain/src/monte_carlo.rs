@@ -85,10 +85,7 @@ pub fn simulate(
     let hand_size = hand_size.min(main_deck.len());
 
     for _ in 0..simulations {
-        let hand: Vec<i64> = main_deck
-            .choose_multiple(rng, hand_size)
-            .copied()
-            .collect();
+        let hand: Vec<i64> = main_deck.choose_multiple(rng, hand_size).copied().collect();
         let mut in_hand = vec![0u32; categories.len()];
 
         for (pos, &card) in hand.iter().enumerate() {

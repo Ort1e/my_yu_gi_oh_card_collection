@@ -25,13 +25,19 @@ async fn deck_list_sorts() {
 
     let (status, page) = t.get("/decks").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(order(&page), ["Never played", "Played lately", "Played long ago"]);
+    assert_eq!(
+        order(&page),
+        ["Never played", "Played lately", "Played long ago"]
+    );
     assert!(page.contains("Versions: 2"));
     assert!(page.contains("Last tournament: 2026-02-08"));
     assert!(page.contains("Last tournament: never"));
 
     let (_, page) = t.get("/decks?sort=tournament").await;
-    assert_eq!(order(&page), ["Played lately", "Played long ago", "Never played"]);
+    assert_eq!(
+        order(&page),
+        ["Played lately", "Played long ago", "Never played"]
+    );
 }
 
 #[tokio::test]
