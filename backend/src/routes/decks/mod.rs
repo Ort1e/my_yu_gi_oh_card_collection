@@ -3,12 +3,13 @@ pub mod form;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
+use serde::Deserialize;
 use sqlx::Row;
 
 use crate::store::db::Pool;
 use crate::store::models::DeckVersionRow;
 use crate::web::error::{AppResult, OrNotFound};
-use crate::web::pagination::{Page, PageParam, PAGE_SIZE};
+use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
 use crate::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -18,36 +19,88 @@ pub struct DeckRow {
     description: Option<String>,
 }
 
+/// One deck of the list, with its versions count and last tournament.
+#[derive(Debug, sqlx::FromRow)]
+pub struct DeckListRow {
+    id: i64,
+    name: String,
+    description: Option<String>,
+    versions: i64,
+    /// The date of the latest tournament one of its versions was played in.
+    last_tournament: Option<String>,
+}
+
+/// The list's sort: `newest` (default: the last created deck first) or
+/// `tournament` (the latest played in a tournament first, never played at
+/// the end, newest first).
+#[derive(Debug, Default, Deserialize)]
+pub struct DeckSort {
+    sort: Option<String>,
+}
+
+impl DeckSort {
+    fn is_tournament(&self) -> bool {
+        self.sort.as_deref() == Some("tournament")
+    }
+
+    fn order_by(&self) -> &'static str {
+        if self.is_tournament() {
+            " ORDER BY last_tournament IS NULL, last_tournament DESC, deck.id DESC"
+        } else {
+            " ORDER BY deck.id DESC"
+        }
+    }
+
+    fn querystring(&self) -> String {
+        pagination::querystring([("sort", self.sort.as_deref())])
+    }
+}
+
 #[derive(Template)]
 #[template(path = "decks/list.html")]
 pub struct DecksList {
     page_title: &'static str,
     page: Page,
     total: i64,
-    decks: Vec<DeckRow>,
+    decks: Vec<DeckListRow>,
+    sort: DeckSort,
+}
+
+impl DecksList {
+    fn sort_is_tournament(&self) -> bool {
+        self.sort.is_tournament()
+    }
 }
 
 pub async fn list(
     State(state): State<AppState>,
     Query(param): Query<PageParam>,
+    Query(sort): Query<DeckSort>,
 ) -> AppResult<DecksList> {
     let pool = &state.pool;
     let total: i64 = sqlx::query_scalar("SELECT count(*) FROM deck")
         .fetch_one(pool)
         .await?;
-    let page = Page::new(param.page, total, String::new());
-    let decks =
-        sqlx::query_as("SELECT id, name, description FROM deck ORDER BY name, id LIMIT ? OFFSET ?")
-            .bind(PAGE_SIZE)
-            .bind(page.offset())
-            .fetch_all(pool)
-            .await?;
+    let page = Page::new(param.page, total, sort.querystring());
+    let decks = sqlx::query_as(&format!(
+        "SELECT deck.id, deck.name, deck.description,
+           (SELECT count(*) FROM deck_version v WHERE v.deck_id = deck.id) AS versions,
+           (SELECT max(t.date) FROM deck_version v JOIN tournament t ON t.id = v.tournament_id
+            WHERE v.deck_id = deck.id) AS last_tournament
+         FROM deck{} LIMIT ? OFFSET ?",
+        sort.order_by()
+    ))
+    .bind(PAGE_SIZE)
+    .bind(page.offset())
+    .fetch_all(pool)
+    .await?;
 
     Ok(DecksList {
         page_title: "All Decks",
         page,
         total,
         decks,
+        sort,
     })
 }
 

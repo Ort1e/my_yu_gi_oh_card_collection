@@ -37,6 +37,15 @@
         dirty = false;
     }
 
+    // an empty version (like the "v1" made with a new deck) is replaced by a
+    // YDKE import instead of staying behind
+    $: isEmpty =
+        !dirty &&
+        deck !== null &&
+        deck.main.length + deck.extra.length + deck.side.length === 0 &&
+        !deck.tournament &&
+        categories.length === 0;
+
     onMount(async () => {
         try {
             setDeck(await api.get());
@@ -152,7 +161,7 @@
         {#if dirty}<span class="unsaved">● unsaved</span>{/if}
     </h2>
 
-    <YdkeToolbar deckId={deck.deck_id} {zones} />
+    <YdkeToolbar deckId={deck.deck_id} {zones} replaceable={isEmpty} removeVersion={api.remove} />
 
     <div class="builder-container">
         <div id="deck-area">

@@ -1,13 +1,17 @@
 <script>
-    // Under the title: import a YDKE string as a new version of the deck, and
-    // copy the deck as YDKE (computed here from the zones, so unsaved changes
-    // are included).
+    // Under the title: import a YDKE string as a new version of the deck
+    // (replacing the current version when it is empty), and copy the deck as
+    // YDKE (computed here from the zones, so unsaved changes are included).
     import { importYdke } from '../api.js';
     import { ydkeUrl } from '../deck.js';
 
     /** the deck to import into; null for a version without a deck */
     export let deckId;
     export let zones;
+    /** the current version is empty: deleted once the import is done */
+    export let replaceable = false;
+    /** deletes the current version */
+    export let removeVersion;
 
     const VARIANTS = {
         'With Proxies': () => true,
@@ -25,16 +29,30 @@
 
         if (!ydke?.trim()) return;
 
-        const name = prompt('Name of the new version:', 'Imported');
+        const question = replaceable
+            ? 'Name of the new version (it replaces this empty one):'
+            : 'Name of the new version:';
+        const name = prompt(question, 'Imported');
 
         if (name === null) return;
 
+        let id;
+
         try {
-            const { id } = await importYdke(deckId, ydke.trim(), name);
-            location.href = `/deck-builder/${id}`;
+            ({ id } = await importYdke(deckId, ydke.trim(), name));
         } catch (e) {
-            alert(`Import failed: ${e.message}`);
+            return alert(`Import failed: ${e.message}`);
         }
+
+        if (replaceable) {
+            try {
+                await removeVersion();
+            } catch (e) {
+                alert(`The deck was imported, but the empty version could not be deleted: ${e.message}`);
+            }
+        }
+
+        location.href = `/deck-builder/${id}`;
     }
 
     async function copy(label) {

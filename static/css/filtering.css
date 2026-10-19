@@ -56,6 +56,20 @@
     display: none;
 }
 
+/* The sort links above a list (templates/decks/list.html): the current
+   one filled, the others outlined. */
+.sort-choices {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.sort-choices .active {
+    pointer-events: none;
+}
+
 /* Phones: the top button would cover the page's title (the header isn't
    fixed there): bottom left, across from "Filter". */
 @media (max-width: 760px) {

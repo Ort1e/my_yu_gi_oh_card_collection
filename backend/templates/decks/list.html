@@ -1,6 +1,12 @@
 {% extends "list_base.html" %}
 
 {% block items %}
+  <nav class="sort-choices" aria-label="Sort the decks">
+    Sort:
+    <a href="/decks" class="btn btn-small {% if self.sort_is_tournament() %}btn-secondary{% else %}active{% endif %}">Newest first</a>
+    <a href="/decks?sort=tournament" class="btn btn-small {% if self.sort_is_tournament() %}active{% else %}btn-secondary{% endif %}">Last tournament</a>
+  </nav>
+
   {% if decks.is_empty() %}
     <p class="card-title">No deck.</p>
   {% else %}
@@ -11,6 +17,8 @@
           <div class="card-title">{{ deck.name }}</div>
           <div class="card-meta-line">
             <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
+            <div>Versions: {{ deck.versions }}</div>
+            <div>Last tournament: {{ deck.last_tournament.as_deref().unwrap_or("never") }}</div>
           </div>
         </div>
       </a>

@@ -1,6 +1,38 @@
-//! Decks: creation, edition, versions, deletion.
+//! Decks: list sorts, creation, edition, versions, deletion.
 
 use super::*;
+
+#[tokio::test]
+async fn deck_list_sorts() {
+    let t = TestApp::new().await;
+    sqlx::query(
+        "INSERT INTO tournament (id, name, date) VALUES (1, 'Old', '2025-09-21'), (2, 'New', '2026-02-08');
+         INSERT INTO deck (id, name) VALUES (1, 'Played long ago'), (2, 'Played lately'), (3, 'Never played');
+         INSERT INTO deck_version (deck_id, version_name, tournament_id) VALUES
+             (1, 'v1', 1), (2, 'v1', NULL), (2, 'v2', 2), (3, 'v1', NULL);",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let order = |page: &str| {
+        let mut found: Vec<(usize, &str)> = ["Played long ago", "Played lately", "Never played"]
+            .into_iter()
+            .map(|name| (page.find(name).unwrap(), name))
+            .collect();
+        found.sort();
+        found.into_iter().map(|(_, name)| name).collect::<Vec<_>>()
+    };
+
+    let (status, page) = t.get("/decks").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(order(&page), ["Never played", "Played lately", "Played long ago"]);
+    assert!(page.contains("Versions: 2"));
+    assert!(page.contains("Last tournament: 2026-02-08"));
+    assert!(page.contains("Last tournament: never"));
+
+    let (_, page) = t.get("/decks?sort=tournament").await;
+    assert_eq!(order(&page), ["Played lately", "Played long ago", "Never played"]);
+}
 
 #[tokio::test]
 async fn create_deck_with_first_version() {
