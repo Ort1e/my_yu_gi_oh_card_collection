@@ -129,6 +129,13 @@ async fn each_lot_against_its_full_price() {
     assert!(lots.contains("<td>10.80</td>"), "{lots}");
     assert!(lots.contains(">0.30</td>"), "{lots}");
     assert!(lots.contains("<td>+2.9%</td>"), "{lots}");
+    // a gain: in the gains, no loss at all
+    let gains = &body[body.find("Biggest gains").unwrap()..body.find("Worst losses").unwrap()];
+    assert!(gains.contains(r#"<a href="/lots/1">#1</a>"#), "{gains}");
+    assert!(
+        body.contains("No lot is worth less than it cost."),
+        "{body}"
+    );
 
     // one copy sold for 7.00: its sale counts instead of its value
     sqlx::query(

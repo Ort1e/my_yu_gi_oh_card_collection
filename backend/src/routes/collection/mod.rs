@@ -30,6 +30,7 @@ const MOVES: usize = 10;
 /// A price move smaller than this (€) isn't shown, whatever its %.
 const MOVE_FLOOR: Decimal = Decimal::from_parts(50, 0, 0, false, 2);
 const QUARTER_DAYS: i64 = 90;
+const TOP_LOTS: usize = 10;
 
 /// Everything the valuations are computed from.
 pub struct ValueData {
@@ -168,6 +169,7 @@ pub struct DeckLine {
 }
 
 /// A purchase lot against its full price (`domain::valuation::lot_gain`).
+#[derive(Clone)]
 pub struct LotLine {
     id: i64,
     date: String,
@@ -203,8 +205,12 @@ pub struct ValuePage {
     losses: Vec<CopyLine>,
     moves: Vec<Moves>,
     decks: Vec<DeckLine>,
-    /// Each purchase lot with cards against its full price, newest first.
-    lot_lines: Vec<LotLine>,
+    /// The purchase lots (with cards) against their full price: the
+    /// [`TOP_LOTS`] whose cards are worth the most today, with the biggest
+    /// gains, with the worst losses.
+    lots_by_value: Vec<LotLine>,
+    lots_by_gain: Vec<LotLine>,
+    lots_by_loss: Vec<LotLine>,
     /// Chart.js data, serialised as JSON.
     chart: String,
 }
@@ -221,6 +227,19 @@ impl ValuePage {
     /// For `partials/copy_values_table.html` (`{% let %}` would move the field).
     fn top_lines(&self) -> &[CopyLine] {
         &self.top
+    }
+
+    /// For `partials/lot_gains_table.html`.
+    fn lots_by_value(&self) -> &[LotLine] {
+        &self.lots_by_value
+    }
+
+    fn lots_by_gain(&self) -> &[LotLine] {
+        &self.lots_by_gain
+    }
+
+    fn lots_by_loss(&self) -> &[LotLine] {
+        &self.lots_by_loss
     }
 
     fn loss_lines(&self) -> &[CopyLine] {
@@ -290,7 +309,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         by_lot.entry(c.lot_id).or_default().push(&c.copy);
     }
     // lots without cards (sleeves, boxes…) are left out
-    let lot_lines = purchase_lots(pool)
+    let lot_lines: Vec<LotLine> = purchase_lots(pool)
         .await?
         .into_iter()
         .filter_map(|lot| {
@@ -312,6 +331,8 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         })
         .collect();
 
+    let (lots_by_value, lots_by_gain, lots_by_loss) = lot_tops(&lot_lines);
+
     let now = data.now();
     let units = unit_totals_on(&copies, today, &data.latest);
     Ok(ValuePage {
@@ -324,7 +345,9 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         losses,
         moves,
         decks: deck_values(pool, &data.latest).await?,
-        lot_lines,
+        lots_by_value,
+        lots_by_gain,
+        lots_by_loss,
         // embedded in a <script>
         chart: chart.to_string().replace("</", "<\\/"),
     })
@@ -353,6 +376,25 @@ fn biggest_losses(copies: &[CopyLine]) -> Vec<CopyLine> {
     losses.sort_by(|a, b| a.gain.cmp(&b.gain).then(a.card_id.cmp(&b.card_id)));
     losses.truncate(TOP_COPIES);
     losses
+}
+
+/// The [`TOP_LOTS`] lots whose cards are worth the most today, with the
+/// biggest gains (above zero), with the worst losses (below zero). Ties by
+/// lot id.
+fn lot_tops(lots: &[LotLine]) -> (Vec<LotLine>, Vec<LotLine>, Vec<LotLine>) {
+    let top = |keep: &dyn Fn(&LotLine) -> bool,
+               order: &dyn Fn(&LotLine, &LotLine) -> std::cmp::Ordering| {
+        let mut chosen: Vec<LotLine> = lots.iter().filter(|l| keep(l)).cloned().collect();
+        chosen.sort_by(|a, b| order(a, b).then(a.id.cmp(&b.id)));
+        chosen.truncate(TOP_LOTS);
+        chosen
+    };
+
+    (
+        top(&|_| true, &|a, b| b.value.cmp(&a.value)),
+        top(&|l| l.gain > Decimal::ZERO, &|a, b| b.gain.cmp(&a.gain)),
+        top(&|l| l.gain < Decimal::ZERO, &|a, b| a.gain.cmp(&b.gain)),
+    )
 }
 
 /// The value of each deck's latest version: its real cards, and its proxies
