@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::store::card_data::{throttle, API_URL};
 use crate::store::cards::SOLD_EXISTS;
-use crate::store::db::{begin_write, Money, Pool};
+use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};
 use crate::store::models::LotRow;
 use crate::web::error::{AppError, AppResult};
 
@@ -106,11 +106,7 @@ pub async fn refresh_prices(
         report.written += 1;
         report.without_price += usize::from(prices.cardmarket.is_none());
     }
-    if dry_run {
-        tx.rollback().await?;
-    } else {
-        tx.commit().await?;
-    }
+    commit_unless_dry_run(tx, dry_run).await?;
 
     Ok(report)
 }

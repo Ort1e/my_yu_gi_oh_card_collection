@@ -16,11 +16,10 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use crate::routes::budget::today;
 use crate::store::card_prices::{
     latest_prices, lots, owned_copies, prices_by_date, purchase_lots, OwnedCopy,
 };
-use crate::store::db::Pool;
+use crate::store::db::{today, Pool};
 use crate::web::error::AppResult;
 use crate::web::filters;
 use crate::AppState;

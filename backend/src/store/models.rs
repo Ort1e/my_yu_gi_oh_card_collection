@@ -108,12 +108,14 @@ impl DeckVersionRow {
 
     /// "Deck - version", as Django's `DeckVersion.name`.
     pub fn full_name(&self) -> String {
-        format!(
-            "{} - {}",
-            self.deck_name.as_deref().unwrap_or("No Deck"),
-            self.version_name
-        )
+        version_full_name(self.deck_name.as_deref(), &self.version_name)
     }
+}
+
+/// "Deck - version" (Django's `DeckVersion.name`), "No Deck - …" for a
+/// version without a deck.
+pub fn version_full_name(deck_name: Option<&str>, version_name: &str) -> String {
+    format!("{} - {version_name}", deck_name.unwrap_or("No Deck"))
 }
 
 #[cfg(test)]

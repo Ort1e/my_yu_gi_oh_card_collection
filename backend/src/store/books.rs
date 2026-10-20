@@ -6,6 +6,8 @@ use domain::book::{author_sort_name, BookFormat, BookInfo};
 use domain::isbn::Isbn;
 use sqlx::SqliteConnection;
 
+use crate::store::db::today;
+
 /// The fields of a book, validated (`routes::books::form` builds them from
 /// the form, [`BookFields::from_info`] from a lookup).
 #[derive(Debug, Clone, Default)]
@@ -70,7 +72,7 @@ pub async fn insert(conn: &mut SqliteConnection, book: &BookFields) -> sqlx::Res
     .bind(series.and(book.volume))
     .bind(book.format.map(BookFormat::label))
     .bind(&book.notes)
-    .bind(chrono::Local::now().date_naive().to_string())
+    .bind(today().to_string())
     .execute(&mut *conn)
     .await?
     .last_insert_rowid();

@@ -330,7 +330,7 @@ mod tests {
     }
 
     fn names(names: &[&str]) -> HashSet<String> {
-        names.iter().map(|n| n.to_string()).collect()
+        names.iter().map(std::string::ToString::to_string).collect()
     }
 
     fn expansion(set_names: &[&str], first_added: NaiveDate) -> Expansion {

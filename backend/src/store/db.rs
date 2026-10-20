@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use chrono::NaiveDate;
+
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
@@ -15,6 +17,23 @@ pub type Pool = SqlitePool;
 //   don't see the row, the write lock stays held). Use `execute()` and
 //   `last_insert_rowid()`.
 // - start write transactions with `begin_write`, not `pool.begin()`.
+
+/// Today, in the server's time zone: the date stored by refreshes and
+/// lookups (`YYYY-MM-DD` with `to_string()`), and the date the collection is
+/// valued on.
+pub fn today() -> NaiveDate {
+    chrono::Local::now().date_naive()
+}
+
+/// Commit, or roll back for a dry run (the maintenance commands and the
+/// refreshes, `--dry-run`).
+pub async fn commit_unless_dry_run(tx: Transaction<'_, Sqlite>, dry_run: bool) -> sqlx::Result<()> {
+    if dry_run {
+        tx.rollback().await
+    } else {
+        tx.commit().await
+    }
+}
 
 /// WAL so readers never block the writer; writers wait for each other.
 pub fn connect_options(db_url: &str) -> SqliteConnectOptions {

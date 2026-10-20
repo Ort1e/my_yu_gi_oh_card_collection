@@ -117,6 +117,15 @@ impl Prices {
     }
 }
 
+/// `part` in % of `whole`, to one decimal; `None` when `whole` is zero.
+fn percent(part: Decimal, whole: Decimal) -> Option<Decimal> {
+    if whole.is_zero() {
+        return None;
+    }
+
+    Some((part * Decimal::ONE_HUNDRED / whole).round_dp(1))
+}
+
 /// A lot that isn't cancelled: `price` paid (purchase) or received (sale).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Lot {
@@ -149,11 +158,7 @@ impl Totals {
 
     /// The gain in % of what was spent, `None` when nothing was.
     pub fn gain_percent(&self) -> Option<Decimal> {
-        if self.spent.is_zero() {
-            return None;
-        }
-
-        Some((self.gain() * Decimal::ONE_HUNDRED / self.spent).round_dp(1))
+        percent(self.gain(), self.spent)
     }
 }
 
@@ -203,11 +208,7 @@ impl UnitTotals {
     }
 
     pub fn gain_percent(&self) -> Option<Decimal> {
-        if self.paid.is_zero() {
-            return None;
-        }
-
-        Some((self.gain() * Decimal::ONE_HUNDRED / self.paid).round_dp(1))
+        percent(self.gain(), self.paid)
     }
 }
 
@@ -256,11 +257,7 @@ impl LotGain {
 
     /// The gain in % of the lot's price, `None` for a free lot (a gift).
     pub fn gain_percent(&self) -> Option<Decimal> {
-        if self.price.is_zero() {
-            return None;
-        }
-
-        Some((self.gain() * Decimal::ONE_HUNDRED / self.price).round_dp(1))
+        percent(self.gain(), self.price)
     }
 }
 
@@ -320,9 +317,9 @@ impl PriceMove {
         self.after - self.before
     }
 
-    /// In % of `before` (never zero, see [`biggest_moves`]).
+    /// In % of `before` (never zero: [`biggest_moves`] skips those).
     pub fn percent(&self) -> Decimal {
-        (self.change() * Decimal::ONE_HUNDRED / self.before).round_dp(1)
+        percent(self.change(), self.before).unwrap_or_default()
     }
 }
 

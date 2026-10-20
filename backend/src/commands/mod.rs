@@ -116,21 +116,17 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
     }
 }
 
-/// Commit, or roll back for a dry run.
-async fn finish(tx: sqlx::Transaction<'_, sqlx::Sqlite>, dry_run: bool) -> sqlx::Result<()> {
-    if dry_run {
-        tx.rollback().await
-    } else {
-        tx.commit().await
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn parse(args: &[&str]) -> Result<Command, String> {
-        Command::parse(&args.iter().map(|a| a.to_string()).collect::<Vec<_>>())
+        Command::parse(
+            &args
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<_>>(),
+        )
     }
 
     #[test]

@@ -31,10 +31,9 @@ use domain::card_set::single_rarity;
 use domain::rarity::split_cardmarket_name;
 use sqlx::SqliteConnection;
 
-use super::finish;
 use crate::store::card_data::{get_or_fetch, plan_translations, Translation};
 use crate::store::cards::{delete_orphan_proxies, replace_proxies};
-use crate::store::db::begin_write;
+use crate::store::db::{begin_write, commit_unless_dry_run};
 use crate::AppState;
 
 /// Changes to make, computed before the write transaction (resolving names
@@ -123,7 +122,7 @@ async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
             .await?;
     }
 
-    finish(tx, dry_run).await?;
+    commit_unless_dry_run(tx, dry_run).await?;
 
     Ok(Report {
         plan,
@@ -544,7 +543,7 @@ mod tests {
     }
 
     fn today() -> String {
-        chrono::Local::now().date_naive().to_string()
+        crate::store::db::today().to_string()
     }
 
     #[tokio::test]

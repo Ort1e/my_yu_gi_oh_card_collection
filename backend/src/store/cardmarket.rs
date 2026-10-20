@@ -23,7 +23,7 @@ use domain::rarity::Rarity;
 use serde_json::Value;
 
 use crate::store::card_data::{fetch_set_infos, SetInfo};
-use crate::store::db::{begin_write, Money, Pool};
+use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};
 use crate::web::error::{AppError, AppResult};
 
 /// A set code whose expansion wasn't found is looked for again after this.
@@ -273,11 +273,7 @@ pub async fn apply(
         report.prices += 1;
     }
 
-    if dry_run {
-        tx.rollback().await?;
-    } else {
-        tx.commit().await?;
-    }
+    commit_unless_dry_run(tx, dry_run).await?;
     Ok(report)
 }
 

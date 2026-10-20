@@ -10,7 +10,7 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 
 use crate::store::cards::{delete_orphan_proxies, replace_proxies};
-use crate::store::db::{begin_write, Pool};
+use crate::store::db::{begin_write, today, Pool};
 use crate::web::error::{AppError, AppResult};
 use crate::AppState;
 
@@ -103,7 +103,7 @@ pub async fn translated_name(
     .bind(language)
     .fetch_optional(pool)
     .await?;
-    let today = chrono::Local::now().date_naive();
+    let today = today();
     if let Some((name, checked_at)) = known {
         let recent = checked_at
             .parse::<chrono::NaiveDate>()
@@ -136,7 +136,7 @@ async fn remember_translation(
     .bind(ygopro_id)
     .bind(language)
     .bind(name)
-    .bind(chrono::Local::now().date_naive().to_string())
+    .bind(today().to_string())
     .execute(pool)
     .await?;
     Ok(())

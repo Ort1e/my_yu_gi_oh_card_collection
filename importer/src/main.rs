@@ -129,18 +129,21 @@ fn req_str(fields: &Value, key: &str) -> String {
 }
 
 fn get_i64(fields: &Value, key: &str) -> Option<i64> {
-    fields.get(key).and_then(|v| v.as_i64())
+    fields.get(key).and_then(serde_json::Value::as_i64)
 }
 
 fn get_bool(fields: &Value, key: &str) -> bool {
-    fields.get(key).and_then(|v| v.as_bool()).unwrap_or(false)
+    fields
+        .get(key)
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn get_i64_array(fields: &Value, key: &str) -> Vec<i64> {
     fields
         .get(key)
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|x| x.as_i64()).collect())
+        .map(|arr| arr.iter().filter_map(serde_json::Value::as_i64).collect())
         .unwrap_or_default()
 }
 

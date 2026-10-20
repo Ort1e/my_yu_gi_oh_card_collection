@@ -16,7 +16,7 @@ use domain::isbn::Isbn;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::store::db::{begin_write, Pool};
+use crate::store::db::{begin_write, today, Pool};
 use crate::web::error::{AppError, AppResult};
 
 const OPEN_LIBRARY_URL: &str = "https://openlibrary.org/api/books";
@@ -58,7 +58,7 @@ pub async fn lookup(
             return Ok(Some(info));
         }
 
-        let today = chrono::Local::now().date_naive();
+        let today = today();
         let recent = checked_at
             .parse::<chrono::NaiveDate>()
             .is_ok_and(|d| (today - d).num_days() < RECHECK_MISSING_DAYS);
@@ -91,7 +91,7 @@ async fn remember(pool: &Pool, isbn: &Isbn, found: Option<&(BookInfo, &str)>) ->
     .bind(isbn.as_str())
     .bind(found.map(|(_, source)| *source))
     .bind(json)
-    .bind(chrono::Local::now().date_naive().to_string())
+    .bind(today().to_string())
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;

@@ -232,7 +232,9 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
                         .iter()
                         .filter_map(|c| {
                             if c.get("id")?.as_i64()? == ygopro_id {
-                                c.get("name")?.as_str().map(|s| s.to_string())
+                                c.get("name")?
+                                    .as_str()
+                                    .map(std::string::ToString::to_string)
                             } else {
                                 None
                             }

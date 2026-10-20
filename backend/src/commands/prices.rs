@@ -9,6 +9,7 @@ use chrono::NaiveDate;
 
 use crate::store::card_prices::{latest_refresh, refresh_prices};
 use crate::store::cardmarket;
+use crate::store::db::today;
 use crate::AppState;
 
 pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
@@ -70,10 +71,6 @@ fn is_due(latest: Option<NaiveDate>, today: NaiveDate) -> bool {
     latest.is_none_or(|latest| (today - latest).num_days() >= REFRESH_EVERY_DAYS)
 }
 
-fn today() -> NaiveDate {
-    chrono::Local::now().date_naive()
-}
-
 #[cfg(test)]
 mod tests {
     use rust_decimal_macros::dec;
@@ -93,17 +90,17 @@ mod tests {
     #[tokio::test]
     async fn cards_priced_today_are_not_asked_again() {
         let t = TestApp::new().await;
-        let today = today().to_string();
+        let date = today().to_string();
         sqlx::query(
             "INSERT INTO card_price (card_data_id, date, cardmarket_price) VALUES (1, ?1, '0.25'), (2, ?1, NULL)",
         )
-        .bind(&today)
+        .bind(&date)
         .execute(&t.state.pool)
         .await
         .unwrap();
 
         // nothing left to ask: no request is made
-        let report = refresh_prices(&t.state.pool, &t.state.http, super::today(), false)
+        let report = refresh_prices(&t.state.pool, &t.state.http, today(), false)
             .await
             .unwrap();
         assert_eq!((report.asked, report.written), (0, 0));
@@ -111,9 +108,6 @@ mod tests {
         let by_date = prices_by_date(&t.state.pool).await.unwrap();
         assert_eq!(by_date.len(), 1);
         assert_eq!(by_date.values().next().unwrap().cards[&1], dec!(0.25));
-        assert_eq!(
-            latest_refresh(&t.state.pool).await.unwrap(),
-            Some(super::today())
-        );
+        assert_eq!(latest_refresh(&t.state.pool).await.unwrap(), Some(today()));
     }
 }

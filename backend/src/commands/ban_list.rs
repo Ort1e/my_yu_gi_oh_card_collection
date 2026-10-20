@@ -23,9 +23,8 @@ use domain::ban_list::{
     BanListError, OPTIONS_URL, US_INDEX_URL,
 };
 
-use super::finish;
 use crate::store::card_data::{find, get_or_fetch};
-use crate::store::db::begin_write;
+use crate::store::db::{begin_write, commit_unless_dry_run};
 use crate::AppState;
 
 pub async fn scrap(
@@ -144,7 +143,7 @@ async fn get_text(state: &AppState, url: &str) -> anyhow::Result<String> {
         .get(url)
         .send()
         .await
-        .and_then(|r| r.error_for_status())
+        .and_then(reqwest::Response::error_for_status)
         .with_context(|| format!("downloading {url}"))?
         .text()
         .await?)
@@ -216,7 +215,7 @@ async fn import(
         .execute(&mut *tx)
         .await?;
     }
-    finish(tx, dry_run).await?;
+    commit_unless_dry_run(tx, dry_run).await?;
 
     println!("{label} ({date}): {} cards (was {before})", entries.len());
     if !unresolved.is_empty() {

@@ -8,8 +8,9 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use super::budget::{today, BudgetData};
+use super::budget::BudgetData;
 use super::collection::ValueData;
+use crate::store::db::today;
 use crate::web::error::AppResult;
 use crate::web::filters;
 use crate::AppState;
