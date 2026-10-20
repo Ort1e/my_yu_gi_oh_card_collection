@@ -108,7 +108,22 @@ pub struct Prices {
     pub products: HashMap<i64, Decimal>,
 }
 
+/// Where a price comes from: a Cardmarket product (a printing) or a card
+/// data (ygoprodeck, the card name).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PriceSource {
+    Product(i64),
+    Card(i64),
+}
+
 impl Prices {
+    pub fn get(&self, source: PriceSource) -> Option<Decimal> {
+        match source {
+            PriceSource::Product(id) => self.products.get(&id).copied(),
+            PriceSource::Card(id) => self.cards.get(&id).copied(),
+        }
+    }
+
     /// The product's price, else the card's.
     pub fn of(&self, card_data_id: Option<i64>, product_id: Option<i64>) -> Option<Decimal> {
         let product = product_id.and_then(|id| self.products.get(&id));
@@ -415,6 +430,17 @@ mod tests {
             cards: HashMap::from(prices),
             products: HashMap::new(),
         }
+    }
+
+    #[test]
+    fn prices_by_source() {
+        let prices = Prices {
+            cards: HashMap::from([(1, dec!(0.41))]),
+            products: HashMap::from([(1, dec!(48.18))]),
+        };
+        assert_eq!(prices.get(PriceSource::Card(1)), Some(dec!(0.41)));
+        assert_eq!(prices.get(PriceSource::Product(1)), Some(dec!(48.18)));
+        assert_eq!(prices.get(PriceSource::Card(2)), None);
     }
 
     #[test]
