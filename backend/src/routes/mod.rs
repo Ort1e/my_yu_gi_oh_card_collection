@@ -32,6 +32,7 @@ pub fn router() -> Router<AppState> {
         .route("/lots", get(lots::list))
         .route("/lots/:id", get(lots::detail))
         .route("/decks", get(decks::list))
+        .route("/decks/built", get(decks::built::page))
         .route("/decks/:id", get(decks::detail))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))

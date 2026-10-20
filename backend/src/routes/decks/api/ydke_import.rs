@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use super::Created;
 use crate::store::card_data::get_or_fetch_by_ygopro_id;
-use crate::store::cards::{new_proxy, Zone, SOLD_EXISTS};
+use crate::store::cards::{locked_elsewhere, new_proxy, Zone, SOLD_EXISTS};
 use crate::store::db::{begin_write, exists};
 use crate::web::error::{bad_request, non_blank, AppResult};
 use crate::AppState;
@@ -24,7 +24,8 @@ pub struct YdkeInput {
 }
 
 /// New version of `deck_id` from a YDKE URL. Each card uses an owned copy
-/// not already used by this import when there is one, else a new proxy.
+/// not already used by this import nor locked by a built version when there
+/// is one, else a new proxy.
 pub async fn import_ydke(
     State(state): State<AppState>,
     Path(deck_id): Path<i64>,
@@ -68,7 +69,8 @@ pub async fn import_ydke(
                     let owned: Vec<i64> = sqlx::query_scalar(&format!(
                         "SELECT id FROM card
                          WHERE is_proxy = 0 AND (card_data_id = ? OR en_name = ?)
-                           AND NOT {SOLD_EXISTS} ORDER BY id"
+                           AND NOT {SOLD_EXISTS} AND id NOT IN ({}) ORDER BY id",
+                        locked_elsewhere(0)
                     ))
                     .bind(data_id)
                     .bind(normalize_card_name(en_name))

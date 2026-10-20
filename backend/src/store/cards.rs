@@ -78,6 +78,77 @@ pub const IN_VERSION: &str = "SELECT card_id FROM deck_version_main_deck WHERE d
     UNION SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
     UNION SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1";
 
+/// SQL subquery: ids of the cards **locked** by a built version other than
+/// `version_id` (0: by any built version), i.e. its real cards. They are out
+/// of the collection for every other version (`domain::built_deck`). The id
+/// is an integer written in the SQL, so the subquery mixes with any binds.
+pub fn locked_elsewhere(version_id: i64) -> String {
+    format!(
+        "SELECT zone.card_id
+         FROM (SELECT deck_version_id, card_id FROM deck_version_main_deck
+               UNION ALL SELECT deck_version_id, card_id FROM deck_version_extra_deck
+               UNION ALL SELECT deck_version_id, card_id FROM deck_version_side_deck) AS zone
+         JOIN deck_version ON deck_version.id = zone.deck_version_id
+         JOIN card AS locked ON locked.id = zone.card_id
+         WHERE deck_version.is_built = 1 AND deck_version.id != {version_id}
+           AND locked.is_proxy = 0"
+    )
+}
+
+/// A proxy copy of `card_id` (name, en_name, card data, code, status), like
+/// the copies of `clone_version`. Returns its id.
+pub async fn proxy_copy(conn: &mut SqliteConnection, card_id: i64) -> sqlx::Result<i64> {
+    Ok(sqlx::query(
+        "INSERT INTO card (name, en_name, card_data_id, code, last_known_status, is_proxy)
+         SELECT name, en_name, card_data_id, code, last_known_status, 1 FROM card WHERE id = ?",
+    )
+    .bind(card_id)
+    .execute(&mut *conn)
+    .await?
+    .last_insert_rowid())
+}
+
+/// In `version_id`, put `new_card` in place of `old_card` (in whichever zone
+/// it is), and move its category assignments of that version.
+pub async fn swap_card(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+    old_card: i64,
+    new_card: i64,
+) -> sqlx::Result<()> {
+    for zone in Zone::ALL {
+        sqlx::query(&format!(
+            "UPDATE {} SET card_id = ? WHERE deck_version_id = ? AND card_id = ?",
+            zone.table()
+        ))
+        .bind(new_card)
+        .bind(version_id)
+        .bind(old_card)
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    let categories = "SELECT id FROM card_category WHERE deck_version_id = ?";
+    sqlx::query(&format!(
+        "INSERT OR IGNORE INTO card_category_assignment (category_id, card_id)
+         SELECT category_id, ? FROM card_category_assignment
+         WHERE card_id = ? AND category_id IN ({categories})"
+    ))
+    .bind(new_card)
+    .bind(old_card)
+    .bind(version_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(&format!(
+        "DELETE FROM card_category_assignment WHERE card_id = ? AND category_id IN ({categories})"
+    ))
+    .bind(old_card)
+    .bind(version_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// The cards in any zone of a deck version.
 pub async fn version_card_ids(
     conn: &mut SqliteConnection,
@@ -160,9 +231,9 @@ pub async fn delete_orphan_proxies(conn: &mut SqliteConnection) -> sqlx::Result<
 }
 
 /// Replace proxies in deck zones by owned, unsold copies of the same card
-/// not already in that version, moving their category assignments. Returns
-/// the number of replacements. Run by `clean-cards` and after new cards are
-/// saved (`card_data::spawn_link_cards`).
+/// not already in that version nor locked by another built version, moving
+/// their category assignments. Returns the number of replacements. Run by
+/// `clean-cards` and after new cards are saved (`card_data::spawn_link_cards`).
 pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize> {
     let mut replaced = 0;
 
@@ -181,8 +252,11 @@ pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize>
             let in_version = version_card_ids(conn, version_id).await?;
 
             let owned: Vec<i64> = sqlx::query_scalar(&format!(
-                "SELECT id FROM card WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}
-                 ORDER BY id"
+                "SELECT id FROM card
+                 WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}
+                   AND id NOT IN ({})
+                 ORDER BY id",
+                locked_elsewhere(version_id)
             ))
             .bind(card_data_id)
             .fetch_all(&mut *conn)
@@ -192,36 +266,7 @@ pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize>
                 continue;
             };
 
-            sqlx::query(&format!(
-                "UPDATE {} SET card_id = ? WHERE deck_version_id = ? AND card_id = ?",
-                zone.table()
-            ))
-            .bind(replacement)
-            .bind(version_id)
-            .bind(proxy_id)
-            .execute(&mut *conn)
-            .await?;
-
-            // the replacement takes the proxy's categories in this version
-            let categories = "SELECT id FROM card_category WHERE deck_version_id = ?";
-            sqlx::query(&format!(
-                "INSERT OR IGNORE INTO card_category_assignment (category_id, card_id)
-                 SELECT category_id, ? FROM card_category_assignment
-                 WHERE card_id = ? AND category_id IN ({categories})"
-            ))
-            .bind(replacement)
-            .bind(proxy_id)
-            .bind(version_id)
-            .execute(&mut *conn)
-            .await?;
-            sqlx::query(&format!(
-                "DELETE FROM card_category_assignment WHERE card_id = ? AND category_id IN ({categories})"
-            ))
-            .bind(proxy_id)
-            .bind(version_id)
-            .execute(&mut *conn)
-            .await?;
-
+            swap_card(conn, version_id, proxy_id, replacement).await?;
             replaced += 1;
         }
     }

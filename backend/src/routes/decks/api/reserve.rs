@@ -7,7 +7,7 @@ use sqlx::QueryBuilder;
 
 use super::{load_cards, push_ids, ApiCard};
 use crate::routes::cards::CardFilter;
-use crate::store::cards::version_card_ids;
+use crate::store::cards::{locked_elsewhere, version_card_ids};
 use crate::store::db::exists;
 use crate::web::error::AppResult;
 use crate::AppState;
@@ -21,7 +21,8 @@ pub struct ReserveQuery {
 
 const RESERVE_LIMIT: i64 = 300;
 
-/// Owned (non-proxy, unsold) cards matching the filters and not in this version.
+/// Owned (non-proxy, unsold) cards matching the filters, not in this version
+/// nor locked by another built version.
 pub async fn reserve(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -46,6 +47,7 @@ pub async fn reserve(
         qb.push(" AND card.id NOT IN ");
         push_ids(&mut qb, in_version);
     }
+    qb.push(format!(" AND card.id NOT IN ({})", locked_elsewhere(id)));
     qb.push(" ORDER BY card.en_name, card.id LIMIT ")
         .push_bind(RESERVE_LIMIT);
     let ids: Vec<i64> = qb.build_query_scalar().fetch_all(&mut *conn).await?;

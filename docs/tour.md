@@ -274,6 +274,31 @@ the app shows to you.
 During frontend work, `npm run dev` serves the app with hot reload on
 `:5173` and forwards `/api` to the backend on `:3000`.
 
+## Built decks
+
+A deck version can be **built** (`deck_version.is_built`, migration 0010):
+the physical deck exists, so its real (non-proxy) cards are **locked**, out
+of the collection for every other version. In this app a proxy already means
+"a card I don't have for this deck", so nothing else is needed to see what is
+missing.
+
+- **Building** (`PATCH /api/deck-versions/:id` with `{"is_built": true}`,
+  `decks/api/version.rs`): `domain::built_deck::plan_build` says which cards
+  change; each of the version's cards shared with other versions becomes a
+  proxy there (`store::cards::proxy_copy` + `swap_card`, categories moved),
+  except the cards another built version already holds: first built, first
+  served, those become proxies here. The answer carries a `build_report`
+  the deck builder shows.
+- **Unbuilding** only clears the flag. The proxies made in other versions
+  stay; `clean-cards` puts the owned cards back (`replace_proxies`).
+- **Locked cards** (`store::cards::locked_elsewhere(version_id)`, a subquery)
+  are skipped by the reserve, the YDKE import and `clean-cards`; saving zones
+  with one is refused with a 400 naming the card and the built deck (only a
+  stale page can send one). A copy of a built version gets proxies for them.
+- Each version can note its **deck box** and **sleeves** (free text).
+- `/decks/built` (`routes/decks/built.rs`): each built version, what it still
+  misses (its proxies), and the shopping list of all of them.
+
 ## The advent calendar
 
 `/advent-calendar/:year` (`routes/advent/`, `templates/advent/calendar.html`,

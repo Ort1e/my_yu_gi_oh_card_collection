@@ -6,6 +6,7 @@
 pub mod ban_list;
 pub mod book;
 pub mod budget;
+pub mod built_deck;
 pub mod card;
 pub mod card_set;
 pub mod cardmarket;

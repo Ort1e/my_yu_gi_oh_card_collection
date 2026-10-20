@@ -77,11 +77,16 @@ pub struct DeckVersionRow {
     pub id: i64,
     pub version_name: String,
     pub deck_name: Option<String>,
+    /// Locks its real cards (`domain::built_deck`).
+    pub is_built: bool,
+    pub deck_box: Option<String>,
+    pub sleeves: Option<String>,
 }
 
 impl DeckVersionRow {
     pub const SELECT: &'static str = "SELECT deck_version.id, deck_version.version_name,
-            deck.name AS deck_name
+            deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
+            deck_version.sleeves
         FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id";
 
     /// "Deck - version", as Django's `DeckVersion.name`.

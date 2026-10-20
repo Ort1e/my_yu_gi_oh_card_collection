@@ -5,6 +5,7 @@
     Sort:
     <a href="/decks" class="btn btn-small {% if self.sort_is_tournament() %}btn-secondary{% else %}active{% endif %}">Newest first</a>
     <a href="/decks?sort=tournament" class="btn btn-small {% if self.sort_is_tournament() %}active{% else %}btn-secondary{% endif %}">Last tournament</a>
+    <a href="/decks/built" class="btn btn-small btn-secondary">Built decks</a>
   </nav>
 
   {% if decks.is_empty() %}

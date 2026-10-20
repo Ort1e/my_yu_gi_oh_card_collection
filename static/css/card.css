@@ -125,6 +125,33 @@ a.rarity-badge:hover {
     text-decoration: underline;
 }
 
+/* "Built" on a deck version (partials/deck_version_item.html): its cards are
+   locked, out of the collection for the other decks. */
+.built-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    background-color: var(--primary);
+    color: var(--text-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+/* The missing cards of a built deck (decks/built.html). */
+.missing-cards {
+    margin: 0.25rem 0 0;
+    padding-left: 1.25rem;
+    columns: 2 16rem;
+}
+
+/* The decks column of the shopping list: text, wrapped. */
+.numbers td.decks-cell {
+    text-align: left;
+    white-space: normal;
+}
+
 /* The English name under a French one (cards, lots). */
 .english-name {
     font-size: 0.85em;

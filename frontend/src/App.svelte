@@ -188,7 +188,15 @@
         </div>
 
         <div id="actions-area">
-            <VersionPanel {api} {deckVersionId} bind:deck bind:banListId bind:dirty on:save={save} />
+            <VersionPanel
+                {api}
+                {deckVersionId}
+                bind:deck
+                bind:banListId
+                bind:dirty
+                on:save={save}
+                on:reload={({ detail }) => setDeck(detail)}
+            />
         </div>
 
         <div id="reserve-area" class="area">

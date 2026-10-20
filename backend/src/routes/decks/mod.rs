@@ -1,4 +1,5 @@
 pub mod api;
+pub mod built;
 pub mod form;
 
 use askama::Template;

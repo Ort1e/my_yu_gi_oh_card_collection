@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Built decks{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Built decks</h1>
+  <p class="back-link"><a href="/decks">← All decks</a></p>
+  <p>A built version locks its real cards: they belong to it alone, out of the collection for the other decks.
+    Build or unbuild a version in the deck builder (version panel). Its proxies are the cards still missing to play it for real.</p>
+
+  {% if versions.is_empty() %}
+  <p>No built deck yet.</p>
+  {% else %}
+  <div class="card-list">
+    {% for built in versions %}
+    <div class="card">
+      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}">{{ built.version.full_name() }}</a></div>
+      <div class="card-meta-line">
+        <div>Deck box: {{ built.version.deck_box.as_deref().unwrap_or("—") }}</div>
+        <div>Sleeves: {{ built.version.sleeves.as_deref().unwrap_or("—") }}</div>
+        <div>Cards: {{ built.cards }}</div>
+        <div>Proxies: {{ built.proxies }}</div>
+      </div>
+      {% if built.missing.is_empty() %}
+      <p>Nothing missing: ready to play.</p>
+      {% else %}
+      <p>Missing:</p>
+      <ul class="missing-cards">
+        {% for (name, count) in built.missing %}
+        <li>{{ count }} × {{ name }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2>Shopping list</h2>
+  {% if shopping.is_empty() %}
+  <p>Nothing to buy: every built deck is complete.</p>
+  {% else %}
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead><tr><th>Card</th><th>Count</th><th>For</th></tr></thead>
+    <tbody>
+      {% for line in shopping %}
+      <tr><td>{{ line.name }}</td><td>{{ line.count }}</td><td class="decks-cell">{{ line.decks }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

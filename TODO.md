@@ -1,11 +1,8 @@
 # TODO
 
-- [ ] Link decks together: a *built* flag on deck versions; the cards of a
-      built version are locked (gone from the collection for every other
-      deck; where other decks used them, they become proxies there), and
-      `/decks/built` lists the built versions and their missing cards.
-      Design: `docs/specs/built-decks.md` (deck box and sleeves too);
-      the building rule (owner), the rest (Claude).
+- [ ] Built decks: write `domain::built_deck::plan_build` (owner; stub,
+      doc comment and 5 unit tests ready, the rest is done). Building a deck
+      panics until then.
 - [ ] Structured tournament results instead of the free `tournament.notes`
       (the notes are already written the same way each time). Per
       tournament: rounds, each with the opponent's deck, die won/lost, the
@@ -50,3 +47,6 @@
       (`card_price`), `/collection/value` (value, gain from the lot prices,
       copies with a unit price compared one by one, moves, by deck), price
       line on card pages, dashboard tile.
+- [x] Built decks (2026-10-20): a built version locks its cards (proxies
+      in the other decks), deck box and sleeves, `/decks/built` with the
+      shopping list. `plan_build` (the building rule) is the owner's.
