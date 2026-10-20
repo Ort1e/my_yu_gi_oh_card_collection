@@ -164,3 +164,24 @@ async fn each_lot_against_its_full_price() {
     let (_, body) = t.get("/collection/value").await;
     assert!(!body.contains(r#"href="/lots/3""#), "{body}");
 }
+
+#[tokio::test]
+async fn the_lists_show_the_estimates() {
+    let t = TestApp::new().await;
+    priced_fixture(&t).await;
+
+    // French NM Dark Magicians at 6.00 × 0.9
+    let (status, cards) = t.get("/cards").await;
+    assert_eq!(status, StatusCode::OK, "{cards}");
+    assert!(cards.contains("Estimate: 5.40 €"), "{cards}");
+
+    let (_, lots) = t.get("/lots").await;
+    assert!(lots.contains("Estimate: 10.80 €"), "{lots}");
+
+    let (_, lot) = t.get("/lots/1").await;
+    assert!(lot.contains("Estimated value:</strong> 10.80 €"), "{lot}");
+    assert!(lot.contains("<td>5.40 €</td>"), "{lot}");
+
+    let (_, seller) = t.get("/sellers/1").await;
+    assert!(seller.contains("Estimate: 10.80 €"), "{seller}");
+}

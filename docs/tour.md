@@ -436,6 +436,11 @@ terms; the price guide files are its open download.
   now, moves under 0.50 € left out (one line per price, the same source on
   both dates).
 
+The lists show estimates too: each card on `/cards` and on a lot's page
+(`CardRow::estimate`, from the `card_prices::MARKET_PRICE` SQL expression:
+the card's latest price, its product's else its name's), and each purchase
+lot the value of its cards still owned (`fill_lot_estimates`).
+
 The page loads every row (`store::card_prices::owned_copies`, `lots`,
 `prices_by_date`) and computes in Rust: money is never summed in SQL. The
 chart is `static/js/collection_value.js`; the card page's price line is an

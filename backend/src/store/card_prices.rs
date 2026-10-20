@@ -9,12 +9,14 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::NaiveDate;
 use domain::card::{CardStatus, Language};
-use domain::valuation::{Copy, Lot, Prices};
+use domain::valuation::{copy_value, Copy, Lot, Prices};
 use rust_decimal::Decimal;
 use serde_json::Value;
 
 use crate::store::card_data::{throttle, API_URL};
+use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::{begin_write, Money, Pool};
+use crate::store::models::LotRow;
 use crate::web::error::{AppError, AppResult};
 
 /// Ids per `cardinfo.php?id=…` request.
@@ -321,6 +323,67 @@ pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
             })
         })
         .collect())
+}
+
+/// SQL expression on `card`: its latest market price (TEXT, Money), its
+/// Cardmarket product's when it has one, else its card name's (ygoprodeck);
+/// NULL without any. Like `latest_prices`, for the list pages.
+pub const MARKET_PRICE: &str = "coalesce(
+    (SELECT price FROM cardmarket_price
+      WHERE product_id = card.cardmarket_product_id ORDER BY date DESC LIMIT 1),
+    (SELECT cardmarket_price FROM card_price
+      WHERE card_data_id = card.card_data_id AND cardmarket_price IS NOT NULL
+      ORDER BY date DESC LIMIT 1))";
+
+/// A copy's estimated value from its [`MARKET_PRICE`], condition
+/// (`last_known_status`) and code (its language), rounded to the cent.
+pub fn estimate(
+    market_price: Option<Money>,
+    status: Option<&str>,
+    code: Option<&str>,
+) -> Option<Money> {
+    let value = copy_value(
+        market_price?.0,
+        status.and_then(CardStatus::from_code),
+        code.and_then(Language::of_code),
+    );
+    Some(Money(value.round_dp(2)))
+}
+
+/// Fill `estimate` of the purchase lots of `lots`: the estimated value of
+/// their cards still owned (proxies and sold cards aside), `None` when none
+/// of them has a market price.
+pub async fn fill_lot_estimates(pool: &Pool, lots: &mut [LotRow]) -> sqlx::Result<()> {
+    let ids: Vec<i64> = lots
+        .iter()
+        .filter(|lot| lot.lot_type == "purchase")
+        .map(|lot| lot.id)
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+
+    let placeholders = vec!["?"; ids.len()].join(", ");
+    let sql = format!(
+        "SELECT unite.lot_id, card.last_known_status, card.code, {MARKET_PRICE}
+         FROM unite JOIN card ON card.id = unite.card_id
+         WHERE unite.lot_id IN ({placeholders}) AND card.is_proxy = 0 AND NOT {SOLD_EXISTS}"
+    );
+    let mut query = sqlx::query_as::<_, (i64, Option<String>, Option<String>, Option<Money>)>(&sql);
+    for id in &ids {
+        query = query.bind(id);
+    }
+
+    let mut totals: HashMap<i64, Decimal> = HashMap::new();
+    for (lot_id, status, code, price) in query.fetch_all(pool).await? {
+        if let Some(value) = estimate(price, status.as_deref(), code.as_deref()) {
+            *totals.entry(lot_id).or_default() += value.0;
+        }
+    }
+    for lot in lots {
+        lot.estimate = totals.get(&lot.id).map(|total| Money(*total));
+    }
+    Ok(())
 }
 
 /// A purchase lot that isn't cancelled, for the gain by lot.

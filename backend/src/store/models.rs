@@ -2,6 +2,7 @@
 
 use domain::card::CardStatus;
 
+use crate::store::card_prices::{estimate, MARKET_PRICE};
 use crate::store::db::Money;
 
 /// A card as shown in lists.
@@ -16,13 +17,30 @@ pub struct CardRow {
     pub card_data_id: Option<i64>,
     /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
     pub name_en: Option<String>,
+    /// Its latest market price (`card_prices::MARKET_PRICE`).
+    pub market_price: Option<Money>,
 }
 
 impl CardRow {
-    pub const COLUMNS: &'static str = "card.id, card.name, card.code, card.last_known_status, \
-         card.rarity, card.is_proxy, card.card_data_id, \
-         (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
-          WHERE card_data.id = card.card_data_id) AS name_en";
+    /// The columns to select from `card` (a `format!` of `MARKET_PRICE`).
+    pub fn columns() -> String {
+        format!(
+            "card.id, card.name, card.code, card.last_known_status, card.rarity, card.is_proxy, \
+             card.card_data_id, \
+             (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
+              WHERE card_data.id = card.card_data_id) AS name_en, \
+             {MARKET_PRICE} AS market_price"
+        )
+    }
+
+    /// Its estimated value: market price × condition and language factors.
+    pub fn estimate(&self) -> Option<Money> {
+        estimate(
+            self.market_price,
+            self.last_known_status.as_deref(),
+            self.code.as_deref(),
+        )
+    }
 
     /// The English name, when it isn't the name already shown.
     pub fn english_name(&self) -> Option<&str> {
@@ -54,6 +72,10 @@ pub struct LotRow {
     pub seller: Option<String>,
     pub shipment_file: Option<String>,
     pub card_count: i64,
+    /// Estimated value of its cards still owned (purchase lots), filled by
+    /// `card_prices::fill_lot_estimates`.
+    #[sqlx(skip)]
+    pub estimate: Option<Money>,
 }
 
 impl LotRow {

@@ -6,6 +6,7 @@
       <div>Buy Date: {{ lot.buy_date }}</div>
       <div>Seller: {{ lot.seller_name() }}</div>
       <div>Cards: {{ lot.card_count }}</div>
+      {% match lot.estimate %}{% when Some with (estimate) %}<div title="Market value of its cards still owned: an estimate">Estimate: {{ estimate }} €</div>{% when None %}{% endmatch %}
     </div>
   </div>
 </a>
