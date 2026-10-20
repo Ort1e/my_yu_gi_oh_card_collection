@@ -2,6 +2,7 @@
 //! template filters and the login.
 
 pub mod auth;
+pub mod day_form;
 pub mod error;
 pub mod filters;
 pub mod forms;

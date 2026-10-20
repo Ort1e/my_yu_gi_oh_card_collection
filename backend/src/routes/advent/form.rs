@@ -19,9 +19,13 @@ use sqlx::SqliteConnection;
 use super::{calendar_id, calendar_lot, load_doors, Door};
 use crate::store::calendar_photos;
 use crate::store::db::{begin_write, Pool};
-use crate::web::error::{AppError, AppResult, OrNotFound};
+use crate::web::day_form::{back_to, check_day, DayForm};
+use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
+
+/// Where the day forms go back to (`day_form::back_to`).
+const EDIT_BASE: &str = "/advent-calendar";
 
 /// Photos live under `<media>/advent_calendar_photos/<year>/`.
 const PHOTO_FOLDER: &str = "advent_calendar_photos";
@@ -194,18 +198,6 @@ pub async fn create(
     Ok(Redirect::to(&format!("/advent-calendar/{year}/edit")).into_response())
 }
 
-fn back_to(year: i64, day: i64) -> Response {
-    Redirect::to(&format!("/advent-calendar/{year}/edit#day-{day}")).into_response()
-}
-
-fn check_day(day: i64) -> AppResult<()> {
-    if (1..=25).contains(&day) {
-        Ok(())
-    } else {
-        Err(AppError::NotFound)
-    }
-}
-
 /// The card a day field names: `#1794` (an id) or a code (`MAMO-FR023`,
 /// case-insensitive), preferring a copy not already in a calendar. Only real
 /// cards (no proxy). `Err` is the message to show.
@@ -249,22 +241,12 @@ async fn current_photo(pool: &Pool, calendar_id: i64, day: i64) -> sqlx::Result<
 pub async fn save_day(
     State(state): State<AppState>,
     Path((year, day)): Path<(i64, i64)>,
-    mut multipart: Multipart,
+    multipart: Multipart,
 ) -> AppResult<Response> {
     check_day(day)?;
     let calendar = calendar_id(&state.pool, year).await?;
 
-    let read = |e: axum::extract::multipart::MultipartError| {
-        AppError::Internal(format!("reading the form: {e}"))
-    };
-    let (mut card_text, mut photo) = (String::new(), Vec::new());
-    while let Some(field) = multipart.next_field().await.map_err(read)? {
-        match field.name() {
-            Some("card") => card_text = field.text().await.map_err(read)?.trim().to_string(),
-            Some("photo") => photo = field.bytes().await.map_err(read)?.to_vec(),
-            _ => {}
-        }
-    }
+    let mut form = DayForm::read(multipart, "card").await?;
 
     let mut errors = Vec::new();
     let mut conn = state.pool.acquire().await?;
@@ -275,7 +257,7 @@ pub async fn save_day(
     .bind(day)
     .fetch_optional(&mut *conn)
     .await?;
-    let card = if card_text.is_empty() {
+    let card = if form.item.is_empty() {
         if current_card.is_none() {
             errors.push(format!(
                 "Day {day}: choose its card (a code like MAMO-FR023, or #id)."
@@ -283,7 +265,7 @@ pub async fn save_day(
         }
         current_card
     } else {
-        match find_card(&mut conn, &card_text).await? {
+        match find_card(&mut conn, &form.item).await? {
             Ok(id) => Some(id),
             Err(why) => {
                 errors.push(format!("Day {day}: {why}"));
@@ -293,17 +275,7 @@ pub async fn save_day(
     };
     drop(conn);
 
-    let processed = if photo.is_empty() {
-        None
-    } else {
-        match calendar_photos::process(photo).await? {
-            Ok(processed) => Some(processed),
-            Err(why) => {
-                errors.push(format!("Day {day}: {why}."));
-                None
-            }
-        }
-    };
+    let processed = form.photo(day, &mut errors).await?;
 
     let (Some(card), true) = (card, errors.is_empty()) else {
         return Ok(edit_page_with(&state.pool, year, errors)
@@ -354,7 +326,7 @@ pub async fn save_day(
         new_photo = new_photo.is_some(),
         "advent day saved"
     );
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }
 
 /// `POST /advent-calendar/:year/days/:day/rotate` (field `direction`:
@@ -381,7 +353,7 @@ pub async fn rotate(
     calendar_photos::remove(&[state.media_dir.join(&old)]).await;
 
     tracing::info!(year, day, clockwise, "advent photo rotated");
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }
 
 /// `POST /advent-calendar/:year/days/:day/delete`: empty the day (its photo
@@ -404,5 +376,5 @@ pub async fn remove_day(
     }
 
     tracing::info!(year, day, "advent day emptied");
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }
