@@ -12,7 +12,7 @@ Suggested reading order, about an hour with the code open next to it:
 4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/store/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
 6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
-7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data.rs`
+7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data/`
 8. [Tests](#tests): `backend/src/tests/`
 9. [The books](#the-books): `backend/src/routes/books/`, a second, smaller collection
 
@@ -29,7 +29,7 @@ Suggested reading order, about an hour with the code open next to it:
  │ routes/   one module per page group: SQL + handler +    │
  │           template struct                               │
  │ templates/  askama HTML (compiled into the binary)      │
- │ forms.rs, cards.rs, card_data.rs, auth.rs, db.rs …      │
+ │ forms.rs, cards.rs, card_data/, auth.rs, db.rs …        │
  └───────┬───────────────────────────┬─────────────────────┘
          │ pure functions            │ sqlx
          ▼                           ▼
@@ -367,7 +367,8 @@ cards links, translates and swaps proxies).
 ## Talking to ygoprodeck
 
 All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
-are in `backend/src/store/card_data.rs`. It allows about 20 requests per
+are in `backend/src/store/card_data/` (the client in `mod.rs`, then
+`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
 second and blocks the IP for an hour above that: `throttle()` keeps every
 call of the server 60 ms apart, and what can be remembered is.
 
