@@ -6,9 +6,9 @@ use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
 use crate::routes::cards::like_pattern;
-use crate::store::card_prices::{estimate, fill_lot_estimates, MARKET_PRICE};
 use crate::store::db::{Money, Pool};
 use crate::store::models::{other_name, LotRow};
+use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::CardRowValues;
 use crate::web::pagination::{self, Page, PAGE_SIZE};

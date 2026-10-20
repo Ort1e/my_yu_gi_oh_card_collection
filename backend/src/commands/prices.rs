@@ -1,15 +1,16 @@
 //! `refresh-prices`: today's market prices from ygoprodeck into `card_price`
 //! (`store::card_prices`), then Cardmarket's price guide
-//! (`store::cardmarket`). The server also runs it by itself every week
+//! (`store::prices::cardmarket`). The server also runs it by itself every week
 //! ([`spawn_weekly`]).
 
 use std::time::Duration;
 
 use chrono::NaiveDate;
 
-use crate::store::card_prices::{latest_refresh, refresh_prices};
-use crate::store::cardmarket;
 use crate::store::db::today;
+use crate::store::prices::cardmarket;
+use crate::store::prices::history::latest_refresh;
+use crate::store::prices::ygoprodeck::refresh_prices;
 use crate::AppState;
 
 pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
@@ -76,7 +77,7 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use super::*;
-    use crate::store::card_prices::prices_by_date;
+    use crate::store::prices::history::prices_by_date;
     use crate::tests::TestApp;
 
     #[test]

@@ -1,6 +1,6 @@
 //! `/collection/value`: what the collection is worth at market prices
 //! (`domain::valuation`, prices from `store::card_prices` and
-//! `store::cardmarket`).
+//! `store::prices::cardmarket`).
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -16,10 +16,9 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use crate::store::card_prices::{
-    latest_prices, lots, owned_copies, prices_by_date, purchase_lots, OwnedCopy,
-};
 use crate::store::db::{today, Pool};
+use crate::store::prices::history::{latest_prices, prices_by_date};
+use crate::store::valuation::{lots, owned_copies, purchase_lots, OwnedCopy};
 use crate::web::error::AppResult;
 use crate::web::filters;
 use crate::AppState;

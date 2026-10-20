@@ -2,8 +2,8 @@
 
 use domain::card::CardStatus;
 
-use crate::store::card_prices::{estimate, MARKET_PRICE};
 use crate::store::db::Money;
+use crate::store::valuation::{estimate, MARKET_PRICE};
 
 /// A card as shown in lists.
 #[derive(Debug, sqlx::FromRow)]
@@ -17,7 +17,7 @@ pub struct CardRow {
     pub card_data_id: Option<i64>,
     /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
     pub name_en: Option<String>,
-    /// Its latest market price (`card_prices::MARKET_PRICE`).
+    /// Its latest market price (`valuation::MARKET_PRICE`).
     pub market_price: Option<Money>,
 }
 
@@ -73,7 +73,7 @@ pub struct LotRow {
     pub shipment_file: Option<String>,
     pub card_count: i64,
     /// Estimated value of its cards still owned (purchase lots), filled by
-    /// `card_prices::fill_lot_estimates`.
+    /// `valuation::fill_lot_estimates`.
     #[sqlx(skip)]
     pub estimate: Option<Money>,
 }

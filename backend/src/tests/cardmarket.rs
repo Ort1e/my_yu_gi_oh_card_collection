@@ -1,4 +1,4 @@
-//! Cardmarket's price guide (`store::cardmarket`): links, prices, the value
+//! Cardmarket's price guide (`store::prices::cardmarket`): links, prices, the value
 //! page and the card edit form. Synthetic catalogue, no network.
 
 use std::collections::{HashMap, HashSet};
@@ -9,7 +9,7 @@ use rust_decimal_macros::dec;
 
 use super::*;
 use crate::store::card_data::SetInfo;
-use crate::store::cardmarket::{apply, Report};
+use crate::store::prices::cardmarket::{apply, Report};
 
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).unwrap()

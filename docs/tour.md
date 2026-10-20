@@ -353,8 +353,8 @@ one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
 
 `refresh-prices` fetches today's market price of every card data
-(`store/card_prices.rs`, batches of 100 ids) into `card_price`, then
-Cardmarket's price guide (`store/cardmarket.rs`, links and prices); the server
+(`store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
+Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices); the server
 does it weekly by itself (`prices::spawn_weekly`: checked every 6 hours, runs
 when the last refresh is 7 days old).
 
@@ -377,8 +377,8 @@ call of the server 60 ms apart, and what can be remembered is.
 | its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`) |
 | a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
 | a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
-| a set code's card names, for its Cardmarket expansion (`store/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
-| market prices, weekly (`store/card_prices.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
+| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
+| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
 
 Two rules: call ygoprodeck **before** opening a write transaction (the calls
 write through the pool), and only through these functions. Tests never call
@@ -393,7 +393,7 @@ rarity names), which are unit-tested on small synthetic JSON.
 and a "Market" line on card pages. Two price sources, both refreshed weekly
 by `refresh-prices`:
 
-- **Cardmarket's price guide** (`store/cardmarket.rs`,
+- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
   `domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
   MB) downloaded into memory, a price **per printing**. Only what the
   collection needs is kept (migration 0009): the products named like our
@@ -437,11 +437,11 @@ terms; the price guide files are its open download.
   both dates).
 
 The lists show estimates too: each card on `/cards` and on a lot's page
-(`CardRow::estimate`, from the `card_prices::MARKET_PRICE` SQL expression:
+(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
 the card's latest price, its product's else its name's), and each purchase
 lot the value of its cards still owned (`fill_lot_estimates`).
 
-The page loads every row (`store::card_prices::owned_copies`, `lots`,
+The page loads every row (`store::valuation::owned_copies`, `lots`,
 `prices_by_date`) and computes in Rust: money is never summed in SQL. The
 chart is `static/js/collection_value.js`; the card page's price line is an
 SVG drawn by the server (`cards::sparkline`).

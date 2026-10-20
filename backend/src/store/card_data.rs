@@ -312,7 +312,7 @@ async fn fetch_set_cards(
 }
 
 /// What ygoprodeck says about a set code, to find its Cardmarket expansion
-/// (`store::cardmarket`).
+/// (`store::prices::cardmarket`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SetInfo {
     /// Its cards' names (`clean_card_name`), empty for an unknown code.
