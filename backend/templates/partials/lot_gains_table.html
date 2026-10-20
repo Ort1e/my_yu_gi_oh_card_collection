@@ -2,20 +2,25 @@
   <div class="table-scroll">
   <table class="numbers">
     <thead>
-      <tr><th>Lot</th><th>Date</th><th>Seller</th><th>Price (€)</th><th>Cards</th><th>Value (€)</th><th>Sold for (€)</th><th>Gain (€)</th><th>Gain</th></tr>
+      <tr><th>Lot</th><th class="phone-hide">Date</th><th>Price (€)</th><th class="phone-hide">Cards</th><th>Value (€)</th><th class="phone-hide">Sold for (€)</th><th>Gain (€)</th><th class="phone-hide">Gain</th></tr>
     </thead>
     <tbody>
       {% for lot in lots %}
       <tr>
-        <td><a href="/lots/{{ lot.id }}">#{{ lot.id }}</a></td>
-        <td>{{ lot.date }}</td>
-        <td class="seller-cell">{{ lot.seller }}</td>
+        <td>
+          <a href="/lots/{{ lot.id }}">#{{ lot.id }}</a>
+          <div class="cell-note">{{ lot.seller }}<span class="phone-only"> · {{ lot.date }}</span></div>
+        </td>
+        <td class="phone-hide">{{ lot.date }}</td>
         <td>{{ lot.price|money }}</td>
-        <td title="{{ lot.owned }} owned, {{ lot.sold }} sold{% if lot.without_price > 0 %}, {{ lot.without_price }} without a market price{% endif %}">{{ lot.owned }}{% if lot.sold > 0 %} + {{ lot.sold }} sold{% endif %}{% if lot.without_price > 0 %} ({{ lot.without_price }} unpriced){% endif %}</td>
+        <td class="phone-hide" title="{{ lot.owned }} owned, {{ lot.sold }} sold{% if lot.without_price > 0 %}, {{ lot.without_price }} without a market price{% endif %}">{{ lot.owned }}{% if lot.sold > 0 %} + {{ lot.sold }} sold{% endif %}{% if lot.without_price > 0 %} ({{ lot.without_price }} unpriced){% endif %}</td>
         <td>{{ lot.value|money }}</td>
-        <td>{% if lot.sold > 0 %}{{ lot.sold_for|money }}{% else %}—{% endif %}</td>
-        <td class="{% if lot.gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ lot.gain|money }}</td>
-        <td>{{ lot.percent }}</td>
+        <td class="phone-hide">{% if lot.sold > 0 %}{{ lot.sold_for|money }}{% else %}—{% endif %}</td>
+        <td class="{% if lot.gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">
+          {{ lot.gain|money }}
+          <div class="cell-note phone-only">{{ lot.percent }}</div>
+        </td>
+        <td class="phone-hide">{{ lot.percent }}</td>
       </tr>
       {% endfor %}
     </tbody>

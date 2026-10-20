@@ -116,16 +116,18 @@
   <div class="table-scroll">
   <table class="numbers">
     <thead>
-      <tr><th>Deck</th><th>Version</th><th>Cards</th><th>Value (€)</th><th>Proxies</th><th>Proxies (€)</th></tr>
+      <tr><th>Deck</th><th class="phone-hide">Cards</th><th>Value (€)</th><th class="phone-hide">Proxies</th><th>Proxies (€)</th></tr>
     </thead>
     <tbody>
       {% for deck in decks %}
       <tr>
-        <td><a href="/decks/{{ deck.id }}">{{ deck.name }}</a></td>
-        <td>{{ deck.version }}</td>
-        <td>{{ deck.cards }}</td>
+        <td>
+          <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
+          <div class="cell-note">{{ deck.version }}</div>
+        </td>
+        <td class="phone-hide">{{ deck.cards }}</td>
         <td>{{ deck.value|money }}</td>
-        <td>{{ deck.proxies }}</td>
+        <td class="phone-hide">{{ deck.proxies }}</td>
         <td>{{ deck.proxies_value|money }}</td>
       </tr>
       {% endfor %}

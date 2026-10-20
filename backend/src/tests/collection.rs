@@ -127,8 +127,8 @@ async fn each_lot_against_its_full_price() {
     assert!(lots.contains(r#"<a href="/lots/1">#1</a>"#), "{lots}");
     assert!(lots.contains("<td>10.50</td>"), "{lots}");
     assert!(lots.contains("<td>10.80</td>"), "{lots}");
-    assert!(lots.contains(">0.30</td>"), "{lots}");
-    assert!(lots.contains("<td>+2.9%</td>"), "{lots}");
+    assert!(lots.contains("0.30\n"), "{lots}");
+    assert!(lots.contains(">+2.9%</td>"), "{lots}");
     // a gain: in the gains, no loss at all
     let gains = &body[body.find("Biggest gains").unwrap()..body.find("Worst losses").unwrap()];
     assert!(gains.contains(r#"<a href="/lots/1">#1</a>"#), "{gains}");
@@ -151,8 +151,8 @@ async fn each_lot_against_its_full_price() {
     let lots = &lots[..lots.find("</table>").unwrap()];
     assert!(lots.contains("1 + 1 sold"), "{lots}");
     assert!(lots.contains("<td>5.40</td>"), "{lots}");
-    assert!(lots.contains("<td>7.00</td>"), "{lots}");
-    assert!(lots.contains(">1.90</td>"), "{lots}");
+    assert!(lots.contains(">7.00</td>"), "{lots}");
+    assert!(lots.contains("1.90\n"), "{lots}");
     // the sale lot isn't listed
     assert!(!lots.contains("/lots/2"), "{lots}");
 
