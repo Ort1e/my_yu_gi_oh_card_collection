@@ -203,7 +203,7 @@ pub struct ValuePage {
     losses: Vec<CopyLine>,
     moves: Vec<Moves>,
     decks: Vec<DeckLine>,
-    /// Each purchase lot against its full price, newest first.
+    /// Each purchase lot with cards against its full price, newest first.
     lot_lines: Vec<LotLine>,
     /// Chart.js data, serialised as JSON.
     chart: String,
@@ -289,13 +289,14 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
     for c in &data.copies {
         by_lot.entry(c.lot_id).or_default().push(&c.copy);
     }
+    // lots without cards (sleeves, boxes…) are left out
     let lot_lines = purchase_lots(pool)
         .await?
         .into_iter()
-        .map(|lot| {
-            let copies = by_lot.get(&lot.id).map(Vec::as_slice).unwrap_or_default();
+        .filter_map(|lot| {
+            let copies = by_lot.get(&lot.id)?;
             let gain = lot_gain(lot.price.0, copies, today, &data.latest);
-            LotLine {
+            Some(LotLine {
                 id: lot.id,
                 date: lot.date,
                 seller: lot.seller.unwrap_or_default(),
@@ -307,7 +308,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
                 sold_for: gain.sold_for,
                 gain: gain.gain(),
                 percent: percent(gain.gain_percent()),
-            }
+            })
         })
         .collect();
 

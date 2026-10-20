@@ -148,4 +148,12 @@ async fn each_lot_against_its_full_price() {
     assert!(lots.contains(">1.90</td>"), "{lots}");
     // the sale lot isn't listed
     assert!(!lots.contains("/lots/2"), "{lots}");
+
+    // nor a lot without cards
+    sqlx::query("INSERT INTO lot (id, lot_type, price, buy_date, no_card_price) VALUES (3, 'purchase', '20.00', '2025-08-01', '19.00')")
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    let (_, body) = t.get("/collection/value").await;
+    assert!(!body.contains(r#"href="/lots/3""#), "{body}");
 }
