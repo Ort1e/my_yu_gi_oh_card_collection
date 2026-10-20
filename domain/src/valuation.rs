@@ -18,6 +18,8 @@
 //!   lots up to that date ([`Totals`]).
 //! - The copies that have a unite price are also compared one by one: value
 //!   against that price ([`UnitTotals`]; no shipping share).
+//! - Each purchase lot is compared with its full price ([`lot_gain`]): the
+//!   value of its cards still owned, plus what its sold cards brought.
 //!
 //! New in the Rust app (Django had no valuation). Deliberate choice: every
 //! language but English gets the French factor (the collection only has
@@ -80,6 +82,8 @@ pub struct Copy {
     /// Its `unite.price` in its purchase lot, `None` when the lot was bought
     /// as a whole.
     pub paid: Option<Decimal>,
+    /// Its `unite.price` in its sale lot, when sold at a known price.
+    pub sold_for: Option<Decimal>,
 }
 
 impl Copy {
@@ -228,6 +232,68 @@ pub fn unit_totals_on(copies: &[Copy], date: NaiveDate, prices: &Prices) -> Unit
     totals
 }
 
+/// One purchase lot today against its full price (`lot.price`, shipping
+/// included).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LotGain {
+    pub price: Decimal,
+    /// Its cards (proxies aside), and how many are still owned.
+    pub copies: usize,
+    pub owned: usize,
+    /// Value of the owned ones with a market price.
+    pub value: Decimal,
+    pub without_price: usize,
+    /// Its cards sold, and what they brought (the ones sold at a known price).
+    pub sold: usize,
+    pub sold_for: Decimal,
+}
+
+impl LotGain {
+    /// `value + sold_for − price`.
+    pub fn gain(&self) -> Decimal {
+        self.value + self.sold_for - self.price
+    }
+
+    /// The gain in % of the lot's price, `None` for a free lot (a gift).
+    pub fn gain_percent(&self) -> Option<Decimal> {
+        if self.price.is_zero() {
+            return None;
+        }
+
+        Some((self.gain() * Decimal::ONE_HUNDRED / self.price).round_dp(1))
+    }
+}
+
+/// [`LotGain`] of a purchase lot of `price` whose cards are `copies`, on
+/// `date` with `prices`. Rounded to the cent.
+pub fn lot_gain(price: Decimal, copies: &[&Copy], date: NaiveDate, prices: &Prices) -> LotGain {
+    let mut lot = LotGain {
+        price,
+        copies: copies.len(),
+        owned: 0,
+        value: Decimal::ZERO,
+        without_price: 0,
+        sold: 0,
+        sold_for: Decimal::ZERO,
+    };
+
+    for copy in copies {
+        if copy.is_owned_on(date) {
+            lot.owned += 1;
+            match copy.value(prices) {
+                Some(value) => lot.value += value,
+                None => lot.without_price += 1,
+            }
+        } else if copy.sold.is_some_and(|sold| sold <= date) {
+            lot.sold += 1;
+            lot.sold_for += copy.sold_for.unwrap_or_default();
+        }
+    }
+
+    lot.value = lot.value.round_dp(2);
+    lot
+}
+
 /// [`totals_on`] each refresh date, with that date's prices, oldest first.
 pub fn history(
     copies: &[Copy],
@@ -312,6 +378,7 @@ mod tests {
             bought,
             sold: None,
             paid: None,
+            sold_for: None,
         }
     }
 
@@ -429,6 +496,41 @@ mod tests {
         assert_eq!((totals.value, totals.paid), (dec!(3.50), dec!(2.00)));
         assert_eq!(totals.gain(), dec!(1.50));
         assert_eq!(totals.gain_percent(), Some(dec!(75.0)));
+    }
+
+    #[test]
+    fn a_lot_against_its_full_price() {
+        let prices = cards([(1, dec!(4.00)), (2, dec!(0.333))]);
+        let mut sold = copy(1, date(1, 1));
+        sold.sold = Some(date(3, 1));
+        sold.sold_for = Some(dec!(2.50));
+        let mut sold_unpriced = copy(2, date(1, 1));
+        sold_unpriced.sold = Some(date(3, 1));
+        let owned = [
+            copy(1, date(1, 1)),
+            copy(2, date(1, 1)),
+            copy(2, date(1, 1)),
+            copy(3, date(1, 1)),
+        ];
+        let copies: Vec<&Copy> = owned.iter().chain([&sold, &sold_unpriced]).collect();
+
+        let lot = lot_gain(dec!(10.00), &copies, date(4, 1), &prices);
+        assert_eq!((lot.copies, lot.owned, lot.sold), (6, 4, 2));
+        assert_eq!(lot.value, dec!(4.67)); // 4 + 2 × 0.333
+        assert_eq!(lot.without_price, 1);
+        assert_eq!(lot.sold_for, dec!(2.50));
+        assert_eq!(lot.gain(), dec!(-2.83));
+        assert_eq!(lot.gain_percent(), Some(dec!(-28.3)));
+
+        // before the sale, the sold copy still counts as owned
+        let before = lot_gain(dec!(10.00), &copies, date(2, 1), &prices);
+        assert_eq!((before.owned, before.sold), (6, 0));
+
+        // a gift
+        assert_eq!(
+            lot_gain(dec!(0), &copies, date(4, 1), &prices).gain_percent(),
+            None
+        );
     }
 
     #[test]

@@ -252,6 +252,8 @@ pub async fn card_history(
 #[derive(Debug, Clone)]
 pub struct OwnedCopy {
     pub card_id: i64,
+    /// Its purchase lot.
+    pub lot_id: i64,
     pub name: String,
     pub code: Option<String>,
     pub copy: Copy,
@@ -260,6 +262,7 @@ pub struct OwnedCopy {
 #[derive(sqlx::FromRow)]
 struct CopyRow {
     card_id: i64,
+    lot_id: i64,
     name: String,
     code: Option<String>,
     card_data_id: Option<i64>,
@@ -268,6 +271,7 @@ struct CopyRow {
     bought: String,
     paid: Option<Money>,
     sold: Option<String>,
+    sold_for: Option<Money>,
 }
 
 /// Every non-proxy card bought in a purchase lot that isn't cancelled, sold
@@ -276,10 +280,16 @@ pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
     let rows: Vec<CopyRow> = sqlx::query_as(
         "SELECT card.id AS card_id, card.name, card.code, card.card_data_id,
                 card.cardmarket_product_id, card.last_known_status AS status, lot.buy_date AS bought, unite.price AS paid,
+                unite.lot_id,
                 (SELECT min(sale.buy_date) FROM unite AS sold_unite
                    JOIN lot AS sale ON sale.id = sold_unite.lot_id
                   WHERE sold_unite.card_id = card.id AND sale.lot_type = 'sale'
-                    AND sale.is_cancelled = 0) AS sold
+                    AND sale.is_cancelled = 0) AS sold,
+                (SELECT sold_unite.price FROM unite AS sold_unite
+                   JOIN lot AS sale ON sale.id = sold_unite.lot_id
+                  WHERE sold_unite.card_id = card.id AND sale.lot_type = 'sale'
+                    AND sale.is_cancelled = 0
+                  ORDER BY sale.buy_date LIMIT 1) AS sold_for
          FROM unite
          JOIN lot ON lot.id = unite.lot_id
          JOIN card ON card.id = unite.card_id
@@ -300,15 +310,38 @@ pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
                 bought: row.bought.parse().ok()?,
                 sold: row.sold.as_deref().and_then(|d| d.parse().ok()),
                 paid: row.paid.map(|p| p.0),
+                sold_for: row.sold_for.map(|p| p.0),
             };
             Some(OwnedCopy {
                 card_id: row.card_id,
+                lot_id: row.lot_id,
                 name: row.name,
                 code: row.code,
                 copy,
             })
         })
         .collect())
+}
+
+/// A purchase lot that isn't cancelled, for the gain by lot.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PurchaseLot {
+    pub id: i64,
+    pub date: String,
+    pub price: Money,
+    pub seller: Option<String>,
+}
+
+/// The purchase lots that aren't cancelled, newest first.
+pub async fn purchase_lots(pool: &Pool) -> sqlx::Result<Vec<PurchaseLot>> {
+    sqlx::query_as(
+        "SELECT lot.id, lot.buy_date AS date, lot.price, seller.name AS seller
+         FROM lot LEFT JOIN seller ON seller.id = lot.seller_id
+         WHERE lot.lot_type = 'purchase' AND lot.is_cancelled = 0
+         ORDER BY lot.buy_date DESC, lot.id DESC",
+    )
+    .fetch_all(pool)
+    .await
 }
 
 /// The lots that aren't cancelled: their date, kind and price.

@@ -87,6 +87,32 @@
   {% endif %}
   {% endfor %}
 
+  <h2>Gain / loss by lot</h2>
+  <p class="value-note">Each purchase lot against its full price (shipping included): the value today of its cards
+    still owned, plus what its sold cards brought (their price in the sale lot), minus the lot's price.</p>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th>Lot</th><th>Date</th><th>Seller</th><th>Price (€)</th><th>Cards</th><th>Value (€)</th><th>Sold for (€)</th><th>Gain (€)</th><th>Gain</th></tr>
+    </thead>
+    <tbody>
+      {% for lot in lot_lines %}
+      <tr>
+        <td><a href="/lots/{{ lot.id }}">#{{ lot.id }}</a></td>
+        <td>{{ lot.date }}</td>
+        <td class="seller-cell">{{ lot.seller }}</td>
+        <td>{{ lot.price|money }}</td>
+        <td title="{{ lot.owned }} owned, {{ lot.sold }} sold{% if lot.without_price > 0 %}, {{ lot.without_price }} without a market price{% endif %}">{{ lot.owned }}{% if lot.sold > 0 %} + {{ lot.sold }} sold{% endif %}{% if lot.without_price > 0 %} ({{ lot.without_price }} unpriced){% endif %}</td>
+        <td>{{ lot.value|money }}</td>
+        <td>{% if lot.sold > 0 %}{{ lot.sold_for|money }}{% else %}—{% endif %}</td>
+        <td class="{% if lot.gain.is_sign_negative() %}value-down{% else %}value-up{% endif %}">{{ lot.gain|money }}</td>
+        <td>{{ lot.percent }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
   <h2>By deck</h2>
   <p class="value-note">Each deck's latest version. Proxies: what the missing cards would cost.</p>
   <div class="table-scroll">

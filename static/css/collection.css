@@ -49,6 +49,11 @@ a.value-tile:hover {
 .value-tile .value-up   { color: #b9f6ca; }
 .value-tile .value-down { color: #ffcdd2; }
 
+/* The sellers of the lots table: text, left-aligned. */
+.numbers td.seller-cell {
+    text-align: left;
+}
+
 /* Explanations under the titles. */
 .value-note {
     font-size: 0.9rem;

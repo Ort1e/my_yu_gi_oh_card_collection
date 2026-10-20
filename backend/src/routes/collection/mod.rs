@@ -9,14 +9,17 @@ use axum::extract::State;
 use chrono::{Duration, NaiveDate};
 use domain::card::{CardStatus, Language};
 use domain::valuation::{
-    biggest_moves, copy_value, history, totals_on, unit_totals_on, Lot, Prices, Totals, UnitTotals,
+    biggest_moves, copy_value, history, lot_gain, totals_on, unit_totals_on, Lot, Prices, Totals,
+    UnitTotals,
 };
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
 
 use crate::routes::budget::today;
-use crate::store::card_prices::{latest_prices, lots, owned_copies, prices_by_date, OwnedCopy};
+use crate::store::card_prices::{
+    latest_prices, lots, owned_copies, prices_by_date, purchase_lots, OwnedCopy,
+};
 use crate::store::db::Pool;
 use crate::web::error::AppResult;
 use crate::web::filters;
@@ -164,6 +167,22 @@ pub struct DeckLine {
     proxies_value: Decimal,
 }
 
+/// A purchase lot against its full price (`domain::valuation::lot_gain`).
+pub struct LotLine {
+    id: i64,
+    date: String,
+    seller: String,
+    price: Decimal,
+    owned: usize,
+    sold: usize,
+    without_price: usize,
+    value: Decimal,
+    sold_for: Decimal,
+    gain: Decimal,
+    /// `+12.5%`, `—` for a free lot.
+    percent: String,
+}
+
 /// The moves over one period, for the template.
 pub struct Moves {
     title: String,
@@ -184,6 +203,8 @@ pub struct ValuePage {
     losses: Vec<CopyLine>,
     moves: Vec<Moves>,
     decks: Vec<DeckLine>,
+    /// Each purchase lot against its full price, newest first.
+    lot_lines: Vec<LotLine>,
     /// Chart.js data, serialised as JSON.
     chart: String,
 }
@@ -264,6 +285,32 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         "net_spent": points.iter().map(|t| to_f64(t.spent - t.sold)).collect::<Vec<_>>(),
     });
 
+    let mut by_lot: HashMap<i64, Vec<&domain::valuation::Copy>> = HashMap::new();
+    for c in &data.copies {
+        by_lot.entry(c.lot_id).or_default().push(&c.copy);
+    }
+    let lot_lines = purchase_lots(pool)
+        .await?
+        .into_iter()
+        .map(|lot| {
+            let copies = by_lot.get(&lot.id).map(Vec::as_slice).unwrap_or_default();
+            let gain = lot_gain(lot.price.0, copies, today, &data.latest);
+            LotLine {
+                id: lot.id,
+                date: lot.date,
+                seller: lot.seller.unwrap_or_default(),
+                price: gain.price,
+                owned: gain.owned,
+                sold: gain.sold,
+                without_price: gain.without_price,
+                value: gain.value,
+                sold_for: gain.sold_for,
+                gain: gain.gain(),
+                percent: percent(gain.gain_percent()),
+            }
+        })
+        .collect();
+
     let now = data.now();
     let units = unit_totals_on(&copies, today, &data.latest);
     Ok(ValuePage {
@@ -276,6 +323,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         losses,
         moves,
         decks: deck_values(pool, &data.latest).await?,
+        lot_lines,
         // embedded in a <script>
         chart: chart.to_string().replace("</", "<\\/"),
     })

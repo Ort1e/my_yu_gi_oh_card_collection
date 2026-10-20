@@ -113,3 +113,39 @@ async fn lists_the_copies_that_lost_the_most() {
     // the other copy gained: not listed
     assert!(!losses.contains(&row(cards[0])), "{losses}");
 }
+
+#[tokio::test]
+async fn each_lot_against_its_full_price() {
+    let t = TestApp::new().await;
+    let cards = priced_fixture(&t).await;
+
+    let (status, body) = t.get("/collection/value").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let lots = &body[body.find("Gain / loss by lot").unwrap()..];
+    let lots = &lots[..lots.find("</table>").unwrap()];
+    // 2 copies at 5.40 against the 10.50 lot
+    assert!(lots.contains(r#"<a href="/lots/1">#1</a>"#), "{lots}");
+    assert!(lots.contains("<td>10.50</td>"), "{lots}");
+    assert!(lots.contains("<td>10.80</td>"), "{lots}");
+    assert!(lots.contains(">0.30</td>"), "{lots}");
+    assert!(lots.contains("<td>+2.9%</td>"), "{lots}");
+
+    // one copy sold for 7.00: its sale counts instead of its value
+    sqlx::query(
+        "INSERT INTO lot (id, lot_type, price, buy_date) VALUES (2, 'sale', '7.00', '2025-07-01');
+         INSERT INTO unite (price, lot_id, card_id) VALUES ('7.00', 2, ?);",
+    )
+    .bind(cards[1])
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let (_, body) = t.get("/collection/value").await;
+    let lots = &body[body.find("Gain / loss by lot").unwrap()..];
+    let lots = &lots[..lots.find("</table>").unwrap()];
+    assert!(lots.contains("1 + 1 sold"), "{lots}");
+    assert!(lots.contains("<td>5.40</td>"), "{lots}");
+    assert!(lots.contains("<td>7.00</td>"), "{lots}");
+    assert!(lots.contains(">1.90</td>"), "{lots}");
+    // the sale lot isn't listed
+    assert!(!lots.contains("/lots/2"), "{lots}");
+}

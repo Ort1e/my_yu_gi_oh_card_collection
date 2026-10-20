@@ -428,6 +428,10 @@ terms; the price guide files are its open download.
   card;
 - beside it, the copies that do have a unite price are compared card by
   card (value against that price, no shipping share);
+- each purchase lot against its **full price** (`lot_gain`): the value of
+  its cards still owned, plus what its sold cards brought (their price in
+  the sale lot), minus `lot.price` (non-card items included, so a lot of
+  only sleeves shows −100%);
 - price moves: since the previous refresh and over 3 months, cards owned
   now, moves under 0.50 € left out (one line per price, the same source on
   both dates).
