@@ -289,6 +289,10 @@ missing.
   except the cards another built version already holds: first built, first
   served, those become proxies here. The answer carries a `build_report`
   the deck builder shows.
+- **Saving a built version's zones** runs the same building step again: a
+  card added from the reserve that other versions use becomes a proxy in
+  them, and the save answer carries a `build_report` too. So a real card of
+  a built version is never in another version.
 - **Unbuilding** only clears the flag. The proxies made in other versions
   stay; `clean-cards` puts the owned cards back (`replace_proxies`), in
   those versions and in the unbuilt one.

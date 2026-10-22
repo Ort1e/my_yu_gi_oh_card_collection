@@ -466,3 +466,53 @@ async fn replacing_a_proxy_by_hand_needs_a_free_copy() {
     let (status, _) = replace(&t, 999, proxy).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn saving_a_built_version_takes_its_new_cards_from_the_others() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    let (dm1, dm2) = (cards[0], cards[1]);
+    put(&t, v1, &[dm1]).await;
+    set_built(&t, v1, true).await;
+    let v2 = version(&t, "v2", &[dm2]).await;
+
+    // dm2, used by v2, added to the built v1 from the reserve
+    let (status, body) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{v1}"),
+            json!({ "main": [dm1, dm2] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["build_report"]["proxied_elsewhere"],
+        json!(["Magicien Sombre → Test - v2"])
+    );
+    assert_eq!(body["is_built"], true);
+    let (proxy, is_proxy, data) = main_deck(&t, v2).await[0];
+    assert!(is_proxy && data == Some(1) && proxy != dm2);
+
+    // saved again with nothing new: nothing taken, no report
+    let (status, body) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{v1}"),
+            json!({ "main": [dm1, dm2] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.get("build_report").is_none(), "{body}");
+
+    // a version that is not built still shares its cards
+    let v3 = version(&t, "v3", &[]).await;
+    let (status, body) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{v3}"),
+            json!({ "main": [proxy] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.get("build_report").is_none());
+}

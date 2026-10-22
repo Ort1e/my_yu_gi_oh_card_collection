@@ -3,7 +3,9 @@
 //! A built version (`is_built`, `domain::built_deck`) locks its real cards:
 //! building one turns its cards shared with other versions into proxies
 //! there, saving zones with a card locked by another built version is
-//! refused, and a copy gets proxies for the locked cards.
+//! refused, saving a built version's zones takes its new cards from the
+//! other versions (they get proxies, like building), and a copy gets proxies
+//! for the locked cards.
 
 use std::collections::{HashMap, HashSet};
 
@@ -42,7 +44,8 @@ pub struct DeckVersion {
     is_built: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
-    /// What building the version did, only in the answer to building it.
+    /// What building the version did, only in the answer to building it or
+    /// to saving a built version's zones when cards were taken elsewhere.
     #[serde(skip_serializing_if = "Option::is_none")]
     build_report: Option<BuildReport>,
     tournament: Option<Tournament>,
@@ -271,7 +274,8 @@ fn locked_message(holders: &[(i64, String, String)]) -> String {
 }
 
 /// Build version `id` (in `tx`): `plan_build`, then the proxies, then the
-/// flag. Returns what was done, for the deck builder.
+/// flag. Returns what was done, for the deck builder. Also run again when a
+/// built version's zones are saved: only its new shared cards change then.
 async fn build(conn: &mut sqlx::SqliteConnection, id: i64) -> AppResult<BuildReport> {
     let mut in_zones = Vec::new();
     for zone in Zone::ALL {
@@ -474,6 +478,14 @@ pub async fn update_version(
                 .execute(&mut *tx)
                 .await?;
             tracing::info!(version_id = id, "deck version unbuilt");
+        }
+        // a built version saved with new cards takes them from the other
+        // versions too, like building did (locked ones were refused above)
+        None | Some(true) if was_built && zones_changed => {
+            let report = build(&mut tx, id).await?;
+            if !report.proxied_elsewhere.is_empty() {
+                build_report = Some(report);
+            }
         }
         _ => {}
     }

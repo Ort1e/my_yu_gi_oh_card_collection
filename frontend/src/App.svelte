@@ -154,15 +154,23 @@
 
     async function save() {
         try {
-            setDeck(
-                await api.update({
-                    main: zones.main.map((c) => c.id),
-                    extra: zones.extra.map((c) => c.id),
-                    side: zones.side.map((c) => c.id),
-                    ban_list_id: banListId,
-                }),
-            );
-            alert('Deck saved!');
+            const saved = await api.update({
+                main: zones.main.map((c) => c.id),
+                extra: zones.extra.map((c) => c.id),
+                side: zones.side.map((c) => c.id),
+                ban_list_id: banListId,
+            });
+
+            setDeck(saved);
+
+            // a built deck takes its new cards from the other decks
+            const taken = saved.build_report?.proxied_elsewhere ?? [];
+
+            if (taken.length > 0) {
+                alert(['Deck saved! Now proxies in the other decks:', ...taken.map((l) => `• ${l}`)].join('\n'));
+            } else {
+                alert('Deck saved!');
+            }
         } catch (e) {
             alert(`Save failed: ${e.message}`);
         }
