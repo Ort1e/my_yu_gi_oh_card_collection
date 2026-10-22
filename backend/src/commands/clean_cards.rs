@@ -2,8 +2,10 @@
 //!
 //! 1. normalise `card_data.en_name` and `card.en_name` ([`normalize_card_name`]);
 //! 2. link every card to the card data of its name (fetched if unknown);
-//! 3. in each deck version, replace proxies by an owned copy of the same
-//!    card that isn't in that version yet, moving its category assignments;
+//! 3. in each deck version that is not built, replace proxies by an owned
+//!    copy of the same card that isn't in that version yet nor locked by a
+//!    built version, moving its category assignments (a built version's
+//!    proxies are swapped by hand, in the deck builder);
 //! 4. delete the proxies that are left unused;
 //! 5. move the rarity out of Cardmarket names (`Raigeki (V.4 - Ultra Rare)`
 //!    → name `Raigeki`, rarity `Ultra Rare`) for the cards without a rarity;

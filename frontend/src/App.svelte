@@ -75,6 +75,35 @@
         }
     }
 
+    /** The deck zone (not the reserve) of `zones` holding `card`, or null. */
+    const zoneOf = (zones, card) =>
+        card ? ['main', 'extra', 'side'].find((z) => zones[z].some((c) => c.id === card.id)) ?? null : null;
+
+    $: selectedZone = zoneOf(zones, selected);
+
+    // a proxy swapped for an owned copy (saved at once; the only way in a
+    // built version, whose proxies are never swapped automatically)
+    async function replaceProxy({ detail: proxy }) {
+        const zone = zoneOf(zones, proxy);
+
+        if (!zone) return;
+
+        try {
+            const { card, proxied_in } = await api.replaceProxy(proxy.id);
+
+            zones[zone] = sortCards(zones[zone].map((c) => (c.id === proxy.id ? card : c)));
+            zones.reserve = zones.reserve.filter((c) => c.id !== card.id);
+            selected = card;
+            categoriesVersion += 1;
+
+            if (proxied_in.length) {
+                alert(`Copy taken from ${proxied_in.join(', ')}: a proxy of it is there now.`);
+            }
+        } catch (e) {
+            alert(`Could not replace the proxy: ${e.message}`);
+        }
+    }
+
     async function move({ cardId, from, to }) {
         if (from === to || !zones[from]) return;
 
@@ -184,7 +213,14 @@
         </div>
 
         <div id="card-overview">
-            <CardOverview card={selected} {banListId} {api} {categoriesVersion} />
+            <CardOverview
+                card={selected}
+                {banListId}
+                {api}
+                {categoriesVersion}
+                canReplace={selectedZone !== null}
+                on:replaceProxy={replaceProxy}
+            />
         </div>
 
         <div id="actions-area">

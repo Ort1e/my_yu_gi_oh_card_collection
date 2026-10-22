@@ -3,6 +3,10 @@
 //! the other versions (they get a proxy instead), except the cards another
 //! built version already holds: first built, first served.
 //!
+//! A built version's proxies are never replaced automatically by owned
+//! copies (`store::cards::replace_proxies` skips it); the deck builder's
+//! "Use my copy" does it by hand.
+//!
 //! New in the Rust app (Django had no built decks).
 
 use std::collections::{HashMap, HashSet};

@@ -290,11 +290,19 @@ missing.
   served, those become proxies here. The answer carries a `build_report`
   the deck builder shows.
 - **Unbuilding** only clears the flag. The proxies made in other versions
-  stay; `clean-cards` puts the owned cards back (`replace_proxies`).
+  stay; `clean-cards` puts the owned cards back (`replace_proxies`), in
+  those versions and in the unbuilt one.
 - **Locked cards** (`store::cards::locked_elsewhere(version_id)`, a subquery)
   are skipped by the reserve, the YDKE import and `clean-cards`; saving zones
   with one is refused with a 400 naming the card and the built deck (only a
   stale page can send one). A copy of a built version gets proxies for them.
+- **A built version's proxies are swapped by hand only.** The automatic
+  swap (`replace_proxies`, after a new lot and in `clean-cards`) skips built
+  versions: the physical deck changes only when you decide. In the deck
+  builder, a selected proxy has a "Use my copy" button (`POST
+  /api/deck-versions/:id/proxies/:card_id/replace`, `decks/api/proxies.rs`):
+  it takes a `store::cards::free_copy` (a copy in no deck first), and if that
+  copy was in other versions, they get a proxy of it, as building does.
 - Each version can note its **deck box** and **sleeves** (free text).
 - `/decks/built` (`routes/decks/built.rs`): each built version, what it still
   misses (its proxies), and the shopping list of all of them.

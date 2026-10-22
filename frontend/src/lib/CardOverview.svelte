@@ -1,4 +1,5 @@
 <script>
+    import { createEventDispatcher } from 'svelte';
     import { banStatus, englishName, imageUrl } from '../deck.js';
 
     export let card;
@@ -6,6 +7,11 @@
     export let api;
     /** bumped by the parent when categories are added/removed */
     export let categoriesVersion = 0;
+
+    /** true for a proxy in a deck zone: it can be swapped for an owned copy */
+    export let canReplace = false;
+
+    const dispatch = createEventDispatcher();
 
     let categories = null;
     let error = null;
@@ -48,7 +54,17 @@
         <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
         <p>Ban Status: {banStatus(card, banListId) || 'Unlimited'}</p>
         <p>Rarity: {#if card.rarity}<a href="/rarities?rarity={encodeURIComponent(card.rarity)}" target="_blank" rel="noopener">{card.rarity}</a>{:else}—{/if}</p>
-        <p>Proxy: {card.is_proxy ? 'Yes' : 'No'}</p>
+        <p>
+            Proxy: {card.is_proxy ? 'Yes' : 'No'}
+            {#if card.is_proxy && canReplace}
+                <button
+                    type="button"
+                    class="replace-proxy"
+                    title="Put an owned copy of this card in place of the proxy"
+                    on:click={() => dispatch('replaceProxy', card)}>Use my copy</button
+                >
+            {/if}
+        </p>
         <div class="category-selector">
             <strong>Categories:</strong>
             {#if error}
@@ -131,6 +147,13 @@
 
     .category-selector input[type="checkbox"] {
         display: none;
+    }
+
+    .replace-proxy {
+        margin-left: 8px;
+        padding: 2px 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
     }
 
     /* The English name under a French one. */

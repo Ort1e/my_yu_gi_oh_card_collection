@@ -37,6 +37,8 @@ export function deckApi(id) {
         clone: (name) => request('POST', `${base}/clone`, { name }),
         addProxy: (name, zone) => request('POST', `${base}/proxies`, { name, zone }),
         deleteProxy: (cardId) => request('DELETE', `${base}/proxies/${cardId}`),
+        /** `{card, proxied_in}`: the owned copy now in place of the proxy */
+        replaceProxy: (cardId) => request('POST', `${base}/proxies/${cardId}/replace`),
         reserve: (filters) => request('POST', `${base}/reserve`, filters),
         categories: () => request('GET', `${base}/categories`),
         // `condition`: null for a plain category, else { description, if_any_of, then, otherwise }

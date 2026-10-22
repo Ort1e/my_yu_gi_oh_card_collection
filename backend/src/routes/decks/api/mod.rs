@@ -30,7 +30,7 @@ use crate::store::db::Money;
 use crate::web::error::AppResult;
 
 pub use categories::{add_category, assign_category, card_categories, categories, delete_category};
-pub use proxies::{add_proxy, delete_proxy};
+pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
 pub use simulation::monte_carlo;
 pub use tournament::save_tournament;

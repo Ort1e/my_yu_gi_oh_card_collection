@@ -180,6 +180,10 @@ pub fn write_router() -> Router<AppState> {
             delete(decks::api::delete_proxy),
         )
         .route(
+            "/api/deck-versions/:id/proxies/:card_id/replace",
+            post(decks::api::replace_proxy),
+        )
+        .route(
             "/api/deck-versions/:id/categories",
             post(decks::api::add_category),
         )

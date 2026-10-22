@@ -230,10 +230,40 @@ pub async fn delete_orphan_proxies(conn: &mut SqliteConnection) -> sqlx::Result<
     .rows_affected())
 }
 
-/// Replace proxies in deck zones by owned, unsold copies of the same card
-/// not already in that version nor locked by another built version, moving
-/// their category assignments. Returns the number of replacements. Run by
-/// `clean-cards` and after new cards are saved (`card_data::spawn_link_cards`).
+/// An owned copy free for `version_id` to take in place of a proxy of
+/// `card_data_id`: unsold, not already in that version, not locked by
+/// another built version. For a built version, copies used in no other deck
+/// come first (taking one from another deck leaves a proxy there).
+pub async fn free_copy(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+    card_data_id: i64,
+    is_built: bool,
+) -> sqlx::Result<Option<i64>> {
+    let order = if is_built {
+        format!("id IN ({IN_ANY_DECK}), id")
+    } else {
+        "id".to_owned()
+    };
+    sqlx::query_scalar(&format!(
+        "SELECT id FROM card
+         WHERE is_proxy = 0 AND card_data_id = ?2 AND NOT {SOLD_EXISTS}
+           AND id NOT IN ({IN_VERSION})
+           AND id NOT IN ({})
+         ORDER BY {order} LIMIT 1",
+        locked_elsewhere(version_id)
+    ))
+    .bind(version_id)
+    .bind(card_data_id)
+    .fetch_optional(&mut *conn)
+    .await
+}
+
+/// Replace proxies in the zones of **non-built** deck versions by a
+/// `free_copy` of the same card, moving their category assignments. Returns
+/// the number of replacements. Run by `clean-cards` and after new cards are
+/// saved (`card_data::spawn_link_cards`). A built version's proxies are
+/// swapped by hand only (`POST /api/deck-versions/:id/proxies/:card_id/replace`).
 pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize> {
     let mut replaced = 0;
 
@@ -241,7 +271,9 @@ pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize>
         let proxies: Vec<(i64, i64, i64)> = sqlx::query_as(&format!(
             "SELECT z.deck_version_id, z.card_id, card.card_data_id
              FROM {} z JOIN card ON card.id = z.card_id
+             JOIN deck_version ON deck_version.id = z.deck_version_id
              WHERE card.is_proxy = 1 AND card.card_data_id IS NOT NULL
+               AND deck_version.is_built = 0
              ORDER BY z.deck_version_id, z.card_id",
             zone.table()
         ))
@@ -249,20 +281,7 @@ pub async fn replace_proxies(conn: &mut SqliteConnection) -> sqlx::Result<usize>
         .await?;
 
         for (version_id, proxy_id, card_data_id) in proxies {
-            let in_version = version_card_ids(conn, version_id).await?;
-
-            let owned: Vec<i64> = sqlx::query_scalar(&format!(
-                "SELECT id FROM card
-                 WHERE is_proxy = 0 AND card_data_id = ? AND NOT {SOLD_EXISTS}
-                   AND id NOT IN ({})
-                 ORDER BY id",
-                locked_elsewhere(version_id)
-            ))
-            .bind(card_data_id)
-            .fetch_all(&mut *conn)
-            .await?;
-
-            let Some(replacement) = owned.into_iter().find(|id| !in_version.contains(id)) else {
+            let Some(replacement) = free_copy(conn, version_id, card_data_id, false).await? else {
                 continue;
             };
 

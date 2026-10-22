@@ -347,3 +347,122 @@ async fn the_built_page_lists_what_is_missing() {
     let (_, deck) = t.get("/decks/1").await;
     assert!(deck.contains("built-badge"), "{deck}");
 }
+
+async fn dm_proxy(t: &TestApp) -> i64 {
+    crate::store::cards::new_proxy(
+        &mut t.state.pool.acquire().await.unwrap(),
+        "Dark Magician",
+        Some(1),
+    )
+    .await
+    .unwrap()
+}
+
+async fn replace(t: &TestApp, version: i64, card: i64) -> (StatusCode, Value) {
+    t.json(
+        "POST",
+        &format!("/api/deck-versions/{version}/proxies/{card}/replace"),
+        json!(null),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn built_versions_keep_their_proxies_until_swapped_by_hand() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    let (built_proxy, other_proxy) = (dm_proxy(&t).await, dm_proxy(&t).await);
+    put(&t, v1, &[built_proxy]).await;
+    set_built(&t, v1, true).await;
+    let v2 = version(&t, "v2", &[other_proxy]).await;
+
+    // the automatic swap (new lot, clean-cards) skips the built version
+    let mut conn = t.state.pool.acquire().await.unwrap();
+    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 1);
+    drop(conn);
+    assert_eq!(main_deck(&t, v1).await[0], (built_proxy, true, Some(1)));
+    assert_eq!(main_deck(&t, v2).await[0], (cards[0], false, Some(1)));
+
+    // unbuilt, it is swapped like any other version (versions that are not
+    // built may share a copy)
+    set_built(&t, v1, false).await;
+    let mut conn = t.state.pool.acquire().await.unwrap();
+    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 1);
+    drop(conn);
+    assert_eq!(main_deck(&t, v1).await[0], (cards[0], false, Some(1)));
+}
+
+#[tokio::test]
+async fn replacing_a_proxy_by_hand_in_a_built_version() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    let (dm1, dm2) = (cards[0], cards[1]);
+    let (first, second) = (dm_proxy(&t).await, dm_proxy(&t).await);
+    put(&t, v1, &[first, second]).await;
+    set_built(&t, v1, true).await;
+    let v2 = version(&t, "v2", &[dm1]).await;
+    // a category of v1 on the first proxy
+    sqlx::query(
+        "INSERT INTO card_category (id, name, deck_version_id) VALUES (60, 'Boss', ?);
+         INSERT INTO card_category_assignment (category_id, card_id) VALUES (60, ?);",
+    )
+    .bind(v1)
+    .bind(first)
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+
+    // the loose copy first, with the proxy's category; the proxy is deleted
+    let (status, body) = replace(&t, v1, first).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["card"]["id"], dm2);
+    assert_eq!(body["proxied_in"], json!([]));
+    assert_eq!(
+        t.scalar("SELECT card_id FROM card_category_assignment WHERE category_id = 60")
+            .await,
+        dm2
+    );
+    assert_eq!(
+        t.scalar(&format!("SELECT count(*) FROM card WHERE id = {first}"))
+            .await,
+        0
+    );
+
+    // then the copy of v2 (not built), which gets a proxy instead
+    let (status, body) = replace(&t, v1, second).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["card"]["id"], dm1);
+    assert_eq!(body["proxied_in"], json!(["Test - v2"]));
+    assert_eq!(
+        main_deck(&t, v1).await,
+        vec![(dm2, false, Some(1)), (dm1, false, Some(1))]
+    );
+    let (proxy, is_proxy, data) = main_deck(&t, v2).await[0];
+    assert!(is_proxy && data == Some(1) && proxy != dm1);
+}
+
+#[tokio::test]
+async fn replacing_a_proxy_by_hand_needs_a_free_copy() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    put(&t, v1, &[cards[0], cards[1]]).await;
+    set_built(&t, v1, true).await;
+    let proxy = dm_proxy(&t).await;
+    let v2 = version(&t, "v2", &[proxy, cards[2]]).await;
+
+    // both copies are locked by v1
+    let (status, body) = replace(&t, v2, proxy).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body["error"],
+        "No free copy of Dark Magician in your collection."
+    );
+
+    // not a proxy, or not in this version
+    let (status, _) = replace(&t, v1, cards[0]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = replace(&t, v1, proxy).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = replace(&t, 999, proxy).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
