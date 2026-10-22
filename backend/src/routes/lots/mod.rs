@@ -125,7 +125,6 @@ impl UniteRow {
             self.code.as_deref(),
         )
     }
-
 }
 
 /// The copies of a lot that look the same (same name, code, rarity,
