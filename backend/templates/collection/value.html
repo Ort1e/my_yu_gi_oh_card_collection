@@ -67,9 +67,9 @@
   <p>No price of an owned card moved by 0.50 € or more.</p>
   {% else %}
   <div class="table-scroll">
-  <table class="numbers">
+  <table class="numbers sortable">
     <thead>
-      <tr><th>Card</th><th>Before (€)</th><th>Now (€)</th><th>Change (€)</th><th>Change</th></tr>
+      <tr><th data-sort="text">Card</th><th data-sort="number">Before (€)</th><th data-sort="number">Now (€)</th><th data-sort="number">Change (€)</th><th data-sort="number">Change %</th></tr>
     </thead>
     <tbody>
       {% for line in period.lines %}
@@ -114,9 +114,9 @@
   <h2>By deck</h2>
   <p class="value-note">Each deck's latest version. Proxies: what the missing cards would cost.</p>
   <div class="table-scroll">
-  <table class="numbers">
+  <table class="numbers sortable">
     <thead>
-      <tr><th>Deck</th><th class="phone-hide">Cards</th><th>Value (€)</th><th class="phone-hide">Proxies</th><th>Proxies (€)</th></tr>
+      <tr><th data-sort="text">Deck</th><th class="phone-hide" data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th class="phone-hide" data-sort="number">Proxies</th><th data-sort="number">Proxies (€)</th></tr>
     </thead>
     <tbody>
       {% for deck in decks %}
@@ -139,6 +139,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% if last_refresh.is_some() %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script id="value-chart-data" type="application/json">{{ chart|safe }}</script>

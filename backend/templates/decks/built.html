@@ -45,11 +45,11 @@
   <p>Nothing to buy: every built deck is complete.</p>
   {% else %}
   <div class="table-scroll">
-  <table class="numbers">
-    <thead><tr><th>Card</th><th>Count</th><th>For</th></tr></thead>
+  <table class="numbers sortable">
+    <thead><tr><th data-sort="text">Card</th><th data-sort="number">Count</th><th class="text" data-sort="text">For</th></tr></thead>
     <tbody>
       {% for line in shopping %}
-      <tr><td>{{ line.name }}</td><td>{{ line.count }}</td><td class="decks-cell">{{ line.decks }}</td></tr>
+      <tr><td>{{ line.name }}</td><td>{{ line.count }}</td><td class="text">{{ line.decks }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -57,4 +57,8 @@
   {% endif %}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% endblock %}

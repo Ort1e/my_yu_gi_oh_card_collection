@@ -57,16 +57,17 @@
   {% endif %}
 
   <h2>Budgets</h2>
+  <div class="table-scroll">
   <table class="numbers">
     <thead>
-      <tr><th>Month</th><th>Amount (€)</th><th>Apports</th></tr>
+      <tr><th>Month</th><th>Amount (€)</th><th class="text">Apports</th></tr>
     </thead>
     <tbody>
       {% for budget in budgets %}
       <tr>
         <td>{{ budget.month_label() }}</td>
         <td>{{ budget.amount }}</td>
-        <td class="apports">
+        <td class="text apports">
           {% for apport in self.apports_of(budget.id) %}
           <div>
             {{ apport.date }}: {{ apport.amount }} € {{ apport.description }}
@@ -82,5 +83,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

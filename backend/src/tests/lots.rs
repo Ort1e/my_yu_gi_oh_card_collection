@@ -59,10 +59,13 @@ async fn create_lot_with_new_seller_and_cards() {
 
     let (status, page) = t.get(&location).await;
     assert_eq!(status, StatusCode::OK);
+    // the two Magicien Sombre copies on one row, the total counting both
+    assert!(page.contains("Magicien Sombre"), "{page}");
     assert!(
-        page.contains("Magicien Sombre") && page.contains("4.50 €"),
-        "{page}"
+        page.contains("<td>2</td>\n      <td>2.25</td>"),
+        "same copies grouped: {page}"
     );
+    assert!(page.contains("<td>4.50</td>"), "{page}");
 }
 
 #[tokio::test]

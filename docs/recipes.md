@@ -185,6 +185,14 @@ Example: a `/tournaments` list.
 2. **Template**: `backend/templates/tournaments/list.html`, extending
    `base.html` (or `list_base.html` for a paginated list). Every field of
    the struct is a variable; `{% for t in tournaments %}…{% endfor %}`.
+   A table of data follows the shared convention (`static/css/style.css`,
+   "Data tables"): `<div class="table-scroll"><table class="numbers">`, on
+   the page background, amounts as plain numbers with the unit in the
+   heading ("Price (€)"), `class="text"` on text columns after the first.
+   To sort it by its headings: `class="sortable"` plus `data-sort="text"` /
+   `"number"` on the `<th>`s and `static/js/tables.js` in `extra_js` (which
+   also gives a search field: `<input type="search" data-filter-table="id">`,
+   see `lots/detail.html`).
 
 3. **Route**: in `routes/mod.rs`, `mod tournaments;` and in `router()`:
    `.route("/tournaments", get(tournaments::list))`.

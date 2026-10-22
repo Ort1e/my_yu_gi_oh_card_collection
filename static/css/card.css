@@ -57,6 +57,11 @@
     background-color: var(--hover-bg);
 }
 
+/* A card box as wide as the page (the summary of a lot above its table). */
+.card.wide-card {
+    max-width: none;
+}
+
 .card.with-image {
     display: flex;
     align-items: center;
@@ -144,12 +149,6 @@ a.rarity-badge:hover {
     margin: 0.25rem 0 0;
     padding-left: 1.25rem;
     columns: 2 16rem;
-}
-
-/* The decks column of the shopping list: text, wrapped. */
-.numbers td.decks-cell {
-    text-align: left;
-    white-space: normal;
 }
 
 /* The English name under a French one (cards, lots). */
