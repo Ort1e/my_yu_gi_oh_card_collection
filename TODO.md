@@ -1,9 +1,5 @@
 # TODO
 
-- [ ] Import the 7 old tournaments into the live DB (after merging
-      `tournaments`, server stopped): `cargo run -p backend --
-      import-tournament-notes data/tournaments_from_notes.json`, check the
-      pages, commit the data submodule, delete the JSON file.
 - [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
       links once "Tournaments" is added, all at the same level. Group them
       (e.g. Collection: Cards, Lots, Sellers, Value, Rarities; Decks:
@@ -39,8 +35,8 @@
       line on card pages, dashboard tile.
 - [x] Tournaments (2026-10-22): rounds and games (draws, unfinished),
       deck labels, `/tournaments` with the stats (by version, label,
-      matchup, die, first/second), the old notes transcribed for a one-off
-      import.
+      matchup, die, first/second); the 7 old tournaments imported from
+      their notes.
 - [x] Tables (2026-10-22): one convention for every data table, sorting
       and search (`static/js/tables.js`); the lot page groups the same
       copies.
