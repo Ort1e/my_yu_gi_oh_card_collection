@@ -15,7 +15,13 @@
       deck version, per label (matchups: "against K9", "with Orcust"), die
       and first/second). The 7
       existing tournaments' notes to move over (by hand or a one-off
-      parse). Spec first (marking the owner's logic: stats, notes parsing), then the rest (Claude).
+      parse). **Spec: `docs/specs/tournaments.md`** (2026-10-22): rounds and
+      games, labels, `/tournaments` with the stats, old notes moved by hand.
+      The owner writes `domain::tournament::stats`, Claude the rest.
+- [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
+      links once "Tournaments" is added, all at the same level. Group them
+      (e.g. Collection: Cards, Lots, Sellers, Value, Rarities; Decks:
+      Decks, Built, Tournaments; Budget; Advent), with a menu on phones.
 ## Done
 
 - [x] Clean up the interface artifacts.
