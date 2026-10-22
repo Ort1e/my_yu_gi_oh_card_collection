@@ -16,7 +16,8 @@
       and first/second). The 7
       existing tournaments' notes to move over (by hand or a one-off
       parse). **Spec: `docs/specs/tournaments.md`** (2026-10-22): rounds and
-      games, labels, `/tournaments` with the stats, old notes moved by hand.
+      games (draws possible, so more than 3), labels, `/tournaments` with the
+      stats, old notes transcribed by Claude and loaded by a one-off command.
       The owner writes `domain::tournament::stats`, Claude the rest.
 - [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
       links once "Tournaments" is added, all at the same level. Group them

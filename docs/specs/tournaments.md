@@ -17,16 +17,20 @@ and compute stats from it.
   matchups, die, first/second). Claude leaves the types, the stubs, their doc
   comments and their unit tests;
 - **Claude**: everything else: the migration, the label writes, the forms and
-  their validation, the pages, the deck builder panel, moving the old notes,
+  their validation, the pages, the deck builder panel, moving the old notes
+  (section 6: transcribed by Claude, loaded by a one-off command),
   docs, handler tests.
 
 ## Decisions
 
-- **Rounds, then games.** A tournament has numbered rounds; a round has 0 to
-  3 games. The round result is chosen, not derived from the games: a double
+- **Rounds, then games.** A tournament has numbered rounds; a round has any
+  number of games (usually up to 3, more when a game is a draw). The round result is chosen, not derived from the games: a double
   loss or a forfeit can't be read from them.
 - **Round results**: `win`, `loss`, `double_loss` (time ran out unfinished:
   both players lose; there are no draws), `bye`, `forfeit_win`.
+- **Game results**: `won`, `lost`, `draw` (a drawn game is replayed, so a
+  round can have more than 3 games). Rounds have no draws (time out = double
+  loss), games do.
 - **Die**: won or lost, per round (NULL for a bye). **First/second** per game.
 - **Labels** (archetype/engine names) tag decks: an opponent's deck has
   several (`Mitsurugi` + `K9` for "mitsu/K9"), and so does each of your own
@@ -34,10 +38,11 @@ and compute stats from it.
   label per strategy whatever the spelling: the forms suggest the existing
   labels and create new ones on the way; a labels page renames and merges.
 - **Team events**: a flag on the tournament, and a team result per round.
-- **The old notes are moved by hand** (7 tournaments): the two writing
-  styles make a parser fragile for so few. The edit page shows the old notes
-  next to the form while you fill it; `tournament.notes` is kept (shown as
-  "Old notes" on the detail page while not empty).
+- **The old notes are moved by Claude, not by hand** (7 tournaments, section
+  6): the two writing styles make a parser fragile for so few, so Claude
+  transcribes them once into a data file loaded by a one-off command, and
+  the owner checks the result on the pages. `tournament.notes` is kept
+  (shown as "Old notes" on the detail page while not empty).
 - **Reads are public** like the decks; writes in `write_router()`.
 
 ## 1. Migration `0011_tournament_results.sql`
@@ -84,8 +89,8 @@ CREATE TABLE tournament_round_label (
 CREATE TABLE tournament_game (
     id         INTEGER PRIMARY KEY,
     round_id   INTEGER NOT NULL REFERENCES tournament_round(id) ON DELETE CASCADE,
-    number     INTEGER NOT NULL CHECK (number BETWEEN 1 AND 3),
-    won        INTEGER NOT NULL CHECK (won IN (0, 1)),
+    number     INTEGER NOT NULL CHECK (number >= 1),
+    result     TEXT NOT NULL CHECK (result IN ('won', 'lost', 'draw')),
     went_first INTEGER CHECK (went_first IN (0, 1)),   -- NULL: not noted
     comment    TEXT,
     UNIQUE (round_id, number)
@@ -101,8 +106,9 @@ with them, like book authors.
 
 - a bye has no opponent, no die, no games, no labels;
 - every other round has an opponent deck (text) or at least one label;
-- games are numbered 1..n in order, at most 3; a `win` needs more games won
-  than lost when games are noted (warn, don't refuse: a game can be scooped);
+- games are numbered 1..n in order, no maximum (draws add games); a `win`
+  needs more games won than lost when games are noted (warn, don't refuse:
+  a game can be scooped);
 - `placement <= players` when both are set; `team_result` only when `is_team`.
 
 ## 3. Stats (`domain/src/tournament.rs`, **the owner's**)
@@ -113,7 +119,8 @@ Types (Claude writes them):
 pub enum RoundResult { Win, Loss, DoubleLoss, Bye, ForfeitWin }
 pub enum Die { Won, Lost }
 
-pub struct Game { pub won: bool, pub went_first: Option<bool> }
+pub enum GameResult { Won, Lost, Draw }
+pub struct Game { pub result: GameResult, pub went_first: Option<bool> }
 
 /// One round, with what the stats group by.
 pub struct RoundRecord {
@@ -125,9 +132,10 @@ pub struct RoundRecord {
     pub games: Vec<Game>,
 }
 
-/// Wins and losses of rounds or games; `rate()` = wins / (wins + losses),
-/// `None` when there are none.
-pub struct Record { pub wins: u32, pub losses: u32 }
+/// Wins, losses and draws of rounds or games (rounds never draw);
+/// `rate()` = wins / (wins + losses), draws left out, `None` when there are
+/// no wins nor losses.
+pub struct Record { pub wins: u32, pub losses: u32, pub draws: u32 }
 
 pub struct Stats {
     pub rounds: Record,
@@ -149,13 +157,14 @@ The rules the tests pin down:
 - **rounds**: `Win` and `ForfeitWin` are wins, `Loss` and `DoubleLoss` are
   losses, a `Bye` is neither (counted in `byes`);
 - **games**: every noted game counts, whatever the round result (a forfeit
-  win has none);
+  win has none); a drawn game is in `draws`, out of the rate;
 - a round with two opponent labels counts once in **each** label's matchup
   (same for own labels);
 - groupings sorted by number of rounds, most played first, then by name/id.
 
-Tests (Claude writes them with the stub): the five rules above, an empty
-input, a bye-only tournament, the die and first/second splits.
+Tests (Claude writes them with the stub): the rules above, an empty input,
+a bye-only tournament, a round with a drawn game (4 games), the die and
+first/second splits.
 
 ## 4. Pages (Claude, `routes/tournaments/`, `templates/tournaments/`)
 
@@ -200,8 +209,24 @@ input, a bye-only tournament, the die and first/second splits.
   while not empty;
 - the deck builder's version `GET` carries the summary.
 
-## 6. Moving the 7 tournaments
+## 6. Moving the 7 tournaments (Claude)
 
-By hand on each edit page, once it exists, with the old notes beside the
-form. When all 7 are done, an "Old notes" leftover can be cleared from the
-edit page (a "Clear the old notes" checkbox), never automatically.
+1. Claude reads the 7 notes and transcribes each into
+   `data/tournaments_from_notes.json` (the **private** data submodule, never
+   the main repo: the notes are personal): placement, players, conclusion,
+   and per round the opponent deck as written, its labels, die, result,
+   comment, and per game result, first/second and comment (the notes'
+   wording kept). Where a note is unclear (a missing die, a game order),
+   Claude leaves the field empty and lists it for the owner.
+2. A one-off command `cargo run -p backend -- import-tournament-notes
+   <file>` (`commands/`) loads it in one write transaction: labels created
+   on the way, own deck labels set, and it refuses a tournament that already
+   has rounds (safe to run twice). `--dry-run` prints counts only.
+3. Run on a scratch copy of `data/app.db` first, the owner checks the 7
+   detail pages, then on the live DB (server stopped), committed in the
+   data submodule. The JSON file is deleted afterwards (the DB holds it).
+4. `tournament.notes` stays until the owner clears it from the edit page (a
+   "Clear the old notes" checkbox), never automatically.
+
+Test: the command on a synthetic JSON (2 tournaments, a bye, a drawn game,
+a new and an existing label), and the refusal on a second run.
