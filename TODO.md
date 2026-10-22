@@ -1,32 +1,14 @@
 # TODO
 
-- [ ] Structured tournament results instead of the free `tournament.notes`
-      (the notes are already written the same way each time). Per
-      tournament: rounds, each with the opponent's deck, die won/lost, the
-      result (win / loss / double loss — no draws: when the round's time
-      runs out unfinished, both players lose — bye, win by forfeit) and
-      its games (won/lost, went first/second, a comment line); then the
-      placement ("7th of 11"), the conclusion (stays free text), and for
-      team events the team's result per round. Opposing decks tagged with
-      archetype/engine labels, several per deck (`Mitsurugi` + `K9` for
-      "mitsu/K9"), one label per strategy whatever the spelling ("mitsu",
-      "mitsurugi"), chosen from the existing ones (new ones added on the
-      way); own decks tagged the same way. Stats to follow (win rate per
-      deck version, per label (matchups: "against K9", "with Orcust"), die
-      and first/second). The 7
-      existing tournaments' notes to move over (by hand or a one-off
-      parse). **Spec: `docs/specs/tournaments.md`** (2026-10-22): rounds and
-      games (draws possible, so more than 3), labels, `/tournaments` with the
-      stats, old notes transcribed by Claude and loaded by a one-off command.
-      The owner writes `domain::tournament::stats`, Claude the rest.
-      **2026-10-22: done on branch `tournaments`** except the owner's
-      `stats` and `Record::rate` (stubs + 7 tests in `domain/src/tournament.rs`);
-      the 7 tournaments transcribed in `data/tournaments_from_notes.json`
-      (untracked), imported with `import-tournament-notes` after the merge.
+- [ ] Import the 7 old tournaments into the live DB (after merging
+      `tournaments`, server stopped): `cargo run -p backend --
+      import-tournament-notes data/tournaments_from_notes.json`, check the
+      pages, commit the data submodule, delete the JSON file.
 - [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
       links once "Tournaments" is added, all at the same level. Group them
       (e.g. Collection: Cards, Lots, Sellers, Value, Rarities; Decks:
       Decks, Built, Tournaments; Budget; Advent), with a menu on phones.
+
 ## Done
 
 - [x] Clean up the interface artifacts.
@@ -55,6 +37,13 @@
       (`card_price`), `/collection/value` (value, gain from the lot prices,
       copies with a unit price compared one by one, moves, by deck), price
       line on card pages, dashboard tile.
+- [x] Tournaments (2026-10-22): rounds and games (draws, unfinished),
+      deck labels, `/tournaments` with the stats (by version, label,
+      matchup, die, first/second), the old notes transcribed for a one-off
+      import.
+- [x] Tables (2026-10-22): one convention for every data table, sorting
+      and search (`static/js/tables.js`); the lot page groups the same
+      copies.
 - [x] Built decks (2026-10-20): a built version locks its cards (proxies
       in the other decks), deck box and sleeves, `/decks/built` with the
       shopping list. 2026-10-22: `plan_build` written; a built deck's

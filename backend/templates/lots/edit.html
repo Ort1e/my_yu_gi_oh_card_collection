@@ -48,7 +48,9 @@
   {% if !unites.is_empty() %}
   <fieldset>
     <legend>Card prices</legend>
-    <table>
+    <div class="table-scroll">
+    <table class="numbers">
+      <thead><tr><th>Card</th><th>Price (€)</th></tr></thead>
       <tbody>
         {% for unite in unites %}
         <tr>
@@ -60,6 +62,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </fieldset>
   {% endif %}
 

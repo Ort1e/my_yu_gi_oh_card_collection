@@ -1,10 +1,12 @@
 //! Tournament results: rounds, games, deck labels, and the stats computed
-//! from them (`docs/specs/tournaments.md`).
+//! from them (docs/tour.md, "Tournaments").
 //!
 //! New in the Rust app: Django only had a free `notes` text per tournament.
 //!
-//! Who wrote what: the enums, `split_labels` and `ordinal` are Claude's;
-//! [`stats`] and [`Record::rate`] (the counting rules) are the owner's.
+//! Everything here was written by Claude (the owner asked for [`stats`] too,
+//! 2026-10-22).
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -155,7 +157,7 @@ pub fn ordinal(n: i64) -> String {
     format!("{n}{suffix}")
 }
 
-// ---------- stats (the owner's) ----------
+// ---------- stats ----------
 
 /// One game, as the stats see it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,8 +194,39 @@ impl Record {
     /// The win rate: `wins / (wins + losses)`, draws left out. `None` when
     /// there are no wins nor losses.
     pub fn rate(&self) -> Option<f64> {
-        todo!("owner: the win rate")
+        let decided = self.wins + self.losses;
+        (decided > 0).then(|| f64::from(self.wins) / f64::from(decided))
     }
+
+    /// Everything counted, draws included: what the groupings sort by.
+    fn played(&self) -> u32 {
+        self.wins + self.losses + self.draws
+    }
+
+    /// Count a round (a bye counts nowhere: see [`stats`]).
+    fn add_round(&mut self, result: RoundResult) {
+        match result {
+            RoundResult::Win | RoundResult::ForfeitWin => self.wins += 1,
+            RoundResult::Loss | RoundResult::DoubleLoss => self.losses += 1,
+            RoundResult::Bye => {}
+        }
+    }
+
+    fn add_game(&mut self, result: GameResult) {
+        match result {
+            GameResult::Won => self.wins += 1,
+            GameResult::Lost => self.losses += 1,
+            GameResult::Draw | GameResult::Unfinished => self.draws += 1,
+        }
+    }
+}
+
+/// The records of a grouping, most played first. A `BTreeMap` already
+/// iterates by key, and `sort_by` is stable: ties keep that order.
+fn most_played<K: Ord>(groups: BTreeMap<K, Record>) -> Vec<(K, Record)> {
+    let mut lines: Vec<(K, Record)> = groups.into_iter().collect();
+    lines.sort_by(|a, b| b.1.played().cmp(&a.1.played()));
+    lines
 }
 
 /// Everything the `/tournaments` page shows.
@@ -223,8 +256,57 @@ pub struct Stats {
 /// The groupings (`per_version`, `per_own_label`, `matchups`) are sorted by
 /// number of rounds counted, most first, then by id / name.
 pub fn stats(rounds: &[RoundRecord]) -> Stats {
-    let _ = rounds;
-    todo!("owner: the tournament stats")
+    let mut stats = Stats::default();
+    let mut per_version: BTreeMap<i64, Record> = BTreeMap::new();
+    let mut per_own_label: BTreeMap<String, Record> = BTreeMap::new();
+    let mut matchups: BTreeMap<String, Record> = BTreeMap::new();
+
+    for round in rounds {
+        // a bye has no opponent, die nor games: it only counts as a bye
+        if round.result == RoundResult::Bye {
+            stats.byes += 1;
+            continue;
+        }
+
+        stats.rounds.add_round(round.result);
+        if let Some(version) = round.version_id {
+            per_version
+                .entry(version)
+                .or_default()
+                .add_round(round.result);
+        }
+        for label in &round.own_labels {
+            per_own_label
+                .entry(label.clone())
+                .or_default()
+                .add_round(round.result);
+        }
+        for label in &round.opponent_labels {
+            matchups
+                .entry(label.clone())
+                .or_default()
+                .add_round(round.result);
+        }
+        match round.die {
+            Some(Die::Won) => stats.die_won.add_round(round.result),
+            Some(Die::Lost) => stats.die_lost.add_round(round.result),
+            None => {}
+        }
+
+        for game in &round.games {
+            stats.games.add_game(game.result);
+            match game.went_first {
+                Some(true) => stats.going_first.add_game(game.result),
+                Some(false) => stats.going_second.add_game(game.result),
+                None => {}
+            }
+        }
+    }
+
+    stats.per_version = most_played(per_version);
+    stats.per_own_label = most_played(per_own_label);
+    stats.matchups = most_played(matchups);
+    stats
 }
 
 #[cfg(test)]

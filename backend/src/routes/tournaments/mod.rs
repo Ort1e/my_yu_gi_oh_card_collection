@@ -1,7 +1,7 @@
 //! `/tournaments`: every tournament with its record, and the stats
 //! (`domain::tournament::stats`); `/tournaments/:id`: one tournament round
 //! by round. The forms are in `form.rs`, the labels page in `labels.rs`
-//! (`docs/specs/tournaments.md`).
+//! (docs/tour.md, "Tournaments").
 
 mod data;
 pub mod form;
@@ -103,6 +103,8 @@ pub struct ListRow {
     is_team: bool,
     record: String,
     placement: String,
+    /// To sort by placement: the place, empty when not noted.
+    placement_rank: String,
 }
 
 pub struct StatLine {
@@ -243,6 +245,7 @@ pub async fn list(
             is_team: t.is_team,
             record: tournament_record(&stats(&loaded.records_of(t))),
             placement: placement_text(t),
+            placement_rank: t.placement.map(|p| p.to_string()).unwrap_or_default(),
         })
         .collect();
 

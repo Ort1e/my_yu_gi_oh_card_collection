@@ -429,6 +429,13 @@ legend {
 /* Phones                                                               */
 /* ------------------------------------------------------------------ */
 
+/* A field in a data table (the card prices of a lot's edit page): a price's width. */
+.numbers td input {
+    width: 8rem;
+    margin-left: auto;          /* fields are blocks: on the right like the numbers */
+    text-align: right;
+}
+
 @media (max-width: 760px) {
     :where(form) {
         padding: 1rem;

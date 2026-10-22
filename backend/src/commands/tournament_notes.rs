@@ -1,6 +1,6 @@
 //! `import-tournament-notes <file.json> [--dry-run]`: one-off load of the
 //! tournaments' old free-text notes, transcribed by hand into a JSON file
-//! (`docs/specs/tournaments.md`, section 6). The file lives in the private
+//! (docs/tour.md, "Tournaments"). The file lives in the private
 //! data submodule and is deleted once imported: the notes are personal.
 //!
 //! Each entry names an existing tournament by id and gives its results and

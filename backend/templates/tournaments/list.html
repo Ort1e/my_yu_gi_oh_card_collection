@@ -41,17 +41,17 @@
   <p>No tournament {% if filtered %}for this filter{% else %}yet{% endif %}.</p>
   {% else %}
   <div class="table-scroll">
-  <table class="numbers tournament-list">
-    <thead><tr><th>Date</th><th>Tournament</th><th>Location</th><th>Deck played</th><th>Rounds</th><th>Placement</th></tr></thead>
+  <table class="numbers sortable">
+    <thead><tr><th data-sort="text">Date</th><th class="text" data-sort="text">Tournament</th><th class="text phone-hide" data-sort="text">Location</th><th class="text" data-sort="text">Deck played</th><th>Rounds</th><th data-sort="number">Placement</th></tr></thead>
     <tbody>
       {% for row in rows %}
       <tr>
         <td>{{ row.date }}</td>
-        <td><a href="/tournaments/{{ row.id }}">{{ row.name }}</a>{% if row.is_team %} <span class="badge">Team</span>{% endif %}</td>
-        <td>{{ row.location }}</td>
-        <td>{% match row.version_id %}{% when Some with (v) %}<a href="/deck-builder/{{ v }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
+        <td class="text"><a href="/tournaments/{{ row.id }}">{{ row.name }}</a>{% if row.is_team %} <span class="badge">Team</span>{% endif %}</td>
+        <td class="text phone-hide">{{ row.location }}</td>
+        <td class="text">{% match row.version_id %}{% when Some with (v) %}<a href="/deck-builder/{{ v }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
         <td>{{ row.record }}</td>
-        <td>{{ row.placement }}</td>
+        <td data-sort-value="{{ row.placement_rank }}">{{ row.placement }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -66,8 +66,8 @@
     {% if !section.lines.is_empty() %}
     <section class="stats-section">
       <h3>{{ section.title }}</h3>
-      <table class="numbers">
-        <thead><tr><th>{{ section.what }}</th><th>{{ section.counted }}</th><th>W-L</th><th>Win rate</th></tr></thead>
+      <table class="numbers sortable">
+        <thead><tr><th data-sort="text">{{ section.what }}</th><th data-sort="number">{{ section.counted }}</th><th>W-L</th><th data-sort="number">Win rate</th></tr></thead>
         <tbody>
           {% for line in section.lines %}
           <tr>
@@ -85,4 +85,8 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% endblock %}

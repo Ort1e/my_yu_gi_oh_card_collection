@@ -1,7 +1,7 @@
 //! Tournament writes, shared by the tournament forms and the one-off
 //! `import-tournament-notes` command: a tournament with its rounds, games
 //! and labels (created on the way), and the deck labels. Labels left without
-//! any use are deleted (`docs/specs/tournaments.md`).
+//! any use are deleted (docs/tour.md, "Tournaments").
 
 use chrono::NaiveDate;
 use domain::tournament::{Die, GameResult, RoundResult};

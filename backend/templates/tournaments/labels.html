@@ -21,20 +21,20 @@
   {% else %}
   <div class="table-scroll">
   <table class="numbers labels-table">
-    <thead><tr><th>Label</th><th>Your decks</th><th>Rounds</th><th>Rename</th><th>Merge into</th></tr></thead>
+    <thead><tr><th>Label</th><th>Your decks</th><th>Rounds</th><th class="text">Rename</th><th class="text">Merge into</th></tr></thead>
     <tbody>
       {% for label in labels %}
       <tr>
         <td>{{ label.name }}</td>
         <td>{{ label.decks }}</td>
         <td>{{ label.rounds }}</td>
-        <td>
+        <td class="text">
           <form method="post" action="/tournaments/labels/{{ label.id }}/rename" class="inline">
             <input type="text" name="name" value="{{ label.name }}" aria-label="New name of {{ label.name }}" required>
             <button type="submit" class="btn-small">Rename</button>
           </form>
         </td>
-        <td>
+        <td class="text">
           <form method="post" action="/tournaments/labels/{{ label.id }}/merge" class="inline">
             <select name="into" aria-label="Merge {{ label.name }} into">
               <option value="">—</option>

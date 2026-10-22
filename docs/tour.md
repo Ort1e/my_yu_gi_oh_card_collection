@@ -334,7 +334,7 @@ a version (`clone`) doesn't take it.
   rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
   blank rows skipped, numbered in order. The edit page shows the old free
   `notes` beside the form until "Clear the old notes".
-- **Stats** (`domain::tournament::stats`, the owner's): rounds (forfeit = win,
+- **Stats** (`domain::tournament::stats`): rounds (forfeit = win,
   double loss = loss, byes apart), games (draws and unfinished out of the
   rate), by version, by your deck's labels, matchups, die, first/second.
   `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.

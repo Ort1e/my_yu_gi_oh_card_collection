@@ -10,11 +10,6 @@
     vertical-align: middle;
 }
 
-.hint {
-    font-size: 0.9em;
-    opacity: 0.8;
-}
-
 .multiline {
     white-space: pre-line;
 }
@@ -202,12 +197,6 @@ form.is-team .team-only {
 }
 
 /* ---------- fixes over the shared styles ---------- */
-
-/* the list's text columns (name, location, deck) read left to right */
-.tournament-list td:nth-child(-n + 4) {
-    text-align: left;
-    white-space: normal;
-}
 
 /* a game's number and its ✕ keep their natural size in the row */
 .field-row > .game-number,
