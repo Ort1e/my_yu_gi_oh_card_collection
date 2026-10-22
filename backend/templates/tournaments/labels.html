@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Deck labels{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <h1>Deck labels</h1>
+  <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
+  <p>The archetype and engine names of your decks (on each deck's edit page) and of your opponents' (on each round).
+    One label per strategy: rename a label, or merge a second spelling into the one to keep.
+    A label nothing uses any more is deleted.</p>
+
+  {% include "partials/form_errors.html" %}
+
+  {% if labels.is_empty() %}
+  <p>No label yet: they are created as you type them in a round or on a deck.</p>
+  {% else %}
+  <div class="table-scroll">
+  <table class="numbers labels-table">
+    <thead><tr><th>Label</th><th>Your decks</th><th>Rounds</th><th>Rename</th><th>Merge into</th></tr></thead>
+    <tbody>
+      {% for label in labels %}
+      <tr>
+        <td>{{ label.name }}</td>
+        <td>{{ label.decks }}</td>
+        <td>{{ label.rounds }}</td>
+        <td>
+          <form method="post" action="/tournaments/labels/{{ label.id }}/rename" class="inline">
+            <input type="text" name="name" value="{{ label.name }}" aria-label="New name of {{ label.name }}" required>
+            <button type="submit" class="btn-small">Rename</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/tournaments/labels/{{ label.id }}/merge" class="inline">
+            <select name="into" aria-label="Merge {{ label.name }} into">
+              <option value="">—</option>
+              {% for other in labels %}{% if other.id != label.id %}<option value="{{ other.id }}">{{ other.name }}</option>{% endif %}{% endfor %}
+            </select>
+            <button type="submit" class="btn-small btn-secondary">Merge</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

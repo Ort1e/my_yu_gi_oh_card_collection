@@ -18,11 +18,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::QueryBuilder;
 
 use super::tournament::Tournament;
-use super::{load_cards, push_ids, ApiCard, Created};
+use super::{load_cards, ApiCard, Created};
 use crate::routes::cards::card_types;
 use crate::store::cards::{
     delete_orphan_proxies, locked_elsewhere, proxy_copy, swap_card, Zone, IN_VERSION,
 };
+use crate::store::db::push_ids;
 use crate::store::db::{begin_write, exists, row_exists, Pool};
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
@@ -130,12 +131,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let (deck_id, tournament_id) = (head.deck_id, head.tournament_id);
 
     let tournament = match tournament_id {
-        Some(t) => {
-            sqlx::query_as("SELECT name, date, location, notes FROM tournament WHERE id = ?")
-                .bind(t)
-                .fetch_optional(&mut *conn)
-                .await?
-        }
+        Some(t) => super::tournament::load(&mut conn, t).await?,
         None => None,
     };
 
@@ -552,8 +548,8 @@ pub async fn clone_version(
     let mut tx = begin_write(&state.pool).await?;
     exists(&mut tx, "deck_version", id).await?;
     let new_id: i64 = sqlx::query(
-        "INSERT INTO deck_version (deck_id, version_name, tournament_id, ban_list_id)
-         SELECT deck_id, ?, tournament_id, ban_list_id FROM deck_version WHERE id = ?
+        "INSERT INTO deck_version (deck_id, version_name, ban_list_id)
+         SELECT deck_id, ?, ban_list_id FROM deck_version WHERE id = ?
         ",
     )
     .bind(name)

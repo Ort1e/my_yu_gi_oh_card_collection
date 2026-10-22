@@ -68,3 +68,10 @@ export function ydkeUrl(zones, keep = () => true) {
 
     return `ydke://${part(zones.main)}!${part(zones.extra)}!${part(zones.side)}!`;
 }
+
+/** "1st", "2nd", "3rd", "4th", "11th", "21st"… (domain::tournament::ordinal). */
+export function ordinal(n) {
+    const suffix = [11, 12, 13].includes(n % 100) ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
+
+    return `${n}${suffix}`;
+}

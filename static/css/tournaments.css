@@ -1,0 +1,245 @@
+/* Tournaments: list and stats, detail, form (templates/tournaments/). */
+
+.badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background-color: var(--secondary);
+    color: var(--text-light);
+    font-size: 0.8em;
+    vertical-align: middle;
+}
+
+.hint {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.multiline {
+    white-space: pre-line;
+}
+
+/* ---------- list and stats ---------- */
+
+.tournament-filter {
+    margin: 1rem 0;
+}
+
+.tournament-filter .filter-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1rem;
+}
+
+.stats-section h3 {
+    margin: 0.5rem 0;
+}
+
+.stats-section table {
+    width: 100%;
+}
+
+/* ---------- detail ---------- */
+
+.tournament-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.rounds {
+    list-style: none;
+    padding: 0;
+}
+
+.round-card {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    background-color: var(--secondary);
+    color: var(--text-light);
+}
+
+.round-title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+}
+
+.round-number {
+    font-weight: bold;
+}
+
+.result {
+    padding: 0 8px;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+.result.win {
+    background-color: #1b7f3a;
+}
+
+.result.loss {
+    background-color: var(--danger);
+}
+
+.result.other {
+    background-color: var(--border-color);
+}
+
+.round-card .labels,
+.round-card .die,
+.round-card .team,
+.round-card .turn {
+    color: var(--text-muted);
+}
+
+.round-card .games {
+    margin: 0.5rem 0 0;
+    padding-left: 1rem;
+    list-style: none;
+}
+
+.round-card .games li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    margin: 0.25rem 0;
+}
+
+.round-card .comment {
+    font-style: italic;
+}
+
+.round-card p.comment {
+    margin: 0.5rem 0 0;
+}
+
+.old-notes {
+    margin-top: 1.5rem;
+}
+
+/* ---------- form ---------- */
+
+.inside-container.with-notes {
+    max-width: var(--page-width);
+}
+
+.form-and-notes {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.form-and-notes > div {
+    flex: 1;
+    min-width: 0;
+}
+
+/* the old notes stay in sight while the rounds are filled in */
+.form-and-notes aside.old-notes {
+    position: sticky;
+    top: 80px;
+    flex: 0 0 34%;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    margin-top: 0;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    background-color: var(--secondary);
+    color: var(--text-light);
+}
+
+.form-and-notes aside.old-notes h2 {
+    margin-top: 0;
+}
+
+.round legend {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.round .games {
+    margin: 0.5rem 0;
+}
+
+.game {
+    align-items: flex-end;
+}
+
+.game .game-number {
+    align-self: center;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+#add-round {
+    margin-bottom: 1rem;
+}
+
+.team-only {
+    display: none;
+}
+
+form.is-team .team-only {
+    display: block;
+}
+
+.labels-table form.inline {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* ---------- fixes over the shared styles ---------- */
+
+/* the list's text columns (name, location, deck) read left to right */
+.tournament-list td:nth-child(-n + 4) {
+    text-align: left;
+    white-space: normal;
+}
+
+/* a game's number and its ✕ keep their natural size in the row */
+.field-row > .game-number,
+.field-row > .remove-game {
+    flex: 0 0 auto;
+}
+
+.field-row > .remove-game {
+    align-self: flex-end;
+    margin-bottom: 0.9rem;
+}
+
+.round p input {
+    max-width: none;
+}
+
+/* ---------- phones ---------- */
+
+@media (max-width: 760px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-and-notes {
+        flex-direction: column;
+    }
+
+    .form-and-notes aside.old-notes {
+        position: static;
+        max-height: 40vh;
+        flex-basis: auto;
+        width: 100%;
+        box-sizing: border-box;
+    }
+}

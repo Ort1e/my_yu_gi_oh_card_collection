@@ -274,35 +274,9 @@ async fn proxies_clone_and_delete() {
 }
 
 #[tokio::test]
-async fn tournament_and_ydke_import() {
+async fn ydke_import() {
     let t = TestApp::new().await;
-    let (v, _) = t.deck_fixture().await;
-    let uri = format!("/api/deck-versions/{v}");
-
-    let (status, _) = t
-        .json(
-            "PUT",
-            &format!("{uri}/tournament"),
-            json!({ "name": "Locals", "date": "2025-06-01", "location": "", "notes": null }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK);
-    let (_, deck) = t.json("GET", &uri, json!(null)).await;
-    assert_eq!(
-        deck["tournament"],
-        json!({ "name": "Locals", "date": "2025-06-01", "location": null, "notes": null })
-    );
-    t.json(
-        "PUT",
-        &format!("{uri}/tournament"),
-        json!({ "name": "Regionals", "date": "2025-06-02" }),
-    )
-    .await;
-    assert_eq!(
-        t.scalar("SELECT count(*) FROM tournament").await,
-        1,
-        "updated in place"
-    );
+    t.deck_fixture().await;
 
     let ydke = domain::ydke::YdkeDeck {
         main: vec![46986414, 46986414, 46986414],

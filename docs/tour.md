@@ -311,6 +311,36 @@ missing.
 - `/decks/built` (`routes/decks/built.rs`): each built version, what it still
   misses (its proxies), and the shopping list of all of them.
 
+## Tournaments
+
+`/tournaments` (`routes/tournaments/`, `templates/tournaments/`,
+`static/css/tournaments.css`): every tournament with its record and
+placement, then the stats, both following the filter (`?since=`, `?deck=`).
+A tournament has numbered **rounds** (`tournament_round`: opponent's deck as
+written, its labels, die, result, team result, comment), each with any number
+of **games** (`tournament_game`: won, lost, draw (replayed, so more than 3
+games) or unfinished (cut by time), first/second, comment). The version
+played is still `deck_version.tournament_id`, one version at most; a copy of
+a version (`clone`) doesn't take it.
+
+- **Labels** (`deck_label`): archetype/engine names, one table for your decks
+  (`deck_deck_label`, on the deck edit page) and the opponents' rounds
+  (`tournament_round_label`). Typed comma-separated with suggestions
+  (`domain::tournament::split_labels`), matched case-insensitively, created on
+  the way, deleted when unused; `/tournaments/labels` renames and merges.
+- **Writes** (`store/tournaments.rs`): `insert`/`update` replace the rounds
+  (`set_results`), shared by the form and `import-tournament-notes`.
+- **The form** (`routes/tournaments/form.rs`, `static/js/tournament_form.js`):
+  rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
+  blank rows skipped, numbered in order. The edit page shows the old free
+  `notes` beside the form until "Clear the old notes".
+- **Stats** (`domain::tournament::stats`, the owner's): rounds (forfeit = win,
+  double loss = loss, byes apart), games (draws and unfinished out of the
+  rate), by version, by your deck's labels, matchups, die, first/second.
+  `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
+- **Deck builder**: the tournament panel is a summary with links to these
+  pages (`decks/api/tournament.rs`).
+
 ## The advent calendar
 
 `/advent-calendar/:year` (`routes/advent/`, `templates/advent/calendar.html`,
@@ -388,6 +418,11 @@ copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
 language of their code, rarity from the card data when the code was printed in
 one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
+
+`import-tournament-notes <file.json>` (`commands/tournament_notes.rs`,
+one-off) loads the tournaments' old notes, transcribed into a JSON file of
+the private data submodule, as rounds and games; a tournament that has rounds
+is skipped, so it is safe to run twice.
 
 `refresh-prices` fetches today's market price of every card data
 (`store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then

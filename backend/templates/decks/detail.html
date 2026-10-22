@@ -12,6 +12,8 @@
     <div class="card-title">{{ deck.name }}</div>
     <div class="card-meta-line">
       <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
+      {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
+      {% if has_tournaments %}<div><a href="/tournaments?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
     </div>
     <div class="button-row">
       <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>

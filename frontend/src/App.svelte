@@ -259,7 +259,7 @@
 
         <div id="tournament-area" class="area">
             <h3>Tournament Info</h3>
-            <Tournament {api} tournament={deck.tournament} />
+            <Tournament {deckVersionId} tournament={deck.tournament} />
         </div>
 
         <div id="test-draw-area" class="area">

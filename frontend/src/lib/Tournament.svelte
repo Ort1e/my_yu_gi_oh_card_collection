@@ -1,56 +1,37 @@
 <script>
-    export let api;
+    // The tournament this version was played at: a summary, edited on the
+    // tournament pages (/tournaments, backend/src/routes/tournaments/).
+    import { ordinal } from '../deck.js';
+
+    export let deckVersionId;
     export let tournament = null;
 
-    let form = {
-        name: tournament?.name ?? '',
-        date: tournament?.date ?? '',
-        location: tournament?.location ?? '',
-        notes: tournament?.notes ?? '',
-    };
-
-    let message = '';
-
-    async function save() {
-        message = 'Saving…';
-
-        try {
-            tournament = await api.saveTournament(form);
-            message = 'Saved.';
-        } catch (e) {
-            message = `Error: ${e.message}`;
-        }
-    }
+    $: placement = !tournament?.placement
+        ? ''
+        : tournament.players
+          ? `${ordinal(tournament.placement)} of ${tournament.players}`
+          : ordinal(tournament.placement);
 </script>
 
-<form class="plain tournament-form" on:submit|preventDefault={save}>
-    <div class="field-row">
-        <div class="wide">
-            <label for="tournament-name">Name</label>
-            <input id="tournament-name" type="text" bind:value={form.name} maxlength="255" required />
-        </div>
-        <div>
-            <label for="tournament-date">Date</label>
-            <input id="tournament-date" type="date" bind:value={form.date} required />
-        </div>
-        <div class="wide">
-            <label for="tournament-location">Location</label>
-            <input id="tournament-location" type="text" bind:value={form.location} maxlength="255" />
-        </div>
-    </div>
-
-    <label for="tournament-notes">Notes</label>
-    <textarea id="tournament-notes" bind:value={form.notes} rows="2"></textarea>
+{#if tournament}
+    <p class="tournament-summary">
+        <a href="/tournaments/{tournament.id}" target="_blank" rel="noopener">{tournament.name}</a>,
+        {tournament.date}{#if tournament.location}, {tournament.location}{/if}
+        {#if placement}<br />Placement: {placement}{/if}
+    </p>
 
     <div class="button-row">
-        <button type="submit">Save the tournament</button>
-        {#if message}<span class="hint">{message}</span>{/if}
+        <a class="btn btn-small" href="/tournaments/{tournament.id}" target="_blank" rel="noopener">Rounds</a>
+        <a class="btn btn-small btn-secondary" href="/tournaments/{tournament.id}/edit" target="_blank" rel="noopener">Edit</a>
     </div>
-</form>
+{:else}
+    <p class="hint">Not played in a tournament yet.</p>
+
+    <a class="btn btn-small" href="/tournaments/add?version={deckVersionId}" target="_blank" rel="noopener">Add a tournament</a>
+{/if}
 
 <style>
-    /* The tournament notes take the width of the fields row above them. */
-    .tournament-form textarea {
-        max-width: none;
+    .tournament-summary {
+        margin: 0 0 0.5rem;
     }
 </style>

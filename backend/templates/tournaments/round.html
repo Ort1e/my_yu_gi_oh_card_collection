@@ -1,0 +1,47 @@
+{# One round of the tournament form, with its games. Needs `round` (RoundValues). #}
+<fieldset class="round" data-index="{{ round.index }}" data-next-game="{{ round.next_game() }}">
+  <legend>Round <span class="round-number">{{ round.number() }}</span>
+    <button type="button" class="remove-round btn-small btn-danger" title="Remove this round">✕</button></legend>
+
+  <div class="field-row">
+    <div>
+      <label for="rounds-{{ round.index }}-result">Result:</label>
+      <select name="rounds-{{ round.index }}-result" id="rounds-{{ round.index }}-result">
+        {% for choice in round.result_choices() %}<option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="rounds-{{ round.index }}-die">Die:</label>
+      <select name="rounds-{{ round.index }}-die" id="rounds-{{ round.index }}-die">
+        {% for choice in round.die_choices() %}<option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="team-only">
+      <label for="rounds-{{ round.index }}-team_result">Team:</label>
+      <select name="rounds-{{ round.index }}-team_result" id="rounds-{{ round.index }}-team_result">
+        {% for choice in round.team_choices() %}<option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="wide">
+      <label for="rounds-{{ round.index }}-opponent_deck">Opponent's deck:</label>
+      <input type="text" name="rounds-{{ round.index }}-opponent_deck" id="rounds-{{ round.index }}-opponent_deck" value="{{ round.opponent_deck }}" placeholder="as you'd write it: mitsu/K9">
+    </div>
+    <div class="wide">
+      <label for="rounds-{{ round.index }}-labels">Its labels:</label>
+      <input type="text" name="rounds-{{ round.index }}-labels" id="rounds-{{ round.index }}-labels" value="{{ round.labels }}" list="label-names" autocomplete="off" placeholder="Mitsurugi, K9">
+    </div>
+  </div>
+
+  <div class="games">
+    {% for game in round.games %}{% include "tournaments/game.html" %}{% endfor %}
+  </div>
+  <button type="button" class="add-game btn-small btn-secondary">+ Add a game</button>
+
+  <p>
+    <label for="rounds-{{ round.index }}-comment">Round comment:</label>
+    <input type="text" name="rounds-{{ round.index }}-comment" id="rounds-{{ round.index }}-comment" value="{{ round.comment }}">
+  </p>
+</fieldset>

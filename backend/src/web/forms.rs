@@ -86,6 +86,27 @@ impl FormData {
         self.date(name, label)
     }
 
+    /// A whole number in `range`, `None` when blank; an error otherwise.
+    pub fn number(
+        &mut self,
+        name: &str,
+        label: &str,
+        range: std::ops::RangeInclusive<i64>,
+    ) -> Option<i64> {
+        let value = self.get(name)?;
+        match value.parse::<i64>() {
+            Ok(n) if range.contains(&n) => Some(n),
+            _ => {
+                self.errors.push(format!(
+                    "{label}: \"{value}\" should be a number between {} and {}.",
+                    range.start(),
+                    range.end()
+                ));
+                None
+            }
+        }
+    }
+
     pub fn id(&mut self, name: &str, label: &str) -> Option<i64> {
         let value = self.get(name)?;
         match value.parse() {
@@ -97,12 +118,13 @@ impl FormData {
         }
     }
 
-    /// Indices of the `cards-<i>-…` rows present, in order.
-    fn card_indices(&self) -> Vec<usize> {
+    /// Indices of the repeated rows `<prefix><i>-…` present, in order:
+    /// `indices("cards-")`, `indices("rounds-2-games-")`.
+    pub fn indices(&self, prefix: &str) -> Vec<usize> {
         let mut indices: Vec<usize> = self
             .values
             .keys()
-            .filter_map(|k| k.strip_prefix("cards-")?.split_once('-')?.0.parse().ok())
+            .filter_map(|k| k.strip_prefix(prefix)?.split_once('-')?.0.parse().ok())
             .collect();
         indices.sort_unstable();
         indices.dedup();
@@ -111,7 +133,7 @@ impl FormData {
 
     /// The card rows as typed (for re-rendering), skipping fully empty ones.
     pub fn card_rows(&self) -> Vec<CardRowValues> {
-        self.card_indices()
+        self.indices("cards-")
             .into_iter()
             .map(|i| {
                 let field = |f: &str| self.text(&format!("cards-{i}-{f}"));

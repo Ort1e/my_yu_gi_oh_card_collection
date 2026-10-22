@@ -109,6 +109,10 @@ pub async fn list(
 #[template(path = "decks/detail.html")]
 pub struct DeckDetail {
     deck: DeckRow,
+    /// Its labels, comma-separated.
+    labels: String,
+    /// Whether a version of it was played in a tournament.
+    has_tournaments: bool,
     versions: Vec<DeckVersionRow>,
     /// Errors of the "new version" form.
     errors: Vec<String>,
@@ -132,8 +136,20 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
     .fetch_all(pool)
     .await?;
 
+    let labels = crate::routes::tournaments::deck_labels(pool, id)
+        .await?
+        .join(", ");
+    let has_tournaments = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM deck_version WHERE deck_id = ? AND tournament_id IS NOT NULL)",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+
     Ok(DeckDetail {
         deck,
+        labels,
+        has_tournaments,
         versions,
         errors,
     })

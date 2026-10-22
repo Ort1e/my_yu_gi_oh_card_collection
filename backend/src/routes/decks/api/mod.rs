@@ -8,7 +8,8 @@
 //!   deck (Django needed the `clean_card_categories` command);
 //! - YDKE import never reuses sold cards, and one owned copy is used once
 //!   across all zones;
-//! - clone keeps the ban list as well as the tournament;
+//! - clone keeps the ban list but not the tournament (the copy wasn't
+//!   played there: it would count twice in the tournament stats);
 //! - conditional categories are created here (Django: in the admin only).
 //!
 //! One file per group of routes; the card JSON shared by all of them is here.
@@ -24,7 +25,9 @@ mod ydke_import;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde::Serialize;
-use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
+use sqlx::{QueryBuilder, SqliteConnection};
+
+use crate::store::db::push_ids;
 
 use crate::store::db::Money;
 use crate::web::error::AppResult;
@@ -33,7 +36,6 @@ pub use categories::{add_category, assign_category, card_categories, categories,
 pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
 pub use simulation::monte_carlo;
-pub use tournament::save_tournament;
 pub use version::{clone_version, delete_version, get_version, update_version};
 pub use ydke_import::import_ydke;
 
@@ -70,15 +72,6 @@ struct CardRecord {
     card_data_id: Option<i64>,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
-}
-
-fn push_ids(qb: &mut QueryBuilder<'_, Sqlite>, ids: impl IntoIterator<Item = i64>) {
-    qb.push("(");
-    let mut sep = qb.separated(", ");
-    for id in ids {
-        sep.push_bind(id);
-    }
-    sep.push_unseparated(")");
 }
 
 /// The cards with these ids, in the same order (unknown ids are skipped).

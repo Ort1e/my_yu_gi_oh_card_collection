@@ -19,6 +19,10 @@
       games (draws possible, so more than 3), labels, `/tournaments` with the
       stats, old notes transcribed by Claude and loaded by a one-off command.
       The owner writes `domain::tournament::stats`, Claude the rest.
+      **2026-10-22: done on branch `tournaments`** except the owner's
+      `stats` and `Record::rate` (stubs + 7 tests in `domain/src/tournament.rs`);
+      the 7 tournaments transcribed in `data/tournaments_from_notes.json`
+      (untracked), imported with `import-tournament-notes` after the merge.
 - [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
       links once "Tournaments" is added, all at the same level. Group them
       (e.g. Collection: Cards, Lots, Sellers, Value, Rarities; Decks:

@@ -17,6 +17,7 @@ mod edit_forms;
 mod lots;
 mod pages;
 mod rarity;
+mod tournaments;
 
 use std::path::PathBuf;
 

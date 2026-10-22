@@ -13,6 +13,7 @@ mod decks;
 mod lots;
 mod reference;
 mod sellers;
+mod tournaments;
 
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, patch, post, put};
@@ -36,6 +37,9 @@ pub fn router() -> Router<AppState> {
         .route("/decks/:id", get(decks::detail))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))
+        .route("/tournaments", get(tournaments::list))
+        .route("/tournaments/labels", get(tournaments::labels::list))
+        .route("/tournaments/:id", get(tournaments::detail))
         .route("/books", get(books::list))
         .route("/books/:id", get(books::detail))
         .route("/books/authors", get(books::authors::list))
@@ -127,6 +131,23 @@ pub fn write_router() -> Router<AppState> {
             "/books/advent-calendar/:year/days/:day/delete",
             post(books::advent::form::remove_day),
         )
+        .route(
+            "/tournaments/add",
+            get(tournaments::form::add_page).post(tournaments::form::create),
+        )
+        .route(
+            "/tournaments/:id/edit",
+            get(tournaments::form::edit_page).post(tournaments::form::update),
+        )
+        .route("/tournaments/:id/delete", post(tournaments::form::delete))
+        .route(
+            "/tournaments/labels/:id/rename",
+            post(tournaments::labels::rename),
+        )
+        .route(
+            "/tournaments/labels/:id/merge",
+            post(tournaments::labels::merge),
+        )
         .route("/lots/add", get(lots::form::page).post(lots::form::create))
         .route(
             "/lots/add/shipment",
@@ -194,10 +215,6 @@ pub fn write_router() -> Router<AppState> {
         .route(
             "/api/deck-versions/:id/cards/:card_id/categories/:category_id",
             put(decks::api::assign_category),
-        )
-        .route(
-            "/api/deck-versions/:id/tournament",
-            put(decks::api::save_tournament),
         )
         .route("/api/decks/:id/import-ydke", post(decks::api::import_ydke))
 }

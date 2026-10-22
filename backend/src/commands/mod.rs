@@ -3,6 +3,7 @@
 //!   cargo run -p backend -- scrap-ban-list [--all] [--dry-run] [--date YYYY-MM-DD]…
 //!   cargo run -p backend -- clean-cards [--dry-run]
 //!   cargo run -p backend -- refresh-prices [--dry-run]
+//!   cargo run -p backend -- import-tournament-notes <file.json> [--dry-run]
 //!
 //! `--dry-run` does the work in a transaction that is rolled back and makes
 //! no API call (names unknown locally are only reported).
@@ -10,9 +11,12 @@
 mod ban_list;
 mod clean_cards;
 mod prices;
+mod tournament_notes;
 
 pub use clean_cards::spawn_daily as spawn_daily_cleanup;
 pub use prices::spawn_weekly as spawn_weekly_price_refresh;
+
+use std::path::PathBuf;
 
 use chrono::NaiveDate;
 
@@ -30,7 +34,10 @@ pub const USAGE: &str = "usage:
       proxies in decks by owned copies and delete unused proxies
   backend refresh-prices [--dry-run]
       fetch today's market prices of every card from ygoprodeck (the server
-      does it weekly)";
+      does it weekly)
+  backend import-tournament-notes <file.json> [--dry-run]
+      one-off: load the tournaments' old notes, transcribed into a JSON file,
+      as rounds and games (tournaments that have rounds are skipped)";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -47,6 +54,10 @@ pub enum Command {
     RefreshPrices {
         dry_run: bool,
     },
+    ImportTournamentNotes {
+        file: PathBuf,
+        dry_run: bool,
+    },
 }
 
 impl Command {
@@ -61,10 +72,19 @@ impl Command {
         } else {
             Vec::new()
         };
+        let file = if name == "import-tournament-notes" {
+            let i = flags
+                .iter()
+                .position(|f| !f.starts_with("--"))
+                .ok_or("import-tournament-notes needs the JSON file")?;
+            Some(PathBuf::from(flags.remove(i)))
+        } else {
+            None
+        };
         let allowed: &[&str] = match name.as_str() {
             "serve" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
-            "clean-cards" | "refresh-prices" => &["--dry-run"],
+            "clean-cards" | "refresh-prices" | "import-tournament-notes" => &["--dry-run"],
             other => return Err(format!("unknown command {other:?}")),
         };
         if let Some(bad) = flags.iter().find(|f| !allowed.contains(f)) {
@@ -81,6 +101,10 @@ impl Command {
                 dry_run: has("--dry-run"),
             },
             "refresh-prices" => Command::RefreshPrices {
+                dry_run: has("--dry-run"),
+            },
+            "import-tournament-notes" => Command::ImportTournamentNotes {
+                file: file.unwrap_or_default(),
                 dry_run: has("--dry-run"),
             },
             _ => Command::Serve,
@@ -113,6 +137,9 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
         } => ban_list::scrap(state, all, dry_run, &dates).await,
         Command::CleanCards { dry_run } => clean_cards::clean(state, dry_run).await,
         Command::RefreshPrices { dry_run } => prices::refresh(state, dry_run).await,
+        Command::ImportTournamentNotes { file, dry_run } => {
+            tournament_notes::import(state, &file, dry_run).await
+        }
     }
 }
 
@@ -171,6 +198,15 @@ mod tests {
             parse(&["refresh-prices", "--dry-run"]),
             Ok(Command::RefreshPrices { dry_run: true })
         );
+        assert_eq!(
+            parse(&["import-tournament-notes", "--dry-run", "notes.json"]),
+            Ok(Command::ImportTournamentNotes {
+                file: PathBuf::from("notes.json"),
+                dry_run: true,
+            })
+        );
+        assert!(parse(&["import-tournament-notes"]).is_err());
+        assert!(parse(&["import-tournament-notes", "a.json", "b.json"]).is_err());
         assert!(parse(&["nope"]).is_err());
     }
 }

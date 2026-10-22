@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{% if id.is_some() %}Edit {{ values.name }}{% else %}Add a tournament{% endif %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container {% if notes.is_empty() %}narrow{% else %}with-notes{% endif %}">
+{% match id %}
+{% when Some with (id) %}
+  <h1>Edit {{ values.name }}</h1>
+  <p class="back-link"><a href="/tournaments/{{ id }}">← Back to the tournament</a></p>
+{% when None %}
+  <h1>Add a tournament</h1>
+  <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
+{% endmatch %}
+
+<div class="form-and-notes">
+{% if !notes.is_empty() %}
+<aside class="old-notes">
+  <h2>Old notes</h2>
+  <p class="multiline">{{ notes }}</p>
+</aside>
+{% endif %}
+
+<div>
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="{{ self.action() }}" id="tournament-form" {% if values.is_team %}class="is-team"{% endif %}>
+  <fieldset>
+    <legend>Tournament</legend>
+    <div class="field-row">
+      <div class="wide">
+        <label for="name">Name:</label>
+        <input type="text" name="name" id="name" value="{{ values.name }}" maxlength="255" required>
+      </div>
+      <div>
+        <label for="date">Date:</label>
+        <input type="date" name="date" id="date" value="{{ values.date }}" required>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="wide">
+        <label for="location">Location:</label>
+        <input type="text" name="location" id="location" value="{{ values.location }}" maxlength="255">
+      </div>
+      <div class="wide">
+        <label for="version_id">Deck version played:</label>
+        <select name="version_id" id="version_id">
+          <option value="">— not noted —</option>
+          {% for version in versions %}
+          <option value="{{ version.id }}" {% if version.selected %}selected{% endif %}>{{ version.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div>
+        <label for="placement">Placement:</label>
+        <input type="number" name="placement" id="placement" value="{{ values.placement }}" min="1" inputmode="numeric" placeholder="7">
+      </div>
+      <div>
+        <label for="players">Players:</label>
+        <input type="number" name="players" id="players" value="{{ values.players }}" min="1" inputmode="numeric" placeholder="11">
+      </div>
+      <label class="switch"><input type="checkbox" name="is_team" id="is_team" {% if values.is_team %}checked{% endif %}> Team event</label>
+    </div>
+  </fieldset>
+
+  <div id="rounds" data-next="{{ values.next_round() }}">
+    {% for round in values.rounds %}{% include "tournaments/round.html" %}{% endfor %}
+  </div>
+  <button type="button" id="add-round" class="btn-secondary">+ Add a round</button>
+
+  <fieldset>
+    <legend>Conclusion</legend>
+    <textarea name="conclusion" id="conclusion" rows="4" aria-label="Conclusion">{{ values.conclusion }}</textarea>
+    {% if !notes.is_empty() %}
+    <label class="switch"><input type="checkbox" name="clear_notes" {% if values.clear_notes %}checked{% endif %}> Clear the old notes (once everything is in the rounds)</label>
+    {% endif %}
+  </fieldset>
+
+  <input type="submit" value="Save">
+</form>
+</div>
+</div>
+
+<template id="round-template">
+  {% let round = values.blank_round() %}
+  {% include "tournaments/round.html" %}
+</template>
+<template id="game-template">
+  {% let game = values.blank_game() %}
+  {% include "tournaments/game.html" %}
+</template>
+<datalist id="label-names">
+  {% for name in label_names %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tournament_form.js"></script>
+{% endblock %}

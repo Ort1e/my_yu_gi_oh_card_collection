@@ -12,4 +12,5 @@ pub mod models;
 pub mod photos;
 pub mod prices;
 pub mod shipment_files;
+pub mod tournaments;
 pub mod valuation;

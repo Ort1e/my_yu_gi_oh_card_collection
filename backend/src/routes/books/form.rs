@@ -63,27 +63,6 @@ impl BookValues {
     }
 }
 
-/// A whole number in `range`, `None` when blank; an error otherwise.
-fn number(
-    form: &mut FormData,
-    name: &str,
-    label: &str,
-    range: std::ops::RangeInclusive<i64>,
-) -> Option<i64> {
-    let value = form.get(name)?;
-    match value.parse::<i64>() {
-        Ok(n) if range.contains(&n) => Some(n),
-        _ => {
-            form.errors.push(format!(
-                "{label}: \"{value}\" should be a number between {} and {}.",
-                range.start(),
-                range.end()
-            ));
-            None
-        }
-    }
-}
-
 /// Validate the form; errors are added to `form.errors`.
 fn read_book(form: &mut FormData) -> Option<BookFields> {
     let isbn = match form.get("isbn").map(Isbn::parse) {
@@ -95,9 +74,9 @@ fn read_book(form: &mut FormData) -> Option<BookFields> {
         }
     };
     let title = form.required("title", "Title").map(|t| clean_name(&t));
-    let year = number(form, "year", "Year", 1000..=2100);
-    let pages = number(form, "pages", "Pages", 1..=100_000);
-    let volume = number(form, "volume", "Volume", 1..=999);
+    let year = form.number("year", "Year", 1000..=2100);
+    let pages = form.number("pages", "Pages", 1..=100_000);
+    let volume = form.number("volume", "Volume", 1..=999);
     let series = form.get("series").map(clean_name);
     if volume.is_some() && series.is_none() {
         form.errors

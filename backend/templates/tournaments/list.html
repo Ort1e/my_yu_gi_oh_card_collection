@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Tournaments{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Tournaments</h1>
+  <div class="button-row">
+    <a href="/tournaments/add" class="btn">Add a tournament</a>
+    <a href="/tournaments/labels" class="btn btn-secondary">Deck labels</a>
+  </div>
+
+  <form method="get" action="/tournaments" class="tournament-filter">
+    <div class="field-row">
+      <div>
+        <label for="since">Since:</label>
+        <input type="date" name="since" id="since" value="{{ since }}">
+      </div>
+      <div class="wide">
+        <label for="deck">Deck:</label>
+        <select name="deck" id="deck">
+          <option value="">All decks</option>
+          {% for deck in decks %}
+          <option value="{{ deck.id }}" {% if deck.selected %}selected{% endif %}>{{ deck.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-buttons">
+        <input type="submit" value="Filter">
+        {% if filtered %}<a href="/tournaments" class="btn btn-secondary">Clear</a>{% endif %}
+      </div>
+    </div>
+    <small>The list and the stats below both follow the filter (the meta moves: stats since a date are the useful ones).</small>
+  </form>
+
+  {% if rows.is_empty() %}
+  <p>No tournament {% if filtered %}for this filter{% else %}yet{% endif %}.</p>
+  {% else %}
+  <div class="table-scroll">
+  <table class="numbers tournament-list">
+    <thead><tr><th>Date</th><th>Tournament</th><th>Location</th><th>Deck played</th><th>Rounds</th><th>Placement</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td><a href="/tournaments/{{ row.id }}">{{ row.name }}</a>{% if row.is_team %} <span class="badge">Team</span>{% endif %}</td>
+        <td>{{ row.location }}</td>
+        <td>{% match row.version_id %}{% when Some with (v) %}<a href="/deck-builder/{{ v }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
+        <td>{{ row.record }}</td>
+        <td>{{ row.placement }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Stats</h2>
+  <p class="hint">Wins-losses (draws third for games), and the win rate without the draws.
+    A win by forfeit is a win, a double loss a loss; byes are left out{% if byes > 0 %} ({{ byes }} here){% endif %}.</p>
+  <div class="stats-grid">
+    {% for section in sections %}
+    {% if !section.lines.is_empty() %}
+    <section class="stats-section">
+      <h3>{{ section.title }}</h3>
+      <table class="numbers">
+        <thead><tr><th>{{ section.what }}</th><th>{{ section.counted }}</th><th>W-L</th><th>Win rate</th></tr></thead>
+        <tbody>
+          {% for line in section.lines %}
+          <tr>
+            <td>{% match line.href %}{% when Some with (href) %}<a href="{{ href }}">{{ line.name }}</a>{% when None %}{{ line.name }}{% endmatch %}</td>
+            <td>{{ line.rounds }}</td>
+            <td>{{ line.record }}</td>
+            <td>{{ line.rate }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

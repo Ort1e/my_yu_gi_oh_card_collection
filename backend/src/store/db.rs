@@ -4,7 +4,7 @@ use std::time::Duration;
 use chrono::NaiveDate;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
-use sqlx::{Sqlite, SqliteConnection, Transaction};
+use sqlx::{QueryBuilder, Sqlite, SqliteConnection, Transaction};
 
 use crate::web::error::{AppError, AppResult};
 
@@ -136,4 +136,14 @@ impl serde::Serialize for Money {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.collect_str(self)
     }
+}
+
+/// Push `(?, ?, …)` binding these ids, for an `IN` list.
+pub fn push_ids(qb: &mut QueryBuilder<'_, Sqlite>, ids: impl IntoIterator<Item = i64>) {
+    qb.push("(");
+    let mut sep = qb.separated(", ");
+    for id in ids {
+        sep.push_bind(id);
+    }
+    sep.push_unseparated(")");
 }

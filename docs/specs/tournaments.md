@@ -9,7 +9,10 @@ games with a comment, placement, conclusion) but in two different writing
 styles. Goal: store that story as data, show every tournament on one page,
 and compute stats from it.
 
-**Status: designed (2026-10-22), not started.**
+**Status: done by Claude on branch `tournaments` (2026-10-22), except the
+owner's `domain::tournament::stats` and `Record::rate` (stubs + tests).** Delete
+this spec once they are written (what's useful is in docs/tour.md,
+"Tournaments").
 
 **Who writes what** (CLAUDE.md, "Division of work"):
 - **the owner**: `domain::tournament`'s stats (section 3): the round and game
@@ -29,8 +32,8 @@ and compute stats from it.
 - **Round results**: `win`, `loss`, `double_loss` (time ran out unfinished:
   both players lose; there are no draws), `bye`, `forfeit_win`.
 - **Game results**: `won`, `lost`, `draw` (a drawn game is replayed, so a
-  round can have more than 3 games). Rounds have no draws (time out = double
-  loss), games do.
+  round can have more than 3 games), `unfinished` (cut by time: the game of
+  a double loss). Rounds have no draws (time out = double loss), games do.
 - **Die**: won or lost, per round (NULL for a bye). **First/second** per game.
 - **Labels** (archetype/engine names) tag decks: an opponent's deck has
   several (`Mitsurugi` + `K9` for "mitsu/K9"), and so does each of your own
@@ -90,25 +93,26 @@ CREATE TABLE tournament_game (
     id         INTEGER PRIMARY KEY,
     round_id   INTEGER NOT NULL REFERENCES tournament_round(id) ON DELETE CASCADE,
     number     INTEGER NOT NULL CHECK (number >= 1),
-    result     TEXT NOT NULL CHECK (result IN ('won', 'lost', 'draw')),
+    result     TEXT NOT NULL CHECK (result IN ('won', 'lost', 'draw', 'unfinished')),
     went_first INTEGER CHECK (went_first IN (0, 1)),   -- NULL: not noted
     comment    TEXT,
     UNIQUE (round_id, number)
 );
 ```
 
-The version played stays `deck_version.tournament_id` (one version per
-tournament). Tournaments can be deleted (rounds and games cascade; the
+The version played stays `deck_version.tournament_id`: at most one version
+per tournament (the form clears it on the others), none when unknown. A
+copy of a version (`clone`) no longer copies its `tournament_id`: the copy
+wasn't played there. Tournaments can be deleted (rounds and games cascade; the
 version's `tournament_id` goes NULL); labels without any use are deleted
 with them, like book authors.
 
 ## 2. Validation (Claude, in the form)
 
 - a bye has no opponent, no die, no games, no labels;
-- every other round has an opponent deck (text) or at least one label;
-- games are numbered 1..n in order, no maximum (draws add games); a `win`
-  needs more games won than lost when games are noted (warn, don't refuse:
-  a game can be scooped);
+- the opponent is optional (not always noted);
+- games are numbered 1..n in order, no maximum (draws add games); the round
+  result is not checked against the games (a game can be scooped);
 - `placement <= players` when both are set; `team_result` only when `is_team`.
 
 ## 3. Stats (`domain/src/tournament.rs`, **the owner's**)
@@ -119,12 +123,12 @@ Types (Claude writes them):
 pub enum RoundResult { Win, Loss, DoubleLoss, Bye, ForfeitWin }
 pub enum Die { Won, Lost }
 
-pub enum GameResult { Won, Lost, Draw }
+pub enum GameResult { Won, Lost, Draw, Unfinished }
 pub struct Game { pub result: GameResult, pub went_first: Option<bool> }
 
 /// One round, with what the stats group by.
 pub struct RoundRecord {
-    pub version_id: i64,             // the deck version played
+    pub version_id: Option<i64>,     // the deck version played, if known
     pub own_labels: Vec<String>,     // the deck's labels
     pub opponent_labels: Vec<String>,
     pub die: Option<Die>,
@@ -157,7 +161,8 @@ The rules the tests pin down:
 - **rounds**: `Win` and `ForfeitWin` are wins, `Loss` and `DoubleLoss` are
   losses, a `Bye` is neither (counted in `byes`);
 - **games**: every noted game counts, whatever the round result (a forfeit
-  win has none); a drawn game is in `draws`, out of the rate;
+  win has none); a drawn or unfinished game is in `draws`, out of the rate;
+- `per_version` leaves out the rounds without a version;
 - a round with two opponent labels counts once in **each** label's matchup
   (same for own labels);
 - groupings sorted by number of rounds, most played first, then by name/id.

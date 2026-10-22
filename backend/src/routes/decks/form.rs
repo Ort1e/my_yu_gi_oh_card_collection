@@ -6,9 +6,12 @@ use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
+use domain::tournament::split_labels;
 
+use crate::routes::tournaments::{deck_labels, label_names};
 use crate::store::cards::delete_orphan_proxies;
 use crate::store::db::{begin_write, exists};
+use crate::store::tournaments::set_deck_labels;
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
@@ -73,6 +76,9 @@ pub struct EditDeckPage {
     errors: Vec<String>,
     name: String,
     description: String,
+    /// Its labels, comma-separated (`domain::tournament::split_labels`).
+    labels: String,
+    label_names: Vec<String>,
 }
 
 pub async fn edit_page(
@@ -91,6 +97,8 @@ pub async fn edit_page(
         errors: Vec::new(),
         name,
         description: description.unwrap_or_default(),
+        labels: deck_labels(&state.pool, id).await?.join(", "),
+        label_names: label_names(&state.pool).await?,
     })
 }
 
@@ -105,6 +113,8 @@ pub async fn update(
             id,
             name: form.text("name"),
             description: form.text("description"),
+            labels: form.text("labels"),
+            label_names: label_names(&state.pool).await?,
             errors: form.errors,
         }
         .into_response());
@@ -121,6 +131,7 @@ pub async fn update(
     if updated == 0 {
         return Err(AppError::NotFound);
     }
+    set_deck_labels(&mut tx, id, &split_labels(&form.text("labels"))).await?;
     tx.commit().await?;
     tracing::info!(deck_id = id, "deck edited");
 

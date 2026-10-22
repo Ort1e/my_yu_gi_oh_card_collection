@@ -49,7 +49,6 @@ export function deckApi(id) {
             request('PUT', `${base}/cards/${cardId}/categories/${categoryId}`, { assigned }),
         simulate: (handSize, simulations) =>
             request('POST', `${base}/monte-carlo`, { hand_size: handSize, simulations }),
-        saveTournament: (tournament) => request('PUT', `${base}/tournament`, tournament),
     };
 }
 

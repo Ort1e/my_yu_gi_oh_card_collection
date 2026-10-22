@@ -1,0 +1,21 @@
+{# One game row of the tournament form. Needs `game` (GameValues). #}
+<div class="game field-row">
+  <span class="game-number">Game {{ game.number() }}</span>
+  <div>
+    <label for="rounds-{{ game.round }}-games-{{ game.index }}-result">Result:</label>
+    <select name="rounds-{{ game.round }}-games-{{ game.index }}-result" id="rounds-{{ game.round }}-games-{{ game.index }}-result">
+      {% for choice in game.result_choices() %}<option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="rounds-{{ game.round }}-games-{{ game.index }}-turn">Went:</label>
+    <select name="rounds-{{ game.round }}-games-{{ game.index }}-turn" id="rounds-{{ game.round }}-games-{{ game.index }}-turn">
+      {% for choice in game.turn_choices() %}<option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="wide">
+    <label for="rounds-{{ game.round }}-games-{{ game.index }}-comment">Comment:</label>
+    <input type="text" name="rounds-{{ game.round }}-games-{{ game.index }}-comment" id="rounds-{{ game.round }}-games-{{ game.index }}-comment" value="{{ game.comment }}">
+  </div>
+  <button type="button" class="remove-game btn-small btn-danger" title="Remove this game">✕</button>
+</div>

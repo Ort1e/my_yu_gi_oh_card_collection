@@ -20,9 +20,17 @@
       <label for="description">Description:</label>
       <textarea name="description" id="description" rows="4">{{ description }}</textarea>
     </p>
+    <p>
+      <label for="labels">Labels:</label>
+      <input type="text" name="labels" id="labels" value="{{ labels }}" list="label-names" autocomplete="off" placeholder="Mitsurugi, K9">
+      <small>Its archetypes and engines, for the tournament stats ("with K9"). Comma-separated; the same labels as your opponents' decks.</small>
+    </p>
   </fieldset>
 
   <input type="submit" value="Save">
 </form>
+<datalist id="label-names">
+  {% for name in label_names %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>
 </div>
 {% endblock %}
