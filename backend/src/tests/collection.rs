@@ -180,7 +180,7 @@ async fn the_lists_show_the_estimates() {
 
     let (_, lot) = t.get("/lots/1").await;
     assert!(lot.contains("Estimated value:</strong> 10.80 €"), "{lot}");
-    assert!(lot.contains("<td>5.40 €</td>"), "{lot}");
+    assert!(lot.contains("<td>5.40</td>"), "{lot}");
 
     let (_, seller) = t.get("/sellers/1").await;
     assert!(seller.contains("Estimate: 10.80 €"), "{seller}");

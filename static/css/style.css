@@ -177,24 +177,103 @@ form tbody tr:nth-child(even) {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Tables of amounts: numbers aligned on the right, except the first column. */
-.numbers td {
+/*
+ * Data tables: <table class="numbers"> inside <div class="table-scroll">, on
+ * the page background (never in a green card). The same everywhere:
+ * - they take the width of their container;
+ * - amounts are plain numbers, the unit in the heading: "Price (€)";
+ *   percentages keep their sign in the cells, the heading says "… %";
+ * - numbers on the right; the first column (what the row is: a card, a
+ *   month) and the columns marked `class="text"` (a code, a condition, a
+ *   list of decks) on the left; a heading is aligned like its column;
+ * - `class="sortable"` on the table: its headings with `data-sort` sort it
+ *   (static/js/tables.js); a total row goes in <tfoot>, out of the sort.
+ */
+.numbers {
+    width: 100%;
+}
+
+.numbers :is(th, td) {
     text-align: right;
     white-space: nowrap;
 }
 
-/* …and the first column (what the row is: a card, a month) wraps: a long
-   card name doesn't stretch the table. */
-.numbers td:first-child {
+.numbers thead th {
+    vertical-align: bottom;     /* headings on the bottom line when one wraps */
+}
+
+/* The first column wraps: a long card name doesn't stretch the table. */
+.numbers :is(th, td):first-child {
     min-width: 8.5rem;
     max-width: 22rem;
     text-align: left;
     white-space: normal;
 }
 
-/* Headings sit on the bottom line when one of them wraps. */
-.numbers thead th {
-    vertical-align: bottom;
+.numbers :is(th, td).text {
+    text-align: left;
+    white-space: normal;
+}
+
+/* Sortable headings (static/js/tables.js): a pointer, and ▲ ▼ on the sorted one. */
+.sortable th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable th[data-sort]:hover {
+    text-decoration: underline;
+}
+
+.sortable th[aria-sort="ascending"]::after {
+    content: " ▲";
+    font-size: 0.75em;
+}
+
+.sortable th[aria-sort="descending"]::after {
+    content: " ▼";
+    font-size: 0.75em;
+}
+
+/* The search field and count above a long table. */
+.table-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    margin: 0.5rem 0;
+}
+
+.table-tools input[type="search"] {
+    flex: 1 1 16rem;
+    max-width: 28rem;
+}
+
+.table-tools .table-count {
+    opacity: 0.8;
+}
+
+/* Buttons keeping only the rows of one kind (a lot's rarities). */
+.tag-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.5rem 0;
+}
+
+.tag-filter button.active {
+    background-color: var(--primary);
+    color: var(--text-light);
+}
+
+.tag-filter .tag-count {
+    opacity: 0.7;
+}
+
+/* A short explanation under a title. */
+.hint {
+    font-size: 0.9em;
+    opacity: 0.8;
 }
 
 /* A second, smaller line in a cell (a lot's seller, a deck's version). */
@@ -213,7 +292,7 @@ form tbody tr:nth-child(even) {
 .debt-orange { color: #c25e00; }    /* over budget, within the allowed debt */
 .debt-red    { color: var(--danger); font-weight: bold; }   /* over the allowed debt */
 
-/* A "Total" row. */
+/* A "Total" row (in a <tfoot> when the table can be sorted). */
 .total-row {
     font-weight: bold;
     border-top: 2px solid rgba(0, 0, 0, 0.5);
@@ -224,12 +303,7 @@ form tbody tr:nth-child(even) {
     overflow-x: auto;
 }
 
-/* The apports column of Budget → Manage: text, left-aligned, one apport per line. */
-.numbers td.apports {
-    text-align: left;
-    white-space: normal;
-}
-
+/* The apports column of Budget → Manage: one apport per line. */
 .apports div {
     padding: 0.15rem 0;
 }

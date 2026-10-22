@@ -339,7 +339,7 @@ async fn the_built_page_lists_what_is_missing() {
     assert!(page.contains("Deck box: red box"), "{page}");
     assert!(page.contains("1 × Kuriboh"), "{page}");
     assert!(
-        page.contains("<td>Kuriboh</td><td>1</td><td class=\"decks-cell\">Test - v1</td>"),
+        page.contains("<td>Kuriboh</td><td>1</td><td class=\"text\">Test - v1</td>"),
         "{page}"
     );
 
