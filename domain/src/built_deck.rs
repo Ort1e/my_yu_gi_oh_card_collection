@@ -36,8 +36,32 @@ pub fn plan_build(
     locked_elsewhere: &HashSet<i64>,
     used_elsewhere: &HashMap<i64, Vec<i64>>,
 ) -> BuildPlan {
-    let _ = (cards, locked_elsewhere, used_elsewhere);
-    todo!("owner: the building rule")
+    let mut plan = BuildPlan::default();
+    let mut seen = HashSet::new();
+
+    for &card in cards {
+        // `insert` is false when the id was already there: a repeated card
+        if !seen.insert(card) {
+            continue;
+        }
+
+        // held by another built version: the proxy goes here, nowhere else
+        if locked_elsewhere.contains(&card) {
+            plan.proxied_here.push(card);
+            continue;
+        }
+
+        let Some(versions) = used_elsewhere.get(&card) else {
+            continue;
+        };
+        let mut versions = versions.clone();
+        versions.sort_unstable();
+        versions.dedup();
+        plan.proxied_elsewhere
+            .extend(versions.into_iter().map(|version| (card, version)));
+    }
+
+    plan
 }
 
 #[cfg(test)]
