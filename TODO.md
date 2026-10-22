@@ -1,8 +1,5 @@
 # TODO
 
-- [ ] Built decks: write `domain::built_deck::plan_build` (owner; stub,
-      doc comment and 5 unit tests ready, the rest is done). Building a deck
-      panics until then.
 - [ ] Structured tournament results instead of the free `tournament.notes`
       (the notes are already written the same way each time). Per
       tournament: rounds, each with the opponent's deck, die won/lost, the
@@ -49,4 +46,6 @@
       line on card pages, dashboard tile.
 - [x] Built decks (2026-10-20): a built version locks its cards (proxies
       in the other decks), deck box and sleeves, `/decks/built` with the
-      shopping list. `plan_build` (the building rule) is the owner's.
+      shopping list. 2026-10-22: `plan_build` written; a built deck's
+      proxies are swapped by hand only ("Use my copy"); saving a built deck
+      takes its new cards from the other decks.
