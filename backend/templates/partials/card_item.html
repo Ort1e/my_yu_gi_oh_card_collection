@@ -23,6 +23,7 @@
           {% endmatch %}
         </div>
         <div>Proxy: {{ card.is_proxy|yes_no }}</div>
+        {% match card.estimate() %}{% when Some with (estimate) %}<div title="Market price × condition and language: an estimate">Estimate: {{ estimate }} €</div>{% when None %}{% endmatch %}
       </div>
     </div>
   </div>

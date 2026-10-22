@@ -8,6 +8,7 @@ use sqlx::{QueryBuilder, Sqlite};
 use crate::routes::cards::like_pattern;
 use crate::store::db::{Money, Pool};
 use crate::store::models::{other_name, LotRow};
+use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::CardRowValues;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
@@ -85,7 +86,8 @@ pub async fn list(
         .push_bind(PAGE_SIZE)
         .push(" OFFSET ")
         .push_bind(page.offset());
-    let lots = select.build_query_as().fetch_all(pool).await?;
+    let mut lots: Vec<LotRow> = select.build_query_as().fetch_all(pool).await?;
+    fill_lot_estimates(pool, &mut lots).await?;
 
     Ok(LotsList {
         page_title: "All Lots",
@@ -106,11 +108,22 @@ pub struct UniteRow {
     code: Option<String>,
     rarity: Option<String>,
     price: Option<Money>,
+    status: Option<String>,
+    market_price: Option<Money>,
 }
 
 impl UniteRow {
     fn english_name(&self) -> Option<&str> {
         other_name(&self.card_name, self.name_en.as_deref())
+    }
+
+    /// Its estimated value (market price × condition and language).
+    fn estimate(&self) -> Option<Money> {
+        estimate(
+            self.market_price,
+            self.status.as_deref(),
+            self.code.as_deref(),
+        )
     }
 
     /// For the set code suggestions of the quick add (`data-code`).
@@ -160,19 +173,21 @@ pub async fn load_detail(
     if rows.is_empty() {
         rows.push(CardRowValues::default());
     }
-    let lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
+    let mut lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
         .bind(id)
         .fetch_optional(pool)
         .await?
         .or_404()?;
-    let unites: Vec<UniteRow> = sqlx::query_as(
+    fill_lot_estimates(pool, std::slice::from_mut(&mut lot)).await?;
+    let unites: Vec<UniteRow> = sqlx::query_as(&format!(
         "SELECT unite.card_id, card.name AS card_name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
-                card.code, card.rarity, unite.price
+                card.code, card.rarity, unite.price, card.last_known_status AS status,
+                {MARKET_PRICE} AS market_price
          FROM unite JOIN card ON card.id = unite.card_id
          LEFT JOIN card_data ON card_data.id = card.card_data_id
-         WHERE unite.lot_id = ? ORDER BY unite.id",
-    )
+         WHERE unite.lot_id = ? ORDER BY unite.id"
+    ))
     .bind(id)
     .fetch_all(pool)
     .await?;

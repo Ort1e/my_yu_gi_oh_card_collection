@@ -12,7 +12,7 @@ Suggested reading order, about an hour with the code open next to it:
 4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/store/db.rs`
 5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
 6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
-7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data.rs`
+7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data/`
 8. [Tests](#tests): `backend/src/tests/`
 9. [The books](#the-books): `backend/src/routes/books/`, a second, smaller collection
 
@@ -29,7 +29,7 @@ Suggested reading order, about an hour with the code open next to it:
  │ routes/   one module per page group: SQL + handler +    │
  │           template struct                               │
  │ templates/  askama HTML (compiled into the binary)      │
- │ forms.rs, cards.rs, card_data.rs, auth.rs, db.rs …      │
+ │ forms.rs, cards.rs, card_data/, auth.rs, db.rs …        │
  └───────┬───────────────────────────┬─────────────────────┘
          │ pure functions            │ sqlx
          ▼                           ▼
@@ -378,8 +378,8 @@ one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
 
 `refresh-prices` fetches today's market price of every card data
-(`store/card_prices.rs`, batches of 100 ids) into `card_price`, then
-Cardmarket's price guide (`store/cardmarket.rs`, links and prices); the server
+(`store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
+Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices); the server
 does it weekly by itself (`prices::spawn_weekly`: checked every 6 hours, runs
 when the last refresh is 7 days old).
 
@@ -392,7 +392,8 @@ cards links, translates and swaps proxies).
 ## Talking to ygoprodeck
 
 All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
-are in `backend/src/store/card_data.rs`. It allows about 20 requests per
+are in `backend/src/store/card_data/` (the client in `mod.rs`, then
+`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
 second and blocks the IP for an hour above that: `throttle()` keeps every
 call of the server 60 ms apart, and what can be remembered is.
 
@@ -402,8 +403,8 @@ call of the server 60 ms apart, and what can be remembered is.
 | its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`) |
 | a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
 | a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
-| a set code's card names, for its Cardmarket expansion (`store/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
-| market prices, weekly (`store/card_prices.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
+| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
+| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
 
 Two rules: call ygoprodeck **before** opening a write transaction (the calls
 write through the pool), and only through these functions. Tests never call
@@ -418,7 +419,7 @@ rarity names), which are unit-tested on small synthetic JSON.
 and a "Market" line on card pages. Two price sources, both refreshed weekly
 by `refresh-prices`:
 
-- **Cardmarket's price guide** (`store/cardmarket.rs`,
+- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
   `domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
   MB) downloaded into memory, a price **per printing**. Only what the
   collection needs is kept (migration 0009): the products named like our
@@ -453,11 +454,20 @@ terms; the price guide files are its open download.
   card;
 - beside it, the copies that do have a unite price are compared card by
   card (value against that price, no shipping share);
+- each purchase lot against its **full price** (`lot_gain`): the value of
+  its cards still owned, plus what its sold cards brought (their price in
+  the sale lot), minus `lot.price` (non-card items included); the lots
+  without cards (sleeves, boxes) are left out;
 - price moves: since the previous refresh and over 3 months, cards owned
   now, moves under 0.50 € left out (one line per price, the same source on
   both dates).
 
-The page loads every row (`store::card_prices::owned_copies`, `lots`,
+The lists show estimates too: each card on `/cards` and on a lot's page
+(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
+the card's latest price, its product's else its name's), and each purchase
+lot the value of its cards still owned (`fill_lot_estimates`).
+
+The page loads every row (`store::valuation::owned_copies`, `lots`,
 `prices_by_date`) and computes in Rust: money is never summed in SQL. The
 chart is `static/js/collection_value.js`; the card page's price line is an
 SVG drawn by the server (`cards::sparkline`).

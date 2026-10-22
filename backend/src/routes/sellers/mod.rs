@@ -4,6 +4,7 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 
 use crate::store::models::LotRow;
+use crate::store::valuation::fill_lot_estimates;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
 use crate::web::pagination::{Page, PageParam, PAGE_SIZE};
@@ -72,13 +73,14 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         .fetch_optional(pool)
         .await?
         .or_404()?;
-    let lots: Vec<LotRow> = sqlx::query_as(&format!(
+    let mut lots: Vec<LotRow> = sqlx::query_as(&format!(
         "{} WHERE lot.seller_id = ? ORDER BY lot.buy_date, lot.id",
         LotRow::SELECT
     ))
     .bind(id)
     .fetch_all(pool)
     .await?;
+    fill_lot_estimates(pool, &mut lots).await?;
     let total_cards = lots.iter().map(|l| l.card_count).sum();
 
     Ok(SellerDetail {

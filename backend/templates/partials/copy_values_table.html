@@ -2,14 +2,17 @@
   <div class="table-scroll">
   <table class="numbers">
     <thead>
-      <tr><th>Card</th><th>Code</th><th>Condition</th><th>Value (€)</th><th>Paid (€)</th><th>Gain (€)</th></tr>
+      <tr><th>Card</th><th class="phone-hide">Code</th><th class="phone-hide">Condition</th><th>Value (€)</th><th>Paid (€)</th><th>Gain (€)</th></tr>
     </thead>
     <tbody>
       {% for line in lines %}
       <tr>
-        <td><a href="/cards/{{ line.card_id }}">{{ line.name }}</a></td>
-        <td>{{ line.code }}</td>
-        <td>{{ line.status }}</td>
+        <td>
+          <a href="/cards/{{ line.card_id }}">{{ line.name }}</a>
+          <div class="cell-note phone-only">{{ line.code }} · {{ line.status }}</div>
+        </td>
+        <td class="phone-hide">{{ line.code }}</td>
+        <td class="phone-hide">{{ line.status }}</td>
         <td>{{ line.value|money }}</td>
         {% match line.paid %}{% when Some with (paid) %}<td>{{ paid|money }}</td>{% when None %}<td>—</td>{% endmatch %}
         {% match line.gain %}{% when Some with (gain) %}<td>{{ gain|money }}</td>{% when None %}<td>—</td>{% endmatch %}

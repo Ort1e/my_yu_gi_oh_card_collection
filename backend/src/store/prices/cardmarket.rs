@@ -21,9 +21,10 @@ use domain::cardmarket_catalog::{
 };
 use domain::rarity::Rarity;
 use serde_json::Value;
+use sqlx::SqliteConnection;
 
 use crate::store::card_data::{fetch_set_infos, SetInfo};
-use crate::store::db::{begin_write, Money, Pool};
+use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};
 use crate::web::error::{AppError, AppResult};
 
 /// A set code whose expansion wasn't found is looked for again after this.
@@ -148,19 +149,14 @@ pub async fn apply(
     sets: &HashMap<String, SetInfo>,
     dry_run: bool,
 ) -> sqlx::Result<Report> {
-    let mut report = Report::default();
     let all_expansions = expansions(products);
-    let found: Vec<(&String, Option<i64>)> = sets
+    let found: Vec<(&str, Option<i64>)> = sets
         .iter()
         .map(|(prefix, set)| {
-            (
-                prefix,
-                pick_expansion(&set.names, &all_expansions, set.release),
-            )
+            let expansion = pick_expansion(&set.names, &all_expansions, set.release);
+            (prefix.as_str(), expansion)
         })
         .collect();
-    report.sets_checked = found.len();
-    report.sets_found = found.iter().filter(|(_, e)| e.is_some()).count();
 
     let our_names: HashSet<String> = sqlx::query_scalar("SELECT en_name FROM card_data")
         .fetch_all(pool)
@@ -171,24 +167,54 @@ pub async fn apply(
         .iter()
         .filter(|p| our_names.contains(&p.key()))
         .collect();
-    report.products = kept.len();
 
+    let today = today.to_string();
     let mut tx = begin_write(pool).await?;
-    let today_str = today.to_string();
+    save_expansions(&mut tx, &found, &today).await?;
+    save_products(&mut tx, &kept, prices, &today).await?;
+    let (linked, unlinked) = relink_cards(&mut tx, &kept, prices).await?;
+    let saved_prices = save_linked_prices(&mut tx, prices, &today).await?;
+    commit_unless_dry_run(tx, dry_run).await?;
 
-    for (prefix, expansion) in &found {
+    Ok(Report {
+        products: kept.len(),
+        sets_checked: found.len(),
+        sets_found: found.iter().filter(|(_, e)| e.is_some()).count(),
+        linked,
+        unlinked,
+        prices: saved_prices,
+    })
+}
+
+/// Each set code looked up and its expansion (NULL: not found, asked again
+/// later).
+async fn save_expansions(
+    conn: &mut SqliteConnection,
+    found: &[(&str, Option<i64>)],
+    today: &str,
+) -> sqlx::Result<()> {
+    for (prefix, expansion) in found {
         sqlx::query(
             "INSERT OR REPLACE INTO cardmarket_expansion (set_code, id_expansion, checked_at)
              VALUES (?, ?, ?)",
         )
         .bind(prefix)
         .bind(expansion)
-        .bind(&today_str)
-        .execute(&mut *tx)
+        .bind(today)
+        .execute(&mut *conn)
         .await?;
     }
+    Ok(())
+}
 
-    for product in &kept {
+/// The products named like our card data, with their latest prices.
+async fn save_products(
+    conn: &mut SqliteConnection,
+    kept: &[&Product],
+    prices: &HashMap<i64, ProductPrices>,
+    today: &str,
+) -> sqlx::Result<()> {
+    for product in kept {
         let product_prices = prices.get(&product.id).copied().unwrap_or_default();
         sqlx::query(
             "INSERT INTO cardmarket_product
@@ -207,21 +233,29 @@ pub async fn apply(
         .bind(product_prices.trend.map(Money))
         .bind(product_prices.avg30.map(Money))
         .bind(product_prices.low.map(Money))
-        .bind(&today_str)
-        .execute(&mut *tx)
+        .bind(today)
+        .execute(&mut *conn)
         .await?;
     }
+    Ok(())
+}
 
-    // the links, guessed again for the cards not chosen by hand
+/// Guess again the product of every card not chosen by hand. Returns how
+/// many got one and how many didn't.
+async fn relink_cards(
+    conn: &mut SqliteConnection,
+    kept: &[&Product],
+    prices: &HashMap<i64, ProductPrices>,
+) -> sqlx::Result<(usize, usize)> {
     let expansion_of: HashMap<String, i64> = sqlx::query_as::<_, (String, i64)>(
         "SELECT set_code, id_expansion FROM cardmarket_expansion WHERE id_expansion IS NOT NULL",
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .collect();
     let mut by_expansion_name: ProductsByName = HashMap::new();
-    for product in &kept {
+    for product in kept {
         let price = prices.get(&product.id).and_then(ProductPrices::value);
         by_expansion_name
             .entry((product.expansion, product.key()))
@@ -235,50 +269,54 @@ pub async fn apply(
          FROM card JOIN card_data ON card_data.id = card.card_data_id
          WHERE card.cardmarket_product_manual = 0",
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *conn)
     .await?;
+
+    let mut linked = 0;
     for card in &cards {
         let product = guess_product(card, &expansion_of, &by_expansion_name);
-        match product {
-            Some(_) => report.linked += 1,
-            None => report.unlinked += 1,
-        }
+        linked += usize::from(product.is_some());
+
         if product != card.cardmarket_product_id {
             sqlx::query("UPDATE card SET cardmarket_product_id = ? WHERE id = ?")
                 .bind(product)
                 .bind(card.id)
-                .execute(&mut *tx)
+                .execute(&mut *conn)
                 .await?;
         }
     }
+    Ok((linked, cards.len() - linked))
+}
 
-    // today's prices of the linked products
+/// Today's price of every product a card is linked to. Returns how many.
+async fn save_linked_prices(
+    conn: &mut SqliteConnection,
+    prices: &HashMap<i64, ProductPrices>,
+    today: &str,
+) -> sqlx::Result<usize> {
     let linked: Vec<i64> = sqlx::query_scalar(
         "SELECT DISTINCT cardmarket_product_id FROM card WHERE cardmarket_product_id IS NOT NULL",
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *conn)
     .await?;
+
+    let mut saved = 0;
     for product_id in linked {
         let Some(price) = prices.get(&product_id).and_then(ProductPrices::value) else {
             continue;
         };
+
         sqlx::query(
             "INSERT OR REPLACE INTO cardmarket_price (product_id, date, price) VALUES (?, ?, ?)",
         )
         .bind(product_id)
-        .bind(&today_str)
+        .bind(today)
         .bind(Money(price))
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-        report.prices += 1;
+        saved += 1;
     }
-
-    if dry_run {
-        tx.rollback().await?;
-    } else {
-        tx.commit().await?;
-    }
-    Ok(report)
+    Ok(saved)
 }
 
 /// The products of each (expansion, name key), with their price.

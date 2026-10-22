@@ -17,9 +17,13 @@ use crate::store::book_data;
 use crate::store::books::{self, BookFields};
 use crate::store::calendar_photos;
 use crate::store::db::{begin_write, Pool};
-use crate::web::error::{AppError, AppResult, OrNotFound};
+use crate::web::day_form::{back_to, check_day, DayForm};
+use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
+
+/// Where the day forms go back to (`day_form::back_to`).
+const EDIT_BASE: &str = "/books/advent-calendar";
 
 #[derive(Template)]
 #[template(path = "books/advent/edit.html")]
@@ -116,18 +120,6 @@ pub async fn create(
     Ok(Redirect::to(&format!("/books/advent-calendar/{year}/edit")).into_response())
 }
 
-fn back_to(year: i64, day: i64) -> Response {
-    Redirect::to(&format!("/books/advent-calendar/{year}/edit#day-{day}")).into_response()
-}
-
-fn check_day(day: i64) -> AppResult<()> {
-    if (1..=25).contains(&day) {
-        Ok(())
-    } else {
-        Err(AppError::NotFound)
-    }
-}
-
 /// The book a day field names.
 enum DayBook {
     /// In the list already.
@@ -197,22 +189,12 @@ async fn current_photo(pool: &Pool, calendar_id: i64, day: i64) -> sqlx::Result<
 pub async fn save_day(
     State(state): State<AppState>,
     Path((year, day)): Path<(i64, i64)>,
-    mut multipart: Multipart,
+    multipart: Multipart,
 ) -> AppResult<Response> {
     check_day(day)?;
     let calendar = calendar_id(&state.pool, year).await?;
 
-    let read = |e: axum::extract::multipart::MultipartError| {
-        AppError::Internal(format!("reading the form: {e}"))
-    };
-    let (mut book_text, mut photo) = (String::new(), Vec::new());
-    while let Some(field) = multipart.next_field().await.map_err(read)? {
-        match field.name() {
-            Some("book") => book_text = field.text().await.map_err(read)?.trim().to_string(),
-            Some("photo") => photo = field.bytes().await.map_err(read)?.to_vec(),
-            _ => {}
-        }
-    }
+    let mut form = DayForm::read(multipart, "book").await?;
 
     let mut errors = Vec::new();
     let current_book: Option<i64> = sqlx::query_scalar(
@@ -222,13 +204,13 @@ pub async fn save_day(
     .bind(day)
     .fetch_optional(&state.pool)
     .await?;
-    let book = if book_text.is_empty() {
+    let book = if form.item.is_empty() {
         if current_book.is_none() {
             errors.push(format!("Day {day}: choose its book (its ISBN, or #id)."));
         }
         current_book.map(DayBook::Existing)
     } else {
-        match find_book(&state, &book_text).await? {
+        match find_book(&state, &form.item).await? {
             Ok(book) => Some(book),
             Err(why) => {
                 errors.push(format!("Day {day}: {why}"));
@@ -237,17 +219,7 @@ pub async fn save_day(
         }
     };
 
-    let processed = if photo.is_empty() {
-        None
-    } else {
-        match calendar_photos::process(photo).await? {
-            Ok(processed) => Some(processed),
-            Err(why) => {
-                errors.push(format!("Day {day}: {why}."));
-                None
-            }
-        }
-    };
+    let processed = form.photo(day, &mut errors).await?;
 
     let (Some(book), true) = (book, errors.is_empty()) else {
         return Ok(edit_page_with(&state.pool, year, errors)
@@ -307,7 +279,7 @@ pub async fn save_day(
         new_photo = new_photo.is_some(),
         "book advent day saved"
     );
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }
 
 /// `POST /books/advent-calendar/:year/days/:day/rotate` (field `direction`:
@@ -335,7 +307,7 @@ pub async fn rotate(
     calendar_photos::remove(&[state.media_dir.join(&old)]).await;
 
     tracing::info!(year, day, clockwise, "book advent photo rotated");
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }
 
 /// `POST /books/advent-calendar/:year/days/:day/delete`: empty the day (its
@@ -358,5 +330,5 @@ pub async fn remove_day(
     }
 
     tracing::info!(year, day, "book advent day emptied");
-    Ok(back_to(year, day))
+    Ok(back_to(EDIT_BASE, year, day))
 }

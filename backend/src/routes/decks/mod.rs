@@ -8,7 +8,7 @@ use serde::Deserialize;
 use sqlx::Row;
 
 use crate::store::db::Pool;
-use crate::store::models::DeckVersionRow;
+use crate::store::models::{version_full_name, DeckVersionRow};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
 use crate::AppState;
@@ -162,6 +162,6 @@ pub async fn builder(State(state): State<AppState>, Path(id): Path<i64>) -> AppR
     let version: String = row.get(1);
     Ok(DeckBuilder {
         id,
-        title: format!("{} - {version}", deck.as_deref().unwrap_or("No Deck")),
+        title: version_full_name(deck.as_deref(), &version),
     })
 }

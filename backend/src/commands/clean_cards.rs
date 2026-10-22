@@ -31,26 +31,36 @@ use domain::card_set::single_rarity;
 use domain::rarity::split_cardmarket_name;
 use sqlx::SqliteConnection;
 
-use super::finish;
 use crate::store::card_data::{get_or_fetch, plan_translations, Translation};
 use crate::store::cards::{delete_orphan_proxies, replace_proxies};
-use crate::store::db::begin_write;
+use crate::store::db::{begin_write, commit_unless_dry_run};
 use crate::AppState;
 
 /// Changes to make, computed before the write transaction (resolving names
 /// may write card data through the pool).
 #[derive(Default)]
 struct Plan {
-    /// card_data id, new en_name
-    data_renames: Vec<(i64, String)>,
-    /// card id, new en_name, new card_data id
-    card_updates: Vec<(i64, String, Option<i64>)>,
+    data_renames: Vec<DataRename>,
+    card_updates: Vec<CardUpdate>,
     unresolved: Vec<String>,
     /// Step 6: names to put in the language of their code.
     translations: Vec<Translation>,
     /// Step 6: cards named in English with another language in their code,
     /// for which ygoprodeck has no translation ("Name (code)").
     untranslated: Vec<String>,
+}
+
+/// Step 1: a card data's normalised name.
+struct DataRename {
+    card_data_id: i64,
+    en_name: String,
+}
+
+/// Steps 1 and 2: a card's normalised name and its card data.
+struct CardUpdate {
+    card_id: i64,
+    en_name: String,
+    card_data_id: Option<i64>,
 }
 
 /// What a run did (or would do, for a dry run).
@@ -93,19 +103,19 @@ async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
 
     let mut tx = begin_write(pool).await?;
 
-    for (id, name) in &plan.data_renames {
+    for rename in &plan.data_renames {
         sqlx::query("UPDATE card_data SET en_name = ? WHERE id = ?")
-            .bind(name)
-            .bind(id)
+            .bind(&rename.en_name)
+            .bind(rename.card_data_id)
             .execute(&mut *tx)
             .await?;
     }
 
-    for (id, name, card_data_id) in &plan.card_updates {
+    for update in &plan.card_updates {
         sqlx::query("UPDATE card SET en_name = ?, card_data_id = ? WHERE id = ?")
-            .bind(name)
-            .bind(card_data_id)
-            .bind(id)
+            .bind(&update.en_name)
+            .bind(update.card_data_id)
+            .bind(update.card_id)
             .execute(&mut *tx)
             .await?;
     }
@@ -123,7 +133,7 @@ async fn run(state: &AppState, dry_run: bool) -> anyhow::Result<Report> {
             .await?;
     }
 
-    finish(tx, dry_run).await?;
+    commit_unless_dry_run(tx, dry_run).await?;
 
     Ok(Report {
         plan,
@@ -222,13 +232,19 @@ async fn plan(state: &AppState, dry_run: bool) -> anyhow::Result<Plan> {
 
         let key = clean_card_name(&normalized);
         if by_name.get(&key).is_some_and(|other| other != id) {
-            println!("card data {id}: {name:?} would become {normalized:?}, which already exists, skipped");
+            tracing::warn!(
+                card_data_id = id,
+                "card data {name:?} would become {normalized:?}, which already exists, skipped"
+            );
             continue;
         }
 
         by_name.remove(&clean_card_name(name));
         by_name.insert(key, *id);
-        plan.data_renames.push((*id, normalized));
+        plan.data_renames.push(DataRename {
+            card_data_id: *id,
+            en_name: normalized,
+        });
     }
 
     let cards: Vec<(i64, String, Option<i64>)> = sqlx::query_as(
@@ -262,7 +278,11 @@ async fn plan(state: &AppState, dry_run: bool) -> anyhow::Result<Plan> {
         // keep the current link when the name can't be resolved
         let new_link = target.or(card_data_id);
         if normalized != en_name || new_link != card_data_id {
-            plan.card_updates.push((id, normalized, new_link));
+            plan.card_updates.push(CardUpdate {
+                card_id: id,
+                en_name: normalized,
+                card_data_id: new_link,
+            });
         }
     }
 
@@ -286,7 +306,10 @@ async fn rarities_from_names(conn: &mut SqliteConnection) -> anyhow::Result<usiz
     for (id, name) in &cards {
         let (short, rarity) = split_cardmarket_name(name);
         let Some(rarity) = rarity else {
-            println!("card {id}: {name:?} has a version suffix with an unknown rarity, skipped");
+            tracing::warn!(
+                card_id = id,
+                "{name:?} has a version suffix with an unknown rarity, skipped"
+            );
             continue;
         };
         sqlx::query("UPDATE card SET name = ?, rarity = ? WHERE id = ?")
@@ -315,7 +338,7 @@ async fn rarities_from_card_data(conn: &mut SqliteConnection) -> anyhow::Result<
         let json: serde_json::Value = match serde_json::from_str(json) {
             Ok(json) => json,
             Err(e) => {
-                println!("card {id}: unreadable card data ({e}), skipped");
+                tracing::warn!(card_id = id, "unreadable card data ({e}), skipped");
                 continue;
             }
         };
@@ -544,7 +567,7 @@ mod tests {
     }
 
     fn today() -> String {
-        chrono::Local::now().date_naive().to_string()
+        crate::store::db::today().to_string()
     }
 
     #[tokio::test]

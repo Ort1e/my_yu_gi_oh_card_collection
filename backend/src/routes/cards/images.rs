@@ -66,7 +66,7 @@ async fn download(
         .get(url)
         .send()
         .await
-        .and_then(|r| r.error_for_status())
+        .and_then(reqwest::Response::error_for_status)
         .map_err(internal)?
         .bytes()
         .await

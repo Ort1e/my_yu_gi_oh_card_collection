@@ -7,6 +7,7 @@ use domain::budget::{self, BudgetSummary, BudgetTotals, LotSummary, RecapEntry};
 use domain::lot::{shipping_cost, LotType};
 use rust_decimal::Decimal;
 
+use crate::store::db::today;
 use crate::store::db::{Money, Pool};
 use crate::web::error::{AppError, AppResult};
 use crate::web::filters;
@@ -80,7 +81,7 @@ impl BudgetData {
             let apports_total = apports
                 .unwrap_or_default()
                 .split_whitespace()
-                .map(|a| a.parse::<Decimal>())
+                .map(str::parse::<Decimal>)
                 .sum::<Result<Decimal, _>>()
                 .map_err(|e| AppError::Internal(format!("budget {id}: bad apport: {e}")))?;
             budgets.push(BudgetSummary {
@@ -98,11 +99,6 @@ impl BudgetData {
         })
     }
 }
-
-pub fn today() -> NaiveDate {
-    chrono::Local::now().date_naive()
-}
-
 #[derive(Template)]
 #[template(path = "budget/overview.html")]
 pub struct BudgetPage {

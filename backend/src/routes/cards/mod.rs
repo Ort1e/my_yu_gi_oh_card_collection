@@ -9,10 +9,11 @@ use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
-use crate::store::card_prices::card_history;
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::models::{CardRow, DeckVersionRow, LotRow};
+use crate::store::prices::history::card_history;
+use crate::store::valuation::fill_lot_estimates;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
@@ -148,7 +149,7 @@ pub async fn list(
     let count: i64 = count.build_query_scalar().fetch_one(pool).await?;
     let page = Page::new(page.page, count, filter.querystring());
 
-    let mut select = QueryBuilder::new(format!("SELECT {} FROM card", CardRow::COLUMNS));
+    let mut select = QueryBuilder::new(format!("SELECT {} FROM card", CardRow::columns()));
     filter.push_where(&mut select);
     select
         .push(" ORDER BY card.en_name, card.id LIMIT ")
@@ -233,7 +234,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     let pool = &state.pool;
     let card: CardRow = sqlx::query_as(&format!(
         "SELECT {} FROM card WHERE card.id = ?",
-        CardRow::COLUMNS
+        CardRow::columns()
     ))
     .bind(id)
     .fetch_optional(pool)
@@ -247,10 +248,14 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
             .await?;
     let (lot, price) = match unite {
         Some((lot_id, price)) => {
-            let lot = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
-                .bind(lot_id)
-                .fetch_optional(pool)
-                .await?;
+            let mut lot: Option<LotRow> =
+                sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
+                    .bind(lot_id)
+                    .fetch_optional(pool)
+                    .await?;
+            if let Some(lot) = lot.as_mut() {
+                fill_lot_estimates(pool, std::slice::from_mut(lot)).await?;
+            }
             (lot, price)
         }
         None => (None, None),

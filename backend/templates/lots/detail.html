@@ -24,6 +24,9 @@
       {% endmatch %}
     </div>
     <div><strong>Cards in Lot:</strong> {{ lot.card_count }}</div>
+    {% match lot.estimate %}{% when Some with (estimate) %}
+    <div title="Market value of its cards still owned: an estimate"><strong>Estimated value:</strong> {{ estimate }} €</div>
+    {% when None %}{% endmatch %}
     {% match calendar_year %}{% when Some with (year) %}
     <div><strong>Advent calendar:</strong> <a href="/advent-calendar/{{ year }}">{{ year }}</a> (<a href="/advent-calendar/{{ year }}/edit">fill its days</a>)</div>
     {% when None %}{% endmatch %}
@@ -35,7 +38,7 @@
   <h2>Cards</h2>
   <table class="numbers">
     <thead>
-      <tr><th>Card</th><th>Rarity</th><th>Price</th></tr>
+      <tr><th>Card</th><th class="phone-hide">Rarity</th><th>Price</th><th title="Market price × condition and language">Estimate</th></tr>
     </thead>
     <tbody>
       {% for unite in unites %}
@@ -43,16 +46,20 @@
         <td>
           <a href="/cards/{{ unite.card_id }}">{{ unite.card_name }}</a>
           {% match unite.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
+          {% match unite.rarity %}{% when Some with (rarity) %}<div class="cell-note phone-only">{{ rarity }}</div>{% when None %}{% endmatch %}
         </td>
-        <td>{% match unite.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}—{% endmatch %}</td>
+        <td class="phone-hide">{% match unite.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}—{% endmatch %}</td>
         <td>{% match unite.price %}{% when Some with (price) %}{{ price }} €{% when None %}—{% endmatch %}</td>
+        <td>{% match unite.estimate() %}{% when Some with (estimate) %}{{ estimate }} €{% when None %}—{% endmatch %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="3">No cards in this lot.</td></tr>
+      <tr><td colspan="4">No cards in this lot.</td></tr>
       {% endfor %}
       <tr class="total-row">
-        <td colspan="2">Total</td>
+        <td>Total</td>
+        <td class="phone-hide"></td>
         <td>{{ total_price }} €</td>
+        <td></td>
       </tr>
     </tbody>
   </table>

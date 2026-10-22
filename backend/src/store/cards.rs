@@ -179,8 +179,8 @@ pub async fn insert_lot_cards(
             .bind(&row.name)
             .bind(&row.en_name)
             .bind(&row.code)
-            .bind(row.status.map(|s| s.code()))
-            .bind(row.rarity.map(|r| r.label()))
+            .bind(row.status.map(domain::card::CardStatus::code))
+            .bind(row.rarity.map(domain::rarity::Rarity::label))
             .bind(row.is_proxy)
             .execute(&mut *conn)
             .await?

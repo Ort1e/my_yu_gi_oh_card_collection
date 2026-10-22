@@ -5,7 +5,7 @@
 //! relinked in the background, like a new card.
 //!
 //! The Cardmarket product (its printing, for its market price) is guessed by
-//! the price refresh (`store::cardmarket`); choosing one here keeps it.
+//! the price refresh (`store::prices::cardmarket`); choosing one here keeps it.
 
 use askama::Template;
 use axum::extract::{Path, State};
@@ -15,8 +15,8 @@ use domain::card::{normalize_card_name, CardStatus};
 use domain::rarity::Rarity;
 
 use crate::store::card_data::spawn_link_cards;
-use crate::store::cardmarket::{candidates, Candidate};
 use crate::store::db::begin_write;
+use crate::store::prices::cardmarket::{candidates, Candidate};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
@@ -211,8 +211,8 @@ pub async fn update(
     .bind(&name)
     .bind(&en_name)
     .bind(form.get("code"))
-    .bind(status.map(|s| s.code()))
-    .bind(rarity.map(|r| r.label()))
+    .bind(status.map(domain::card::CardStatus::code))
+    .bind(rarity.map(domain::rarity::Rarity::label))
     .bind(form.checked("is_proxy"))
     .bind(renamed)
     .bind(renamed)

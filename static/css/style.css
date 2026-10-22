@@ -183,8 +183,29 @@ form tbody tr:nth-child(even) {
     white-space: nowrap;
 }
 
+/* …and the first column (what the row is: a card, a month) wraps: a long
+   card name doesn't stretch the table. */
 .numbers td:first-child {
+    min-width: 8.5rem;
+    max-width: 22rem;
     text-align: left;
+    white-space: normal;
+}
+
+/* Headings sit on the bottom line when one of them wraps. */
+.numbers thead th {
+    vertical-align: bottom;
+}
+
+/* A second, smaller line in a cell (a lot's seller, a deck's version). */
+.cell-note {
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+/* Shown on phones only (what the hidden columns said), see the end. */
+.phone-only {
+    display: none;
 }
 
 /* Debt amounts (budget pages), coloured by the `debt_color` filter (filters.rs). */
@@ -269,5 +290,44 @@ form tbody tr:nth-child(even) {
 
     :where(th, td) {
         padding: 0.3rem 0.5rem;
+    }
+
+    /* Secondary columns hidden on phones (their content is in a
+       `.phone-only` line of the first column). */
+    .phone-hide {
+        display: none;
+    }
+
+    div.phone-only {
+        display: block;
+    }
+
+    span.phone-only {
+        display: inline;
+    }
+
+    /* A table scrolled sideways keeps its first column: what the row is.
+       It needs an opaque background, the row's colour over the page's. */
+    .numbers th:first-child,
+    .numbers td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        max-width: 45vw;
+        background-color: var(--bg-color);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.15);
+    }
+
+    .numbers tbody tr:nth-child(even) td:first-child {
+        background-color: color-mix(in srgb, white 35%, var(--bg-color));
+    }
+
+    .card .numbers th:first-child,
+    .card .numbers td:first-child {
+        background-color: var(--secondary);
+    }
+
+    .card .numbers tbody tr:nth-child(even) td:first-child {
+        background-color: color-mix(in srgb, white 8%, var(--secondary));
     }
 }

@@ -113,3 +113,75 @@ async fn lists_the_copies_that_lost_the_most() {
     // the other copy gained: not listed
     assert!(!losses.contains(&row(cards[0])), "{losses}");
 }
+
+#[tokio::test]
+async fn each_lot_against_its_full_price() {
+    let t = TestApp::new().await;
+    let cards = priced_fixture(&t).await;
+
+    let (status, body) = t.get("/collection/value").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let lots = &body[body.find("Gain / loss by lot").unwrap()..];
+    let lots = &lots[..lots.find("</table>").unwrap()];
+    // 2 copies at 5.40 against the 10.50 lot
+    assert!(lots.contains(r#"<a href="/lots/1">#1</a>"#), "{lots}");
+    assert!(lots.contains("<td>10.50</td>"), "{lots}");
+    assert!(lots.contains("<td>10.80</td>"), "{lots}");
+    assert!(lots.contains("0.30\n"), "{lots}");
+    assert!(lots.contains(">+2.9%</td>"), "{lots}");
+    // a gain: in the gains, no loss at all
+    let gains = &body[body.find("Biggest gains").unwrap()..body.find("Worst losses").unwrap()];
+    assert!(gains.contains(r#"<a href="/lots/1">#1</a>"#), "{gains}");
+    assert!(
+        body.contains("No lot is worth less than it cost."),
+        "{body}"
+    );
+
+    // one copy sold for 7.00: its sale counts instead of its value
+    sqlx::query(
+        "INSERT INTO lot (id, lot_type, price, buy_date) VALUES (2, 'sale', '7.00', '2025-07-01');
+         INSERT INTO unite (price, lot_id, card_id) VALUES ('7.00', 2, ?);",
+    )
+    .bind(cards[1])
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let (_, body) = t.get("/collection/value").await;
+    let lots = &body[body.find("Gain / loss by lot").unwrap()..];
+    let lots = &lots[..lots.find("</table>").unwrap()];
+    assert!(lots.contains("1 + 1 sold"), "{lots}");
+    assert!(lots.contains("<td>5.40</td>"), "{lots}");
+    assert!(lots.contains(">7.00</td>"), "{lots}");
+    assert!(lots.contains("1.90\n"), "{lots}");
+    // the sale lot isn't listed
+    assert!(!lots.contains("/lots/2"), "{lots}");
+
+    // nor a lot without cards
+    sqlx::query("INSERT INTO lot (id, lot_type, price, buy_date, no_card_price) VALUES (3, 'purchase', '20.00', '2025-08-01', '19.00')")
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    let (_, body) = t.get("/collection/value").await;
+    assert!(!body.contains(r#"href="/lots/3""#), "{body}");
+}
+
+#[tokio::test]
+async fn the_lists_show_the_estimates() {
+    let t = TestApp::new().await;
+    priced_fixture(&t).await;
+
+    // French NM Dark Magicians at 6.00 × 0.9
+    let (status, cards) = t.get("/cards").await;
+    assert_eq!(status, StatusCode::OK, "{cards}");
+    assert!(cards.contains("Estimate: 5.40 €"), "{cards}");
+
+    let (_, lots) = t.get("/lots").await;
+    assert!(lots.contains("Estimate: 10.80 €"), "{lots}");
+
+    let (_, lot) = t.get("/lots/1").await;
+    assert!(lot.contains("Estimated value:</strong> 10.80 €"), "{lot}");
+    assert!(lot.contains("<td>5.40 €</td>"), "{lot}");
+
+    let (_, seller) = t.get("/sellers/1").await;
+    assert!(seller.contains("Estimate: 10.80 €"), "{seller}");
+}
