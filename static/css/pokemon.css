@@ -169,9 +169,21 @@ label.checkbox input {
     margin: 0;
 }
 
+/* On the red form: white on a dark band, not red on red. */
 .finder-status.is-error {
-    color: var(--danger);
+    padding: 0.4rem 0.7rem;
+    border-left: 4px solid #fff;
+    border-radius: var(--radius);
+    background-color: #00000055;
+    color: #fff;
     font-weight: 600;
+}
+
+/* The card's language, first in the finder's row. */
+.finder-row select {
+    flex: 0 0 9rem;
+    width: auto;
+    margin: 0;
 }
 
 .finder-results {
@@ -222,7 +234,7 @@ label.checkbox input {
 
 .finder-hint {
     margin-top: 0.4rem;
-    color: var(--primary);
+    color: #fff;
     font-weight: 600;
 }
 
@@ -355,6 +367,15 @@ form.wish-got {
 /* ---------- phones ---------- */
 
 @media (max-width: 760px) {
+    /* the language on its own line: room for the search */
+    .finder-row {
+        flex-wrap: wrap;
+    }
+
+    .finder-row select {
+        flex-basis: 100%;
+    }
+
     .pokemon-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: 0.6rem;

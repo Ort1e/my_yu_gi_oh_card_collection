@@ -5,15 +5,6 @@
   <legend>This copy</legend>
   <div class="field-row">
     <div>
-      <label for="language">Language:</label>
-      <select name="language" id="language">
-        {% for (code, label) in values.languages() %}
-        <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-        {% if !values.other_language().is_empty() %}<option value="{{ values.other_language() }}" selected>{{ values.other_language() }}</option>{% endif %}
-      </select>
-    </div>
-    <div>
       <label for="variant">Variant:</label>
       <select name="variant" id="variant">
         {% for variant in values.variants() %}

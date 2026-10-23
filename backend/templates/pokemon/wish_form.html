@@ -24,22 +24,6 @@
     <legend>What I want</legend>
     <div class="field-row">
       <div>
-        <label for="catalogue">Cards:</label>
-        <select name="catalogue" id="catalogue">
-          <option value="intl" {% if !values.japanese() %}selected{% endif %}>International (French, English…)</option>
-          <option value="ja" {% if values.japanese() %}selected{% endif %}>Japanese</option>
-        </select>
-      </div>
-      <div>
-        <label for="language">Language:</label>
-        <select name="language" id="language">
-          <option value="">Any</option>
-          {% for (code, label) in values.languages() %}
-          <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
         <label for="variant">Variant:</label>
         <select name="variant" id="variant">
           <option value="">Any</option>

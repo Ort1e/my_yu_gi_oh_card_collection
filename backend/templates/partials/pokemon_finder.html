@@ -1,9 +1,19 @@
 {# The card finder (static/js/pokemon_finder.js): search TCGdex by printed
    code or name, pick a card; it fills the `card` field and shows the card's
-   rarity and printed variants. Needs `values.card`. #}
+   rarity and printed variants. The form's language is here, before the
+   search: it chooses the cards searched (Japanese: the Japanese ones).
+   Needs `values.card` and `values.languages()`, `language_is()`,
+   `other_language()`, `any_language()` (CopyValues, WishValues). #}
 <fieldset class="pokemon-finder">
   <legend>Card</legend>
   <div class="finder-row">
+    <select name="language" id="language" aria-label="Language of the card" title="Language of the card: the search looks for cards in it">
+      {% if values.any_language() %}<option value="">Any language</option>{% endif %}
+      {% for (code, label) in values.languages() %}
+      <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+      {% if !values.other_language().is_empty() %}<option value="{{ values.other_language() }}" selected>{{ values.other_language() }}</option>{% endif %}
+    </select>
     <input type="search" id="finder-q" autocomplete="off" aria-label="Find a card"
            placeholder="FNE 067 (printed at the bottom), a name (Hypotrempe), or both: 30C Zekrom">
     <button type="button" id="finder-search">Find</button>
@@ -25,6 +35,6 @@
   <p class="finder-id">
     <label for="card">TCGdex id:</label>
     <input type="text" name="card" id="card" value="{{ values.card }}" autocomplete="off" placeholder="sv06.5-067">
-    <small>Filled when you pick a card. The search uses the language chosen below (Japanese: the Japanese cards).</small>
+    <small>Filled when you pick a card. Choose the card's language first: Japanese cards are found in Japanese only.</small>
   </p>
 </fieldset>

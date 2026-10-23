@@ -187,7 +187,6 @@ pub async fn list(State(state): State<AppState>) -> AppResult<WishlistPage> {
 #[derive(Debug, Default)]
 pub struct WishValues {
     card: String,
-    catalogue: String,
     language: String,
     variant: String,
     max_price: String,
@@ -199,7 +198,6 @@ impl WishValues {
     fn from_form(form: &FormData) -> WishValues {
         WishValues {
             card: form.text("card"),
-            catalogue: form.text("catalogue"),
             language: form.text("language"),
             variant: form.text("variant"),
             max_price: form.text("max_price"),
@@ -216,16 +214,22 @@ impl WishValues {
         self.language == code
     }
 
+    /// "Any language" (of the international cards: Japanese cards are
+    /// Japanese only).
+    fn any_language(&self) -> bool {
+        true
+    }
+
+    fn other_language(&self) -> &str {
+        ""
+    }
+
     fn variants(&self) -> [Variant; 5] {
         Variant::ALL
     }
 
     fn variant_is(&self, variant: &Variant) -> bool {
         self.variant == variant.code()
-    }
-
-    fn japanese(&self) -> bool {
-        self.catalogue == "ja"
     }
 }
 
@@ -316,7 +320,6 @@ pub async fn add_page() -> WishFormPage {
         id: None,
         errors: Vec::new(),
         values: WishValues {
-            catalogue: "intl".into(),
             priority: "2".into(),
             ..WishValues::default()
         },
@@ -356,8 +359,12 @@ async fn stored_values(pool: &Pool, id: i64) -> AppResult<WishValues> {
         .or_404()?;
     Ok(WishValues {
         card: wish.tcgdex_id,
-        catalogue: wish.catalogue,
-        language: wish.language.unwrap_or_default(),
+        // a Japanese card's wish in any language: Japanese (the only one)
+        language: match (wish.language, wish.catalogue.as_str()) {
+            (Some(language), _) => language,
+            (None, "ja") => "ja".into(),
+            (None, _) => String::new(),
+        },
         variant: wish.variant.unwrap_or_default(),
         max_price: wish
             .max_price

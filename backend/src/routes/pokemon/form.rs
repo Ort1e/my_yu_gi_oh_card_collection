@@ -96,6 +96,11 @@ impl CopyValues {
         self.language == code
     }
 
+    /// A copy has one language ("Any" is for wishes).
+    pub fn any_language(&self) -> bool {
+        false
+    }
+
     /// A language typed that the list doesn't offer.
     pub fn other_language(&self) -> &str {
         if LANGUAGES.iter().any(|(code, _)| *code == self.language) {
