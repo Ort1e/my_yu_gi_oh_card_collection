@@ -1,6 +1,8 @@
 /*
  * The navigation bar at the top of every page (templates/base.html).
  * It stays in place when scrolling (`position: fixed`).
+ * Links are grouped in <details> menus (Collection, Decks); on phones they
+ * hide behind a "Menu" button (static/js/nav.js).
  */
 
 .site-header {
@@ -32,6 +34,7 @@
 
 .nav-links {
     display: flex;
+    align-items: center;
     gap: 1.5rem;
     margin: 0;
     padding: 0;
@@ -49,6 +52,74 @@
     text-decoration: underline;
 }
 
+/* The page you are on, and the group it is in. */
+.nav-links a[aria-current="page"],
+.nav-links summary.nav-current {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.3em;
+}
+
+/* ---------- groups: a title that opens a menu of links ---------- */
+
+.nav-group {
+    position: relative;         /* the menu hangs below its title */
+}
+
+.nav-group summary {
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    list-style: none;           /* no default triangle: ours is below */
+}
+
+.nav-group summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-group summary::after {
+    content: " \25BE";          /* ▾ */
+    font-size: 0.8em;
+}
+
+.nav-group details[open] > summary::after {
+    content: " \25B4";          /* ▴ */
+}
+
+.nav-group summary:hover {
+    color: #fff;
+}
+
+.nav-submenu {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    left: -0.8rem;
+    z-index: 1;
+    min-width: 11rem;
+    margin: 0;
+    padding: 0.4rem 0;
+    list-style: none;
+    background-color: var(--secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.nav-submenu a {
+    display: block;
+    padding: 0.35rem 0.8rem;
+}
+
+.nav-submenu a:hover {
+    background-color: var(--hover-bg);
+}
+
+/* The "Menu" button: phones only. */
+.nav-toggle {
+    display: none;
+}
+
 /* The other collection (Books / Cards): set apart from the other links. */
 .nav-links a.section-switch {
     padding: 0.1rem 0.6rem;
@@ -56,8 +127,9 @@
     border-radius: 1rem;
 }
 
-/* Phones: the header is not fixed (it would hide half the screen), and its
-   links wrap under the logo. */
+/* Phones: the header is not fixed (it would hide half the screen). The logo
+   and the "Menu" button on one line, the links in a column under them, the
+   groups' links indented below their title. */
 @media (max-width: 760px) {
     .site-header {
         position: static;
@@ -67,8 +139,7 @@
     }
 
     .navbar {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-wrap: wrap;
         gap: 0.3rem;
     }
 
@@ -76,13 +147,59 @@
         font-size: 1.2rem;
     }
 
-    .nav-links {
-        flex-wrap: wrap;
-        gap: 0.2rem 1rem;
+    .nav-toggle {
+        display: block;
+        padding: 0.3rem 0.8rem;
+        font: inherit;
+        font-weight: 500;
+        color: var(--text-light);
+        background: none;
+        border: 1px solid var(--text-light);
+        border-radius: var(--radius);
+        cursor: pointer;
     }
 
-    .nav-links a {
+    .nav-toggle[hidden] {
+        display: none;          /* no script: no button, links shown */
+    }
+
+    .nav-links {
+        order: 1;               /* below the logo and the button */
+        flex-basis: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+    }
+
+    .navbar.nav-collapsible:not(.nav-open) .nav-links {
+        display: none;
+    }
+
+    .nav-links a,
+    .nav-group summary {
         display: inline-block;
-        padding: 0.25rem 0;     /* easier to tap */
+        padding: 0.4rem 0;      /* easier to tap */
+    }
+
+    .nav-links a.section-switch {
+        margin-top: 0.3rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    .nav-submenu {
+        position: static;
+        min-width: 0;
+        padding: 0 0 0.3rem 1rem;
+        background: none;
+        border: none;
+        box-shadow: none;
+    }
+
+    .nav-submenu a {
+        padding: 0.4rem 0;
+    }
+
+    .nav-submenu a:hover {
+        background: none;
     }
 }

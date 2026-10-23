@@ -197,7 +197,9 @@ Example: a `/tournaments` list.
 3. **Route**: in `routes/mod.rs`, `mod tournaments;` and in `router()`:
    `.route("/tournaments", get(tournaments::list))`.
 
-4. **Link** it from `templates/base.html` (the navigation) if needed.
+4. **Link** it from `templates/base.html` (the navigation) if needed: in the
+   group it belongs to (`Collection`, `Decks`: a `<details>` menu), or at the
+   top level. `static/js/nav.js` marks the current page by itself.
 
 5. Add the URL to the `pages_render` test in `tests/pages.rs`.
 
