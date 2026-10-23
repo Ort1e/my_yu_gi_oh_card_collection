@@ -459,7 +459,14 @@ reprint is printed with the number of the card it reprints (Pikachu & Zekrom
 GX: 33/181), which TCGdex doesn't keep: a set size that fits none of the
 sets, or a number in none, offers the reprints to pick from
 (`sets::subsets`), and `30C Zekrom` (a code then a name) searches the sets'
-names (`&`, `et`, `and` alike: `domain::pokemon::fold_name`).
+names (`&`, `et`, `and` alike: `domain::pokemon::fold_name`). A code also
+covers its family: TCGdex keeps a Trainer Gallery apart (`swsh10tg`,
+code `ASR:TG`) while its cards print `ASR TG29/TG30` (`sets::in_family`);
+a lettered number alone (`TG29`) lists every card with it
+(`tcgdex::by_number`). A number missing from sets remembered on an earlier
+day asks TCGdex again (`sets::are_old`, `sets::forget`). TCGdex has no
+pictures of the Trainer Galleries either: they borrow one (below), the
+same illustrator's and rarity's first.
 
 **Booster openings** (migration 0013, `store/pokemon/openings.rs`,
 `routes/pokemon/openings.rs`): the booster form saves a `pokemon_opening`

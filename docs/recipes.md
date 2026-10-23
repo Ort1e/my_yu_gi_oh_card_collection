@@ -156,7 +156,9 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
   code with its Classic Collection: type the set size after the number
   (`1/30`), or pick the card on the next step. A Classic Collection
   reprint shows the old card's number: type it with its size (`33/181`)
-  and pick it in the list, or find it by name (`30C Zekrom`). Cards come
+  and pick it in the list, or find it by name (`30C Zekrom`). A Trainer
+  Gallery card (TG29/TG30) prints its main set's code: `ASR TG29`, or
+  `TG29` alone in the finder (every TG29 is listed, with its set). Cards come
   in near mint unless changed.
 - **The openings** (Openings in the header): each booster with its cards
   and value. A card forgotten: the opening's page → **Add cards by

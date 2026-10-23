@@ -6,7 +6,8 @@
 //!
 //! Several sets can share a code: 30th Celebration (`30th`, 158 cards and
 //! the Mew cards R, G, B) and its Classic Collection (`30th-c`, 001 to 030)
-//! are both `30C`. A number found in both is told apart by the set size
+//! are both `30C`. A code also covers its family: TCGdex keeps a Trainer
+//! Gallery apart, coded `ASR:TG`, while its cards print `ASR` (TG29/TG30). A number found in both is told apart by the set size
 //! printed after it (`/128`, `/030`); else both are offered ([`cards`]).
 
 use domain::pokemon::card_ref::{is_set_size, same_number};
@@ -42,6 +43,15 @@ pub struct SetInfo {
     /// The set size printed after the numbers (`/064`).
     pub official: Option<i64>,
     pub cards: Vec<SetCard>,
+    /// When TCGdex was asked (`YYYY-MM-DD`).
+    pub fetched_at: String,
+}
+
+/// Whether some of these sets were asked on an earlier day: a number not
+/// found in them is worth asking TCGdex again ([`forget`]).
+pub fn are_old(sets: &[SetInfo]) -> bool {
+    let today = today().to_string();
+    sets.iter().any(|set| set.fetched_at != today)
 }
 
 impl SetInfo {
@@ -105,10 +115,45 @@ pub fn cards_named<'a>(sets: &'a [SetInfo], typed: &str) -> Vec<(&'a SetInfo, &'
 /// whose cards may keep the number of the card they reprint: when a number
 /// isn't found, their cards are offered.
 pub fn subsets(sets: &[SetInfo]) -> Vec<&SetInfo> {
+    let Some(main) = sets.first() else {
+        return Vec::new();
+    };
+    // the same code exactly: a Trainer Gallery (`ASR:TG`) has its own numbers
+    let same_code = |set: &&SetInfo| match (&set.code, &main.code) {
+        (Some(code), Some(main)) => code.eq_ignore_ascii_case(main),
+        _ => false,
+    };
     sets.iter()
         .skip(1)
+        .filter(same_code)
         .filter(|set| set.cards.len() <= 40)
         .collect()
+}
+
+/// Whether a set's code is `code` or one of its family (`ASR:TG` for `ASR`).
+fn in_family(set_code: &str, code: &str) -> bool {
+    set_code.eq_ignore_ascii_case(code)
+        || set_code
+            .to_ascii_lowercase()
+            .starts_with(&format!("{}:", code.to_ascii_lowercase()))
+}
+
+/// Forget the sets remembered with this code (or id), so the next lookup
+/// asks TCGdex again: a number not found may be a card added since.
+pub async fn forget(pool: &Pool, language: &str, code: &str) -> AppResult<()> {
+    let code = code.trim();
+    let mut tx = begin_write(pool).await?;
+    sqlx::query(
+        "DELETE FROM pokemon_set WHERE language = ?1
+             AND (lower(code) = lower(?2) OR lower(code) LIKE lower(?2) || ':%'
+                  OR lower(id) = lower(?2))",
+    )
+    .bind(language)
+    .bind(code)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 /// The sets with this printed code (or TCGdex id: then with the code of
@@ -125,7 +170,9 @@ pub async fn by_code(
     let printed = sets
         .first()
         .and_then(|set| set.code.clone())
-        .filter(|printed| !printed.eq_ignore_ascii_case(code.trim()));
+        // `ASR:TG` (a set found by its id) belongs to the family `ASR`
+        .map(|printed| printed.split(':').next().unwrap_or_default().to_string())
+        .filter(|printed| !printed.is_empty() && !printed.eq_ignore_ascii_case(code.trim()));
     if let Some(printed) = printed {
         for set in by_code_once(pool, http, language, &printed).await? {
             if !sets.iter().any(|known| known.id == set.id) {
@@ -178,7 +225,8 @@ struct SetRow {
 async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Vec<SetInfo>> {
     let mut rows: Vec<SetRow> = sqlx::query_as(
         "SELECT language, id, name, code, official, cards, fetched_at FROM pokemon_set
-         WHERE language = ?1 AND lower(code) = lower(?2)",
+         WHERE language = ?1
+             AND (lower(code) = lower(?2) OR lower(code) LIKE lower(?2) || ':%')",
     )
     .bind(language)
     .bind(code)
@@ -210,6 +258,7 @@ async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Vec
             code: row.code,
             official: row.official,
             cards: serde_json::from_str(&row.cards).unwrap_or_default(),
+            fetched_at: row.fetched_at,
         })
         .collect())
 }
@@ -239,7 +288,7 @@ async fn find(http: &reqwest::Client, language: &str, code: &str) -> AppResult<V
             let same = |field: &str| {
                 abbreviation[field]
                     .as_str()
-                    .is_some_and(|c| c.eq_ignore_ascii_case(code))
+                    .is_some_and(|c| in_family(c, code))
             };
             if same("localized") || same("official") {
                 found.push(set);
@@ -272,6 +321,7 @@ fn from_tcgdex(language: &str, set: &Value) -> Option<SetInfo> {
             .or_else(|| (language == "ja").then(|| set["id"].as_str().map(str::to_string))?),
         official: set["cardCount"]["official"].as_i64(),
         cards,
+        fetched_at: today().to_string(),
     })
 }
 
@@ -304,6 +354,12 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn codes_have_families() {
+        assert!(in_family("ASR", "asr") && in_family("ASR:TG", "ASR"));
+        assert!(!in_family("ASRX", "ASR") && !in_family("ASR", "ASR:TG"));
+    }
 
     #[test]
     fn reads_a_set() {

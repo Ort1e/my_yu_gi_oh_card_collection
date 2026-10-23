@@ -6,7 +6,7 @@
 //! ignoring the case" (`eq:` would be exact but case-sensitive): callers
 //! keep the exact matches. Answers are reshaped in `domain::pokemon`.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use reqwest::StatusCode;
@@ -115,6 +115,60 @@ pub async fn search(
         .into_iter()
         .filter(|card| !is_pocket(card, &pocket))
         .collect())
+}
+
+/// The cards printed with this number in any set (`TG29`: one per Trainer
+/// Gallery), Pocket cards left out (brief).
+pub async fn by_number(
+    http: &reqwest::Client,
+    language: &str,
+    number: &str,
+) -> Result<Vec<Value>, AppError> {
+    let limit = SEARCH_LIMIT.to_string();
+    let answer = get(
+        http,
+        &format!("{language}/cards"),
+        &[
+            ("localId", &format!("eq:{number}")),
+            ("pagination:itemsPerPage", &limit),
+        ],
+    )
+    .await?;
+    let pocket = pocket_sets(http).await;
+    Ok(list(answer)
+        .into_iter()
+        .filter(|card| !is_pocket(card, &pocket))
+        .collect())
+}
+
+/// Every set's name in a language, by id: the finder shows them under the
+/// results. Asked once per language and run; empty when TCGdex can't
+/// answer (the ids are shown then).
+pub async fn set_names(http: &reqwest::Client, language: &str) -> HashMap<String, String> {
+    static NAMES: Mutex<BTreeMap<String, HashMap<String, String>>> =
+        Mutex::const_new(BTreeMap::new());
+    let mut names = NAMES.lock().await;
+    if let Some(known) = names.get(language) {
+        return known.clone();
+    }
+
+    let found: HashMap<String, String> = match get(http, &format!("{language}/sets"), &[]).await {
+        Ok(answer) => list(answer)
+            .into_iter()
+            .filter_map(|set| {
+                Some((
+                    set["id"].as_str()?.to_string(),
+                    set["name"].as_str()?.to_string(),
+                ))
+            })
+            .collect(),
+        Err(e) => {
+            tracing::warn!("{e}");
+            return HashMap::new();
+        }
+    };
+    names.insert(language.to_string(), found.clone());
+    found
 }
 
 /// The cards of a Pokémon (its Pokédex number), in a language (brief).

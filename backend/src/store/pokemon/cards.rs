@@ -209,10 +209,11 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
     Ok(id)
 }
 
-/// For a card TCGdex has no picture of (the Classic Collection reprints):
-/// the picture of another print with the same name, the same illustrator's
-/// when one is (a reprint keeps its artwork), saved in `image` with its id
-/// in `image_from`. Tried once: `image_from = ''` when none was found.
+/// For a card TCGdex has no picture of (the Classic Collection reprints,
+/// the Trainer Galleries): the picture of another print with the same name,
+/// the best match first (same illustrator: a reprint keeps its artwork;
+/// same rarity: a gold card's gold twin), saved in `image` with its id in
+/// `image_from`. Tried once: `image_from = ''` when none was found.
 /// The picture's URL, if any. Asks TCGdex: not inside a write transaction.
 pub async fn borrow_image(
     pool: &Pool,
@@ -228,7 +229,11 @@ pub async fn borrow_image(
     let language = Catalogue::from_code(&catalogue)
         .unwrap_or(Catalogue::International)
         .data_language();
-    let (Some(name), illustrator) = (json["name"].as_str(), json["illustrator"].as_str()) else {
+    let (Some(name), illustrator, rarity) = (
+        json["name"].as_str(),
+        json["illustrator"].as_str(),
+        json["rarity"].as_str(),
+    ) else {
         return Ok(None);
     };
 
@@ -245,16 +250,20 @@ pub async fn borrow_image(
         .take(5)
         .collect();
     let mut chosen = same_name.first().cloned();
-    if let Some(illustrator) = illustrator {
-        for brief in &same_name {
-            let Some(id) = brief["id"].as_str() else {
-                continue;
-            };
-            let card = tcgdex::card(http, language, id).await?;
-            if card.is_some_and(|c| c["illustrator"].as_str() == Some(illustrator)) {
-                chosen = Some(brief.clone());
-                break;
-            }
+    let mut best = 0;
+    for brief in &same_name {
+        let Some(id) = brief["id"].as_str() else {
+            continue;
+        };
+        let Some(card) = tcgdex::card(http, language, id).await? else {
+            continue;
+        };
+        let same = |field: &str, mine: Option<&str>| mine.is_some() && card[field].as_str() == mine;
+        let score =
+            2 * u8::from(same("illustrator", illustrator)) + u8::from(same("rarity", rarity));
+        if score > best {
+            best = score;
+            chosen = Some(brief.clone());
         }
     }
 

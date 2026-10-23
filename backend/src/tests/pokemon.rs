@@ -732,3 +732,50 @@ async fn openings_are_listed_and_grow() {
         "{page}"
     );
 }
+
+#[tokio::test]
+async fn trainer_galleries_answer_to_their_main_code() {
+    let t = TestApp::new().await;
+    sqlx::query(
+        "INSERT INTO pokemon_card (catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
+             name_en, rarity, category, variants, json, fetched_at)
+         VALUES ('intl', 'swsh10tg-TG29', 'swsh10tg', 'Astres Radieux Galerie de Dresseurs',
+                 'TG29', 'Sylveroy Cavalier du Froid VMAX', 'Ice Rider Calyrex VMAX',
+                 'Secret Rare', 'Pokemon', 'holo', '{}', date('now'));
+         INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
+             ('fr', 'swsh10', 'Astres Radieux', 'ASR', 189,
+              '[{\"id\":\"swsh10-001\",\"localId\":\"001\",\"name\":\"Mimigal\"}]', date('now')),
+             ('fr', 'swsh10tg', 'Astres Radieux Galerie de Dresseurs', 'ASR:TG', 30,
+              '[{\"id\":\"swsh10tg-TG29\",\"localId\":\"TG29\",
+                 \"name\":\"Sylveroy Cavalier du Froid VMAX\"}]', date('now'));",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+
+    let (status, answer) = search(&t, "ASR TG29/TG30").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["cards"][0]["id"], "swsh10tg-TG29");
+    let (_, answer) = search(&t, "asr sylveroy").await;
+    assert_eq!(answer["cards"][0]["id"], "swsh10tg-TG29");
+
+    // the booster form too; a number in neither is an error, not the gallery's list
+    let opening = |pulls| {
+        vec![
+            ("set", "ASR"),
+            ("language", "fr"),
+            ("obtained_on", "2026-10-23"),
+            ("source", "booster"),
+            ("pulls", pulls),
+            ("step", "preview"),
+        ]
+    };
+    let (_, page) = t.post("/pokemon/add/booster", &opening("1 TG29")).await;
+    assert!(!page.contains("class=\"error\""), "{page}");
+    assert!(
+        page.contains(r#"name="rows-1-card" value="swsh10tg-TG29""#),
+        "{page}"
+    );
+    let (_, page) = t.post("/pokemon/add/booster", &opening("300")).await;
+    assert!(page.contains("no number 300 in"), "{page}");
+}

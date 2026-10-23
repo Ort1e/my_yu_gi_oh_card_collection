@@ -282,7 +282,7 @@ async fn preview(
     pulls: &[Pull],
     errors: &mut Vec<String>,
 ) -> AppResult<Option<(String, Vec<PreviewRow>)>> {
-    let found = match sets::by_code(&state.pool, &state.http, language, code).await {
+    let mut found = match sets::by_code(&state.pool, &state.http, language, code).await {
         Ok(found) if !found.is_empty() => found,
         Ok(_) => {
             errors.push(format!(
@@ -299,6 +299,20 @@ async fn preview(
         }
         Err(e) => return Err(e),
     };
+
+    // a number missing from sets remembered on another day: ask again
+    let missing = |found: &[SetInfo]| {
+        pulls
+            .iter()
+            .any(|p| sets::cards(found, &p.number, p.total.as_deref()).is_empty())
+    };
+    if missing(&found) && sets::are_old(&found) {
+        sets::forget(&state.pool, language, code).await?;
+        let again = sets::by_code(&state.pool, &state.http, language, code).await?;
+        if !again.is_empty() {
+            found = again;
+        }
+    }
 
     // numbers in no set: an error, unless a smaller set shares the code
     // (its reprints keep their old numbers: the owner picks the card)

@@ -80,6 +80,13 @@ pub async fn search(
                 number,
                 total,
             }) => by_code(&state, &language, &code, &number, total.as_deref()).await,
+            Ok(CardRef {
+                set_code: None,
+                number,
+                ..
+            }) if number.starts_with(|c: char| c.is_ascii_alphabetic()) => {
+                by_number(&state, &language, &number).await
+            }
             Ok(CardRef { set_code: None, .. }) => return Ok(answer(
                 StatusCode::BAD_REQUEST,
                 "Add the set code before the number: FNE 067 (it is printed next to the number).",
@@ -158,7 +165,13 @@ async fn by_code(
     number: &str,
     total: Option<&str>,
 ) -> AppResult<Found> {
-    let found = sets::by_code(&state.pool, &state.http, language, code).await?;
+    let mut found = sets::by_code(&state.pool, &state.http, language, code).await?;
+    if sets::cards(&found, number, total).is_empty() && sets::are_old(&found) {
+        // remembered sets may be missing it (a card added since, a family
+        // set not known then): ask TCGdex again
+        sets::forget(&state.pool, language, code).await?;
+        found = sets::by_code(&state.pool, &state.http, language, code).await?;
+    }
     let Some(main) = found.first() else {
         return Ok(Err(answer(
             StatusCode::NOT_FOUND,
@@ -224,7 +237,17 @@ async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> 
         )));
     }
 
-    let cards = briefs
+    Ok(Ok((
+        briefs_json(state, language, &briefs).await,
+        Value::Null,
+        None,
+    )))
+}
+
+/// TCGdex's brief cards as results, with their sets' names.
+async fn briefs_json(state: &AppState, language: &str, briefs: &[Value]) -> Vec<Value> {
+    let names = tcgdex::set_names(&state.http, language).await;
+    briefs
         .iter()
         .filter_map(|brief| {
             let id = brief["id"].as_str()?;
@@ -234,12 +257,33 @@ async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> 
                 "name": brief["name"],
                 "local_id": brief["localId"],
                 "set_id": set_id,
+                "set_name": names.get(set_id),
                 "thumb": brief["image"].as_str().map(|i| format!("{i}/low.webp")),
                 "secret": false,
             }))
         })
-        .collect();
-    Ok(Ok((cards, Value::Null, None)))
+        .collect()
+}
+
+/// `TG29/TG30` without its code: the cards with this number in every set
+/// (a lettered number is rare enough to list them all).
+async fn by_number(state: &AppState, language: &str, number: &str) -> AppResult<Found> {
+    let briefs = tcgdex::by_number(&state.http, language, number).await?;
+    if briefs.is_empty() {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!("No card numbered {number}: add the set code before it (ASR {number})."),
+        )));
+    }
+    let note = format!(
+        "{} cards numbered {number}: pick yours (or add the set code: ASR {number}).",
+        briefs.len()
+    );
+    Ok(Ok((
+        briefs_json(state, language, &briefs).await,
+        Value::Null,
+        Some(note),
+    )))
 }
 
 /// `&`, `et` and `and` written the other ways (TCGdex's names use `&` in
