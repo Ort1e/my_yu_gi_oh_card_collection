@@ -2,11 +2,15 @@
 //! both ask TCGdex and write its cache.
 //!
 //! - `GET /pokemon/api/search?q=…&lang=fr`: the printed code (`FNE 067`)
-//!   finds one card through its set; anything else is a name. A Japanese
-//!   search typed in Latin letters (`Horsea`) finds the Japanese cards of
-//!   that Pokémon by its Pokédex number. 200 `{"catalogue", "cards":
-//!   [{"id", "name", "local_id", "set_id", "thumb", "secret"}], "set"}`,
-//!   400 / 404 / 502 `{"error"}`.
+//!   finds a card through its set (one per set sharing the code, unless
+//!   the set size `/030` settles it; a number in no set offers the smaller
+//!   sets' cards: Classic Collection reprints keep their old number); a
+//!   code and a name (`30C Zekrom`) searches that set's names; anything
+//!   else is a name (`&`, `et` and `and` alike). A Japanese search typed
+//!   in Latin letters (`Horsea`) finds the Japanese cards of that Pokémon
+//!   by its Pokédex number. 200 `{"catalogue", "cards": [{"id", "name",
+//!   "local_id", "set_id", "set_name", "thumb", "secret"}], "set",
+//!   "note"}`, 400 / 404 / 502 `{"error"}`.
 //! - `GET /pokemon/api/card?id=…&lang=fr`: one card, saved in
 //!   `pokemon_card`, with what the form needs to choose: rarity (and the
 //!   guide's link), printed variants with today's price, full art
@@ -80,9 +84,14 @@ pub async fn search(
                 StatusCode::BAD_REQUEST,
                 "Add the set code before the number: FNE 067 (it is printed next to the number).",
             )),
-            Err(_) => by_name(&state, &language, q).await,
+            Err(_) => match q.split_once(' ') {
+                Some((code, name)) if card_ref::is_set_code(code) => {
+                    in_set(&state, &language, code, name.trim(), q).await
+                }
+                _ => by_name(&state, &language, q).await,
+            },
         };
-    let (cards, set) = match found {
+    let (cards, set, note) = match found {
         Ok(Ok(found)) => found,
         Ok(Err(response)) => return Ok(response),
         Err(e) => return unavailable(e),
@@ -92,11 +101,53 @@ pub async fn search(
         "catalogue": catalogue.code(),
         "cards": cards,
         "set": set,
+        "note": note,
     }))
     .into_response())
 }
 
-type Found = Result<(Vec<Value>, Value), Response>;
+/// The cards, the set (or null), a note for the finder (or null); or the
+/// error answer.
+type Found = Result<(Vec<Value>, Value, Option<String>), Response>;
+
+fn card_json(set: &sets::SetInfo, card: &sets::SetCard) -> Value {
+    json!({
+        "id": card.id,
+        "name": card.name,
+        "local_id": card.local_id,
+        "set_id": set.id,
+        "set_name": set.name,
+        "official": set.official,
+        "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
+        "secret": set.is_secret(&card.local_id),
+    })
+}
+
+/// `30C Zekrom`: the cards of the sets with this code whose name has these
+/// words; a code TCGdex doesn't know: a name search of the whole text.
+async fn in_set(
+    state: &AppState,
+    language: &str,
+    code: &str,
+    name: &str,
+    q: &str,
+) -> AppResult<Found> {
+    let found = sets::by_code(&state.pool, &state.http, language, code).await?;
+    if found.is_empty() {
+        return by_name(state, language, q).await;
+    }
+    let cards: Vec<Value> = sets::cards_named(&found, name)
+        .into_iter()
+        .map(|(set, card)| card_json(set, card))
+        .collect();
+    if cards.is_empty() {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!("No card named like \"{name}\" in the sets {code}."),
+        )));
+    }
+    Ok(Ok((cards, Value::Null, None)))
+}
 
 /// The card(s) with this printed code: one, or one per set sharing the
 /// code when the set size (`/128`) doesn't tell them apart.
@@ -115,6 +166,24 @@ async fn by_code(
         )));
     };
     let cards = sets::cards(&found, number, total);
+    let subsets = sets::subsets(&found);
+    if cards.is_empty() && !subsets.is_empty() {
+        // a reprint keeps the number of the card it reprints: offer them
+        let results = subsets
+            .iter()
+            .flat_map(|set| set.cards.iter().map(move |card| card_json(set, card)))
+            .collect();
+        let printed = match total {
+            Some(total) => format!("{number}/{total}"),
+            None => number.to_string(),
+        };
+        let note = format!(
+            "{printed} is not a {} number: a {} card keeps the number of the card it \
+             reprints. Pick yours below.",
+            main.name, subsets[0].name
+        );
+        return Ok(Ok((results, Value::Null, Some(note))));
+    }
     if cards.is_empty() {
         let names: Vec<String> = found
             .iter()
@@ -128,30 +197,26 @@ async fn by_code(
 
     let results = cards
         .iter()
-        .map(|(set, card)| {
-            json!({
-                "id": card.id,
-                "name": card.name,
-                "local_id": card.local_id,
-                "set_id": set.id,
-                "set_name": set.name,
-                "official": set.official,
-                "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
-                "secret": set.is_secret(&card.local_id),
-            })
-        })
+        .map(|(set, card)| card_json(set, card))
         .collect();
     let set =
         json!({"id": main.id, "name": main.name, "code": main.code, "official": main.official});
-    Ok(Ok((results, set)))
+    Ok(Ok((results, set, None)))
 }
 
 async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> {
-    let briefs = if language == "ja" && q.is_ascii() {
+    let mut briefs = if language == "ja" && q.is_ascii() {
         japanese_by_latin_name(state, q).await?
     } else {
         tcgdex::search(&state.http, language, q).await?
     };
+    // "Pikachu & Zekrom" is "Pikachu et Zekrom" in French
+    for other in other_spellings(q) {
+        if !briefs.is_empty() {
+            break;
+        }
+        briefs = tcgdex::search(&state.http, language, &other).await?;
+    }
     if briefs.is_empty() {
         return Ok(Err(answer(
             StatusCode::NOT_FOUND,
@@ -174,7 +239,33 @@ async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> 
             }))
         })
         .collect();
-    Ok(Ok((cards, Value::Null)))
+    Ok(Ok((cards, Value::Null, None)))
+}
+
+/// `&`, `et` and `and` written the other ways (TCGdex's names use `&` in
+/// English, `et` in French).
+fn other_spellings(q: &str) -> Vec<String> {
+    let words: Vec<&str> = q.split_whitespace().collect();
+    if !words
+        .iter()
+        .any(|w| matches!(w.to_lowercase().as_str(), "&" | "et" | "and"))
+    {
+        return Vec::new();
+    }
+    ["&", "et", "and"]
+        .iter()
+        .map(|joint| {
+            words
+                .iter()
+                .map(|w| match w.to_lowercase().as_str() {
+                    "&" | "et" | "and" => *joint,
+                    _ => *w,
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|other| other != q)
+        .collect()
 }
 
 /// The Japanese cards of the Pokémon named `q` in English or French: its

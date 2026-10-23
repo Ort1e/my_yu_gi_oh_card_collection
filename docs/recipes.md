@@ -154,7 +154,14 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
   `h` holo, `x2` two copies; a card numbered by a letter, like the Mew
   cards of 30th Celebration: `B`). 30th Celebration (**30C**) shares its
   code with its Classic Collection: type the set size after the number
-  (`1/30`), or pick the card on the next step. **Find the cards** shows each card with its
+  (`1/30`), or pick the card on the next step. A Classic Collection
+  reprint shows the old card's number: type it with its size (`33/181`)
+  and pick it in the list, or find it by name (`30C Zekrom`). Cards come
+  in near mint unless changed.
+- **The openings** (Openings in the header): each booster with its cards
+  and value. A card forgotten: the opening's page → **Add cards by
+  number** or **Add one card**; a card in the wrong opening: its edit
+  page, "From a booster opening". **Find the cards** shows each card with its
   picture and rarity: check the variant (the guide says how to tell them
   apart), full art, condition; a count of 0 leaves a card out. **Save**.
 - **One card** (Add → One card: a single, a gift, a graded card): find it by

@@ -454,7 +454,20 @@ through its set's list (`sv06.5-67` is a 404, `067` is the number). Several
 sets can share a printed code: 30th Celebration (`30th`) and its Classic
 Collection (`30th-c`) are both `30C`, with numbers 001 to 030 in both; the
 set size typed after the number (`001/030`, `1/30` in the booster form)
-picks one, else both are offered (`sets::cards`). Codes may start with a
+picks one, else both are offered (`sets::cards`). A Classic Collection
+reprint is printed with the number of the card it reprints (Pikachu & Zekrom
+GX: 33/181), which TCGdex doesn't keep: a set size that fits none of the
+sets, or a number in none, offers the reprints to pick from
+(`sets::subsets`), and `30C Zekrom` (a code then a name) searches the sets'
+names (`&`, `et`, `and` alike: `domain::pokemon::fold_name`).
+
+**Booster openings** (migration 0013, `store/pokemon/openings.rs`,
+`routes/pokemon/openings.rs`): the booster form saves a `pokemon_opening`
+with its copies (`pokemon_copy.opening_id`); `/pokemon/openings` lists them
+with their value and best card, an opening's page shows its cards and adds
+more (the booster form with `?opening=<id>`, or the one-card form, whose
+"From a booster opening" field also moves a copy). The migration grouped
+the booster copies saved before by day and language. Codes may start with a
 digit (`30C`) and a few cards are numbered by a letter (the Mew cards R, G,
 B).
 

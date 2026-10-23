@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Edit an opening{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Edit the opening</h1>
+<p class="back-link"><a href="/pokemon/openings/{{ opening.id }}">← Back to the opening</a></p>
+<p>{{ opening.label() }}</p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/pokemon/openings/{{ opening.id }}/edit">
+  <p>
+    <label for="opened_on">Opened on:</label>
+    <input type="date" name="opened_on" id="opened_on" value="{{ opened_on }}">
+    <small>Its cards get the same date.</small>
+  </p>
+  <p>
+    <label for="note">Note:</label>
+    <textarea name="note" id="note" rows="3" placeholder="Bought at…, a gift from…">{{ note }}</textarea>
+  </p>
+  <p><small>A card in the wrong opening: its edit page, "From a booster opening".</small></p>
+  <input type="submit" value="Save">
+</form>
+</div>
+{% endblock %}

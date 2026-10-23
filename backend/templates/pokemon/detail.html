@@ -45,6 +45,7 @@
       {% if !copy.estimate_text().is_empty() %}<small>(your estimate)</small>{% else if !self.market_text().is_empty() %}<small>(market {{ self.market_text() }} €)</small>{% endif %}
     </div>
     {% endmatch %}
+    {% match copy.opening_id %}{% when Some with (opening_id) %}<div class="card-subtitle">From <a href="/pokemon/openings/{{ opening_id }}">a booster opening</a></div>{% when None %}{% endmatch %}
     {% match copy.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
     {% for wish_id in wishes_got %}<div class="card-subtitle">★ Got from the <a href="/pokemon/wishlist" class="on-card">wishlist</a></div>{% endfor %}
     <div class="card-subtitle"><small>Added on {{ copy.added_on }} · copy #{{ copy.id }}</small></div>

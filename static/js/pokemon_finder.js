@@ -88,9 +88,19 @@ async function search() {
         return;
     }
 
-    if (answer.cards.length === 1) {
+    if (answer.cards.length === 1 && !answer.note) {
         say('');
         await pick(answer.cards[0].id, answer.catalogue, answer.cards[0].secret);
+        return;
+    }
+
+    if (answer.note) {
+        say(answer.note);
+
+        for (const card of answer.cards) {
+            results.append(resultButton(card, answer.catalogue));
+        }
+
         return;
     }
 

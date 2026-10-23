@@ -10,6 +10,7 @@
 //! printed after it (`/128`, `/030`); else both are offered ([`cards`]).
 
 use domain::pokemon::card_ref::{is_set_size, same_number};
+use domain::pokemon::name_matches;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -67,6 +68,15 @@ pub fn cards<'a>(
     number: &str,
     total: Option<&str>,
 ) -> Vec<(&'a SetInfo, &'a SetCard)> {
+    // a set size that is none of these sets' while a reprint collection
+    // shares the code: a reprint printed with its old number (33/181)
+    let foreign_size = total
+        .and_then(|t| t.parse::<i64>().ok())
+        .is_some_and(|t| sets.iter().all(|set| set.official != Some(t)));
+    if foreign_size && !subsets(sets).is_empty() {
+        return Vec::new();
+    }
+
     let found: Vec<_> = sets
         .iter()
         .filter_map(|set| Some((set, set.card(number)?)))
@@ -83,10 +93,55 @@ pub fn cards<'a>(
     }
 }
 
-/// The sets with this printed code (or TCGdex id) in `language`, the
-/// biggest first; empty when TCGdex knows none. Asks TCGdex only when
+/// The cards of these sets whose name contains `typed` (`30C Zekrom`).
+pub fn cards_named<'a>(sets: &'a [SetInfo], typed: &str) -> Vec<(&'a SetInfo, &'a SetCard)> {
+    sets.iter()
+        .flat_map(|set| set.cards.iter().map(move |card| (set, card)))
+        .filter(|(_, card)| name_matches(&card.name, typed))
+        .collect()
+}
+
+/// The smaller sets sharing the main set's code (a Classic Collection),
+/// whose cards may keep the number of the card they reprint: when a number
+/// isn't found, their cards are offered.
+pub fn subsets(sets: &[SetInfo]) -> Vec<&SetInfo> {
+    sets.iter()
+        .skip(1)
+        .filter(|set| set.cards.len() <= 40)
+        .collect()
+}
+
+/// The sets with this printed code (or TCGdex id: then with the code of
+/// that set, so `30th` also finds `30th-c`) in `language`, the biggest
+/// first; empty when TCGdex knows none. Asks TCGdex only when
 /// `pokemon_set` has no fresh answer: call it before a write transaction.
 pub async fn by_code(
+    pool: &Pool,
+    http: &reqwest::Client,
+    language: &str,
+    code: &str,
+) -> AppResult<Vec<SetInfo>> {
+    let mut sets = by_code_once(pool, http, language, code).await?;
+    let printed = sets
+        .first()
+        .and_then(|set| set.code.clone())
+        .filter(|printed| !printed.eq_ignore_ascii_case(code.trim()));
+    if let Some(printed) = printed {
+        for set in by_code_once(pool, http, language, &printed).await? {
+            if !sets.iter().any(|known| known.id == set.id) {
+                sets.push(set);
+            }
+        }
+        sort(&mut sets);
+    }
+    Ok(sets)
+}
+
+fn sort(sets: &mut [SetInfo]) {
+    sets.sort_by(|a, b| b.cards.len().cmp(&a.cards.len()).then(a.id.cmp(&b.id)));
+}
+
+async fn by_code_once(
     pool: &Pool,
     http: &reqwest::Client,
     language: &str,
@@ -103,7 +158,7 @@ pub async fn by_code(
         }
     }
 
-    sets.sort_by(|a, b| b.cards.len().cmp(&a.cards.len()).then(a.id.cmp(&b.id)));
+    sort(&mut sets);
     Ok(sets)
 }
 

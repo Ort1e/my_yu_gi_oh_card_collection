@@ -238,6 +238,8 @@ pub struct CopyFields {
     pub sold_on: Option<NaiveDate>,
     pub sold_price: Option<Decimal>,
     pub note: Option<String>,
+    /// The booster opening it came from.
+    pub opening_id: Option<i64>,
 }
 
 fn date(d: Option<NaiveDate>) -> Option<String> {
@@ -248,8 +250,8 @@ pub async fn insert_copy(conn: &mut SqliteConnection, copy: &CopyFields) -> sqlx
     let done = sqlx::query(
         "INSERT INTO pokemon_copy (card_id, language, variant, condition, full_art, source,
              obtained_on, price, grader, grade, cert_number, estimate, sold_on, sold_price,
-             note, added_on)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             note, opening_id, added_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(copy.card_id)
     .bind(&copy.language)
@@ -266,6 +268,7 @@ pub async fn insert_copy(conn: &mut SqliteConnection, copy: &CopyFields) -> sqlx
     .bind(date(copy.sold_on))
     .bind(copy.sold_price.map(Money))
     .bind(&copy.note)
+    .bind(copy.opening_id)
     .bind(today().to_string())
     .execute(conn)
     .await?;
@@ -281,7 +284,8 @@ pub async fn update_copy(
     let done = sqlx::query(
         "UPDATE pokemon_copy SET card_id = ?, language = ?, variant = ?, condition = ?,
              full_art = ?, source = ?, obtained_on = ?, price = ?, grader = ?, grade = ?,
-             cert_number = ?, estimate = ?, sold_on = ?, sold_price = ?, note = ?
+             cert_number = ?, estimate = ?, sold_on = ?, sold_price = ?, note = ?,
+             opening_id = ?
          WHERE id = ?",
     )
     .bind(copy.card_id)
@@ -299,6 +303,7 @@ pub async fn update_copy(
     .bind(date(copy.sold_on))
     .bind(copy.sold_price.map(Money))
     .bind(&copy.note)
+    .bind(copy.opening_id)
     .bind(id)
     .execute(conn)
     .await?;

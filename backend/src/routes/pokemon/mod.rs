@@ -5,7 +5,8 @@
 //!
 //! - `mod.rs`: the collection (a grid of pictures or a table) and a copy's page;
 //! - `form.rs`: add one copy (singles, gifts, graded copies), edit, sell;
-//! - `booster.rs`: add a booster opening's cards at once;
+//! - `booster.rs`: add a booster opening's cards at once (or more cards to one);
+//! - `openings.rs`: the booster openings, one with its cards;
 //! - `wishlist.rs`: the wishes, their price against the maximum;
 //! - `api.rs`: the card finder's JSON (`static/js/pokemon_finder.js`);
 //! - `rarities.rs`: the rarity and variant guide; `images.rs`: card pictures.
@@ -17,6 +18,7 @@ pub mod api;
 pub mod booster;
 pub mod form;
 pub mod images;
+pub mod openings;
 pub mod rarities;
 pub mod wishlist;
 
@@ -104,6 +106,7 @@ pub struct CopyRow {
     pub sold_price: Option<Money>,
     pub note: Option<String>,
     pub added_on: String,
+    pub opening_id: Option<i64>,
     pub catalogue: String,
     pub tcgdex_id: String,
     pub set_name: String,
@@ -126,7 +129,7 @@ impl CopyRow {
     pub const SELECT: &'static str = "SELECT pc.id, pc.card_id, pc.language, pc.variant,
             pc.condition, pc.full_art, pc.source, pc.obtained_on, pc.price, pc.grader,
             pc.grade, pc.cert_number, pc.estimate, pc.sold_on, pc.sold_price, pc.note,
-            pc.added_on, c.catalogue, c.tcgdex_id, c.set_name, c.local_id,
+            pc.added_on, pc.opening_id, c.catalogue, c.tcgdex_id, c.set_name, c.local_id,
             c.name_fr, c.name_en, c.name_ja, c.name_manual, c.rarity, c.types, c.image,
             c.image_fr
          FROM pokemon_copy pc JOIN pokemon_card c ON c.id = pc.card_id";

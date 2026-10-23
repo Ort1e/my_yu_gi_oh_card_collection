@@ -1,14 +1,19 @@
 //! A booster opening: every card pulled, added at once (behind the login).
+//! Saving makes a `pokemon_opening` (`openings.rs` lists them); the same
+//! form adds forgotten cards to an opening (`?opening=<id>`).
 //!
 //! 1. The form: the set (its printed code, `FNE`), the language, the date
 //!    and the numbers (`67 45r 12x2`, `domain::pokemon::pulls`).
 //! 2. "Find the cards" (`step=preview`): the set's cards from TCGdex
-//!    (`store::pokemon::sets`), each number matched; an unknown number
-//!    stops here with the list. When sets share the code (`30C`: 30th
-//!    Celebration and its Classic Collection), a number found in both
-//!    offers both cards (`1/30` picks by the printed set size). Each card is shown with its picture,
-//!    rarity (and the guide's link) and its printed variants to choose
-//!    from, full art pre-ticked from the rarity.
+//!    (`store::pokemon::sets`), each number matched. Each card is shown
+//!    with its picture, rarity (and the guide's link) and its printed
+//!    variants to choose from, full art pre-ticked from the rarity, near
+//!    mint. When sets share the code (`30C`: 30th Celebration and its
+//!    Classic Collection), a number found in both offers both cards (`1/30`
+//!    picks by the printed set size), and a number found in neither offers
+//!    the smaller set's cards (Classic Collection reprints keep the number
+//!    of the card they reprint: 33/181). Any other unknown number stops
+//!    here with the list.
 //! 3. "Save" (`step=save`): the rows as checked, one copy per count.
 
 use std::collections::HashMap;
@@ -24,14 +29,18 @@ use domain::pokemon::{
 };
 use serde::Deserialize;
 
-use super::form::{added, find_card, Added};
+use super::form::{find_card, Added};
 use super::{card_names, image_src, rarities};
 use crate::store::db::{begin_write, today};
 use crate::store::pokemon::cards::{self, CopyFields};
-use crate::store::pokemon::sets;
+use crate::store::pokemon::openings::{self, Opening};
+use crate::store::pokemon::sets::{self, SetInfo};
 use crate::web::error::{AppError, AppResult};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
+
+/// The condition a card pulled from a booster is in, unless changed.
+const NEW_CARD: CardStatus = CardStatus::NearMint;
 
 /// The opening's fields as typed.
 #[derive(Debug, Default)]
@@ -41,6 +50,8 @@ pub struct OpeningValues {
     obtained_on: String,
     pulls: String,
     source: String,
+    /// Adding to this opening (its id), or empty: a new opening.
+    opening: String,
 }
 
 impl OpeningValues {
@@ -51,6 +62,7 @@ impl OpeningValues {
             obtained_on: form.text("obtained_on"),
             pulls: form.text("pulls"),
             source: form.text("source"),
+            opening: form.text("opening"),
         }
     }
 
@@ -73,6 +85,7 @@ impl OpeningValues {
 
 /// One card found, to check before saving.
 pub struct PreviewRow {
+    /// Empty: a number found in no set, to choose among `alternatives`.
     tcgdex_id: String,
     card_id: i64,
     name: String,
@@ -89,7 +102,7 @@ pub struct PreviewRow {
     language: String,
     /// The set of this card (shown when several sets share the code).
     set_name: String,
-    /// The same number in the other sets with this code: `(TCGdex id, label)`.
+    /// Other cards it may be: `(TCGdex id, label)`.
     alternatives: Vec<(String, String)>,
 }
 
@@ -111,6 +124,11 @@ impl PreviewRow {
         self.variants.len() > 1
     }
 
+    /// Not found by its number: to choose in the list.
+    fn is_unknown(&self) -> bool {
+        self.tcgdex_id.is_empty()
+    }
+
     /// `30ᵉ Anniversaire No. 001 · Noeunoeuf`.
     fn label(&self) -> String {
         format!("{} No. {} · {}", self.set_name, self.local_id, self.name)
@@ -122,14 +140,24 @@ impl PreviewRow {
 pub struct BoosterPage {
     errors: Vec<String>,
     values: OpeningValues,
-    /// Step 2: the cards found, and the set's name.
+    /// Step 2: the cards found, and the sets' names.
     preview: Vec<PreviewRow>,
     set_name: String,
-    /// After a save.
-    added: Vec<Added>,
+    /// Adding to this opening.
+    opening: Option<Opening>,
 }
 
 impl BoosterPage {
+    fn new(values: OpeningValues, opening: Option<Opening>) -> BoosterPage {
+        BoosterPage {
+            errors: Vec::new(),
+            values,
+            preview: Vec::new(),
+            set_name: String::new(),
+            opening,
+        }
+    }
+
     fn copies(&self) -> u32 {
         self.preview.iter().map(|r| r.count).sum()
     }
@@ -137,38 +165,50 @@ impl BoosterPage {
     fn conditions(&self) -> [CardStatus; 5] {
         CardStatus::ALL
     }
+
+    fn is_new_card(&self, status: &CardStatus) -> bool {
+        *status == NEW_CARD
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct BoosterParams {
-    /// The copies just added: `12,13,14`.
-    added: Option<String>,
+    /// Add cards to this opening.
+    opening: Option<i64>,
 }
 
-/// `GET /pokemon/add/booster`.
+/// The opening of the form's `opening` field, if any (the form is then
+/// fixed to its set, language and date).
+async fn opening_of(state: &AppState, id: Option<i64>) -> AppResult<Option<Opening>> {
+    match id {
+        Some(id) => Ok(openings::get(&state.pool, id).await?),
+        None => Ok(None),
+    }
+}
+
+/// `GET /pokemon/add/booster[?opening=<id>]`.
 pub async fn page(
     State(state): State<AppState>,
     Query(params): Query<BoosterParams>,
 ) -> AppResult<BoosterPage> {
-    let ids: Vec<i64> = params
-        .added
-        .as_deref()
-        .unwrap_or("")
-        .split(',')
-        .filter_map(|id| id.parse().ok())
-        .collect();
-    Ok(BoosterPage {
-        errors: Vec::new(),
-        values: OpeningValues {
+    let opening = opening_of(&state, params.opening).await?;
+    let values = match &opening {
+        Some(opening) => OpeningValues {
+            set: opening.set_code.clone(),
+            language: opening.language.clone(),
+            obtained_on: opening.opened_on.clone().unwrap_or_default(),
+            source: Source::Booster.code().into(),
+            opening: opening.id.to_string(),
+            ..OpeningValues::default()
+        },
+        None => OpeningValues {
             language: "fr".into(),
             obtained_on: today().to_string(),
             source: Source::Booster.code().into(),
             ..OpeningValues::default()
         },
-        preview: Vec::new(),
-        set_name: String::new(),
-        added: added(&state.pool, &ids).await?,
-    })
+    };
+    Ok(BoosterPage::new(values, opening))
 }
 
 /// `POST /pokemon/add/booster`: `step=preview` finds the cards, `step=save`
@@ -178,17 +218,16 @@ pub async fn submit(
     Form(pairs): Form<Pairs>,
 ) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
+    let opening_id = form.id("opening", "Opening");
+    let opening = opening_of(&state, opening_id).await?;
+    if opening_id.is_some() && opening.is_none() {
+        return Err(AppError::NotFound);
+    }
     if form.get("step") == Some("save") {
-        return save(&state, form).await;
+        return save(&state, form, opening).await;
     }
 
-    let mut page = BoosterPage {
-        errors: Vec::new(),
-        values: OpeningValues::from_form(&form),
-        preview: Vec::new(),
-        set_name: String::new(),
-        added: Vec::new(),
-    };
+    let mut page = BoosterPage::new(OpeningValues::from_form(&form), opening);
     let code = form.required("set", "Set (its code, printed on the cards: FNE)");
     let language = read_language(&mut form);
     form.date("obtained_on", "Opened on");
@@ -224,7 +263,7 @@ fn read_language(form: &mut FormData) -> Option<String> {
     language
 }
 
-/// The set's cards for these pulls; errors for unknown numbers.
+/// The sets' cards for these pulls; errors for unknown numbers.
 async fn preview(
     state: &AppState,
     code: &str,
@@ -250,12 +289,15 @@ async fn preview(
         Err(e) => return Err(e),
     };
 
+    // numbers in no set: an error, unless a smaller set shares the code
+    // (its reprints keep their old numbers: the owner picks the card)
+    let subsets = sets::subsets(&found);
     let unknown: Vec<&str> = pulls
         .iter()
         .filter(|p| sets::cards(&found, &p.number, p.total.as_deref()).is_empty())
         .map(|p| p.number.as_str())
         .collect();
-    if !unknown.is_empty() {
+    if !unknown.is_empty() && subsets.is_empty() {
         let names: Vec<String> = found
             .iter()
             .map(|set| format!("{} ({} cards)", set.name, set.cards.len()))
@@ -273,7 +315,10 @@ async fn preview(
     let mut rows = Vec::new();
     for pull in pulls {
         let candidates = sets::cards(&found, &pull.number, pull.total.as_deref());
-        let (set, card) = candidates[0];
+        let Some((set, card)) = candidates.first().copied() else {
+            rows.push(unknown_row(pull, language, &subsets));
+            continue;
+        };
         let card_id = match ids.get(&card.id) {
             Some(id) => *id,
             None => match find_card(state, catalogue, &card.id, errors).await? {
@@ -304,6 +349,37 @@ async fn preview(
     }
     let names: Vec<&str> = found.iter().map(|set| set.name.as_str()).collect();
     Ok(Some((names.join(" / "), rows)))
+}
+
+/// A number found in no set: the cards of the smaller sets to choose from.
+fn unknown_row(pull: &Pull, language: &str, subsets: &[&SetInfo]) -> PreviewRow {
+    let alternatives = subsets
+        .iter()
+        .flat_map(|set| {
+            set.cards.iter().map(move |card| {
+                let label = format!("{} No. {} · {}", set.name, card.local_id, card.name);
+                (card.id.clone(), label)
+            })
+        })
+        .collect();
+    PreviewRow {
+        tcgdex_id: String::new(),
+        card_id: 0,
+        name: format!("No. {}", pull.number),
+        other_name: String::new(),
+        local_id: pull.number.clone(),
+        rarity: String::new(),
+        secret: false,
+        variants: Variant::ALL.to_vec(),
+        // the Classic Collection cards are all holo
+        variant: pull.variant.unwrap_or(Variant::Holo),
+        full_art: false,
+        count: pull.count,
+        has_image: false,
+        language: language.to_string(),
+        set_name: String::new(),
+        alternatives,
+    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -366,8 +442,16 @@ async fn preview_row(
     })
 }
 
-/// Step 3: one copy per count of each row.
-async fn save(state: &AppState, mut form: FormData) -> AppResult<Response> {
+/// Step 3: one copy per count of each row, in a new opening or the one
+/// being added to.
+async fn save(
+    state: &AppState,
+    mut form: FormData,
+    opening: Option<Opening>,
+) -> AppResult<Response> {
+    if opening.is_none() {
+        form.required("set", "Set (its code, printed on the cards: FNE)");
+    }
     let language = read_language(&mut form);
     let obtained_on = form.date("obtained_on", "Opened on");
     let source = form.get("source").and_then(Source::from_code);
@@ -379,17 +463,22 @@ async fn save(state: &AppState, mut form: FormData) -> AppResult<Response> {
     for i in form.indices("rows-") {
         let field = |name: &str| form.get(&format!("rows-{i}-{name}")).map(str::to_string);
         let n = i + 1;
+        let count = field("count").and_then(|c| c.parse::<u32>().ok());
         let Some(tcgdex_id) = field("card") else {
+            if count != Some(0) {
+                form.errors.push(format!(
+                    "Card {n}: choose which card it is (or a count of 0)."
+                ));
+            }
             continue;
         };
-        let count = field("count").and_then(|c| c.parse::<u32>().ok());
         let variant = field("variant").as_deref().and_then(Variant::from_code);
-        let condition = field("condition");
-        let condition = match condition.as_deref() {
+        let condition = match field("condition").as_deref() {
             None => Some(None),
             Some(code) => CardStatus::from_code(code).map(Some),
         };
         match (count.filter(|c| (0..=99).contains(c)), variant, condition) {
+            (Some(0), ..) => {}
             (Some(count), Some(variant), Some(condition)) => copies.push((
                 tcgdex_id,
                 count,
@@ -402,21 +491,17 @@ async fn save(state: &AppState, mut form: FormData) -> AppResult<Response> {
                 .push(format!("Card {n}: invalid count, variant or condition.")),
         }
     }
-    if copies.iter().all(|(_, count, ..)| *count == 0) {
+    if copies.is_empty() && form.errors.is_empty() {
         form.errors.push("No card to save.".into());
     }
     let (Some(language), Some(source), true) = (language, source, form.errors.is_empty()) else {
-        let page = BoosterPage {
-            values: OpeningValues::from_form(&form),
-            errors: form.errors,
-            preview: Vec::new(),
-            set_name: String::new(),
-            added: Vec::new(),
-        };
+        let mut page = BoosterPage::new(OpeningValues::from_form(&form), opening);
+        page.errors = form.errors;
         return Ok(page.into_response());
     };
 
-    // the cards were looked up at step 2: these are cache hits
+    // the cards were looked up at step 2 (cache hits), but for a card
+    // chosen among the others of a shared code
     let catalogue = Catalogue::of_language(&language);
     let mut rows = Vec::new();
     for (tcgdex_id, count, variant, condition, full_art) in copies {
@@ -426,17 +511,20 @@ async fn save(state: &AppState, mut form: FormData) -> AppResult<Response> {
         rows.push((card_id, count, variant, condition, full_art));
     }
     if !form.errors.is_empty() {
-        let page = BoosterPage {
-            values: OpeningValues::from_form(&form),
-            errors: form.errors,
-            preview: Vec::new(),
-            set_name: String::new(),
-            added: Vec::new(),
-        };
+        let mut page = BoosterPage::new(OpeningValues::from_form(&form), opening);
+        page.errors = form.errors;
         return Ok(page.into_response());
     }
 
     let mut tx = begin_write(&state.pool).await?;
+    let opening_id = match &opening {
+        Some(opening) => opening.id,
+        None => {
+            let set = form.text("set");
+            let set_name = form.get("set_name").unwrap_or(&set).to_string();
+            openings::insert(&mut tx, &language, &set, &set_name, obtained_on).await?
+        }
+    };
     let mut ids = Vec::new();
     for (card_id, count, variant, condition, full_art) in rows {
         let copy = CopyFields {
@@ -455,14 +543,33 @@ async fn save(state: &AppState, mut form: FormData) -> AppResult<Response> {
             sold_on: None,
             sold_price: None,
             note: None,
+            opening_id: Some(opening_id),
         };
         for _ in 0..count {
             ids.push(cards::insert_copy(&mut tx, &copy).await?);
         }
     }
     tx.commit().await?;
-    tracing::info!(copies = ids.len(), "Pokémon booster opening added");
+    tracing::info!(
+        opening_id,
+        copies = ids.len(),
+        "Pokémon booster opening saved"
+    );
 
     let ids: Vec<String> = ids.iter().map(i64::to_string).collect();
-    Ok(Redirect::to(&format!("/pokemon/add/booster?added={}", ids.join(","))).into_response())
+    Ok(Redirect::to(&format!(
+        "/pokemon/openings/{opening_id}?added={}",
+        ids.join(",")
+    ))
+    .into_response())
+}
+
+/// For the opening's page: the copies just added and their wishes.
+pub async fn added_copies(state: &AppState, added: Option<&str>) -> AppResult<Vec<Added>> {
+    let ids: Vec<i64> = added
+        .unwrap_or("")
+        .split(',')
+        .filter_map(|id| id.parse().ok())
+        .collect();
+    super::form::added(&state.pool, &ids).await
 }

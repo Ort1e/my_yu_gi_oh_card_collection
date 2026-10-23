@@ -21,7 +21,8 @@ static NUMBER: LazyLock<Regex> =
 static SET_CODE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z0-9][A-Za-z0-9.\-]{1,9}$").unwrap());
 
-fn is_set_code(text: &str) -> bool {
+/// A set code as printed: `FNE`, `SV6a`, `30C` (at least one letter).
+pub fn is_set_code(text: &str) -> bool {
     SET_CODE.is_match(text) && text.chars().any(|c| c.is_ascii_alphabetic())
 }
 

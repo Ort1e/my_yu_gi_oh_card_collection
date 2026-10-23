@@ -362,6 +362,13 @@ form.wish-got {
     }
 }
 
+/* A number found in no set (booster form): no picture yet. */
+.booster-unknown {
+    width: 120px;
+    font-size: 3rem;
+    border-radius: 6px;
+}
+
 /* A number found in two sets sharing a code (booster form): which card. */
 .card-choice {
     margin: 0.4rem 0;

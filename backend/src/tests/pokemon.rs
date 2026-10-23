@@ -185,6 +185,7 @@ async fn a_booster_opening_is_previewed_then_saved() {
             "/pokemon/add/booster",
             &[
                 ("step", "save"),
+                ("set", "fne"),
                 ("language", "fr"),
                 ("obtained_on", "2026-10-22"),
                 ("source", "booster"),
@@ -200,7 +201,7 @@ async fn a_booster_opening_is_previewed_then_saved() {
         )
         .await;
     assert_eq!(status, StatusCode::SEE_OTHER);
-    assert_eq!(location, "/pokemon/add/booster?added=1,2,3");
+    assert_eq!(location, "/pokemon/openings/1?added=1,2,3");
     assert_eq!(
         t.text(
             "SELECT group_concat(card_id || variant || full_art || source || obtained_on, ' ')
@@ -214,6 +215,18 @@ async fn a_booster_opening_is_previewed_then_saved() {
     assert!(
         page.contains("Added:") && page.contains("/pokemon/3"),
         "{page}"
+    );
+    assert_eq!(
+        t.text("SELECT set_code || ' ' || set_name || ' ' || opened_on FROM pokemon_opening")
+            .await
+            .as_deref(),
+        Some("fne fne 2026-10-22"),
+        "no set_name field posted: the code"
+    );
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM pokemon_copy WHERE opening_id = 1")
+            .await,
+        3
     );
 
     // 0.1 + 0.1 + 34.43
@@ -439,13 +452,20 @@ async fn celebration(t: &TestApp) {
              ('intl', '30th-B', '30th', '30ᵉ Anniversaire', 'B', 'Mew', 'Mew',
               'RGB Rare', 'Pokemon', 'holo', '{}', date('now')),
              ('intl', '30th-c-001', '30th-c', 'Collection Classique', '001', 'Dracaufeu',
-              'Charizard', NULL, 'Pokemon', 'holo', '{}', date('now'));
+              'Charizard', NULL, 'Pokemon', 'holo', '{}', date('now')),
+             ('intl', '30th-c-008', '30th-c', 'Collection Classique', '008',
+              'Pikachu et Zekrom GX', 'Pikachu & Zekrom GX', NULL, 'Pokemon', 'holo', '{}',
+              date('now'));
          INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
              ('fr', '30th', '30ᵉ Anniversaire', '30C', 128,
               '[{\"id\":\"30th-001\",\"localId\":\"001\",\"name\":\"Noeunoeuf\"},
+                {\"id\":\"30th-033\",\"localId\":\"033\",\"name\":\"Pikachu\"},
+                {\"id\":\"30th-056\",\"localId\":\"056\",\"name\":\"Zekrom\"},
                 {\"id\":\"30th-B\",\"localId\":\"B\",\"name\":\"Mew\"}]', date('now')),
              ('fr', '30th-c', 'Collection Classique', '30C', 30,
-              '[{\"id\":\"30th-c-001\",\"localId\":\"001\",\"name\":\"Dracaufeu\"}]', date('now'));",
+              '[{\"id\":\"30th-c-001\",\"localId\":\"001\",\"name\":\"Dracaufeu\"},
+                {\"id\":\"30th-c-008\",\"localId\":\"008\",\"name\":\"Pikachu et Zekrom GX\"}]',
+              date('now'));",
     )
     .execute(&t.state.pool)
     .await
@@ -511,4 +531,160 @@ async fn sets_sharing_a_code_are_told_apart() {
     ));
     assert!(page.contains(r#"name="rows-1-card" value="30th-B""#));
     assert!(page.contains(r#"name="rows-2-card" value="30th-c-001""#));
+}
+
+#[tokio::test]
+async fn reprints_are_found_by_name_or_offered() {
+    let t = TestApp::new().await;
+    celebration(&t).await;
+
+    // a code and a name: that set's cards; & is et
+    let (status, answer) = search(&t, "30C Zekrom").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    let ids: Vec<_> = answer["cards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].clone())
+        .collect();
+    assert_eq!(ids, ["30th-056", "30th-c-008"]);
+    let (_, answer) = search(&t, "30c pikachu & zekrom").await;
+    assert_eq!(answer["cards"][0]["id"], "30th-c-008");
+
+    // the reprint's old number (Team Up 33/181): the Classic Collection is offered
+    let (status, answer) = search(&t, "30C 33/181").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        answer["note"]
+            .as_str()
+            .unwrap()
+            .contains("keeps the number"),
+        "{answer}"
+    );
+    assert_eq!(answer["cards"].as_array().unwrap().len(), 2);
+
+    // the booster form: 33 is no card of the main set: choose; near mint by default
+    let (_, page) = t
+        .post(
+            "/pokemon/add/booster",
+            &[
+                ("set", "30C"),
+                ("language", "fr"),
+                ("obtained_on", "2026-10-23"),
+                ("source", "booster"),
+                ("pulls", "B 33/181"),
+                ("step", "preview"),
+            ],
+        )
+        .await;
+    assert!(!page.contains("class=\"error\""), "{page}");
+    assert!(
+        page.contains("a Classic Collection card keeps the number"),
+        "{page}"
+    );
+    assert!(page.contains(r#"<option value="" selected>— choose the card —</option>"#));
+    assert!(page.contains(r#"<option value="NM" selected>Near Mint</option>"#));
+
+    let save = |card: &'static str| {
+        vec![
+            ("step", "save"),
+            ("set", "30C"),
+            ("set_name", "30ᵉ Anniversaire / Collection Classique"),
+            ("language", "fr"),
+            ("obtained_on", "2026-10-23"),
+            ("source", "booster"),
+            ("rows-0-card", "30th-B"),
+            ("rows-0-variant", "holo"),
+            ("rows-0-count", "1"),
+            ("rows-0-condition", "NM"),
+            ("rows-1-card", card),
+            ("rows-1-variant", "holo"),
+            ("rows-1-count", "1"),
+            ("rows-1-condition", "NM"),
+        ]
+    };
+    let (status, page) = t.post("/pokemon/add/booster", &save("")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Card 2: choose which card it is"), "{page}");
+    let (status, location) = t.post("/pokemon/add/booster", &save("30th-c-008")).await;
+    assert_eq!(
+        (status, location.as_str()),
+        (StatusCode::SEE_OTHER, "/pokemon/openings/1?added=1,2")
+    );
+    assert_eq!(
+        t.text("SELECT group_concat(condition, ' ') FROM pokemon_copy")
+            .await
+            .as_deref(),
+        Some("NM NM")
+    );
+}
+
+#[tokio::test]
+async fn openings_are_listed_and_grow() {
+    let t = TestApp::new().await;
+    fixture(&t).await;
+    let opening = [
+        ("step", "save"),
+        ("set", "FNE"),
+        ("set_name", "Fable Nébuleuse"),
+        ("language", "fr"),
+        ("obtained_on", "2026-10-22"),
+        ("source", "booster"),
+        ("rows-0-card", "sv06.5-067"),
+        ("rows-0-variant", "holo"),
+        ("rows-0-count", "1"),
+    ];
+    t.post("/pokemon/add/booster", &opening).await;
+
+    let (status, page) = t.get("/pokemon/openings").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Booster openings (1)") && page.contains("Fable Nébuleuse"));
+    assert!(page.contains("<td>34.43</td>"), "{page}");
+
+    // a forgotten card, by number: the form is the opening's
+    let (_, page) = t.get("/pokemon/add/booster?opening=1").await;
+    assert!(
+        page.contains("Add cards to an opening") && page.contains(r#"name="opening" value="1""#)
+    );
+    let mut more = opening.to_vec();
+    more.extend([("opening", "1")]);
+    more[6] = ("rows-0-card", "sv06.5-010");
+    more[7] = ("rows-0-variant", "reverse");
+    let (status, location) = t.post("/pokemon/add/booster", &more).await;
+    assert_eq!(
+        (status, location.as_str()),
+        (StatusCode::SEE_OTHER, "/pokemon/openings/1?added=2")
+    );
+    assert_eq!(t.scalar("SELECT count(*) FROM pokemon_opening").await, 1);
+
+    // one card with the finder, into the opening
+    let mut single = HORSEA_IR.to_vec();
+    single.push(("opening", "1"));
+    let (_, location) = t.post("/pokemon/add", &single).await;
+    assert_eq!(location, "/pokemon/openings/1?added=3");
+    let (_, page) = t.get("/pokemon/openings/1").await;
+    assert!(
+        page.contains("3 cards") && page.contains("value <strong>"),
+        "{page}"
+    );
+    let (_, page) = t.get("/pokemon/3").await;
+    assert!(page.contains("/pokemon/openings/1"));
+
+    // an unknown opening is refused; the date moves its cards' too
+    let mut wrong = HORSEA_IR.to_vec();
+    wrong.push(("opening", "9"));
+    let (_, page) = t.post("/pokemon/add", &wrong).await;
+    assert!(page.contains("Booster opening: invalid choice."));
+    let (status, _) = t
+        .post(
+            "/pokemon/openings/1/edit",
+            &[("opened_on", "2026-10-21"), ("note", "At the shop")],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM pokemon_copy WHERE obtained_on = '2026-10-21'")
+            .await,
+        3
+    );
 }

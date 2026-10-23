@@ -56,6 +56,17 @@
   </div>
 </fieldset>
 
+<p>
+  <label for="opening">From a booster opening:</label>
+  <select name="opening" id="opening">
+    <option value="">None</option>
+    {% for (id, label) in values.openings %}
+    <option value="{{ id }}" {% if values.opening_is(id) %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <small>A card forgotten when the booster was added, or put in the wrong one.</small>
+</p>
+
 <details class="book-more" {% if values.has_grading() %}open{% endif %}>
   <summary>Graded card (PSA, CGC…)</summary>
   <fieldset>

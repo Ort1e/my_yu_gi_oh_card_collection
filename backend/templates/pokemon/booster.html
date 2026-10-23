@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Add a booster opening{% endblock %}
+{% block title %}{% if opening.is_some() %}Add cards to an opening{% else %}Add a booster opening{% endif %}{% endblock %}
 {% block body_class %}pokemon{% endblock %}
 {% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
 
@@ -12,15 +12,28 @@
 
 {% block content %}
 <div class="inside-container narrow">
+{% match opening %}{% when Some with (opening) %}
+<h1>Add cards to an opening</h1>
+<p class="back-link"><a href="/pokemon/openings/{{ opening.id }}">← Back to the opening</a></p>
+<p>{{ opening.label() }}. The cards are added to it.</p>
+{% when None %}
 <h1>Add a booster opening</h1>
-<p class="back-link"><a href="/pokemon">← Back to the collection</a> · One card (a single, a gift)? <a href="/pokemon/add">Add a card</a></p>
+<p class="back-link"><a href="/pokemon/openings">← The openings</a> · One card (a single, a gift)? <a href="/pokemon/add">Add a card</a></p>
+{% endmatch %}
 
-{% include "partials/pokemon_added.html" %}
 {% include "partials/form_errors.html" %}
 
 <form method="post" action="/pokemon/add/booster" id="booster-form">
+  <input type="hidden" name="opening" value="{{ values.opening }}">
+  <input type="hidden" name="set_name" value="{{ set_name }}">
   <fieldset>
     <legend>The opening</legend>
+    {% if opening.is_some() %}
+    <input type="hidden" name="set" value="{{ values.set }}">
+    <input type="hidden" name="language" value="{{ values.language }}">
+    <input type="hidden" name="obtained_on" value="{{ values.obtained_on }}">
+    <input type="hidden" name="source" value="{{ values.source }}">
+    {% else %}
     <div class="field-row">
       <div>
         <label for="set">Set code:</label>
@@ -49,12 +62,14 @@
     </div>
     <small>The set code is printed at the bottom of the cards, next to the number: <strong>FNE</strong> 067/064
       (French), SFA (English), 30C (30th Celebration); a Japanese card shows its set id: SV6a.</small>
+    {% endif %}
     <p>
       <label for="pulls">The cards' numbers:</label>
       <textarea name="pulls" id="pulls" rows="3" placeholder="12 34 45r 67 TG05x2">{{ values.pulls }}</textarea>
       <small>Separated by spaces or commas. After a number: <strong>r</strong> for a reverse holo,
         <strong>h</strong> holo, <strong>x2</strong> for two copies. A card numbered by a letter: the letter (B).
-        Two sets with the same code (30C): add the set size printed after the number (1/30).
+        Two sets with the same code (30C): add the set size printed after the number (1/30);
+        a Classic Collection reprint shows the number of the old card: type it with its size (33/181).
         You can check each card's variant on the next step.</small>
     </p>
   </fieldset>
@@ -69,11 +84,21 @@
     {% for row in preview %}
     <div class="booster-row">
       {% if row.alternatives.is_empty() %}<input type="hidden" name="rows-{{ loop.index0 }}-card" value="{{ row.tcgdex_id }}">{% endif %}
+      {% if row.is_unknown() %}<div class="pokemon-no-image booster-unknown">?</div>{% endif %}
       {% if row.has_image %}<img src="{{ row.image_src() }}" alt="{{ row.name }}" width="120" height="167" loading="lazy">{% endif %}
       <div class="booster-row-fields">
         <div class="finder-card-name">{{ row.name }} <small>No. {{ row.local_id }}</small></div>
         {% if !row.other_name.is_empty() %}<div class="english-name">{{ row.other_name }}</div>{% endif %}
-        {% if !row.alternatives.is_empty() %}
+        {% if row.is_unknown() %}
+        <div class="card-choice">
+          <label for="rows-{{ loop.index0 }}-card">Not in the main set: a Classic Collection card keeps the number of the card it reprints. Which one is it?</label>
+          <select name="rows-{{ loop.index0 }}-card" id="rows-{{ loop.index0 }}-card">
+            <option value="" selected>— choose the card —</option>
+            {% for (id, label) in row.alternatives %}<option value="{{ id }}">{{ label }}</option>{% endfor %}
+          </select>
+          <small>Not one of them? Check the number, or set its copies to 0.</small>
+        </div>
+        {% else if !row.alternatives.is_empty() %}
         <div class="card-choice">
           <label for="rows-{{ loop.index0 }}-card">This number is in {{ row.alternatives.len() + 1 }} sets with this code: which card is yours?</label>
           <select name="rows-{{ loop.index0 }}-card" id="rows-{{ loop.index0 }}-card">
@@ -101,7 +126,7 @@
             <label for="rows-{{ loop.index0 }}-condition">Condition:</label>
             <select name="rows-{{ loop.index0 }}-condition" id="rows-{{ loop.index0 }}-condition">
               <option value="">Not noted</option>
-              {% for status in self.conditions() %}<option value="{{ status.code() }}">{{ status.label() }}</option>{% endfor %}
+              {% for status in self.conditions() %}<option value="{{ status.code() }}" {% if self.is_new_card(status) %}selected{% endif %}>{{ status.label() }}</option>{% endfor %}
             </select>
           </div>
           <div>

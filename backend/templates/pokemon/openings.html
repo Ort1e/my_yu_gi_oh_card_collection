@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Booster openings{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>Booster openings ({{ openings.len() }})</h1>
+<p><a href="/pokemon/add/booster" class="btn">Add a booster opening</a></p>
+
+{% if openings.is_empty() %}
+<p>No opening yet.</p>
+{% else %}
+<div class="table-scroll">
+<table class="numbers sortable">
+  <thead>
+    <tr>
+      <th data-sort="text">Opened on</th>
+      <th data-sort="text" class="text">Set</th>
+      <th data-sort="text" class="text">Language</th>
+      <th data-sort="number">Cards</th>
+      <th data-sort="text" class="text">Best card</th>
+      <th data-sort="number">Value (€)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in openings %}
+    <tr>
+      <td><a href="/pokemon/openings/{{ row.opening.id }}">{% match row.opening.opened_on %}{% when Some with (date) %}{{ date }}{% when None %}No date{% endmatch %}</a></td>
+      <td class="text">{{ row.opening.set_name }}</td>
+      <td class="text">{{ row.opening.language }}</td>
+      <td>{{ row.opening.cards }}</td>
+      <td class="text">{% match row.best %}{% when Some with ((copy_id, name, value)) %}<a href="/pokemon/{{ copy_id }}">{{ name }}</a> ({{ value }} €){% when None %}{% endmatch %}</td>
+      <td>{{ row.value_text() }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+{% endblock %}

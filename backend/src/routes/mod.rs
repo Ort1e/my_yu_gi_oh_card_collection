@@ -50,6 +50,8 @@ pub fn router() -> Router<AppState> {
         .route("/pokemon", get(pokemon::list))
         .route("/pokemon/rarities", get(pokemon::rarities::page))
         .route("/pokemon/wishlist", get(pokemon::wishlist::list))
+        .route("/pokemon/openings", get(pokemon::openings::list))
+        .route("/pokemon/openings/:id", get(pokemon::openings::detail))
         .route("/pokemon/:id", get(pokemon::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))
         .route("/api/deck-versions/:id", get(decks::api::get_version))
@@ -166,6 +168,10 @@ pub fn write_router() -> Router<AppState> {
             post(pokemon::wishlist::delete),
         )
         .route("/pokemon/wishlist/:id/got", post(pokemon::wishlist::got))
+        .route(
+            "/pokemon/openings/:id/edit",
+            get(pokemon::openings::edit_page).post(pokemon::openings::update),
+        )
         .route("/pokemon/api/search", get(pokemon::api::search))
         .route("/pokemon/api/card", get(pokemon::api::card))
         .route(

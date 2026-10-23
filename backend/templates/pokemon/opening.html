@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Booster opening{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/books.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<p class="back-link"><a href="/pokemon/openings">← The openings</a></p>
+<h1>{{ opening.set_name }}</h1>
+<p>
+  Opened on {% match opening.opened_on %}{% when Some with (date) %}{{ date }}{% when None %}a day not noted{% endmatch %}
+  · {{ opening.language }} · {{ opening.cards }} cards · value <strong>{{ self.value_text() }} €</strong>
+</p>
+{% match opening.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
+
+{% include "partials/pokemon_added.html" %}
+
+<div class="button-row">
+  <a href="/pokemon/add/booster?opening={{ opening.id }}" class="btn">Add cards by number</a>
+  <a href="/pokemon/add?opening={{ opening.id }}" class="btn btn-secondary">Add one card (find it)</a>
+  <a href="/pokemon/openings/{{ opening.id }}/edit" class="btn btn-secondary">Date, note</a>
+</div>
+
+{% if copies.is_empty() %}
+<p>No card in this opening.</p>
+{% else %}
+<div class="pokemon-grid">
+  {% for copy in copies %}
+    {% include "partials/pokemon_item.html" %}
+  {% endfor %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

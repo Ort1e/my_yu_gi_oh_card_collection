@@ -326,6 +326,41 @@ impl CardInfo {
     }
 }
 
+/// A card name to compare: lower case, without accents, `&`, `et` and
+/// `and` the same (French writes "Pikachu et Zekrom GX", English
+/// "Pikachu & Zekrom GX"), `-` as a space ("Mew-ex" = "Mew ex").
+pub fn fold_name(name: &str) -> String {
+    let plain: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'à' | 'â' | 'ä' | 'á' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'î' | 'ï' | 'í' => 'i',
+            'ô' | 'ö' | 'ó' => 'o',
+            'ù' | 'û' | 'ü' | 'ú' => 'u',
+            'ç' => 'c',
+            'ñ' => 'n',
+            '-' | '’' | '\'' => ' ',
+            c => c,
+        })
+        .collect();
+    plain
+        .split_whitespace()
+        .map(|word| match word {
+            "et" | "and" => "&",
+            word => word,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Whether a card's name contains what was typed (both [`fold_name`]d).
+pub fn name_matches(name: &str, typed: &str) -> bool {
+    let typed = fold_name(typed);
+    !typed.is_empty() && fold_name(name).contains(&typed)
+}
+
 /// Whether a card of this rarity is (most likely) a full art: the
 /// suggestion of the forms, the owner ticks or unticks it. TCGdex has no
 /// "full art" field; its English rarities (also used for the Japanese
@@ -451,6 +486,16 @@ mod tests {
         assert_eq!(parse_language("french"), None);
         assert_eq!(language_label("ja"), "Japanese");
         assert_eq!(language_label("ko"), "ko");
+    }
+
+    #[test]
+    fn names_match_across_languages() {
+        assert!(name_matches("Pikachu et Zekrom GX", "pikachu & zekrom"));
+        assert!(name_matches("Pikachu & Zekrom GX", "Pikachu and Zekrom"));
+        assert!(name_matches("Pêchaminus-ex", "pechaminus ex"));
+        assert!(name_matches("Pikachu et Zekrom GX", "zekrom"));
+        assert!(!name_matches("Zekrom", "pikachu"));
+        assert!(!name_matches("Zekrom", "  "));
     }
 
     #[test]

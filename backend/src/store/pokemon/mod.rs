@@ -3,12 +3,14 @@
 //! - `cards.rs`: TCGdex's cards, remembered in `pokemon_card` (owned or
 //!   wished cards only), and the copy and wish writes;
 //! - `sets.rs`: sets by printed code (`FNE`), remembered in `pokemon_set`;
-//! - `prices.rs`: the weekly Cardmarket prices in `pokemon_price`.
+//! - `prices.rs`: the weekly Cardmarket prices in `pokemon_price`;
+//! - `openings.rs`: booster openings (`pokemon_opening`).
 //!
 //! Network calls happen before any write transaction (CLAUDE.md): the
 //! lookups write their cache through the pool.
 
 pub mod cards;
+pub mod openings;
 pub mod prices;
 pub mod sets;
 pub mod tcgdex;

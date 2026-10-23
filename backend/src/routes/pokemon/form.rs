@@ -19,6 +19,7 @@ use serde::Deserialize;
 use super::CopyRow;
 use crate::store::db::{begin_write, today, Pool};
 use crate::store::pokemon::cards::{self, CopyFields};
+use crate::store::pokemon::openings;
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
@@ -43,6 +44,10 @@ pub struct CopyValues {
     pub note: String,
     /// Edit page only: the card's name typed by hand (a Japanese Trainer).
     pub name_manual: String,
+    /// The booster opening's id, or empty.
+    pub opening: String,
+    /// The openings to choose from: `(id, label)`.
+    pub openings: Vec<(i64, String)>,
 }
 
 impl CopyValues {
@@ -64,7 +69,23 @@ impl CopyValues {
             sold_price: form.text("sold_price"),
             note: form.text("note"),
             name_manual: form.text("name_manual"),
+            opening: form.text("opening"),
+            openings: Vec::new(),
         }
+    }
+
+    /// The openings to choose from, loaded.
+    async fn with_openings(mut self, pool: &Pool) -> AppResult<CopyValues> {
+        self.openings = openings::all(pool)
+            .await?
+            .into_iter()
+            .map(|o| (o.id, o.label()))
+            .collect();
+        Ok(self)
+    }
+
+    pub fn opening_is(&self, id: &i64) -> bool {
+        self.opening == id.to_string()
     }
 
     pub fn languages(&self) -> [(&'static str, &'static str); 7] {
@@ -170,6 +191,7 @@ fn read_copy(form: &mut FormData) -> Option<(String, CopyFields)> {
             .push("Grade: give the grading company too (PSA, CGC…).".into());
     }
     let estimate = form.decimal("estimate", "Estimate");
+    let opening_id = form.id("opening", "Booster opening");
     let sold_on = form.date("sold_on", "Sold on");
     let sold_price = form.decimal("sold_price", "Sold for");
     if sold_price.is_some() && form.get("sold_on").is_none() {
@@ -199,8 +221,19 @@ fn read_copy(form: &mut FormData) -> Option<(String, CopyFields)> {
             sold_on,
             sold_price,
             note: form.get("note").map(str::to_string),
+            opening_id,
         },
     ))
+}
+
+/// An error when the opening chosen doesn't exist (any more).
+async fn check_opening(pool: &Pool, copy: &CopyFields, errors: &mut Vec<String>) -> AppResult<()> {
+    if let Some(id) = copy.opening_id {
+        if openings::get(pool, id).await?.is_none() {
+            errors.push("Booster opening: invalid choice.".into());
+        }
+    }
+    Ok(())
 }
 
 /// The `pokemon_card` id of the card typed, asking TCGdex when needed; a
@@ -275,13 +308,15 @@ pub struct AddCopyPage {
     added: Vec<Added>,
 }
 
-/// `?added=<id>` after a save; `?card=…&language=…&variant=…` from a wish.
+/// `?added=<id>` after a save; `?card=…&language=…&variant=…` from a wish;
+/// `?opening=<id>` from an opening's page.
 #[derive(Debug, Deserialize)]
 pub struct AddParams {
     added: Option<i64>,
     card: Option<String>,
     language: Option<String>,
     variant: Option<String>,
+    opening: Option<i64>,
 }
 
 /// `GET /pokemon/add`.
@@ -289,7 +324,7 @@ pub async fn add_page(
     State(state): State<AppState>,
     Query(params): Query<AddParams>,
 ) -> AppResult<AddCopyPage> {
-    let values = CopyValues {
+    let mut values = CopyValues {
         card: params.card.unwrap_or_default(),
         language: params.language.unwrap_or_else(|| "fr".into()),
         variant: params.variant.unwrap_or_default(),
@@ -297,6 +332,16 @@ pub async fn add_page(
         obtained_on: today().to_string(),
         ..CopyValues::default()
     };
+    if let Some(opening) = match params.opening {
+        Some(id) => openings::get(&state.pool, id).await?,
+        None => None,
+    } {
+        values.opening = opening.id.to_string();
+        values.language = opening.language;
+        values.source = Source::Booster.code().into();
+        values.obtained_on = opening.opened_on.unwrap_or_default();
+    }
+    let values = values.with_openings(&state.pool).await?;
     let added = match params.added {
         Some(id) => added(&state.pool, &[id]).await?,
         None => Vec::new(),
@@ -329,9 +374,14 @@ pub async fn create(
         None => None,
     };
 
+    if let Some(copy) = &copy {
+        check_opening(&state.pool, copy, &mut form.errors).await?;
+    }
     let Some(copy) = copy.take().filter(|_| form.errors.is_empty()) else {
         let page = AddCopyPage {
-            values: CopyValues::from_form(&form),
+            values: CopyValues::from_form(&form)
+                .with_openings(&state.pool)
+                .await?,
             errors: form.errors,
             added: Vec::new(),
         };
@@ -343,7 +393,11 @@ pub async fn create(
     tx.commit().await?;
     tracing::info!(copy_id = id, "Pokémon copy added");
 
-    Ok(Redirect::to(&format!("/pokemon/add?added={id}")).into_response())
+    let to = match copy.opening_id {
+        Some(opening) => format!("/pokemon/openings/{opening}?added={id}"),
+        None => format!("/pokemon/add?added={id}"),
+    };
+    Ok(Redirect::to(&to).into_response())
 }
 
 // ---------- edit ----------
@@ -382,6 +436,8 @@ fn stored_values(copy: &CopyRow) -> CopyValues {
         sold_price: money(&copy.sold_price),
         note: text(&copy.note),
         name_manual: text(&copy.name_manual),
+        opening: copy.opening_id.map(|id| id.to_string()).unwrap_or_default(),
+        openings: Vec::new(),
     }
 }
 
@@ -402,7 +458,7 @@ pub async fn edit_page(
     Ok(EditCopyPage {
         id,
         errors: Vec::new(),
-        values: stored_values(&copy),
+        values: stored_values(&copy).with_openings(&state.pool).await?,
         japanese: copy.catalogue == "ja",
     })
 }
@@ -424,10 +480,15 @@ pub async fn update(
         }
     }
 
+    if let Some(copy) = &copy {
+        check_opening(&state.pool, copy, &mut form.errors).await?;
+    }
     let Some(copy) = copy.filter(|_| form.errors.is_empty()) else {
         let page = EditCopyPage {
             id,
-            values: CopyValues::from_form(&form),
+            values: CopyValues::from_form(&form)
+                .with_openings(&state.pool)
+                .await?,
             errors: form.errors,
             japanese: before.catalogue == "ja",
         };
