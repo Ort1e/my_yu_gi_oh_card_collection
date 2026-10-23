@@ -24,6 +24,15 @@
     <small>Its cards get the same date.</small>
   </p>
   <p>
+    <label for="language">Language of its cards:</label>
+    <select name="language" id="language">
+      {% for (code, label) in self.languages() %}
+      <option value="{{ code }}" {% if self.language_is(code) %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <small>All its cards change with it (an English booster saved as French: choose English).</small>
+  </p>
+  <p>
     <label for="note">Note:</label>
     <textarea name="note" id="note" rows="3" placeholder="Bought at…, a gift from…">{{ note }}</textarea>
   </p>

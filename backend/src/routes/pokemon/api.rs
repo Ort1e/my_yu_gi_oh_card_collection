@@ -320,6 +320,7 @@ struct CardRow {
     variants: String,
     image: Option<String>,
     image_fr: Option<String>,
+    image_from: Option<String>,
 }
 
 pub async fn card(
@@ -349,7 +350,7 @@ pub async fn card(
     };
     let card: CardRow = sqlx::query_as(
         "SELECT id, catalogue, tcgdex_id, set_name, local_id, name_fr, name_en, name_ja,
-                name_manual, rarity, category, types, variants, image, image_fr
+                name_manual, rarity, category, types, variants, image, image_fr, image_from
          FROM pokemon_card WHERE id = ?",
     )
     .bind(card_id)
@@ -382,7 +383,7 @@ pub async fn card(
         })
         .collect();
 
-    let has_image = card.image.is_some() || card.image_fr.is_some();
+    let has_image = super::has_picture(&card.image, &card.image_fr, &card.image_from);
     Ok(Json(json!({
         "card_id": card.id,
         "id": card.tcgdex_id,

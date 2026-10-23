@@ -76,26 +76,44 @@ pub async fn insert(
     Ok(done.last_insert_rowid())
 }
 
-/// The date and the note; `false` when there is no such opening. The date
-/// goes to its copies too (they were obtained that day).
+/// What an opening's edit page changes.
+pub struct OpeningFields<'a> {
+    pub opened_on: Option<NaiveDate>,
+    pub note: Option<&'a str>,
+    /// Its cards' language (the same catalogue: the caller checks).
+    pub language: &'a str,
+    /// The code printed in that language (`SFA` for `FNE` in English).
+    pub set_code: &'a str,
+    pub set_name: &'a str,
+}
+
+/// `false` when there is no such opening. The date and the language go to
+/// its copies too (they were all obtained that day, in that language).
 pub async fn update(
     conn: &mut SqliteConnection,
     id: i64,
-    opened_on: Option<NaiveDate>,
-    note: Option<&str>,
+    fields: &OpeningFields<'_>,
 ) -> sqlx::Result<bool> {
-    let opened_on = opened_on.map(|d| d.to_string());
-    let done = sqlx::query("UPDATE pokemon_opening SET opened_on = ?, note = ? WHERE id = ?")
-        .bind(&opened_on)
-        .bind(note)
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
+    let opened_on = fields.opened_on.map(|d| d.to_string());
+    let done = sqlx::query(
+        "UPDATE pokemon_opening SET opened_on = ?, note = ?, language = ?, set_code = ?,
+             set_name = ?
+         WHERE id = ?",
+    )
+    .bind(&opened_on)
+    .bind(fields.note)
+    .bind(fields.language)
+    .bind(fields.set_code)
+    .bind(fields.set_name)
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
     if done.rows_affected() == 0 {
         return Ok(false);
     }
-    sqlx::query("UPDATE pokemon_copy SET obtained_on = ? WHERE opening_id = ?")
+    sqlx::query("UPDATE pokemon_copy SET obtained_on = ?, language = ? WHERE opening_id = ?")
         .bind(&opened_on)
+        .bind(fields.language)
         .bind(id)
         .execute(conn)
         .await?;

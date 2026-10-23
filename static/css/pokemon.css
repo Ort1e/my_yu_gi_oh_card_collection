@@ -139,6 +139,16 @@ label.checkbox input {
     border-radius: 12px;
 }
 
+.pokemon-detail-picture {
+    max-width: 300px;
+    margin: 0;
+}
+
+.pokemon-detail-picture figcaption {
+    font-size: 0.85rem;
+    color: #555;
+}
+
 .pokemon-detail .card {
     flex: 1 1 18rem;
 }

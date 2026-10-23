@@ -161,7 +161,9 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
 - **The openings** (Openings in the header): each booster with its cards
   and value. A card forgotten: the opening's page → **Add cards by
   number** or **Add one card**; a card in the wrong opening: its edit
-  page, "From a booster opening". **Find the cards** shows each card with its
+  page, "From a booster opening". Saved in the wrong language (the form
+  starts in the last opening's): **Date, language, note** changes all its
+  cards. **Find the cards** shows each card with its
   picture and rarity: check the variant (the guide says how to tell them
   apart), full art, condition; a count of 0 leaves a card out. **Save**.
 - **One card** (Add → One card: a single, a gift, a graded card): find it by

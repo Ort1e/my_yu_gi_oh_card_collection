@@ -687,4 +687,48 @@ async fn openings_are_listed_and_grow() {
             .await,
         3
     );
+
+    // an English booster saved as French: its cards, set code and name follow
+    sqlx::query(
+        "INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at)
+         VALUES ('en', 'sv06.5', 'Shrouded Fable', 'SFA', 64, '[]', date('now'))",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let (_, page) = t.get("/pokemon/openings/1/edit").await;
+    assert!(
+        page.contains(r#"<option value="en" >English</option>"#),
+        "{page}"
+    );
+    assert!(!page.contains("Japanese"), "not the other catalogue");
+    let (status, _) = t
+        .post(
+            "/pokemon/openings/1/edit",
+            &[("opened_on", "2026-10-21"), ("language", "en")],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        t.text("SELECT language || ' ' || set_code || ' ' || set_name FROM pokemon_opening")
+            .await
+            .as_deref(),
+        Some("en SFA Shrouded Fable")
+    );
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM pokemon_copy WHERE language = 'en'")
+            .await,
+        3
+    );
+    let (_, page) = t
+        .post("/pokemon/openings/1/edit", &[("language", "ja")])
+        .await;
+    assert!(page.contains("Japanese cards are other cards"));
+
+    // the next opening starts in the last one's language
+    let (_, page) = t.get("/pokemon/add/booster").await;
+    assert!(
+        page.contains(r#"<option value="en" selected>English</option>"#),
+        "{page}"
+    );
 }

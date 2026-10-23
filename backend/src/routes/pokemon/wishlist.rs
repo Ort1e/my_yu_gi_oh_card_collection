@@ -41,6 +41,7 @@ pub struct WishRow {
     rarity: Option<String>,
     image: Option<String>,
     image_fr: Option<String>,
+    image_from: Option<String>,
     #[sqlx(skip)]
     price: Option<Decimal>,
     #[sqlx(skip)]
@@ -51,7 +52,7 @@ impl WishRow {
     const SELECT: &'static str = "SELECT w.id, w.card_id, w.language, w.variant, w.max_price,
             w.priority, w.note, w.got_copy_id, c.catalogue, c.tcgdex_id,
             c.set_name, c.local_id, c.name_fr, c.name_en, c.name_ja, c.name_manual, c.rarity,
-            c.image, c.image_fr
+            c.image, c.image_fr, c.image_from
          FROM pokemon_wish w JOIN pokemon_card c ON c.id = w.card_id";
 
     /// The language its name and picture are shown in.
@@ -82,7 +83,7 @@ impl WishRow {
     }
 
     fn has_image(&self) -> bool {
-        self.image.is_some() || self.image_fr.is_some()
+        super::has_picture(&self.image, &self.image_fr, &self.image_from)
     }
 
     fn image_src(&self) -> String {

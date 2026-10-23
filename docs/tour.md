@@ -467,7 +467,19 @@ with its copies (`pokemon_copy.opening_id`); `/pokemon/openings` lists them
 with their value and best card, an opening's page shows its cards and adds
 more (the booster form with `?opening=<id>`, or the one-card form, whose
 "From a booster opening" field also moves a copy). The migration grouped
-the booster copies saved before by day and language. Codes may start with a
+the booster copies saved before by day and language. Its edit page
+changes its date and language, and its cards' with them (French ⇔
+English; not Japanese, another catalogue): the set code and names are
+looked up again by its cards' set ids. A new opening starts in the last
+one's language.
+
+**Borrowed pictures** (migration 0014): TCGdex has no picture of some
+prints yet (all 30 Classic Collection reprints of 30th Celebration). The
+picture route then borrows, once, the picture of a print with the same
+name, the same illustrator's when there is one (a reprint keeps its
+artwork): `cards::borrow_image`, `pokemon_card.image_from` (the print
+shown; `''`: none found). The card's page says so; TCGdex's own picture
+replaces it when it comes. Codes may start with a
 digit (`30C`) and a few cards are numbered by a letter (the Mew cards R, G,
 B).
 

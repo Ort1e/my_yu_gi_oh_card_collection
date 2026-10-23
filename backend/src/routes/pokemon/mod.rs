@@ -81,6 +81,16 @@ pub fn card_names(
     (main, other)
 }
 
+/// Whether a card has a picture to show: its own, or a borrowed one, or
+/// none tried yet (the picture route borrows one: `image_from` NULL).
+pub fn has_picture(
+    image: &Option<String>,
+    image_fr: &Option<String>,
+    image_from: &Option<String>,
+) -> bool {
+    image.is_some() || image_fr.is_some() || image_from.is_none()
+}
+
 /// The picture of a card in a language (`/pokemon/card-image/…`).
 pub fn image_src(card_id: i64, language: &str) -> String {
     format!("/pokemon/card-image/{card_id}/{language}")
@@ -119,6 +129,8 @@ pub struct CopyRow {
     pub types: Option<String>,
     pub image: Option<String>,
     pub image_fr: Option<String>,
+    /// The print whose picture is shown, when not the card's own.
+    pub image_from: Option<String>,
     /// Today's market value (`None`: no price, or sold).
     #[sqlx(skip)]
     pub value: Option<Decimal>,
@@ -131,7 +143,7 @@ impl CopyRow {
             pc.grade, pc.cert_number, pc.estimate, pc.sold_on, pc.sold_price, pc.note,
             pc.added_on, pc.opening_id, c.catalogue, c.tcgdex_id, c.set_name, c.local_id,
             c.name_fr, c.name_en, c.name_ja, c.name_manual, c.rarity, c.types, c.image,
-            c.image_fr
+            c.image_fr, c.image_from
          FROM pokemon_copy pc JOIN pokemon_card c ON c.id = pc.card_id";
 
     fn names(&self) -> (String, String) {
@@ -187,7 +199,12 @@ impl CopyRow {
     }
 
     pub fn has_image(&self) -> bool {
-        self.image.is_some() || (self.language == "fr" && self.image_fr.is_some())
+        has_picture(&self.image, &self.image_fr, &self.image_from)
+    }
+
+    /// The print whose picture is borrowed (`sm9-33`), or empty.
+    pub fn picture_from(&self) -> &str {
+        self.image_from.as_deref().unwrap_or("")
     }
 
     pub fn image_src(&self) -> String {

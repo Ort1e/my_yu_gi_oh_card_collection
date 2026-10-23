@@ -186,6 +186,16 @@ async fn opening_of(state: &AppState, id: Option<i64>) -> AppResult<Option<Openi
     }
 }
 
+/// The language of the latest opening, else French.
+async fn last_language(state: &AppState) -> AppResult<String> {
+    let last: Option<String> = sqlx::query_scalar(
+        "SELECT language FROM pokemon_opening ORDER BY added_on DESC, id DESC LIMIT 1",
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(last.unwrap_or_else(|| "fr".into()))
+}
+
 /// `GET /pokemon/add/booster[?opening=<id>]`.
 pub async fn page(
     State(state): State<AppState>,
@@ -202,7 +212,8 @@ pub async fn page(
             ..OpeningValues::default()
         },
         None => OpeningValues {
-            language: "fr".into(),
+            // the last opening's language (boosters come in runs), else French
+            language: last_language(&state).await?,
             obtained_on: today().to_string(),
             source: Source::Booster.code().into(),
             ..OpeningValues::default()
@@ -394,6 +405,7 @@ struct CardFacts {
     variants: String,
     image: Option<String>,
     image_fr: Option<String>,
+    image_from: Option<String>,
 }
 
 async fn preview_row(
@@ -405,7 +417,7 @@ async fn preview_row(
 ) -> AppResult<PreviewRow> {
     let card: CardFacts = sqlx::query_as(
         "SELECT tcgdex_id, local_id, name_fr, name_en, name_ja, name_manual, rarity, variants,
-                image, image_fr
+                image, image_fr, image_from
          FROM pokemon_card WHERE id = ?",
     )
     .bind(card_id)
@@ -435,7 +447,7 @@ async fn preview_row(
             variants
         },
         count: pull.count,
-        has_image: card.image.is_some() || card.image_fr.is_some(),
+        has_image: super::has_picture(&card.image, &card.image_fr, &card.image_from),
         set_name: String::new(),
         alternatives: Vec::new(),
         language: language.to_string(),

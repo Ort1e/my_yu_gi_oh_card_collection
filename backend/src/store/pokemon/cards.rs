@@ -161,7 +161,10 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
              name_fr = excluded.name_fr, name_en = excluded.name_en,
              name_ja = excluded.name_ja, rarity = excluded.rarity,
              category = excluded.category, types = excluded.types, dex_id = excluded.dex_id,
-             variants = excluded.variants, image = excluded.image,
+             variants = excluded.variants,
+             -- a borrowed picture stays until TCGdex has the card's own
+             image = coalesce(excluded.image, pokemon_card.image),
+             image_from = CASE WHEN excluded.image IS NULL THEN pokemon_card.image_from END,
              image_fr = excluded.image_fr, json = excluded.json,
              fetched_at = excluded.fetched_at",
     )
@@ -204,6 +207,72 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
     tx.commit().await?;
     tracing::info!(card = %info.tcgdex_id, "Pokémon card data saved");
     Ok(id)
+}
+
+/// For a card TCGdex has no picture of (the Classic Collection reprints):
+/// the picture of another print with the same name, the same illustrator's
+/// when one is (a reprint keeps its artwork), saved in `image` with its id
+/// in `image_from`. Tried once: `image_from = ''` when none was found.
+/// The picture's URL, if any. Asks TCGdex: not inside a write transaction.
+pub async fn borrow_image(
+    pool: &Pool,
+    http: &reqwest::Client,
+    card_id: i64,
+) -> AppResult<Option<String>> {
+    let (catalogue, tcgdex_id, json): (String, String, String) =
+        sqlx::query_as("SELECT catalogue, tcgdex_id, json FROM pokemon_card WHERE id = ?")
+            .bind(card_id)
+            .fetch_one(pool)
+            .await?;
+    let json: Value = serde_json::from_str(&json).unwrap_or_default();
+    let language = Catalogue::from_code(&catalogue)
+        .unwrap_or(Catalogue::International)
+        .data_language();
+    let (Some(name), illustrator) = (json["name"].as_str(), json["illustrator"].as_str()) else {
+        return Ok(None);
+    };
+
+    let same_name: Vec<Value> = tcgdex::search(http, language, name)
+        .await?
+        .into_iter()
+        .filter(|c| {
+            c["name"]
+                .as_str()
+                .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                && c["image"].is_string()
+                && c["id"].as_str() != Some(tcgdex_id.as_str())
+        })
+        .take(5)
+        .collect();
+    let mut chosen = same_name.first().cloned();
+    if let Some(illustrator) = illustrator {
+        for brief in &same_name {
+            let Some(id) = brief["id"].as_str() else {
+                continue;
+            };
+            let card = tcgdex::card(http, language, id).await?;
+            if card.is_some_and(|c| c["illustrator"].as_str() == Some(illustrator)) {
+                chosen = Some(brief.clone());
+                break;
+            }
+        }
+    }
+
+    let image = chosen
+        .as_ref()
+        .and_then(|c| c["image"].as_str())
+        .map(str::to_string);
+    let from = chosen.as_ref().and_then(|c| c["id"].as_str()).unwrap_or("");
+    let mut tx = begin_write(pool).await?;
+    sqlx::query("UPDATE pokemon_card SET image = coalesce(?, image), image_from = ? WHERE id = ?")
+        .bind(&image)
+        .bind(from)
+        .bind(card_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    tracing::info!(card = %tcgdex_id, from, "Pokémon picture borrowed");
+    Ok(image)
 }
 
 /// The cards nobody owns (or ever owned) nor wishes any more, with their

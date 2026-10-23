@@ -1,13 +1,23 @@
 //! Pokémon card pictures: `/pokemon/card-image/:card_id/:lang`, the French
 //! print's picture for `fr` when TCGdex has it, else the English (or
 //! Japanese) one. Downloaded once from TCGdex (`{image}/high.webp`) into
-//! `<media>/pokemon_card_images/`, then served from there.
+//! `<media>/pokemon_card_images/`, then served from there. A card TCGdex
+//! has no picture of borrows one (`cards::borrow_image`), once.
 
 use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::IntoResponse;
 
-use crate::store::pokemon::tcgdex;
+use crate::store::pokemon::{cards, tcgdex};
+
+/// `(catalogue, tcgdex_id, image, image_fr, image_from)`.
+type Picture = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::AppState;
 
@@ -30,18 +40,25 @@ pub async fn card_image(
     State(state): State<AppState>,
     Path((card_id, language)): Path<(i64, String)>,
 ) -> AppResult<impl IntoResponse> {
-    let (catalogue, tcgdex_id, image, image_fr): (String, String, Option<String>, Option<String>) =
-        sqlx::query_as(
-            "SELECT catalogue, tcgdex_id, image, image_fr FROM pokemon_card WHERE id = ?",
-        )
-        .bind(card_id)
-        .fetch_optional(&state.pool)
-        .await?
-        .or_404()?;
+    let (catalogue, tcgdex_id, image, image_fr, image_from): Picture = sqlx::query_as(
+        "SELECT catalogue, tcgdex_id, image, image_fr, image_from FROM pokemon_card WHERE id = ?",
+    )
+    .bind(card_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .or_404()?;
 
+    let image = match (image, &image_fr, &image_from) {
+        (None, None, None) => cards::borrow_image(&state.pool, &state.http, card_id).await?,
+        (image, ..) => image,
+    };
+    let borrowed = image_from.as_deref().is_some_and(|from| !from.is_empty());
     let (url, print) = match (language.as_str(), image_fr) {
         ("fr", Some(url)) => (url, "fr"),
-        (_, fr) => (image.or(fr).ok_or(AppError::NotFound)?, "base"),
+        (_, fr) => (
+            image.or(fr).ok_or(AppError::NotFound)?,
+            if borrowed { "borrowed" } else { "base" },
+        ),
     };
     let dir = state.media_dir.join("pokemon_card_images");
     let path = dir.join(file_name(&catalogue, &tcgdex_id, print));

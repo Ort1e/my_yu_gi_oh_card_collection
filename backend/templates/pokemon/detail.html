@@ -15,7 +15,10 @@
 
 <div class="pokemon-detail">
   {% if copy.has_image() %}
-  <img src="{{ copy.image_src() }}" alt="{{ copy.name() }}" class="pokemon-detail-image" width="367" height="512">
+  <figure class="pokemon-detail-picture">
+    <img src="{{ copy.image_src() }}" alt="{{ copy.name() }}" class="pokemon-detail-image" width="367" height="512">
+    {% if !copy.picture_from().is_empty() %}<figcaption>TCGdex has no picture of this print yet: this is {{ copy.picture_from() }}, same name and artist.</figcaption>{% endif %}
+  </figure>
   {% endif %}
 
   <div class="card">
