@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Pokémon cards{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/filtering.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1 class="card-title">Pokémon cards ({{ page.count }}/{{ total }}):</h1>
+
+  <p class="pokemon-summary">
+    Market value: <strong>{{ self.value_text() }} €</strong>
+    {% if without_price > 0 %}<span class="muted">({{ without_price }} without a price)</span>{% endif %}
+    · <a href="{{ self.other_view_href() }}">{% if self.is_table() %}Pictures{% else %}Table{% endif %}</a>
+  </p>
+
+  {% if copies.is_empty() %}
+    <p class="card-title">{% if total == 0 %}No card yet: add a booster opening or a card with the "Add" menu.{% else %}No card matches these filters.{% endif %}</p>
+  {% else if self.is_table() %}
+    <div class="table-scroll">
+    <table class="numbers sortable">
+      <thead>
+        <tr>
+          <th data-sort="text">Card</th>
+          <th data-sort="text" class="text">Set</th>
+          <th data-sort="text" class="text">No.</th>
+          <th data-sort="text" class="text">Rarity</th>
+          <th data-sort="text" class="text">Variant</th>
+          <th data-sort="text" class="text">Language</th>
+          <th data-sort="text" class="text">Condition</th>
+          <th data-sort="text" class="text">Obtained</th>
+          <th data-sort="number">Value (€)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for copy in copies %}
+        <tr>
+          <td><a href="/pokemon/{{ copy.id }}">{{ copy.name() }}</a>{% if copy.full_art %} <span class="tag">Full art</span>{% endif %}{% if copy.is_graded() %} <span class="tag">{{ copy.grading() }}</span>{% endif %}{% if copy.is_sold() %} <span class="tag">Sold</span>{% endif %}</td>
+          <td class="text">{{ copy.set_name }}</td>
+          <td class="text">{{ copy.local_id }}</td>
+          <td class="text">{% if !copy.rarity_text().is_empty() %}<a href="{{ copy.rarity_href() }}">{{ copy.rarity_text() }}</a>{% endif %}</td>
+          <td class="text">{{ copy.variant_label() }}</td>
+          <td class="text">{{ copy.language_label() }}</td>
+          <td class="text">{{ copy.condition_label() }}</td>
+          <td class="text">{{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %}, {{ date }}{% when None %}{% endmatch %}</td>
+          <td>{{ copy.value_text() }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <div class="pokemon-grid">
+      {% for copy in copies %}
+        {% include "partials/pokemon_item.html" %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% include "partials/pagination.html" %}
+
+  <a href="/pokemon/add/booster" title="Add a booster opening" class="btn floating-button top">Add cards</a>
+
+  <button id="filter-badge" class="floating-button">Filter</button>
+  <div id="filter-modal" class="filter-modal hidden">
+    <div class="filter-content">
+      <form method="get">
+        <h2>Filter the cards</h2>
+        <input type="hidden" name="view" value="{{ self.view() }}">
+
+        <label for="q">Name:</label>
+        <input type="search" name="q" id="q" value="{{ self.q_value() }}" placeholder="French, English or Japanese">
+
+        <label for="type">Type:</label>
+        <select name="type" id="type">
+          <option value="">Any</option>
+          {% for kind in options.types %}<option value="{{ kind }}" {% if self.type_is(kind) %}selected{% endif %}>{{ kind }}</option>{% endfor %}
+        </select>
+
+        <label for="set">Set:</label>
+        <select name="set" id="set">
+          <option value="">Any</option>
+          {% for (id, name) in options.sets %}<option value="{{ id }}" {% if self.set_is(id) %}selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+
+        <label for="rarity">Rarity:</label>
+        <select name="rarity" id="rarity">
+          <option value="">Any</option>
+          {% for rarity in options.rarities %}<option value="{{ rarity }}" {% if self.rarity_is(rarity) %}selected{% endif %}>{{ rarity }}</option>{% endfor %}
+        </select>
+
+        <label for="language">Language:</label>
+        <select name="language" id="language">
+          <option value="">Any</option>
+          {% for (label, code) in options.languages %}<option value="{{ code }}" {% if self.language_is(code) %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+
+        <label for="source">Obtained from:</label>
+        <select name="source" id="source">
+          <option value="">Anywhere</option>
+          {% for source in self.sources() %}<option value="{{ source.code() }}" {% if self.source_is(source.code()) %}selected{% endif %}>{{ source.label() }}</option>{% endfor %}
+        </select>
+
+        <label class="checkbox"><input type="checkbox" name="full_art" value="1" {% if self.full_art_checked() %}checked{% endif %}> Full arts only</label>
+        <label class="checkbox"><input type="checkbox" name="graded" value="1" {% if self.graded_checked() %}checked{% endif %}> Graded only</label>
+
+        <label for="sold">Show:</label>
+        <select name="sold" id="sold">
+          <option value="owned" {% if self.sold_is("owned") %}selected{% endif %}>The cards I have</option>
+          <option value="sold" {% if self.sold_is("sold") %}selected{% endif %}>The cards sold</option>
+          <option value="all" {% if self.sold_is("all") %}selected{% endif %}>All</option>
+        </select>
+
+        <label for="sort">Sort by:</label>
+        <select name="sort" id="sort">
+          <option value="set" {% if self.sort_is("set") %}selected{% endif %}>Set and number</option>
+          <option value="price" {% if self.sort_is("price") %}selected{% endif %}>Value, highest first</option>
+          <option value="added" {% if self.sort_is("added") %}selected{% endif %}>Latest obtained first</option>
+        </select>
+
+        <div class="button-row">
+          <button type="submit">Apply</button>
+          <a href="/pokemon" class="btn btn-secondary">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="/static/js/filter_modal.js"></script>
+  <script src="/static/js/tables.js"></script>
+{% endblock %}

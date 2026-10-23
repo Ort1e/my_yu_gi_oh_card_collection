@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Edit a Pokémon card{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/books.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Edit the card</h1>
+<p class="back-link"><a href="/pokemon/{{ id }}">← Back to the card</a></p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/pokemon/{{ id }}/edit" id="copy-form">
+  {% include "pokemon/copy_fields.html" %}
+
+  {% if japanese %}
+  <p>
+    <label for="name_manual">Name (typed by hand):</label>
+    <input type="text" name="name_manual" id="name_manual" value="{{ values.name_manual }}" placeholder="Nemona">
+    <small>A Japanese Trainer or Energy has only its Japanese name: write the one you know it by.</small>
+  </p>
+  {% endif %}
+
+  <fieldset>
+    <legend>Sold</legend>
+    <div class="field-row">
+      <div>
+        <label for="sold_on">Sold on:</label>
+        <input type="date" name="sold_on" id="sold_on" value="{{ values.sold_on }}">
+      </div>
+      <div>
+        <label for="sold_price">For (€):</label>
+        <input type="text" name="sold_price" id="sold_price" value="{{ values.sold_price }}" inputmode="decimal">
+      </div>
+    </div>
+    <small>Cards are never deleted: a card that leaves the collection is marked sold (or given: a date without a price).</small>
+  </fieldset>
+
+  <input type="submit" value="Save">
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/pokemon_rarities.js"></script>
+<script src="/static/js/pokemon_finder.js"></script>
+{% endblock %}

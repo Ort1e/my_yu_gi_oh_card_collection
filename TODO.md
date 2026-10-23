@@ -1,11 +1,19 @@
 # TODO
 
-- [ ] Pokémon cards: list the cards owned and a wishlist, with Cardmarket
-      prices from TCGdex (spec: `docs/specs/pokemon.md`, designed;
-      Claude writes all of it).
+- [ ] Split the workspace by collection, to read each one at once: a crate
+      per collection (`yugioh`, `pokemon`, `books`), each with its domain
+      logic, store, routes and templates, and a thin `backend` that only
+      wires them (server, login, shared web plumbing: forms, errors,
+      pagination, `Money`, photos). To study first: askama templates per
+      crate, the shared `TestApp`, the migrations (one folder, run once),
+      and what stays shared (card conditions, valuation factors).
 
 ## Done
 
+- [x] Pokémon cards (2026-10-23): `/pokemon`, a third collection (TCGdex card
+      data and Cardmarket prices, French/English/Japanese): booster openings,
+      single cards, graded copies, sold not deleted, wishlist with price
+      alerts, rarity and variant guide with help to choose.
 - [x] Navigation bar (2026-10-23): links grouped in menus (Collection:
       Cards, Lots, Sellers, Value, Rarities; Decks: Decks, Built decks,
       Tournaments), the current page marked, a "Menu" button on phones.

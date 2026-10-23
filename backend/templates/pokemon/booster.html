@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Add a booster opening{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/books.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Add a booster opening</h1>
+<p class="back-link"><a href="/pokemon">← Back to the collection</a> · One card (a single, a gift)? <a href="/pokemon/add">Add a card</a></p>
+
+{% include "partials/pokemon_added.html" %}
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="/pokemon/add/booster" id="booster-form">
+  <fieldset>
+    <legend>The opening</legend>
+    <div class="field-row">
+      <div>
+        <label for="set">Set code:</label>
+        <input type="text" name="set" id="set" value="{{ values.set }}" placeholder="FNE" autocomplete="off" required>
+      </div>
+      <div>
+        <label for="language">Language:</label>
+        <select name="language" id="language">
+          {% for (code, label) in values.languages() %}
+          <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="obtained_on">Opened on:</label>
+        <input type="date" name="obtained_on" id="obtained_on" value="{{ values.obtained_on }}">
+      </div>
+      <div>
+        <label for="source">From:</label>
+        <select name="source" id="source">
+          {% for source in values.sources() %}
+          <option value="{{ source.code() }}" {% if values.source_is(source) %}selected{% endif %}>{{ source.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <small>The set code is printed at the bottom of the cards, next to the number: <strong>FNE</strong> 067/064
+      (French), SFA (English); a Japanese card shows its set id: SV6a.</small>
+    <p>
+      <label for="pulls">The cards' numbers:</label>
+      <textarea name="pulls" id="pulls" rows="3" placeholder="12 34 45r 67 TG05x2">{{ values.pulls }}</textarea>
+      <small>Separated by spaces or commas. After a number: <strong>r</strong> for a reverse holo,
+        <strong>h</strong> holo, <strong>x2</strong> for two copies. You can check each card's variant on the next step.</small>
+    </p>
+  </fieldset>
+
+  {% if preview.is_empty() %}
+  <button type="submit" name="step" value="preview">Find the cards</button>
+  {% else %}
+  <h2>{{ set_name }}: {{ self.copies() }} cards</h2>
+  <p><small>Check each card: the variant (<a href="/pokemon/rarities#variants" target="_blank">how to tell them apart</a>),
+    full art, condition. A count of 0 leaves a card out.</small></p>
+  <div class="booster-rows">
+    {% for row in preview %}
+    <div class="booster-row">
+      <input type="hidden" name="rows-{{ loop.index0 }}-card" value="{{ row.tcgdex_id }}">
+      {% if row.has_image %}<img src="{{ row.image_src() }}" alt="{{ row.name }}" width="120" height="167" loading="lazy">{% endif %}
+      <div class="booster-row-fields">
+        <div class="finder-card-name">{{ row.name }} <small>No. {{ row.local_id }}</small></div>
+        {% if !row.other_name.is_empty() %}<div class="english-name">{{ row.other_name }}</div>{% endif %}
+        <div>
+          {% if !row.rarity.is_empty() %}<a href="{{ row.rarity_href() }}" target="_blank" class="rarity-badge">{{ row.rarity }}</a>{% endif %}
+          {% if row.secret %}<span class="tag" title="Its number is above the set size: a chase card">Secret</span>{% endif %}
+        </div>
+        <div class="field-row">
+          <div>
+            <label for="rows-{{ loop.index0 }}-variant">Variant:</label>
+            <select name="rows-{{ loop.index0 }}-variant" id="rows-{{ loop.index0 }}-variant" class="variant-select">
+              {% for variant in row.variants %}
+              <option value="{{ variant.code() }}" {% if row.variant_is(variant) %}selected{% endif %}>{{ variant.label() }}</option>
+              {% endfor %}
+            </select>
+            {% if row.has_choice() %}<small class="variant-help" data-variant-help></small>{% endif %}
+          </div>
+          <div>
+            <label for="rows-{{ loop.index0 }}-condition">Condition:</label>
+            <select name="rows-{{ loop.index0 }}-condition" id="rows-{{ loop.index0 }}-condition">
+              <option value="">Not noted</option>
+              {% for status in self.conditions() %}<option value="{{ status.code() }}">{{ status.label() }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="rows-{{ loop.index0 }}-count">Copies:</label>
+            <input type="number" name="rows-{{ loop.index0 }}-count" id="rows-{{ loop.index0 }}-count" value="{{ row.count }}" min="0" max="99">
+          </div>
+        </div>
+        <label class="checkbox"><input type="checkbox" name="rows-{{ loop.index0 }}-full_art" value="1" {% if row.full_art %}checked{% endif %}> Full art</label>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="button-row">
+    <button type="submit" name="step" value="save">Save these {{ self.copies() }} cards</button>
+    <button type="submit" name="step" value="preview" class="btn-secondary">Find again (numbers changed)</button>
+  </div>
+  {% endif %}
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/pokemon_rarities.js"></script>
+<script src="/static/js/pokemon_booster.js"></script>
+{% endblock %}

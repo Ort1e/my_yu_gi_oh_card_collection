@@ -143,6 +143,33 @@ added; or `#id`) and its photo. Photos in
 `data/media/book_advent_calendar_photos/<year>/`: commit them with the
 data, like the card calendars.
 
+## Add Pokémon cards
+
+In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
+
+- **A booster opening** (Add → A booster opening): the set code printed at
+  the bottom of the cards, next to the number (**FNE** 067/064 on a French
+  card, SFA on an English one, the set id like SV6a on a Japanese one), the
+  language, the date, then the numbers: `12 34 45r 67x2` (`r` reverse holo,
+  `h` holo, `x2` two copies). **Find the cards** shows each card with its
+  picture and rarity: check the variant (the guide says how to tell them
+  apart), full art, condition; a count of 0 leaves a card out. **Save**.
+- **One card** (Add → One card: a single, a gift, a graded card): find it by
+  its printed code (`FNE 067`) or its name in the language chosen below
+  (Japanese: a Japanese name, or the English/French name of the Pokémon),
+  pick it, choose its variant among those printed, then the rest.
+- **The wishlist**: Wishlist → Add a wish (a card, the language and variant
+  wanted or any, the most you would pay, a priority). Its row turns green
+  when Cardmarket's trend is at or under your price. Adding a copy that
+  fulfils a wish offers "Mark it got"; "I got it" on a wish opens the add
+  form pre-filled.
+- A card sold or given away: its page → **Edit or mark sold** (a date, a
+  price or none). Cards are never deleted.
+
+Prices come with the weekly refresh (`refresh-prices`), and when a card is
+first added. Pictures are a cache in `data/media/pokemon_card_images/`
+(not committed, like `card_images/`): downloaded again when missing.
+
 ## Add a read-only page
 
 Example: a `/tournaments` list.

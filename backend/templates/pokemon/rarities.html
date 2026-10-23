@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Pokémon rarities{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <h1>Recognising rarities and variants</h1>
+  <p>
+    A Pokémon card's <strong>rarity</strong> is printed on it: a small symbol at the bottom, next to the
+    number (Japanese cards: letters, like <strong>SAR</strong>). Its <strong>variant</strong> (normal,
+    holo, reverse holo) is not printed: you see it in the shine. Check, in this order:
+  </p>
+
+  <table class="rarity-checks">
+    <thead>
+      <tr><th>Look at</th><th>If you see</th><th>It's probably</th></tr>
+    </thead>
+    <tbody>
+      <tr><td rowspan="2">The number</td><td>above the set size: 067/064</td><td>a chase card: illustration rare, special illustration rare, hyper rare, gold, rainbow…</td></tr>
+      <tr><td>letters before it: TG05, GG35, SV107</td><td>a Trainer Gallery, Galarian Gallery or Shiny Vault card (Sword &amp; Shield)</td></tr>
+      <tr><td rowspan="5">The rarity symbol<br><small>(bottom left or right)</small></td><td>● ◆ ★ in black</td><td>Common, Uncommon, Rare</td></tr>
+      <tr><td>★★ in black</td><td>Double Rare (an ex, not full art)</td></tr>
+      <tr><td>★ in gold</td><td>Illustration Rare</td></tr>
+      <tr><td>★★ in silver / ★★ in gold</td><td>Ultra Rare (full-art ex or Supporter) / Special Illustration Rare</td></tr>
+      <tr><td>★★★ in gold</td><td>Hyper Rare (gold card)</td></tr>
+      <tr><td rowspan="3">The shine<br><small>(tilt the card)</small></td><td>nothing shines</td><td>the <strong>normal</strong> print</td></tr>
+      <tr><td>only the picture shines</td><td>the <strong>holo</strong> print</td></tr>
+      <tr><td>everything but the picture shines (border, text box)</td><td>the <strong>reverse holo</strong> print</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <strong>Full art</strong>: the picture covers the whole card, the text is printed over it.
+    Full arts are the ultra rares, illustration rares, special illustration rares and gold cards:
+    the app ticks it from the rarity, you can untick it.
+  </p>
+
+  <h2 id="variants">Variants</h2>
+  <div id="variant-list" class="card-list"></div>
+
+  <h2>Rarities</h2>
+  <div id="rarity-list" class="card-list"></div>
+
+  <p><small>
+    Compiled in October 2026 from the Pokémon Company's announcement of the Scarlet &amp; Violet symbols,
+    <a href="https://cgccards.com/news/article/12438/pokemon-rarity-symbols">CGC's rarity symbols guide</a>,
+    <a href="https://www.dexerto.com/pokemon/pokemon-card-symbols-explained-2457360/">Dexerto</a> and
+    Japanese retailers' guides. Names are TCGdex's (those the app shows). Looks change between eras:
+    when in doubt, compare with a card whose rarity you know.
+  </small></p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/pokemon_rarities.js"></script>
+<script src="/static/js/pokemon_rarity_guide.js"></script>
+{% endblock %}

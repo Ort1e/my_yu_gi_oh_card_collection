@@ -1,0 +1,30 @@
+{# The card finder (static/js/pokemon_finder.js): search TCGdex by printed
+   code or name, pick a card; it fills the `card` field and shows the card's
+   rarity and printed variants. Needs `values.card`. #}
+<fieldset class="pokemon-finder">
+  <legend>Card</legend>
+  <div class="finder-row">
+    <input type="search" id="finder-q" autocomplete="off" aria-label="Find a card"
+           placeholder="FNE 067 (printed at the bottom), or a name: Hypotrempe">
+    <button type="button" id="finder-search">Find</button>
+  </div>
+  <p id="finder-status" class="finder-status" role="status" aria-live="polite"></p>
+  <div id="finder-results" class="finder-results"></div>
+
+  <div id="finder-card" class="finder-card" hidden>
+    <img id="finder-card-image" alt="" width="160" height="223" hidden>
+    <div>
+      <div id="finder-card-name" class="finder-card-name"></div>
+      <div id="finder-card-other" class="english-name"></div>
+      <div id="finder-card-set"></div>
+      <div id="finder-card-rarity"></div>
+      <div id="finder-card-hint" class="finder-hint"></div>
+    </div>
+  </div>
+
+  <p class="finder-id">
+    <label for="card">TCGdex id:</label>
+    <input type="text" name="card" id="card" value="{{ values.card }}" autocomplete="off" placeholder="sv06.5-067">
+    <small>Filled when you pick a card. The search uses the language chosen below (Japanese: the Japanese cards).</small>
+  </p>
+</fieldset>

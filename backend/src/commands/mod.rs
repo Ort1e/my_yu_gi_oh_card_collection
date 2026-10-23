@@ -33,8 +33,9 @@ pub const USAGE: &str = "usage:
       normalise card names, link cards to the right card data, replace
       proxies in decks by owned copies and delete unused proxies
   backend refresh-prices [--dry-run]
-      fetch today's market prices of every card from ygoprodeck (the server
-      does it weekly)
+      fetch today's market prices: every Yu-Gi-Oh! card from ygoprodeck and
+      Cardmarket's price guide, the Pokémon cards owned or wished from TCGdex
+      (the server does it weekly)
   backend import-tournament-notes <file.json> [--dry-run]
       one-off: load the tournaments' old notes, transcribed into a JSON file,
       as rounds and games (tournaments that have rounds are skipped)";

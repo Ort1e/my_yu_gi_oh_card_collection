@@ -139,8 +139,12 @@ pub async fn require_login(
     }
 
     let uri = request.uri();
-    // the JSON APIs: the deck builder's and the books' ISBN lookup
-    if uri.path().starts_with("/api/") || uri.path().starts_with("/books/api/") {
+    // the JSON APIs: the deck builder's, the books' ISBN lookup, the Pokémon finder
+    let path = uri.path();
+    if ["/api/", "/books/api/", "/pokemon/api/"]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+    {
         return (
             StatusCode::UNAUTHORIZED,
             axum::Json(serde_json::json!({ "error": "Log in to make changes." })),

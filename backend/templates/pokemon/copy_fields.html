@@ -1,0 +1,92 @@
+{# The fields of the add and edit forms of a copy (routes/pokemon/form.rs, CopyValues). #}
+{% include "partials/pokemon_finder.html" %}
+
+<fieldset>
+  <legend>This copy</legend>
+  <div class="field-row">
+    <div>
+      <label for="language">Language:</label>
+      <select name="language" id="language">
+        {% for (code, label) in values.languages() %}
+        <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+        {% if !values.other_language().is_empty() %}<option value="{{ values.other_language() }}" selected>{{ values.other_language() }}</option>{% endif %}
+      </select>
+    </div>
+    <div>
+      <label for="variant">Variant:</label>
+      <select name="variant" id="variant">
+        {% for variant in values.variants() %}
+        <option value="{{ variant.code() }}" {% if values.variant_is(variant) %}selected{% endif %}>{{ variant.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="condition">Condition:</label>
+      <select name="condition" id="condition">
+        <option value="">Not noted</option>
+        {% for status in values.conditions() %}
+        <option value="{{ status.code() }}" {% if values.condition_is(status) %}selected{% endif %}>{{ status.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div id="variant-choices" class="variant-choices" hidden></div>
+  <p>
+    <label class="checkbox"><input type="checkbox" name="full_art" id="full_art" value="1" {% if values.full_art %}checked{% endif %}> Full art</label>
+    <small>Ticked from the rarity when you pick a card: the art covers the whole card.</small>
+  </p>
+  <div class="field-row">
+    <div>
+      <label for="source">Obtained from:</label>
+      <select name="source" id="source">
+        {% for source in values.sources() %}
+        <option value="{{ source.code() }}" {% if values.source_is(source) %}selected{% endif %}>{{ source.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="obtained_on">On:</label>
+      <input type="date" name="obtained_on" id="obtained_on" value="{{ values.obtained_on }}">
+    </div>
+    <div>
+      <label for="price">Price paid (€):</label>
+      <input type="text" name="price" id="price" value="{{ values.price }}" inputmode="decimal" placeholder="a single only">
+    </div>
+  </div>
+</fieldset>
+
+<details class="book-more" {% if values.has_grading() %}open{% endif %}>
+  <summary>Graded card (PSA, CGC…)</summary>
+  <fieldset>
+    <div class="field-row">
+      <div>
+        <label for="grader">Grading company:</label>
+        <input type="text" name="grader" id="grader" value="{{ values.grader }}" list="graders" autocomplete="off">
+      </div>
+      <div>
+        <label for="grade">Grade:</label>
+        <input type="text" name="grade" id="grade" value="{{ values.grade }}" placeholder="10, 9.5">
+      </div>
+      <div>
+        <label for="cert_number">Certificate number:</label>
+        <input type="text" name="cert_number" id="cert_number" value="{{ values.cert_number }}">
+      </div>
+      <div>
+        <label for="estimate">Its value (€):</label>
+        <input type="text" name="estimate" id="estimate" value="{{ values.estimate }}" inputmode="decimal">
+      </div>
+    </div>
+    <small>Cardmarket's prices are for raw cards: the value of a graded card is the one you note here.</small>
+  </fieldset>
+</details>
+
+<p>
+  <label for="note">Note:</label>
+  <textarea name="note" id="note" rows="2">{{ values.note }}</textarea>
+</p>
+
+<datalist id="graders">
+  <option value="PSA"></option><option value="CGC"></option><option value="BGS"></option>
+  <option value="PCA"></option><option value="Collect Aura"></option>
+</datalist>

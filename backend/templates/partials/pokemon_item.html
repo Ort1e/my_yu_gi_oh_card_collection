@@ -1,0 +1,22 @@
+{# One copy in the collection's grid (routes/pokemon/mod.rs, CopyRow). #}
+<a href="/pokemon/{{ copy.id }}" class="pokemon-tile{% if copy.is_sold() %} sold{% endif %}">
+  {% if copy.has_image() %}
+  <img src="{{ copy.image_src() }}" alt="{{ copy.name() }}" loading="lazy" width="245" height="342">
+  {% else %}
+  <div class="pokemon-no-image">{{ copy.name() }}<br><small>{{ copy.set_name }} {{ copy.local_id }}</small></div>
+  {% endif %}
+  <div class="pokemon-tile-text">
+    <div class="pokemon-tile-name">{{ copy.name() }}</div>
+    {% if !copy.other_name().is_empty() %}<div class="english-name">{{ copy.other_name() }}</div>{% endif %}
+    <div class="pokemon-tile-meta">
+      {{ copy.set_name }} · {{ copy.local_id }} · {{ copy.language }}
+      {% if copy.variant != "normal" %}· {{ copy.variant_label() }}{% endif %}
+    </div>
+    <div class="pokemon-tile-meta">
+      {% if copy.full_art %}<span class="tag">Full art</span>{% endif %}
+      {% if copy.is_graded() %}<span class="tag">{{ copy.grading() }}</span>{% endif %}
+      {% if copy.is_sold() %}<span class="tag">Sold</span>{% endif %}
+      {% if !copy.value_text().is_empty() %}<span class="pokemon-value">{{ copy.value_text() }} €</span>{% endif %}
+    </div>
+  </div>
+</a>

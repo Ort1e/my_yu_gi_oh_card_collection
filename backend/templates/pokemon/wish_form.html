@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}{% if id.is_some() %}Edit a wish{% else %}Add a wish{% endif %}{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/books.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>{% if id.is_some() %}Edit the wish{% else %}Add a wish{% endif %}</h1>
+<p class="back-link"><a href="/pokemon/wishlist">← Back to the wishlist</a></p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="{{ self.action() }}" id="wish-form">
+  {% include "partials/pokemon_finder.html" %}
+
+  <fieldset>
+    <legend>What I want</legend>
+    <div class="field-row">
+      <div>
+        <label for="catalogue">Cards:</label>
+        <select name="catalogue" id="catalogue">
+          <option value="intl" {% if !values.japanese() %}selected{% endif %}>International (French, English…)</option>
+          <option value="ja" {% if values.japanese() %}selected{% endif %}>Japanese</option>
+        </select>
+      </div>
+      <div>
+        <label for="language">Language:</label>
+        <select name="language" id="language">
+          <option value="">Any</option>
+          {% for (code, label) in values.languages() %}
+          <option value="{{ code }}" {% if values.language_is(code) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="variant">Variant:</label>
+        <select name="variant" id="variant">
+          <option value="">Any</option>
+          {% for variant in values.variants() %}
+          <option value="{{ variant.code() }}" {% if values.variant_is(variant) %}selected{% endif %}>{{ variant.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div id="variant-choices" class="variant-choices" hidden></div>
+    <div class="field-row">
+      <div>
+        <label for="max_price">Most I would pay (€):</label>
+        <input type="text" name="max_price" id="max_price" value="{{ values.max_price }}" inputmode="decimal">
+      </div>
+      <div>
+        <label for="priority">Priority:</label>
+        <select name="priority" id="priority">
+          <option value="1" {% if values.priority == "1" %}selected{% endif %}>1 – most wanted</option>
+          <option value="2" {% if values.priority == "2" %}selected{% endif %}>2</option>
+          <option value="3" {% if values.priority == "3" %}selected{% endif %}>3 – some day</option>
+        </select>
+      </div>
+    </div>
+    <p>
+      <label for="note">Note:</label>
+      <textarea name="note" id="note" rows="2">{{ values.note }}</textarea>
+    </p>
+  </fieldset>
+
+  <input type="submit" value="{% if id.is_some() %}Save{% else %}Add the wish{% endif %}">
+</form>
+
+{% match id %}{% when Some with (id) %}
+<form method="post" action="/pokemon/wishlist/{{ id }}/delete" class="inline" data-confirm="Delete this wish?">
+  <button type="submit" class="btn-danger">Delete this wish</button>
+</form>
+{% when None %}{% endmatch %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/pokemon_rarities.js"></script>
+<script src="/static/js/pokemon_finder.js"></script>
+{% endblock %}

@@ -14,6 +14,7 @@ pub mod cardmarket_catalog;
 pub mod isbn;
 pub mod lot;
 pub mod monte_carlo;
+pub mod pokemon;
 pub mod rarity;
 pub mod tournament;
 pub mod valuation;

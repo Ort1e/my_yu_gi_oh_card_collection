@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Pokémon wishlist{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>Wishlist ({{ wanted.len() }})</h1>
+{% if self.under_max() > 0 %}
+<p class="success">{{ self.under_max() }} {% if self.under_max() == 1 %}card is{% else %}cards are{% endif %} at or under your price today.</p>
+{% endif %}
+<p>Prices: Cardmarket's trend, refreshed every week. <a href="/pokemon/wishlist/add" class="btn">Add a wish</a></p>
+
+{% if wanted.is_empty() %}
+<p>No wish yet.</p>
+{% else %}
+<div class="wish-list">
+  {% for wish in wanted %}
+  <div class="wish {{ wish.verdict_class() }}">
+    {% if wish.has_image() %}<img src="{{ wish.image_src() }}" alt="{{ wish.name() }}" width="120" height="167" loading="lazy">{% endif %}
+    <div class="wish-text">
+      <div class="finder-card-name">{{ wish.name() }} <span class="priority" title="Priority (1: most wanted)">P{{ wish.priority }}</span></div>
+      {% if !wish.other_name().is_empty() %}<div class="english-name">{{ wish.other_name() }}</div>{% endif %}
+      <div>{{ wish.set_name }} · No. {{ wish.local_id }}
+        {% if !wish.rarity_text().is_empty() %}· <a href="{{ wish.rarity_href() }}">{{ wish.rarity_text() }}</a>{% endif %}</div>
+      <div>Language: {{ wish.language_text() }} · Variant: {{ wish.variant_text() }}</div>
+      <div class="wish-prices">
+        Today: <strong>{% if wish.price_text().is_empty() %}no price{% else %}{{ wish.price_text() }} €{% endif %}</strong>
+        {% if !wish.max_text().is_empty() %}· your max: {{ wish.max_text() }} €{% endif %}
+        {% if !wish.verdict_label().is_empty() %}<span class="verdict">{{ wish.verdict_label() }}</span>{% endif %}
+      </div>
+      {% match wish.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
+      <div class="button-row">
+        <a href="/pokemon/add?{{ wish.got_it_href() }}" class="btn">I got it</a>
+        <a href="/pokemon/wishlist/{{ wish.id }}/edit" class="btn btn-secondary">Edit</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if !got.is_empty() %}
+<details class="wishes-got">
+  <summary>Wishes got ({{ got.len() }})</summary>
+  <ul>
+    {% for wish in got %}
+    <li>
+      {{ wish.name() }} ({{ wish.set_name }} {{ wish.local_id }}){% match wish.got_copy_id %}{% when Some with (copy_id) %}: <a href="/pokemon/{{ copy_id }}">your copy</a>{% when None %}{% endmatch %}
+      <form method="post" action="/pokemon/wishlist/{{ wish.id }}/got" class="inline">
+        <input type="hidden" name="copy_id" value="">
+        <button type="submit" class="btn-secondary">Wanted again</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+</div>
+{% endblock %}

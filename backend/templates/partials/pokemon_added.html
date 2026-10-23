@@ -1,0 +1,18 @@
+{# The copies just added, and the wishes they fulfil (routes/pokemon/form.rs, Added). #}
+{% if !added.is_empty() %}
+<div class="success">
+  Added:
+  {% for item in added %}{% if !loop.first %}, {% endif %}<a href="/pokemon/{{ item.copy.id }}">{{ item.copy.name() }}</a>{% endfor %}.
+  Next one?
+</div>
+{% for item in added %}
+{% for (wish_id, copy_id) in item.wishes %}
+<form method="post" action="/pokemon/wishlist/{{ wish_id }}/got" class="wish-got">
+  <input type="hidden" name="copy_id" value="{{ copy_id }}">
+  <input type="hidden" name="back" value="/pokemon/{{ copy_id }}">
+  ★ <strong>{{ item.copy.name() }}</strong> was on your wishlist.
+  <button type="submit">Mark it got</button>
+</form>
+{% endfor %}
+{% endfor %}
+{% endif %}

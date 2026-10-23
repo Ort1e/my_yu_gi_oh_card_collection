@@ -15,6 +15,7 @@ Suggested reading order, about an hour with the code open next to it:
 7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data/`
 8. [Tests](#tests): `backend/src/tests/`
 9. [The books](#the-books): `backend/src/routes/books/`, a second, smaller collection
+10. [The Pokémon cards](#the-pokémon-cards): `backend/src/routes/pokemon/`, a third one, with prices
 
 ## The big picture
 
@@ -397,6 +398,79 @@ quarter turn. Plain HTTP on the home network can't use the live camera
 Like ygoprodeck: the lookup happens **before** any write transaction, and
 tests never call it (they insert `book_data` rows).
 
+## The Pokémon cards
+
+A third collection with its own tables (migration 0012), nothing shared
+with the Yu-Gi-Oh! ones: the owner's Pokémon cards, mostly from boosters
+opened at home, in French, English and Japanese, collected and not played
+(no decks). Every route starts with `/pokemon`; the templates swap the
+navigation bar (`partials/pokemon_nav.html`) and the colours (`body.pokemon`,
+`static/css/pokemon.css`: pale yellow, red header). Reads are public, writes
+and the TCGdex lookups behind the login. Copies are **never deleted** (sold
+instead, like the Yu-Gi-Oh! cards); wishes can be.
+
+| Piece | Where |
+|---|---|
+| tables: `pokemon_card` (TCGdex's cards, owned or wished only), `pokemon_copy`, `pokemon_wish`, `pokemon_price`, `pokemon_set` (set cache) | `migrations/0012_pokemon.sql` |
+| TCGdex JSON → `CardInfo`, `Variant`, `Source`, `Catalogue`, full art from the rarity | `domain/src/pokemon/mod.rs` |
+| the printed code (`FNE 067/064`), card numbers that match (`67` = `067`) | `domain/src/pokemon/card_ref.rs` |
+| a booster's numbers (`67 45r 12x2`) | `domain/src/pokemon/pulls.rs` |
+| a variant's price from Cardmarket's numbers, a copy's value | `domain/src/pokemon/price.rs` |
+| a wish's price against its maximum, a copy that fulfils it | `domain/src/pokemon/wish.rs` |
+| the TCGdex client (throttled, every call goes through it) | `store/pokemon/tcgdex.rs` |
+| cards cached in `pokemon_card` (`cards::ensure`), copy and wish writes, orphan cards | `store/pokemon/cards.rs` |
+| sets by printed code, with their card lists | `store/pokemon/sets.rs` |
+| prices: latest, history, the weekly refresh | `store/pokemon/prices.rs` |
+| the collection (pictures or table, filters, value), a copy | `routes/pokemon/mod.rs` |
+| add one copy, edit (and sell) | `routes/pokemon/form.rs` |
+| a booster opening: numbers → preview → save | `routes/pokemon/booster.rs` |
+| the wishlist | `routes/pokemon/wishlist.rs` |
+| the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `routes/pokemon/api.rs` |
+| pictures, downloaded once into `media/pokemon_card_images/` | `routes/pokemon/images.rs` |
+| the rarity and variant guide | `routes/pokemon/rarities.rs`, `static/js/pokemon_rarities.js` |
+
+**TCGdex** ([tcgdex.dev](https://tcgdex.dev), free, no key) has two
+catalogues: the international cards (one id, `sv06.5-067`, for the French,
+English, German… prints) and the Japanese ones (their own sets and ids,
+`SV6a-010`, Japanese names only). A copy's language picks the catalogue
+(`ja` → Japanese). An international card is asked in English (its category,
+types and rarity are the stored labels; French answers translate them) and
+in French (name, set name, picture); a Japanese card in Japanese, then its
+species' French and English names by its Pokédex number. The Pokémon TCG API
+(pokemontcg.io) is being replaced by a paid service: not used.
+
+| What | Call | Remembered in |
+|---|---|---|
+| a card | `GET /v2/{en,fr,ja}/cards/{id}` | `pokemon_card`, asked again after 30 days |
+| a Japanese card's species names | `GET /v2/{fr,en}/cards?dexId=eq:{n}` | `pokemon_card` |
+| a set by printed code (`FNE`, `SFA`) and its card list | `GET /v2/{lang}/sets?abbreviation.localized=` (then `.official`, then the id), `GET /v2/{lang}/sets/{id}` | `pokemon_set`, 7 days |
+| a name search | `GET /v2/{lang}/cards?name=` (Pocket cards left out) | not stored |
+| a picture | `{image}/high.webp` | `media/pokemon_card_images/` |
+| prices, weekly | the card again | `pokemon_price` |
+
+Its filters match "contains, ignoring the case" (`eq:` is exact but
+case-sensitive), so the code keeps the exact matches; a card is only found
+through its set's list (`sv06.5-67` is a 404, `067` is the number).
+
+**Prices** (`domain::pokemon::price`): TCGdex gives Cardmarket's numbers per
+variant (`variants_detailed[].pricing.cardmarket`), else once per card.
+Cardmarket sells a card's normal and reverse holo prints as one product:
+the plain fields are the normal's, the `-holo` ones the **reverse holo**'s;
+a holo-only card has its price in the plain fields. A price is the trend,
+else the 30-day average. A copy's value: a graded copy's estimate (typed by
+hand), else its variant's price × the condition factor of the Yu-Gi-Oh!
+cards; no language factor. Boosters cost nothing in the app: there is no
+gain/loss, only the market value (and what a single cost, when noted).
+
+**Choosing** (the owner can't always tell a rarity at a glance): the card
+finder (`partials/pokemon_finder.html`, `static/js/pokemon_finder.js`)
+shows the picked card's rarity with its symbol and the guide's link, a
+"chase card" hint when its number is above the set size, and one button per
+printed variant with its price and how to recognise it; the booster preview
+has the same per row (`static/js/pokemon_booster.js`). The guide
+(`/pokemon/rarities`) is data in `static/js/pokemon_rarities.js`, like the
+Yu-Gi-Oh! one.
+
 ## Login
 
 `web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the
@@ -426,7 +500,8 @@ is skipped, so it is safe to run twice.
 
 `refresh-prices` fetches today's market price of every card data
 (`store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
-Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices); the server
+Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices), then the
+Pokémon cards owned or wished from TCGdex (`store/pokemon/prices.rs`); the server
 does it weekly by itself (`prices::spawn_weekly`: checked every 6 hours, runs
 when the last refresh is 7 days old).
 

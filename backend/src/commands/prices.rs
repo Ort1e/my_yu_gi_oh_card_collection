@@ -1,6 +1,7 @@
 //! `refresh-prices`: today's market prices from ygoprodeck into `card_price`
 //! (`store::card_prices`), then Cardmarket's price guide
-//! (`store::prices::cardmarket`). The server also runs it by itself every week
+//! (`store::prices::cardmarket`), then the Pokémon cards' from TCGdex
+//! (`store::pokemon::prices`). The server also runs it by itself every week
 //! ([`spawn_weekly`]).
 
 use std::time::Duration;
@@ -8,6 +9,7 @@ use std::time::Duration;
 use chrono::NaiveDate;
 
 use crate::store::db::today;
+use crate::store::pokemon;
 use crate::store::prices::cardmarket;
 use crate::store::prices::history::latest_refresh;
 use crate::store::prices::ygoprodeck::refresh_prices;
@@ -21,6 +23,8 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
         report.asked, report.written, report.without_price, report.missing
     );
     let report = cardmarket::refresh(&state.pool, &state.http, today(), dry_run).await?;
+    println!("{}", report.summary());
+    let report = pokemon::prices::refresh(&state.pool, &state.http, today(), dry_run).await?;
     println!("{}", report.summary());
 
     if dry_run {
@@ -46,7 +50,7 @@ pub fn spawn_weekly(state: AppState) {
     });
 }
 
-/// Both refreshes; Cardmarket's even when ygoprodeck's failed (they are
+/// The three refreshes, each even when the one before failed (they are
 /// independent).
 async fn refresh_in_background(state: &AppState) {
     match refresh_prices(&state.pool, &state.http, today(), false).await {
@@ -56,6 +60,10 @@ async fn refresh_in_background(state: &AppState) {
     match cardmarket::refresh(&state.pool, &state.http, today(), false).await {
         Ok(report) => tracing::info!("{}", report.summary()),
         Err(e) => tracing::warn!("background Cardmarket refresh: {e}"),
+    }
+    match pokemon::prices::refresh(&state.pool, &state.http, today(), false).await {
+        Ok(report) => tracing::info!("{}", report.summary()),
+        Err(e) => tracing::warn!("background Pokémon price refresh: {e}"),
     }
 }
 

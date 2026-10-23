@@ -18,22 +18,30 @@ pub struct Page {
     /// Other query parameters (filters), already URL-encoded, to keep in the
     /// pagination links.
     pub querystring: String,
+    /// Items per page.
+    pub size: i64,
 }
 
 impl Page {
     /// Clamp the requested page into range (Django would 404 instead).
     pub fn new(requested: Option<i64>, count: i64, querystring: String) -> Page {
-        let num_pages = ((count + PAGE_SIZE - 1) / PAGE_SIZE).max(1);
+        Page::sized(requested, count, querystring, PAGE_SIZE)
+    }
+
+    /// `size` items per page (the picture grids show more).
+    pub fn sized(requested: Option<i64>, count: i64, querystring: String, size: i64) -> Page {
+        let num_pages = ((count + size - 1) / size).max(1);
         Page {
             number: requested.unwrap_or(1).clamp(1, num_pages),
             num_pages,
             count,
             querystring,
+            size,
         }
     }
 
     pub fn offset(&self) -> i64 {
-        (self.number - 1) * PAGE_SIZE
+        (self.number - 1) * self.size
     }
 
     pub fn has_previous(&self) -> bool {

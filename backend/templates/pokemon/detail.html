@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ copy.name() }}{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<p class="back-link"><a href="/pokemon">← Back to the collection</a></p>
+
+<div class="pokemon-detail">
+  {% if copy.has_image() %}
+  <img src="{{ copy.image_src() }}" alt="{{ copy.name() }}" class="pokemon-detail-image" width="367" height="512">
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title">{{ copy.name() }}</div>
+    {% if !copy.other_name().is_empty() %}<div class="english-name">{{ copy.other_name() }}</div>{% endif %}
+    <div class="card-subtitle">{{ copy.set_name }} · No. {{ copy.local_id }} <small>(TCGdex {{ copy.tcgdex_id }})</small></div>
+    {% if !copy.rarity_text().is_empty() %}
+    <div class="card-subtitle">Rarity: <a href="{{ copy.rarity_href() }}" class="rarity-badge">{{ copy.rarity_text() }}</a></div>
+    {% endif %}
+    {% if !copy.types_text().is_empty() %}<div class="card-subtitle">Type: {{ copy.types_text() }}</div>{% endif %}
+    <div class="card-subtitle">Language: {{ copy.language_label() }} · Variant: {{ copy.variant_label() }}{% if copy.full_art %} · Full art{% endif %}</div>
+    <div class="card-subtitle">
+      Condition:
+      {% if copy.condition_label().is_empty() %}not noted{% else %}<span class="status-badge {{ copy.condition_code()|lower }}">{{ copy.condition_label() }}</span>{% endif %}
+    </div>
+    {% if copy.is_graded() %}
+    <div class="card-subtitle">Graded: {{ copy.grading() }}{% match copy.cert_number %}{% when Some with (cert) %} · certificate {{ cert }}{% when None %}{% endmatch %}</div>
+    {% endif %}
+    <div class="card-subtitle">
+      {{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %} on {{ date }}{% when None %}{% endmatch %}{% if !copy.price_text().is_empty() %} · paid {{ copy.price_text() }} €{% endif %}
+    </div>
+    {% match copy.sold_on %}{% when Some with (date) %}
+    <div class="card-subtitle"><strong>Sold</strong> on {{ date }}{% if !copy.sold_price_text().is_empty() %} for {{ copy.sold_price_text() }} €{% endif %}</div>
+    {% when None %}
+    <div class="card-subtitle" title="Cardmarket's trend for its variant × its condition{% if copy.is_graded() %}, or your estimate{% endif %}">
+      Value: {% if copy.value_text().is_empty() %}no price{% else %}{{ copy.value_text() }} €{% endif %}
+      {% if !copy.estimate_text().is_empty() %}<small>(your estimate)</small>{% else if !self.market_text().is_empty() %}<small>(market {{ self.market_text() }} €)</small>{% endif %}
+    </div>
+    {% endmatch %}
+    {% match copy.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
+    {% for wish_id in wishes_got %}<div class="card-subtitle">★ Got from the <a href="/pokemon/wishlist" class="on-card">wishlist</a></div>{% endfor %}
+    <div class="card-subtitle"><small>Added on {{ copy.added_on }} · copy #{{ copy.id }}</small></div>
+    <div class="button-row"><a href="/pokemon/{{ copy.id }}/edit" class="btn">Edit{% if !copy.is_sold() %} or mark sold{% endif %}</a></div>
+  </div>
+</div>
+
+{% if !others.is_empty() %}
+<h2>Other copies of this card</h2>
+<ul>
+  {% for (id, language, variant, sold) in others %}
+  <li><a href="/pokemon/{{ id }}">Copy #{{ id }}</a>: {{ language }}, {{ variant }}{% if sold %} (sold){% endif %}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if !history.is_empty() %}
+<h2>Market price of its variant</h2>
+<div class="table-scroll">
+<table class="numbers pokemon-history">
+  <thead><tr><th>Date</th><th>Cardmarket trend (€)</th></tr></thead>
+  <tbody>
+    {% for point in history %}<tr><td>{{ point.date }}</td><td>{{ point.price }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,295 @@
+//! The card finder's JSON (`static/js/pokemon_finder.js`), behind the login:
+//! both ask TCGdex and write its cache.
+//!
+//! - `GET /pokemon/api/search?q=…&lang=fr`: the printed code (`FNE 067`)
+//!   finds one card through its set; anything else is a name. A Japanese
+//!   search typed in Latin letters (`Horsea`) finds the Japanese cards of
+//!   that Pokémon by its Pokédex number. 200 `{"catalogue", "cards":
+//!   [{"id", "name", "local_id", "set_id", "thumb", "secret"}], "set"}`,
+//!   400 / 404 / 502 `{"error"}`.
+//! - `GET /pokemon/api/card?id=…&lang=fr`: one card, saved in
+//!   `pokemon_card`, with what the form needs to choose: rarity (and the
+//!   guide's link), printed variants with today's price, full art
+//!   suggestion. 404 `{"error"}` when TCGdex knows no such card.
+
+use axum::extract::{Query, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use domain::pokemon::card_ref::{self, CardRef};
+use domain::pokemon::{default_variant, is_full_art, parse_language, Catalogue, Variant};
+use serde::Deserialize;
+use serde_json::{json, Value};
+
+use super::{card_names, image_src, rarities};
+use crate::store::pokemon::{cards, prices, sets, tcgdex};
+use crate::web::error::{AppError, AppResult};
+use crate::AppState;
+
+fn answer(status: StatusCode, error: impl Into<String>) -> Response {
+    (status, Json(json!({ "error": error.into() }))).into_response()
+}
+
+/// TCGdex down: a 502 the finder shows, not a 500.
+fn unavailable(e: AppError) -> AppResult<Response> {
+    match e {
+        AppError::Internal(why) => {
+            tracing::warn!("{why}");
+            Ok(answer(
+                StatusCode::BAD_GATEWAY,
+                "TCGdex did not answer. Try again in a moment.",
+            ))
+        }
+        e => Err(e),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchParams {
+    #[serde(default)]
+    q: String,
+    lang: Option<String>,
+}
+
+pub async fn search(
+    State(state): State<AppState>,
+    Query(params): Query<SearchParams>,
+) -> AppResult<Response> {
+    let language = params
+        .lang
+        .as_deref()
+        .and_then(parse_language)
+        .unwrap_or_else(|| "fr".into());
+    let q = params.q.trim();
+    if q.is_empty() {
+        return Ok(answer(
+            StatusCode::BAD_REQUEST,
+            "Type a name or a code like FNE 067.",
+        ));
+    }
+    let catalogue = Catalogue::of_language(&language);
+
+    let found =
+        match card_ref::parse(q) {
+            Ok(CardRef {
+                set_code: Some(code),
+                number,
+            }) => by_code(&state, &language, &code, &number).await,
+            Ok(CardRef { set_code: None, .. }) => return Ok(answer(
+                StatusCode::BAD_REQUEST,
+                "Add the set code before the number: FNE 067 (it is printed next to the number).",
+            )),
+            Err(_) => by_name(&state, &language, q).await,
+        };
+    let (cards, set) = match found {
+        Ok(Ok(found)) => found,
+        Ok(Err(response)) => return Ok(response),
+        Err(e) => return unavailable(e),
+    };
+
+    Ok(Json(json!({
+        "catalogue": catalogue.code(),
+        "cards": cards,
+        "set": set,
+    }))
+    .into_response())
+}
+
+type Found = Result<(Vec<Value>, Value), Response>;
+
+async fn by_code(state: &AppState, language: &str, code: &str, number: &str) -> AppResult<Found> {
+    let Some(set) = sets::by_code(&state.pool, &state.http, language, code).await? else {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!("No set \"{code}\" in this language: check the code printed on the card."),
+        )));
+    };
+    let Some(card) = set.card(number) else {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!(
+                "No number {number} in {} ({} cards).",
+                set.name,
+                set.cards.len()
+            ),
+        )));
+    };
+
+    let result = json!({
+        "id": card.id,
+        "name": card.name,
+        "local_id": card.local_id,
+        "set_id": set.id,
+        "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
+        "secret": set.is_secret(&card.local_id),
+    });
+    let set = json!({"id": set.id, "name": set.name, "code": set.code, "official": set.official});
+    Ok(Ok((vec![result], set)))
+}
+
+async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> {
+    let briefs = if language == "ja" && q.is_ascii() {
+        japanese_by_latin_name(state, q).await?
+    } else {
+        tcgdex::search(&state.http, language, q).await?
+    };
+    if briefs.is_empty() {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!("No card named like \"{q}\" in this language."),
+        )));
+    }
+
+    let cards = briefs
+        .iter()
+        .filter_map(|brief| {
+            let id = brief["id"].as_str()?;
+            let (set_id, _) = id.rsplit_once('-')?;
+            Some(json!({
+                "id": id,
+                "name": brief["name"],
+                "local_id": brief["localId"],
+                "set_id": set_id,
+                "thumb": brief["image"].as_str().map(|i| format!("{i}/low.webp")),
+                "secret": false,
+            }))
+        })
+        .collect();
+    Ok(Ok((cards, Value::Null)))
+}
+
+/// The Japanese cards of the Pokémon named `q` in English or French: its
+/// Pokédex number from a card of that name, then the Japanese cards with it.
+async fn japanese_by_latin_name(state: &AppState, q: &str) -> AppResult<Vec<Value>> {
+    for language in ["en", "fr"] {
+        let named = tcgdex::search(&state.http, language, q).await?;
+        let exact = named
+            .iter()
+            .find(|c| {
+                c["name"]
+                    .as_str()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(q))
+            })
+            .or(named.first());
+        let Some(id) = exact.and_then(|c| c["id"].as_str()) else {
+            continue;
+        };
+        let Some(card) = tcgdex::card(&state.http, language, id).await? else {
+            continue;
+        };
+        if let Some(dex_id) = card["dexId"].as_array().and_then(|d| d.first()?.as_i64()) {
+            return tcgdex::species_cards(&state.http, "ja", dex_id).await;
+        }
+    }
+    Ok(Vec::new())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CardParams {
+    #[serde(default)]
+    id: String,
+    lang: Option<String>,
+    /// For a wish in any language: `intl` or `ja`.
+    catalogue: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct CardRow {
+    id: i64,
+    catalogue: String,
+    tcgdex_id: String,
+    set_name: String,
+    local_id: String,
+    name_fr: Option<String>,
+    name_en: Option<String>,
+    name_ja: Option<String>,
+    name_manual: Option<String>,
+    rarity: Option<String>,
+    category: String,
+    types: Option<String>,
+    variants: String,
+    image: Option<String>,
+    image_fr: Option<String>,
+}
+
+pub async fn card(
+    State(state): State<AppState>,
+    Query(params): Query<CardParams>,
+) -> AppResult<Response> {
+    let language = params.lang.as_deref().and_then(parse_language);
+    let catalogue = match (&language, params.catalogue.as_deref()) {
+        (Some(language), _) => Catalogue::of_language(language),
+        (None, Some(code)) => Catalogue::from_code(code).unwrap_or(Catalogue::International),
+        (None, None) => Catalogue::International,
+    };
+    let id = params.id.trim();
+    if id.is_empty() {
+        return Ok(answer(StatusCode::BAD_REQUEST, "No card id."));
+    }
+
+    let card_id = match cards::ensure(&state.pool, &state.http, catalogue, id).await {
+        Ok(Some(card_id)) => card_id,
+        Ok(None) => {
+            return Ok(answer(
+                StatusCode::NOT_FOUND,
+                format!("TCGdex knows no card \"{id}\" in these cards."),
+            ))
+        }
+        Err(e) => return unavailable(e),
+    };
+    let card: CardRow = sqlx::query_as(
+        "SELECT id, catalogue, tcgdex_id, set_name, local_id, name_fr, name_en, name_ja,
+                name_manual, rarity, category, types, variants, image, image_fr
+         FROM pokemon_card WHERE id = ?",
+    )
+    .bind(card_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let shown = language.unwrap_or_else(|| if card.catalogue == "ja" { "ja" } else { "fr" }.into());
+    let (name, other_name) = card_names(
+        &shown,
+        card.name_fr.as_deref(),
+        card.name_en.as_deref(),
+        card.name_ja.as_deref(),
+        card.name_manual.as_deref(),
+    );
+    let latest = prices::latest(&state.pool).await?;
+    let card_prices = latest.get(&card.id);
+    let mut variants = Variant::parse_list(&card.variants);
+    let printed_known = !variants.is_empty();
+    if !printed_known {
+        variants = Variant::ALL.to_vec();
+    }
+    let variants: Vec<Value> = variants
+        .iter()
+        .map(|v| {
+            json!({
+                "code": v.code(),
+                "label": v.label(),
+                "price": card_prices.and_then(|p| p.get(v)).map(|p| p.to_string()),
+            })
+        })
+        .collect();
+
+    let has_image = card.image.is_some() || card.image_fr.is_some();
+    Ok(Json(json!({
+        "card_id": card.id,
+        "id": card.tcgdex_id,
+        "catalogue": card.catalogue,
+        "name": name,
+        "other_name": other_name,
+        "set_name": card.set_name,
+        "local_id": card.local_id,
+        "rarity": card.rarity,
+        "rarity_href": card.rarity.as_deref().map(rarities::href),
+        "full_art": is_full_art(card.rarity.as_deref()),
+        "category": card.category,
+        "types": card.types,
+        "variants": variants,
+        "variants_known": printed_known,
+        "default_variant": default_variant(&Variant::parse_list(&card.variants)).code(),
+        "image": has_image.then(|| image_src(card.id, &shown)),
+    }))
+    .into_response())
+}
