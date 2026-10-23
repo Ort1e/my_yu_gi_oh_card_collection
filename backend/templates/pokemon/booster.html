@@ -48,12 +48,14 @@
       </div>
     </div>
     <small>The set code is printed at the bottom of the cards, next to the number: <strong>FNE</strong> 067/064
-      (French), SFA (English); a Japanese card shows its set id: SV6a.</small>
+      (French), SFA (English), 30C (30th Celebration); a Japanese card shows its set id: SV6a.</small>
     <p>
       <label for="pulls">The cards' numbers:</label>
       <textarea name="pulls" id="pulls" rows="3" placeholder="12 34 45r 67 TG05x2">{{ values.pulls }}</textarea>
       <small>Separated by spaces or commas. After a number: <strong>r</strong> for a reverse holo,
-        <strong>h</strong> holo, <strong>x2</strong> for two copies. You can check each card's variant on the next step.</small>
+        <strong>h</strong> holo, <strong>x2</strong> for two copies. A card numbered by a letter: the letter (B).
+        Two sets with the same code (30C): add the set size printed after the number (1/30).
+        You can check each card's variant on the next step.</small>
     </p>
   </fieldset>
 
@@ -66,11 +68,21 @@
   <div class="booster-rows">
     {% for row in preview %}
     <div class="booster-row">
-      <input type="hidden" name="rows-{{ loop.index0 }}-card" value="{{ row.tcgdex_id }}">
+      {% if row.alternatives.is_empty() %}<input type="hidden" name="rows-{{ loop.index0 }}-card" value="{{ row.tcgdex_id }}">{% endif %}
       {% if row.has_image %}<img src="{{ row.image_src() }}" alt="{{ row.name }}" width="120" height="167" loading="lazy">{% endif %}
       <div class="booster-row-fields">
         <div class="finder-card-name">{{ row.name }} <small>No. {{ row.local_id }}</small></div>
         {% if !row.other_name.is_empty() %}<div class="english-name">{{ row.other_name }}</div>{% endif %}
+        {% if !row.alternatives.is_empty() %}
+        <div class="card-choice">
+          <label for="rows-{{ loop.index0 }}-card">This number is in {{ row.alternatives.len() + 1 }} sets with this code: which card is yours?</label>
+          <select name="rows-{{ loop.index0 }}-card" id="rows-{{ loop.index0 }}-card">
+            <option value="{{ row.tcgdex_id }}" selected>{{ row.label() }}</option>
+            {% for (id, label) in row.alternatives %}<option value="{{ id }}">{{ label }}</option>{% endfor %}
+          </select>
+          <small>Look at the number after the slash on the card (/128, /030). Next time, type it: 1/30.</small>
+        </div>
+        {% endif %}
         <div>
           {% if !row.rarity.is_empty() %}<a href="{{ row.rarity_href() }}" target="_blank" class="rarity-badge">{{ row.rarity }}</a>{% endif %}
           {% if row.secret %}<span class="tag" title="Its number is above the set size: a chase card">Secret</span>{% endif %}

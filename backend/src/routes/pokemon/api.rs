@@ -74,7 +74,8 @@ pub async fn search(
             Ok(CardRef {
                 set_code: Some(code),
                 number,
-            }) => by_code(&state, &language, &code, &number).await,
+                total,
+            }) => by_code(&state, &language, &code, &number, total.as_deref()).await,
             Ok(CardRef { set_code: None, .. }) => return Ok(answer(
                 StatusCode::BAD_REQUEST,
                 "Add the set code before the number: FNE 067 (it is printed next to the number).",
@@ -97,34 +98,52 @@ pub async fn search(
 
 type Found = Result<(Vec<Value>, Value), Response>;
 
-async fn by_code(state: &AppState, language: &str, code: &str, number: &str) -> AppResult<Found> {
-    let Some(set) = sets::by_code(&state.pool, &state.http, language, code).await? else {
+/// The card(s) with this printed code: one, or one per set sharing the
+/// code when the set size (`/128`) doesn't tell them apart.
+async fn by_code(
+    state: &AppState,
+    language: &str,
+    code: &str,
+    number: &str,
+    total: Option<&str>,
+) -> AppResult<Found> {
+    let found = sets::by_code(&state.pool, &state.http, language, code).await?;
+    let Some(main) = found.first() else {
         return Ok(Err(answer(
             StatusCode::NOT_FOUND,
             format!("No set \"{code}\" in this language: check the code printed on the card."),
         )));
     };
-    let Some(card) = set.card(number) else {
+    let cards = sets::cards(&found, number, total);
+    if cards.is_empty() {
+        let names: Vec<String> = found
+            .iter()
+            .map(|set| format!("{} ({} cards)", set.name, set.cards.len()))
+            .collect();
         return Ok(Err(answer(
             StatusCode::NOT_FOUND,
-            format!(
-                "No number {number} in {} ({} cards).",
-                set.name,
-                set.cards.len()
-            ),
+            format!("No number {number} in {}.", names.join(", ")),
         )));
-    };
+    }
 
-    let result = json!({
-        "id": card.id,
-        "name": card.name,
-        "local_id": card.local_id,
-        "set_id": set.id,
-        "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
-        "secret": set.is_secret(&card.local_id),
-    });
-    let set = json!({"id": set.id, "name": set.name, "code": set.code, "official": set.official});
-    Ok(Ok((vec![result], set)))
+    let results = cards
+        .iter()
+        .map(|(set, card)| {
+            json!({
+                "id": card.id,
+                "name": card.name,
+                "local_id": card.local_id,
+                "set_id": set.id,
+                "set_name": set.name,
+                "official": set.official,
+                "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
+                "secret": set.is_secret(&card.local_id),
+            })
+        })
+        .collect();
+    let set =
+        json!({"id": main.id, "name": main.name, "code": main.code, "official": main.official});
+    Ok(Ok((results, set)))
 }
 
 async fn by_name(state: &AppState, language: &str, q: &str) -> AppResult<Found> {

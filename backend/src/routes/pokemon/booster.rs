@@ -4,7 +4,9 @@
 //!    and the numbers (`67 45r 12x2`, `domain::pokemon::pulls`).
 //! 2. "Find the cards" (`step=preview`): the set's cards from TCGdex
 //!    (`store::pokemon::sets`), each number matched; an unknown number
-//!    stops here with the list. Each card is shown with its picture,
+//!    stops here with the list. When sets share the code (`30C`: 30th
+//!    Celebration and its Classic Collection), a number found in both
+//!    offers both cards (`1/30` picks by the printed set size). Each card is shown with its picture,
 //!    rarity (and the guide's link) and its printed variants to choose
 //!    from, full art pre-ticked from the rarity.
 //! 3. "Save" (`step=save`): the rows as checked, one copy per count.
@@ -85,6 +87,10 @@ pub struct PreviewRow {
     count: u32,
     has_image: bool,
     language: String,
+    /// The set of this card (shown when several sets share the code).
+    set_name: String,
+    /// The same number in the other sets with this code: `(TCGdex id, label)`.
+    alternatives: Vec<(String, String)>,
 }
 
 impl PreviewRow {
@@ -103,6 +109,11 @@ impl PreviewRow {
     /// Several printed variants: the owner has to look (the guide helps).
     fn has_choice(&self) -> bool {
         self.variants.len() > 1
+    }
+
+    /// `30ᵉ Anniversaire No. 001 · Noeunoeuf`.
+    fn label(&self) -> String {
+        format!("{} No. {} · {}", self.set_name, self.local_id, self.name)
     }
 }
 
@@ -221,12 +232,12 @@ async fn preview(
     pulls: &[Pull],
     errors: &mut Vec<String>,
 ) -> AppResult<Option<(String, Vec<PreviewRow>)>> {
-    let set = match sets::by_code(&state.pool, &state.http, language, code).await {
-        Ok(Some(set)) => set,
-        Ok(None) => {
+    let found = match sets::by_code(&state.pool, &state.http, language, code).await {
+        Ok(found) if !found.is_empty() => found,
+        Ok(_) => {
             errors.push(format!(
                 "Set: TCGdex knows no set \"{code}\" in {}. Type the code printed at the \
-                 bottom of the cards (FNE, SFA; Japanese: SV6a).",
+                 bottom of the cards (FNE, SFA, 30C; Japanese: SV6a).",
                 domain::pokemon::language_label(language)
             ));
             return Ok(None);
@@ -241,15 +252,18 @@ async fn preview(
 
     let unknown: Vec<&str> = pulls
         .iter()
-        .filter(|p| set.card(&p.number).is_none())
+        .filter(|p| sets::cards(&found, &p.number, p.total.as_deref()).is_empty())
         .map(|p| p.number.as_str())
         .collect();
     if !unknown.is_empty() {
+        let names: Vec<String> = found
+            .iter()
+            .map(|set| format!("{} ({} cards)", set.name, set.cards.len()))
+            .collect();
         errors.push(format!(
-            "Cards: no number {} in {} ({} cards).",
+            "Cards: no number {} in {}.",
             unknown.join(", "),
-            set.name,
-            set.cards.len()
+            names.join(", ")
         ));
         return Ok(None);
     }
@@ -258,7 +272,8 @@ async fn preview(
     let mut ids: HashMap<String, i64> = HashMap::new();
     let mut rows = Vec::new();
     for pull in pulls {
-        let card = set.card(&pull.number).expect("checked above");
+        let candidates = sets::cards(&found, &pull.number, pull.total.as_deref());
+        let (set, card) = candidates[0];
         let card_id = match ids.get(&card.id) {
             Some(id) => *id,
             None => match find_card(state, catalogue, &card.id, errors).await? {
@@ -269,18 +284,26 @@ async fn preview(
                 None => return Ok(None),
             },
         };
-        rows.push(
-            preview_row(
-                state,
-                card_id,
-                language,
-                pull,
-                set.is_secret(&card.local_id),
-            )
-            .await?,
-        );
+        let mut row = preview_row(
+            state,
+            card_id,
+            language,
+            pull,
+            set.is_secret(&card.local_id),
+        )
+        .await?;
+        row.set_name.clone_from(&set.name);
+        row.alternatives = candidates[1..]
+            .iter()
+            .map(|(set, card)| {
+                let label = format!("{} No. {} · {}", set.name, card.local_id, card.name);
+                (card.id.clone(), label)
+            })
+            .collect();
+        rows.push(row);
     }
-    Ok(Some((set.name, rows)))
+    let names: Vec<&str> = found.iter().map(|set| set.name.as_str()).collect();
+    Ok(Some((names.join(" / "), rows)))
 }
 
 #[derive(sqlx::FromRow)]
@@ -337,6 +360,8 @@ async fn preview_row(
         },
         count: pull.count,
         has_image: card.image.is_some() || card.image_fr.is_some(),
+        set_name: String::new(),
+        alternatives: Vec::new(),
         language: language.to_string(),
     })
 }

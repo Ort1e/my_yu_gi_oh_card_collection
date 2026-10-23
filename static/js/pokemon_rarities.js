@@ -150,6 +150,25 @@ const POKEMON_RARITIES = [
         japanese: 'MUR',
     },
     {
+        name: 'RGB Rare',
+        symbol: 'no number: the letter R, G or B instead',
+        look: 'The three Mew cards of 30th Celebration (2026), in red, green and blue, numbered R, G and B. Type the letter in the booster form.',
+        japanese: '',
+    },
+    {
+        name: 'Futuristic Rare',
+        symbol: 'its own symbol; number above the set size',
+        look: 'The top card of 30th Celebration (2026): Mew ex, number 158.',
+        japanese: '',
+    },
+    {
+        name: 'Classic Collection',
+        aliases: ['None', 'Sans Rareté'],
+        symbol: 'no rarity symbol',
+        look: 'A famous old card reprinted in its original look with an anniversary stamp (Celebrations 2021, 30th Celebration 2026). In 30th Celebration they share the code 30C with the main set: their numbers end in /030.',
+        japanese: '',
+    },
+    {
         name: 'Promo',
         symbol: 'a black star with "PROMO", or a code like SVP 001',
         look: 'Given in a product or an event; no rarity tier.',
@@ -159,8 +178,8 @@ const POKEMON_RARITIES = [
 
 // Rarities TCGdex knows and the guide doesn't describe yet (old or rare ones).
 const POKEMON_UNDESCRIBED = [
-    'Black White Rare', 'Classic Collection', 'Crown', 'Futuristic Rare', 'LEGEND',
-    'Mega Attack Rare', 'Pikachu Rare', 'Rare Holo LV.X', 'Rare PRIME', 'RGB Rare',
+    'Black White Rare', 'Crown', 'LEGEND', 'Mega Attack Rare', 'Pikachu Rare',
+    'Rare Holo LV.X', 'Rare PRIME',
 ];
 
 const pokemonFold = (text) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();

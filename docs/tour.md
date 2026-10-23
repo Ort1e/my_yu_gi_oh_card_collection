@@ -450,7 +450,13 @@ species' French and English names by its Pokédex number. The Pokémon TCG API
 
 Its filters match "contains, ignoring the case" (`eq:` is exact but
 case-sensitive), so the code keeps the exact matches; a card is only found
-through its set's list (`sv06.5-67` is a 404, `067` is the number).
+through its set's list (`sv06.5-67` is a 404, `067` is the number). Several
+sets can share a printed code: 30th Celebration (`30th`) and its Classic
+Collection (`30th-c`) are both `30C`, with numbers 001 to 030 in both; the
+set size typed after the number (`001/030`, `1/30` in the booster form)
+picks one, else both are offered (`sets::cards`). Codes may start with a
+digit (`30C`) and a few cards are numbered by a letter (the Mew cards R, G,
+B).
 
 **Prices** (`domain::pokemon::price`): TCGdex gives Cardmarket's numbers per
 variant (`variants_detailed[].pricing.cardmarket`), else once per card.

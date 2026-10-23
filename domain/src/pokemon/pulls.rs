@@ -1,7 +1,10 @@
 //! A booster opening's numbers, typed in one field of the booster form:
 //! `67 45r 12x2, TG05`. Each number is a card of the chosen set; a letter
 //! after it gives the variant (`r` reverse holo, `h` holo, `n` normal),
-//! `x2` the number of copies.
+//! `x2` the number of copies. A card numbered by a letter is typed as is
+//! (`B`: the Mew cards of 30th Celebration). `/30` after a number gives the
+//! set size printed on the card, for two sets sharing a code (`1/30`: the
+//! Classic Collection's 001, not 30th Celebration's).
 
 use std::sync::LazyLock;
 
@@ -9,13 +12,23 @@ use regex::Regex;
 
 use super::Variant;
 
-static PULL: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?i)([a-z]{0,5}\d{1,4})([rhn])?(?:[x×*](\d{1,2}))?$").unwrap());
+/// `<number>[/<total>][r|h|n][x<count>]`.
+static PULL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?i)([a-z]{0,5}\d{1,4})(?:/([a-z]{0,5}\d{1,4}))?([rhn])?(?:[x×*](\d{1,2}))?$")
+        .unwrap()
+});
+/// `<letter>[/<total>][x<count>]`, tried first: `Gx2` is the card G twice,
+/// not a number `Gx2`.
+static LETTER_PULL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?i)([a-z])(?:/([a-z]{0,5}\d{1,4}))?(?:[x×*](\d{1,2}))?$").unwrap()
+});
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pull {
-    /// As typed (`67`, `TG05`): matched with `card_ref::same_number`.
+    /// As typed (`67`, `TG05`, `B`): matched with `card_ref::same_number`.
     pub number: String,
+    /// The set size typed after it (`30` in `1/30`).
+    pub total: Option<String>,
     /// `None`: the card's default variant.
     pub variant: Option<Variant>,
     /// Copies of this card (1 to 99).
@@ -70,22 +83,35 @@ pub fn parse(text: &str) -> Result<Vec<Pull>, PullError> {
 }
 
 fn read(piece: &str) -> Option<Pull> {
+    if let Some(captures) = LETTER_PULL.captures(piece) {
+        return Some(Pull {
+            number: captures[1].to_string(),
+            total: captures.get(2).map(|m| m.as_str().to_string()),
+            variant: None,
+            count: count(captures.get(3))?,
+        });
+    }
+
     let captures = PULL.captures(piece)?;
-    let variant = captures.get(2).map(|m| match m.as_str() {
+    let variant = captures.get(3).map(|m| match m.as_str() {
         "r" | "R" => Variant::Reverse,
         "h" | "H" => Variant::Holo,
         _ => Variant::Normal,
     });
-    let count = match captures.get(3) {
-        None => 1,
-        Some(count) => count.as_str().parse().ok().filter(|n| *n >= 1)?,
-    };
-
     Some(Pull {
         number: captures[1].to_string(),
+        total: captures.get(2).map(|m| m.as_str().to_string()),
         variant,
-        count,
+        count: count(captures.get(4))?,
     })
+}
+
+/// `x2` → 2, nothing → 1; `None` for 0.
+fn count(count: Option<regex::Match>) -> Option<u32> {
+    match count {
+        None => Some(1),
+        Some(count) => count.as_str().parse().ok().filter(|n| *n >= 1),
+    }
 }
 
 /// The copies a list of pulls makes.
@@ -100,9 +126,30 @@ mod tests {
     fn pull(number: &str, variant: Option<Variant>, count: u32) -> Pull {
         Pull {
             number: number.to_string(),
+            total: None,
             variant,
             count,
         }
+    }
+
+    #[test]
+    fn reads_letters_and_set_sizes() {
+        let with_total = |number: &str, total: &str, variant, count| Pull {
+            total: Some(total.to_string()),
+            ..pull(number, variant, count)
+        };
+        assert_eq!(
+            parse("B r Gx2 1/30 12/128r 5/30x2").unwrap(),
+            [
+                pull("B", None, 1),
+                pull("r", None, 1),
+                pull("G", None, 2),
+                with_total("1", "30", None, 1),
+                with_total("12", "128", Some(Variant::Reverse), 1),
+                with_total("5", "30", None, 2),
+            ]
+        );
+        assert!(parse("BB").is_err() && parse("1/").is_err());
     }
 
     #[test]

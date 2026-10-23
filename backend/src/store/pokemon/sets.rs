@@ -3,8 +3,13 @@
 //! their card lists: the booster form and the card finder reach a card by
 //! set + number. Remembered in `pokemon_set` per language, asked again
 //! after [`RECHECK_DAYS`] (promo sets grow).
+//!
+//! Several sets can share a code: 30th Celebration (`30th`, 158 cards and
+//! the Mew cards R, G, B) and its Classic Collection (`30th-c`, 001 to 030)
+//! are both `30C`. A number found in both is told apart by the set size
+//! printed after it (`/128`, `/030`); else both are offered ([`cards`]).
 
-use domain::pokemon::card_ref::same_number;
+use domain::pokemon::card_ref::{is_set_size, same_number};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -54,27 +59,52 @@ impl SetInfo {
     }
 }
 
-/// The set with this printed code (or TCGdex id) in `language`; `None` when
-/// TCGdex knows none. Asks TCGdex only when `pokemon_set` has no fresh
-/// answer: call it before a write transaction.
+/// The cards printed with this number in these sets (`/total`: the set
+/// size printed after it, when typed). Several when sets share a code and
+/// the size doesn't settle it: the main set's first.
+pub fn cards<'a>(
+    sets: &'a [SetInfo],
+    number: &str,
+    total: Option<&str>,
+) -> Vec<(&'a SetInfo, &'a SetCard)> {
+    let found: Vec<_> = sets
+        .iter()
+        .filter_map(|set| Some((set, set.card(number)?)))
+        .collect();
+    let sized: Vec<_> = found
+        .iter()
+        .filter(|(set, _)| total.is_some_and(|t| is_set_size(t, set.official)))
+        .copied()
+        .collect();
+    if sized.is_empty() {
+        found
+    } else {
+        sized
+    }
+}
+
+/// The sets with this printed code (or TCGdex id) in `language`, the
+/// biggest first; empty when TCGdex knows none. Asks TCGdex only when
+/// `pokemon_set` has no fresh answer: call it before a write transaction.
 pub async fn by_code(
     pool: &Pool,
     http: &reqwest::Client,
     language: &str,
     code: &str,
-) -> AppResult<Option<SetInfo>> {
+) -> AppResult<Vec<SetInfo>> {
     let code = code.trim();
-    if let Some(set) = remembered(pool, language, code).await? {
-        return Ok(Some(set));
+    let mut sets = remembered(pool, language, code).await?;
+    if sets.is_empty() {
+        for json in find(http, language, code).await? {
+            let set = from_tcgdex(language, &json)
+                .ok_or_else(|| AppError::Internal(format!("TCGdex: unreadable set {code}")))?;
+            remember(pool, &set).await?;
+            sets.push(set);
+        }
     }
 
-    let Some(json) = find(http, language, code).await? else {
-        return Ok(None);
-    };
-    let set = from_tcgdex(language, &json)
-        .ok_or_else(|| AppError::Internal(format!("TCGdex: unreadable set {code}")))?;
-    remember(pool, &set).await?;
-    Ok(Some(set))
+    sets.sort_by(|a, b| b.cards.len().cmp(&a.cards.len()).then(a.id.cmp(&b.id)));
+    Ok(sets)
 }
 
 #[derive(sqlx::FromRow)]
@@ -88,19 +118,36 @@ struct SetRow {
     fetched_at: String,
 }
 
-async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Option<SetInfo>> {
-    let row: Option<SetRow> = sqlx::query_as(
+/// The sets remembered with this code (else with this id); none when one
+/// of them is old (they are asked again together).
+async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Vec<SetInfo>> {
+    let mut rows: Vec<SetRow> = sqlx::query_as(
         "SELECT language, id, name, code, official, cards, fetched_at FROM pokemon_set
-         WHERE language = ?1 AND (lower(code) = lower(?2) OR lower(id) = lower(?2))
-         ORDER BY lower(code) = lower(?2) DESC LIMIT 1",
+         WHERE language = ?1 AND lower(code) = lower(?2)",
     )
     .bind(language)
     .bind(code)
-    .fetch_optional(pool)
+    .fetch_all(pool)
     .await?;
+    if rows.is_empty() {
+        rows = sqlx::query_as(
+            "SELECT language, id, name, code, official, cards, fetched_at FROM pokemon_set
+             WHERE language = ?1 AND lower(id) = lower(?2)",
+        )
+        .bind(language)
+        .bind(code)
+        .fetch_all(pool)
+        .await?;
+    }
+    if rows
+        .iter()
+        .any(|row| !is_fresh(&row.fetched_at, RECHECK_DAYS))
+    {
+        return Ok(Vec::new());
+    }
 
-    Ok(row
-        .filter(|row| is_fresh(&row.fetched_at, RECHECK_DAYS))
+    Ok(rows
+        .into_iter()
         .map(|row| SetInfo {
             language: row.language,
             id: row.id,
@@ -108,37 +155,46 @@ async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Opt
             code: row.code,
             official: row.official,
             cards: serde_json::from_str(&row.cards).unwrap_or_default(),
-        }))
+        })
+        .collect())
 }
 
-/// Ask TCGdex: the code as printed in this language, as printed in English
-/// (the `official` one), then as a set id.
-async fn find(http: &reqwest::Client, language: &str, code: &str) -> AppResult<Option<Value>> {
+/// Ask TCGdex: every set with the code as printed in this language or as
+/// printed in English (the `official` one); none: the code as a set id.
+async fn find(http: &reqwest::Client, language: &str, code: &str) -> AppResult<Vec<Value>> {
     if language == "ja" {
-        return tcgdex::set(http, "ja", code).await;
+        return Ok(tcgdex::set(http, "ja", code).await?.into_iter().collect());
     }
 
+    let mut found: Vec<Value> = Vec::new();
     for field in ["abbreviation.localized", "abbreviation.official"] {
+        // "contains" matches: keep the sets whose code is exactly this one
         let candidates = tcgdex::sets_where(http, language, field, code).await?;
-        for brief in candidates.iter().take(5) {
+        for brief in candidates.iter().take(8) {
             let Some(id) = brief["id"].as_str() else {
                 continue;
             };
+            if found.iter().any(|set| set["id"].as_str() == Some(id)) {
+                continue;
+            }
             let Some(set) = tcgdex::set(http, language, id).await? else {
                 continue;
             };
-            let printed = printed_code(&set);
-            if printed.is_some_and(|p| p.eq_ignore_ascii_case(code))
-                || set["abbreviation"]["official"]
+            let abbreviation = &set["abbreviation"];
+            let same = |field: &str| {
+                abbreviation[field]
                     .as_str()
-                    .is_some_and(|p| p.eq_ignore_ascii_case(code))
-            {
-                return Ok(Some(set));
+                    .is_some_and(|c| c.eq_ignore_ascii_case(code))
+            };
+            if same("localized") || same("official") {
+                found.push(set);
             }
         }
     }
-
-    tcgdex::set(http, language, code).await
+    if found.is_empty() {
+        found.extend(tcgdex::set(http, language, code).await?);
+    }
+    Ok(found)
 }
 
 /// The code printed in the set's language: its localized abbreviation,

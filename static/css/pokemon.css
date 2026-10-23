@@ -361,3 +361,11 @@ form.wish-got {
         width: 100px;
     }
 }
+
+/* A number found in two sets sharing a code (booster form): which card. */
+.card-choice {
+    margin: 0.4rem 0;
+    padding: 0.5rem;
+    border: 2px dashed #fff;
+    border-radius: var(--radius);
+}

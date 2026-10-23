@@ -426,3 +426,89 @@ async fn the_refresh_counts_the_cards_to_price() {
         "a dry run deletes nothing"
     );
 }
+
+/// 30th Celebration: two sets share the printed code 30C (the main set, with
+/// the Mew cards numbered by a letter, and its Classic Collection).
+async fn celebration(t: &TestApp) {
+    sqlx::query(
+        "INSERT INTO pokemon_card (catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
+             name_en, rarity, category, variants, json, fetched_at)
+         VALUES
+             ('intl', '30th-001', '30th', '30ᵉ Anniversaire', '001', 'Noeunoeuf', 'Exeggcute',
+              'Common', 'Pokemon', 'normal', '{}', date('now')),
+             ('intl', '30th-B', '30th', '30ᵉ Anniversaire', 'B', 'Mew', 'Mew',
+              'RGB Rare', 'Pokemon', 'holo', '{}', date('now')),
+             ('intl', '30th-c-001', '30th-c', 'Collection Classique', '001', 'Dracaufeu',
+              'Charizard', NULL, 'Pokemon', 'holo', '{}', date('now'));
+         INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
+             ('fr', '30th', '30ᵉ Anniversaire', '30C', 128,
+              '[{\"id\":\"30th-001\",\"localId\":\"001\",\"name\":\"Noeunoeuf\"},
+                {\"id\":\"30th-B\",\"localId\":\"B\",\"name\":\"Mew\"}]', date('now')),
+             ('fr', '30th-c', 'Collection Classique', '30C', 30,
+              '[{\"id\":\"30th-c-001\",\"localId\":\"001\",\"name\":\"Dracaufeu\"}]', date('now'));",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+}
+
+async fn search(t: &TestApp, q: &str) -> (StatusCode, serde_json::Value) {
+    let q: String = url::form_urlencoded::byte_serialize(q.as_bytes()).collect();
+    t.json(
+        "GET",
+        &format!("/pokemon/api/search?lang=fr&q={q}"),
+        serde_json::json!(null),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn sets_sharing_a_code_are_told_apart() {
+    let t = TestApp::new().await;
+    celebration(&t).await;
+    // the number alone: both cards, the main set first
+    let (status, answer) = search(&t, "30C 001").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    let ids: Vec<_> = answer["cards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].clone())
+        .collect();
+    assert_eq!(ids, ["30th-001", "30th-c-001"]);
+    assert_eq!(answer["cards"][1]["set_name"], "Collection Classique");
+
+    // the set size printed after it settles it; a letter is a number
+    let (_, answer) = search(&t, "30C 001/030").await;
+    assert_eq!(answer["cards"].as_array().unwrap().len(), 1);
+    assert_eq!(answer["cards"][0]["id"], "30th-c-001");
+    let (_, answer) = search(&t, "30c B").await;
+    assert_eq!(answer["cards"][0]["id"], "30th-B");
+
+    // the booster form: 1 is in both sets (a choice), B and 1/30 are not
+    let (status, page) = t
+        .post(
+            "/pokemon/add/booster",
+            &[
+                ("set", "30C"),
+                ("language", "fr"),
+                ("obtained_on", "2026-10-23"),
+                ("source", "booster"),
+                ("pulls", "1 B 1/30"),
+                ("step", "preview"),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!page.contains("class=\"error\""), "{page}");
+    assert!(
+        page.contains("30ᵉ Anniversaire / Collection Classique: 3 cards"),
+        "{page}"
+    );
+    assert!(page.contains("This number is in 2 sets with this code"));
+    assert!(page.contains(
+        r#"<option value="30th-c-001">Collection Classique No. 001 · Dracaufeu</option>"#
+    ));
+    assert!(page.contains(r#"name="rows-1-card" value="30th-B""#));
+    assert!(page.contains(r#"name="rows-2-card" value="30th-c-001""#));
+}

@@ -151,7 +151,10 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
   the bottom of the cards, next to the number (**FNE** 067/064 on a French
   card, SFA on an English one, the set id like SV6a on a Japanese one), the
   language, the date, then the numbers: `12 34 45r 67x2` (`r` reverse holo,
-  `h` holo, `x2` two copies). **Find the cards** shows each card with its
+  `h` holo, `x2` two copies; a card numbered by a letter, like the Mew
+  cards of 30th Celebration: `B`). 30th Celebration (**30C**) shares its
+  code with its Classic Collection: type the set size after the number
+  (`1/30`), or pick the card on the next step. **Find the cards** shows each card with its
   picture and rarity: check the variant (the guide says how to tell them
   apart), full art, condition; a count of 0 leaves a card out. **Save**.
 - **One card** (Add → One card: a single, a gift, a graded card): find it by

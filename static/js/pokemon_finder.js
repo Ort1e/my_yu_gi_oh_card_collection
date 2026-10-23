@@ -94,7 +94,11 @@ async function search() {
         return;
     }
 
-    say(`${answer.cards.length} cards: pick yours.`);
+    const sameCode = answer.cards.length > 1 && answer.cards.every((c) => c.set_name);
+
+    say(sameCode
+        ? 'This code is used by several sets: pick the card with the number printed on yours (the set size after the slash tells them apart).'
+        : `${answer.cards.length} cards: pick yours.`);
 
     for (const card of answer.cards) {
         results.append(resultButton(card, answer.catalogue));
@@ -116,7 +120,8 @@ function resultButton(card, catalogue) {
     }
 
     const label = document.createElement('span');
-    label.textContent = `${card.name} · ${card.set_id} ${card.local_id}`;
+    const size = card.official ? `/${String(card.official).padStart(3, '0')}` : '';
+    label.textContent = `${card.name} · ${card.set_name ?? card.set_id} ${card.local_id}${size}`;
     button.append(label);
 
     button.addEventListener('click', () => {
