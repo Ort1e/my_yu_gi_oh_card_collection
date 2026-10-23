@@ -1,12 +1,14 @@
 # TODO
 
-- [ ] Tidy the navigation bar (`templates/base.html`, `static/css/`): 10
-      links once "Tournaments" is added, all at the same level. Group them
-      (e.g. Collection: Cards, Lots, Sellers, Value, Rarities; Decks:
-      Decks, Built, Tournaments; Budget; Advent), with a menu on phones.
+- [ ] Pokémon cards: list the cards owned and a wishlist, with Cardmarket
+      prices from TCGdex (spec: `docs/specs/pokemon.md`, designed;
+      Claude writes all of it).
 
 ## Done
 
+- [x] Navigation bar (2026-10-23): links grouped in menus (Collection:
+      Cards, Lots, Sellers, Value, Rarities; Decks: Decks, Built decks,
+      Tournaments), the current page marked, a "Menu" button on phones.
 - [x] Clean up the interface artifacts.
 - [x] Add logs.
 - [x] Refactor for readability (2026-10-18): files split by area
