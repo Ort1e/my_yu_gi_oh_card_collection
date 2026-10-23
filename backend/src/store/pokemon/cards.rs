@@ -17,7 +17,11 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 use sqlx::SqliteConnection;
 
-use super::{is_fresh, tcgdex};
+use std::time::{Duration, Instant};
+
+use tokio::sync::Mutex;
+
+use super::{is_fresh, ptcgio, tcgdex};
 use crate::store::db::{begin_write, today, Money, Pool};
 use crate::web::error::AppResult;
 
@@ -162,9 +166,11 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
              name_ja = excluded.name_ja, rarity = excluded.rarity,
              category = excluded.category, types = excluded.types, dex_id = excluded.dex_id,
              variants = excluded.variants,
-             -- a borrowed picture stays until TCGdex has the card's own
+             -- a picture from elsewhere stays until TCGdex has the card's own
              image = coalesce(excluded.image, pokemon_card.image),
-             image_from = CASE WHEN excluded.image IS NULL THEN pokemon_card.image_from END,
+             -- (a picture looked for and not found, '', is looked for again)
+             image_from = CASE WHEN excluded.image IS NULL AND pokemon_card.image_from <> ''
+                               THEN pokemon_card.image_from END,
              image_fr = excluded.image_fr, json = excluded.json,
              fetched_at = excluded.fetched_at",
     )
@@ -209,79 +215,92 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
     Ok(id)
 }
 
-/// For a card TCGdex has no picture of (the Classic Collection reprints,
-/// the Trainer Galleries): the picture of another print with the same name,
-/// the best match first (same illustrator: a reprint keeps its artwork;
-/// same rarity: a gold card's gold twin), saved in `image` with its id in
-/// `image_from`. Tried once: `image_from = ''` when none was found.
-/// The picture's URL, if any. Asks TCGdex: not inside a write transaction.
-pub async fn borrow_image(
+/// For a card TCGdex has no picture of (Trainer Galleries, some promos,
+/// the Classic Collection reprints): the same print's picture from the
+/// Pokémon TCG API (`store::pokemon::ptcgio`), saved in `image` (a full
+/// URL) with `image_from = 'pokemontcg:<its id>'`; `''` when it has none
+/// either. Never another print's: the picture would be wrong (a Trainer
+/// Gallery's artwork is its own). A failure (that service answers 500 now
+/// and then) is not saved: the card is tried again an hour later. The
+/// picture's URL, if any. Asks the network: not inside a write transaction.
+pub async fn find_image(
     pool: &Pool,
     http: &reqwest::Client,
     card_id: i64,
 ) -> AppResult<Option<String>> {
-    let (catalogue, tcgdex_id, json): (String, String, String) =
-        sqlx::query_as("SELECT catalogue, tcgdex_id, json FROM pokemon_card WHERE id = ?")
-            .bind(card_id)
-            .fetch_one(pool)
-            .await?;
-    let json: Value = serde_json::from_str(&json).unwrap_or_default();
-    let language = Catalogue::from_code(&catalogue)
-        .unwrap_or(Catalogue::International)
-        .data_language();
-    let (Some(name), illustrator, rarity) = (
-        json["name"].as_str(),
-        json["illustrator"].as_str(),
-        json["rarity"].as_str(),
-    ) else {
-        return Ok(None);
-    };
-
-    let same_name: Vec<Value> = tcgdex::search(http, language, name)
-        .await?
-        .into_iter()
-        .filter(|c| {
-            c["name"]
-                .as_str()
-                .is_some_and(|n| n.eq_ignore_ascii_case(name))
-                && c["image"].is_string()
-                && c["id"].as_str() != Some(tcgdex_id.as_str())
-        })
-        .take(5)
-        .collect();
-    let mut chosen = same_name.first().cloned();
-    let mut best = 0;
-    for brief in &same_name {
-        let Some(id) = brief["id"].as_str() else {
-            continue;
-        };
-        let Some(card) = tcgdex::card(http, language, id).await? else {
-            continue;
-        };
-        let same = |field: &str, mine: Option<&str>| mine.is_some() && card[field].as_str() == mine;
-        let score =
-            2 * u8::from(same("illustrator", illustrator)) + u8::from(same("rarity", rarity));
-        if score > best {
-            best = score;
-            chosen = Some(brief.clone());
+    static FAILED: Mutex<Vec<(i64, Instant)>> = Mutex::const_new(Vec::new());
+    {
+        let mut failed = FAILED.lock().await;
+        failed.retain(|(_, at)| at.elapsed() < Duration::from_secs(3600));
+        if failed.iter().any(|(id, _)| *id == card_id) {
+            return Ok(None);
         }
     }
 
-    let image = chosen
-        .as_ref()
-        .and_then(|c| c["image"].as_str())
-        .map(str::to_string);
-    let from = chosen.as_ref().and_then(|c| c["id"].as_str()).unwrap_or("");
+    let (catalogue, json): (String, String) =
+        sqlx::query_as("SELECT catalogue, json FROM pokemon_card WHERE id = ?")
+            .bind(card_id)
+            .fetch_one(pool)
+            .await?;
+    let found = if catalogue == Catalogue::Japanese.code() {
+        // the Pokémon TCG API has no Japanese cards
+        Ok(None)
+    } else {
+        lookup_elsewhere(http, &serde_json::from_str(&json).unwrap_or_default()).await
+    };
+    let found = match found {
+        Ok(found) => found,
+        Err(e) => {
+            tracing::warn!("{e}");
+            FAILED.lock().await.push((card_id, Instant::now()));
+            return Ok(None);
+        }
+    };
+
+    let (from, image) = match &found {
+        Some((id, url)) => (format!("pokemontcg:{id}"), Some(url.clone())),
+        None => (String::new(), None),
+    };
     let mut tx = begin_write(pool).await?;
     sqlx::query("UPDATE pokemon_card SET image = coalesce(?, image), image_from = ? WHERE id = ?")
         .bind(&image)
-        .bind(from)
+        .bind(&from)
         .bind(card_id)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    tracing::info!(card = %tcgdex_id, from, "Pokémon picture borrowed");
+    tracing::info!(card_id, from, "Pokémon picture looked up elsewhere");
     Ok(image)
+}
+
+/// The Pokémon TCG API's card for TCGdex's English card JSON.
+async fn lookup_elsewhere(
+    http: &reqwest::Client,
+    json: &Value,
+) -> AppResult<Option<(String, String)>> {
+    let (Some(name), Some(number), Some(set_id)) = (
+        json["name"].as_str(),
+        json["localId"].as_str(),
+        json["set"]["id"].as_str(),
+    ) else {
+        return Ok(None);
+    };
+    // the printed code: TCGdex's set (`ASR:TG` → `ASR`)
+    let set = tcgdex::set(http, "en", set_id).await?;
+    let code = set
+        .as_ref()
+        .and_then(|set| set["abbreviation"]["official"].as_str())
+        .map(|code| code.split(':').next().unwrap_or(code).to_string());
+    let wanted = ptcgio::Wanted {
+        name,
+        artist: json["illustrator"].as_str(),
+        number,
+        set_id,
+        set_name: json["set"]["name"].as_str().unwrap_or_default(),
+        set_code: code.as_deref(),
+        official: json["set"]["cardCount"]["official"].as_i64(),
+    };
+    ptcgio::find(http, &wanted).await
 }
 
 /// The cards nobody owns (or ever owned) nor wishes any more, with their

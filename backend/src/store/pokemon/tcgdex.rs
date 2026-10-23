@@ -229,20 +229,3 @@ fn is_pocket(card: &Value, pocket: &HashSet<String>) -> bool {
         .and_then(|id| id.rsplit_once('-'))
         .is_some_and(|(set, _)| pocket.contains(set))
 }
-
-/// A card picture (`{image}/high.webp`).
-pub async fn image(http: &reqwest::Client, base_url: &str) -> Result<Vec<u8>, AppError> {
-    let url = format!("{base_url}/high.webp");
-    let fail = |e: reqwest::Error| error("image", e);
-    let bytes = http
-        .get(&url)
-        .timeout(TIMEOUT)
-        .send()
-        .await
-        .and_then(reqwest::Response::error_for_status)
-        .map_err(fail)?
-        .bytes()
-        .await
-        .map_err(fail)?;
-    Ok(bytes.to_vec())
-}

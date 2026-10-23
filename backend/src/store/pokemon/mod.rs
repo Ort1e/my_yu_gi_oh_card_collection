@@ -4,7 +4,8 @@
 //!   wished cards only), and the copy and wish writes;
 //! - `sets.rs`: sets by printed code (`FNE`), remembered in `pokemon_set`;
 //! - `prices.rs`: the weekly Cardmarket prices in `pokemon_price`;
-//! - `openings.rs`: booster openings (`pokemon_opening`).
+//! - `openings.rs`: booster openings (`pokemon_opening`);
+//! - `ptcgio.rs`: the Pokémon TCG API, for the pictures TCGdex lacks.
 //!
 //! Network calls happen before any write transaction (CLAUDE.md): the
 //! lookups write their cache through the pool.
@@ -12,6 +13,7 @@
 pub mod cards;
 pub mod openings;
 pub mod prices;
+pub mod ptcgio;
 pub mod sets;
 pub mod tcgdex;
 

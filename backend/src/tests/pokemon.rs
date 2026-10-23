@@ -70,6 +70,11 @@ async fn pages_render_empty() {
     }
     let (_, page) = t.get("/pokemon").await;
     assert!(page.contains("No card yet"));
+    let (_, page) = t.get("/pokemon/add").await;
+    assert!(
+        page.contains(r#"<option value="NM" selected>Near Mint</option>"#),
+        "near mint by default"
+    );
     assert_eq!(t.get("/pokemon/9").await.0, StatusCode::NOT_FOUND);
 }
 

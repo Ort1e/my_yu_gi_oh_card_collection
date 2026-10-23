@@ -466,7 +466,7 @@ a lettered number alone (`TG29`) lists every card with it
 (`tcgdex::by_number`). A number missing from sets remembered on an earlier
 day asks TCGdex again (`sets::are_old`, `sets::forget`). TCGdex has no
 pictures of the Trainer Galleries either: they borrow one (below), the
-same illustrator's and rarity's first.
+the Pokémon TCG API's (below).
 
 **Booster openings** (migration 0013, `store/pokemon/openings.rs`,
 `routes/pokemon/openings.rs`): the booster form saves a `pokemon_opening`
@@ -480,15 +480,20 @@ English; not Japanese, another catalogue): the set code and names are
 looked up again by its cards' set ids. A new opening starts in the last
 one's language.
 
-**Borrowed pictures** (migration 0014): TCGdex has no picture of some
-prints yet (all 30 Classic Collection reprints of 30th Celebration). The
-picture route then borrows, once, the picture of a print with the same
-name, the same illustrator's when there is one (a reprint keeps its
-artwork): `cards::borrow_image`, `pokemon_card.image_from` (the print
-shown; `''`: none found). The card's page says so; TCGdex's own picture
-replaces it when it comes. Codes may start with a
-digit (`30C`) and a few cards are numbered by a letter (the Mew cards R, G,
-B).
+**Pictures TCGdex lacks** (migrations 0014, 0015): TCGdex has no picture
+of some prints (the Trainer Galleries, some promos, the Classic Collection
+reprints). The picture route then asks the [Pokémon TCG
+API](https://pokemontcg.io) for the same print, once (`store/pokemon/ptcgio.rs`,
+`cards::find_image`): its set by printed code and size (`30C`, 30 cards:
+`me55c`), name or id written its way (`sv06.5` → `sv6pt5`); the card by
+number, else by name and artist (it numbers a reprint like the card it
+reprints: 33). Saved in `image` (a full URL) with `image_from =
+'pokemontcg:<id>'`; `''` = it has none (asked again at the monthly card
+refresh). That service is being replaced by a paid one and answers 500 or
+502 now and then: calls are spaced and retried, a failure is not saved and
+the card is tried again an hour later. Never another print's picture (an
+earlier version borrowed one by name: often another artwork; 0015 cleared
+them).
 
 **Prices** (`domain::pokemon::price`): TCGdex gives Cardmarket's numbers per
 variant (`variants_detailed[].pricing.cardmarket`), else once per card.

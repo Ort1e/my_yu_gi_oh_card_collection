@@ -335,6 +335,8 @@ pub async fn add_page(
         variant: params.variant.unwrap_or_default(),
         source: Source::Single.code().into(),
         obtained_on: today().to_string(),
+        // a card added is near mint unless said otherwise
+        condition: CardStatus::NearMint.code().into(),
         ..CopyValues::default()
     };
     if let Some(opening) = match params.opening {

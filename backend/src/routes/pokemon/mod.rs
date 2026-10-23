@@ -202,7 +202,8 @@ impl CopyRow {
         has_picture(&self.image, &self.image_fr, &self.image_from)
     }
 
-    /// The print whose picture is borrowed (`sm9-33`), or empty.
+    /// Where its picture comes from when not TCGdex (`pokemontcg:swsh10tg-TG29`),
+    /// or empty.
     pub fn picture_from(&self) -> &str {
         self.image_from.as_deref().unwrap_or("")
     }
