@@ -779,3 +779,34 @@ async fn trainer_galleries_answer_to_their_main_code() {
     let (_, page) = t.post("/pokemon/add/booster", &opening("300")).await;
     assert!(page.contains("no number 300 in"), "{page}");
 }
+
+#[tokio::test]
+async fn japanese_codes_with_their_rarity_letters() {
+    let t = TestApp::new().await;
+    sqlx::query(
+        "INSERT INTO pokemon_card (catalogue, tcgdex_id, set_id, set_name, local_id, name_ja,
+             name_fr, name_en, category, dex_id, variants, json, fetched_at)
+         VALUES ('ja', 'SV3a-071', 'SV3a', 'レイジングサーフ', '071', 'イベルタル', 'Yveltal',
+                 'Yveltal', 'Pokemon', 717, 'holo', '{}', date('now'));
+         INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at)
+         VALUES ('ja', 'SV3a', 'レイジングサーフ', 'SV3a', 62,
+                 '[{\"id\":\"SV3a-071\",\"localId\":\"071\",\"name\":\"イベルタル\"}]', date('now'));",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+
+    for q in ["sv3a 071/062ar", "SV3a 071/062 AR", "SV3a 71"] {
+        let q: String = url::form_urlencoded::byte_serialize(q.as_bytes()).collect();
+        let (status, answer) = t
+            .json(
+                "GET",
+                &format!("/pokemon/api/search?lang=ja&q={q}"),
+                serde_json::json!(null),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{q}: {answer}");
+        assert_eq!(answer["cards"][0]["id"], "SV3a-071");
+        assert_eq!(answer["catalogue"], "ja");
+    }
+}

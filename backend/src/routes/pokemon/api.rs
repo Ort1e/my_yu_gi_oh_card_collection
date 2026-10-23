@@ -79,6 +79,7 @@ pub async fn search(
                 set_code: Some(code),
                 number,
                 total,
+                ..
             }) => by_code(&state, &language, &code, &number, total.as_deref()).await,
             Ok(CardRef {
                 set_code: None,

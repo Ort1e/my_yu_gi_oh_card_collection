@@ -12,10 +12,14 @@ use regex::Regex;
 
 use super::Variant;
 
-/// `<number>[/<total>][r|h|n][x<count>]`.
+/// `<number>[/<total>[<Japanese rarity>]][r|h|n][x<count>]`: `71/62ar`
+/// (the rarity letters printed on Japanese cards, ignored: 2 letters or
+/// more, a lone `r` stays the reverse holo).
 static PULL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(?i)([a-z]{0,5}\d{1,4})(?:/([a-z]{0,5}\d{1,4}))?([rhn])?(?:[x×*](\d{1,2}))?$")
-        .unwrap()
+    Regex::new(
+        r"^(?i)([a-z]{0,5}\d{1,4})(?:/([a-z]{0,5}\d{1,4})(rr|rrr|ar|sr|sar|ur|hr|chr|csr|ssr|ace|mur|ma|pr)?)?([rhn])?(?:[x×*](\d{1,2}))?$",
+    )
+    .unwrap()
 });
 /// `<letter>[/<total>][x<count>]`, tried first: `Gx2` is the card G twice,
 /// not a number `Gx2`.
@@ -93,7 +97,7 @@ fn read(piece: &str) -> Option<Pull> {
     }
 
     let captures = PULL.captures(piece)?;
-    let variant = captures.get(3).map(|m| match m.as_str() {
+    let variant = captures.get(4).map(|m| match m.as_str() {
         "r" | "R" => Variant::Reverse,
         "h" | "H" => Variant::Holo,
         _ => Variant::Normal,
@@ -102,7 +106,7 @@ fn read(piece: &str) -> Option<Pull> {
         number: captures[1].to_string(),
         total: captures.get(2).map(|m| m.as_str().to_string()),
         variant,
-        count: count(captures.get(4))?,
+        count: count(captures.get(5))?,
     })
 }
 
@@ -150,6 +154,13 @@ mod tests {
             ]
         );
         assert!(parse("BB").is_err() && parse("1/").is_err());
+        assert_eq!(
+            parse("71/62ar 10/62rx2").unwrap(),
+            [
+                with_total("71", "62", None, 1),
+                with_total("10", "62", Some(Variant::Reverse), 2),
+            ]
+        );
     }
 
     #[test]

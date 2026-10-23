@@ -5,6 +5,10 @@
 //! (a card numbered by a letter: the Mew cards R, G, B of 30th Celebration),
 //! or the number alone (the set is then chosen apart).
 //!
+//! Japanese cards print their rarity letters after the set size
+//! (`SV3a 071/062 AR`, typed `071/062ar` too): they are read apart
+//! ([`CardRef::rarity`]), not taken for the number.
+//!
 //! The `/total` is kept: two sets can share a code (30th Celebration and its
 //! Classic Collection are both `30C`), and the set size tells them apart.
 
@@ -34,6 +38,31 @@ pub struct CardRef {
     pub number: String,
     /// The set size printed after the number (`064` in `067/064`), when typed.
     pub total: Option<String>,
+    /// The Japanese rarity letters printed after it (`AR`), upper case.
+    pub rarity: Option<String>,
+}
+
+/// The rarity letters of the Japanese cards (Bulbapedia's list, 2026).
+pub const JAPANESE_RARITIES: [&str; 20] = [
+    "C", "U", "R", "RR", "RRR", "AR", "SR", "SAR", "UR", "HR", "CHR", "CSR", "S", "SSR", "K", "A",
+    "ACE", "MUR", "MA", "PR",
+];
+
+fn japanese_rarity(text: &str) -> Option<String> {
+    let upper = text.to_ascii_uppercase();
+    JAPANESE_RARITIES.contains(&upper.as_str()).then_some(upper)
+}
+
+/// `062ar` → (`062`, `AR`): a set size and the rarity letters after it.
+pub fn split_rarity(total: &str) -> (&str, Option<String>) {
+    let digits_end = total
+        .rfind(|c: char| c.is_ascii_digit())
+        .map_or(0, |i| i + 1);
+    let (size, letters) = total.split_at(digits_end);
+    match japanese_rarity(letters) {
+        Some(rarity) if !size.is_empty() => (size, Some(rarity)),
+        _ => (total, None),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +88,15 @@ impl std::error::Error for CardRefError {}
 
 /// `"FNE 067/064"` → set `FNE`, number `067`.
 pub fn parse(text: &str) -> Result<CardRef, CardRefError> {
-    let tokens: Vec<&str> = text.split_whitespace().collect();
+    let mut tokens: Vec<&str> = text.split_whitespace().collect();
+    // `071/062 AR`: the rarity letters as their own word
+    let mut rarity = None;
+    if tokens.len() >= 2 && tokens[tokens.len() - 2].contains('/') {
+        rarity = japanese_rarity(tokens[tokens.len() - 1]);
+        if rarity.is_some() {
+            tokens.pop();
+        }
+    }
     let (code, number) = match tokens.as_slice() {
         [] => return Err(CardRefError::Empty),
         [one] => (None, *one),
@@ -68,7 +105,12 @@ pub fn parse(text: &str) -> Result<CardRef, CardRefError> {
     };
 
     let (number, total) = match number.split_once('/') {
-        Some((number, total)) => (number, Some(total)),
+        Some((number, total)) => {
+            // `071/062ar`: the rarity stuck to the set size
+            let (total, stuck) = split_rarity(total);
+            rarity = rarity.or(stuck);
+            (number, Some(total))
+        }
         None => (number, None),
     };
     if !NUMBER.is_match(number) || total.is_some_and(|t| !NUMBER.is_match(t)) {
@@ -87,6 +129,7 @@ pub fn parse(text: &str) -> Result<CardRef, CardRefError> {
         set_code: code.map(str::to_string),
         number: number.to_string(),
         total: total.map(str::to_string),
+        rarity,
     })
 }
 
@@ -123,7 +166,29 @@ mod tests {
             set_code: code.map(str::to_string),
             number: number.to_string(),
             total: total.map(str::to_string),
+            rarity: None,
         }
+    }
+
+    #[test]
+    fn reads_japanese_rarity_letters() {
+        let yveltal = CardRef {
+            rarity: Some("AR".into()),
+            ..card_ref(Some("sv3a"), "071", Some("062"))
+        };
+        assert_eq!(parse("sv3a 071/062ar"), Ok(yveltal.clone()));
+        assert_eq!(
+            parse("SV3a 071/062 AR").map(|r| r.rarity),
+            Ok(Some("AR".into()))
+        );
+        assert_eq!(
+            parse("071/062 sar").map(|r| r.rarity),
+            Ok(Some("SAR".into()))
+        );
+        assert_eq!(split_rarity("062"), ("062", None));
+        assert_eq!(split_rarity("TG30"), ("TG30", None));
+        assert_eq!(split_rarity("062xx"), ("062xx", None), "not a rarity");
+        assert_eq!(parse("SV3a 071/062 XX"), Err(CardRefError::Invalid));
     }
 
     #[test]
