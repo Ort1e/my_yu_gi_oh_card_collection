@@ -93,6 +93,12 @@
     margin-bottom: 0;
 }
 
+/* A link in a box's text: white and underlined, like the text around it. */
+.card a.on-card {
+    color: #fff;
+    text-decoration: underline;
+}
+
 /* ------------------------------------------------------------------ */
 /* Card status badges: <span class="status-badge nm">Near Mint</span>    */
 /* ------------------------------------------------------------------ */

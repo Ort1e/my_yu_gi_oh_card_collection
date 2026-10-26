@@ -376,6 +376,18 @@ legend {
     cursor: pointer;
 }
 
+/* The fields rarely needed (a book's publisher, a card's grading): folded
+   until needed, <details class="more-fields"><summary>…</summary>…</details>. */
+.more-fields {
+    margin-bottom: 1.5rem;
+}
+
+.more-fields summary {
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 /* "+ Add a card", under the card rows: keep it apart from the submit button. */
 #add-row {
     margin-bottom: 1rem;

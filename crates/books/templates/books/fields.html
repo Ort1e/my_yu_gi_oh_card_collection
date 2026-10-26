@@ -36,7 +36,7 @@
   </div>
 </fieldset>
 
-<details class="book-more" {% if !values.publisher.is_empty() || !values.year.is_empty() || !values.pages.is_empty() || !values.format.is_empty() || !values.language.is_empty() || !values.notes.is_empty() %}open{% endif %}>
+<details class="more-fields" {% if !values.publisher.is_empty() || !values.year.is_empty() || !values.pages.is_empty() || !values.format.is_empty() || !values.language.is_empty() || !values.notes.is_empty() %}open{% endif %}>
   <summary>Publisher, year, format, notes…</summary>
   <fieldset>
     <p>

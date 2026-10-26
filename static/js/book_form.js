@@ -71,7 +71,7 @@ function fill(book) {
         if (['publisher', 'year', 'language', 'pages', 'format'].includes(id)) filledMore = true;
     }
 
-    if (filledMore) document.querySelector('.book-more')?.setAttribute('open', '');
+    if (filledMore) document.querySelector('.more-fields')?.setAttribute('open', '');
 }
 
 async function lookup() {
