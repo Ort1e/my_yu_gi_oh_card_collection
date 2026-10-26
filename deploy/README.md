@@ -70,13 +70,13 @@ the app itself; the scripts run as root.
 
 The scripts use the host `nas`; another name: `NAS=… deploy/pc/…`.
 
-## 2. A GitHub token for the updates (once)
+## 2. Updates without a token
 
-The repository is private: the NAS reads its releases with a token.
-GitHub → Settings → Developer settings → Fine-grained tokens → new:
-repository access **only this repository**, permission **Contents:
-read-only**, an expiry (a year; renew it then). It goes in `nightly.env`
-(`GITHUB_TOKEN`) and serves `install-on-nas.sh` too.
+The app's repository is public (only the data repository is private): the
+NAS downloads the builds from the release page like anyone, no GitHub
+token needed. Leave `GITHUB_TOKEN` empty in `nightly.env`; it would only
+serve if the repository became private (a fine-grained token, this
+repository only, "Contents: read-only").
 
 ## 3. First install
 
@@ -88,8 +88,8 @@ the checks green, `nas-release` publishes it as the release `nas-latest`. From t
 root:
 
 ```bash
-GITHUB_TOKEN=github_pat_… deploy/pc/install-on-nas.sh
-# or with the archive downloaded from the release page:
+deploy/pc/install-on-nas.sh
+# or with an archive downloaded from the release page:
 deploy/pc/install-on-nas.sh ~/Downloads/collection-nas.tar.gz
 ```
 
@@ -100,7 +100,7 @@ two settings files from their examples. Fill them in on the NAS:
 ```bash
 ssh nas
 nano /apps/collection/collection.env   # APP_PASSWORD (yours), APP_PASSWORD_FRIEND
-nano /apps/collection/nightly.env      # OVH_USER, OVH_PASSWORD, GITHUB_TOKEN
+nano /apps/collection/nightly.env      # OVH_USER, OVH_PASSWORD
 ```
 
 `install.sh` can be run again: it never overwrites the settings or the

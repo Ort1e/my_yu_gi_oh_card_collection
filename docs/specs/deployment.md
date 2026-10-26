@@ -112,8 +112,8 @@ after a go.
 - **CI** (GitHub Actions, `.github/workflows/ci.yml`), on every push and
   pull request: `cargo fmt --check`, `cargo clippy`, `cargo test`, the deck
   builder's `npm run build`, `cargo audit`, `npm audit`. Without the data
-  submodule: the tests never need it. Free minutes are plenty for a
-  private repository.
+  submodule: the tests never need it. The app's repository is public (only
+  the data repository is private): its Actions minutes are free.
 - **Protection of `main`** (a GitHub ruleset): no force push, no deletion,
   changes only through a pull request from `dev` with the CI green. The
   owner may keep a bypass for emergencies. Same "no force push, no
@@ -127,9 +127,9 @@ after a go.
 Automatic (the owner prefers it): when `main` changes, the CI builds the
 app for the NAS (x86_64, static: musl, so Debian 8's old libraries don't
 matter) with the deck builder and the stylesheets, and publishes it as a
-GitHub release (`nas-latest`). Every night the NAS asks for it (`curl`, a
-read-only token: the repository is private), and when it changed: backup,
-replace, restart. By hand: the same script.
+GitHub release (`nas-latest`). Every night the NAS asks for it (the app's
+`fetch-release`, from the public release page: no token), and when it
+changed: backup, replace, restart. By hand: the same script.
 
 ## Steps (each one reviewed before the next)
 

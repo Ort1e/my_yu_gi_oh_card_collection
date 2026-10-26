@@ -55,7 +55,7 @@ pub const USAGE: &str = "usage:
       media mirrored into DIR/media, copies older than DAYS (14) deleted
   backend fetch-release --to DIR
       on the NAS: download the latest build of main into DIR when it isn't
-      the one installed (GITHUB_TOKEN, GITHUB_REPO; deploy/nas/update.sh)
+      the one installed (the public release; deploy/nas/update.sh)
   backend import-tournament-notes <file.json> [--dry-run]
       one-off: load the tournaments' old notes, transcribed into a JSON file,
       as rounds and games (tournaments that have rounds are skipped)";

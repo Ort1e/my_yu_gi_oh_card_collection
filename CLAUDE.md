@@ -84,7 +84,7 @@ cargo run -p backend -- import-tournament-notes <file.json>   # one-off: the tou
 cargo run -p backend -- refresh-prices        # today's market prices: ygoprodeck into card_price, then Cardmarket's price guide (links, prices), then the Pokémon cards from TCGdex (--dry-run); the server does it weekly by itself
 cargo run -p backend -- export-public         # the public copy (static pages: Yu-Gi-Oh! and Pokémon cards, Pokémon wishlist, books, market values; nothing else) into public-export/ (--out DIR), for the OVH hosting: common::export + each crate's public section
 cargo run -p backend -- backup --to DIR      # consistent copy while the server runs: DIR/app-DATE.db (VACUUM INTO), media mirrored, --keep 14 days (the NAS runs it nightly)
-backend fetch-release --to DIR                # on the NAS only: downloads the CI's `nas-latest` build when new (GITHUB_TOKEN, GITHUB_REPO; deploy/nas/update.sh)
+backend fetch-release --to DIR                # on the NAS only: downloads the CI's `nas-latest` build when new (public release; GITHUB_TOKEN only for a private repository; deploy/nas/update.sh)
 cargo run -p backend -- clean-pictures        # delete the cached card pictures (media/card_images, media/pokemon_card_images) no card uses any more (--dry-run); the server does it daily
 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)

@@ -5,8 +5,8 @@
 #   deploy/pc/install-on-nas.sh [collection-nas.tar.gz]
 #
 # Without an archive, the latest one (release `nas-latest`, built by the CI
-# from main) is downloaded with GITHUB_TOKEN (a token that can read the
-# repository). NAS: the SSH host to use (default `nas`, see deploy/README.md).
+# from main) is downloaded from the repository's public release page. NAS:
+# the SSH host to use (default `nas`, see deploy/README.md).
 set -euo pipefail
 NAS="${NAS:-nas}"
 REPO="${GITHUB_REPO:-Ort1e/my_yu_gi_oh_card_collection}"
@@ -15,15 +15,9 @@ trap 'rm -rf "$work"' EXIT
 
 archive="${1:-}"
 if [ -z "$archive" ]; then
-    : "${GITHUB_TOKEN:?set GITHUB_TOKEN, or give the archive downloaded from the release page}"
-    api="https://api.github.com/repos/$REPO/releases/tags/nas-latest"
-    url=$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$api" |
-        python3 -c 'import json, sys
-for a in json.load(sys.stdin)["assets"]:
-    if a["name"] == "collection-nas.tar.gz": print(a["url"])')
     archive="$work/collection-nas.tar.gz"
-    curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-        -o "$archive" "$url"
+    curl -fsSL -o "$archive" \
+        "https://github.com/$REPO/releases/download/nas-latest/collection-nas.tar.gz"
     echo "downloaded the latest build"
 fi
 
