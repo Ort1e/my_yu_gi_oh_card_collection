@@ -1,7 +1,7 @@
 //! `refresh-prices`: today's market prices from ygoprodeck into `card_price`
 //! (`store::card_prices`), then Cardmarket's price guide
 //! (`store::prices::cardmarket`), then the Pokémon cards' from TCGdex
-//! (`store::pokemon::prices`). The server also runs it by itself every week
+//! (`pokemon::store::prices`). The server also runs it by itself every week
 //! ([`spawn_weekly`]).
 
 use std::time::Duration;
@@ -9,11 +9,11 @@ use std::time::Duration;
 use chrono::NaiveDate;
 
 use crate::store::db::today;
-use crate::store::pokemon;
 use crate::store::prices::cardmarket;
 use crate::store::prices::history::latest_refresh;
 use crate::store::prices::ygoprodeck::refresh_prices;
 use crate::AppState;
+use pokemon::store as pokemon_store;
 
 pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     let report = refresh_prices(&state.pool, &state.http, today(), dry_run).await?;
@@ -24,7 +24,7 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     );
     let report = cardmarket::refresh(&state.pool, &state.http, today(), dry_run).await?;
     println!("{}", report.summary());
-    let report = pokemon::prices::refresh(&state.pool, &state.http, today(), dry_run).await?;
+    let report = pokemon_store::prices::refresh(&state.pool, &state.http, today(), dry_run).await?;
     println!("{}", report.summary());
 
     if dry_run {
@@ -61,7 +61,7 @@ async fn refresh_in_background(state: &AppState) {
         Ok(report) => tracing::info!("{}", report.summary()),
         Err(e) => tracing::warn!("background Cardmarket refresh: {e}"),
     }
-    match pokemon::prices::refresh(&state.pool, &state.http, today(), false).await {
+    match pokemon_store::prices::refresh(&state.pool, &state.http, today(), false).await {
         Ok(report) => tracing::info!("{}", report.summary()),
         Err(e) => tracing::warn!("background Pokémon price refresh: {e}"),
     }

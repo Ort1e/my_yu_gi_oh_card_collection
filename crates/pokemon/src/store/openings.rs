@@ -6,7 +6,7 @@
 use chrono::NaiveDate;
 use sqlx::SqliteConnection;
 
-use crate::store::db::{today, Pool};
+use common::db::{today, Pool};
 
 /// An opening as the pages show it.
 #[derive(Debug, Clone, sqlx::FromRow)]

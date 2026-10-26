@@ -105,5 +105,8 @@ async fn shutdown_signal() {
 
 /// The server: the routes of every collection, assembled by `common::app`.
 pub fn app(state: AppState) -> Router {
-    common::app(state, vec![routes::all(), books::routes()])
+    common::app(
+        state,
+        vec![routes::all(), books::routes(), pokemon::routes()],
+    )
 }

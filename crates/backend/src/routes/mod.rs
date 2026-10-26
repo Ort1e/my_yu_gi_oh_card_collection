@@ -10,7 +10,6 @@ mod collection;
 mod dashboard;
 mod decks;
 mod lots;
-mod pokemon;
 mod reference;
 mod sellers;
 mod tournaments;
@@ -51,12 +50,6 @@ pub fn router() -> Router<AppState> {
         .route("/tournaments", get(tournaments::list))
         .route("/tournaments/labels", get(tournaments::labels::list))
         .route("/tournaments/:id", get(tournaments::detail))
-        .route("/pokemon", get(pokemon::list))
-        .route("/pokemon/rarities", get(pokemon::rarities::page))
-        .route("/pokemon/wishlist", get(pokemon::wishlist::list))
-        .route("/pokemon/openings", get(pokemon::openings::list))
-        .route("/pokemon/openings/:id", get(pokemon::openings::detail))
-        .route("/pokemon/:id", get(pokemon::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))
         .route("/api/deck-versions/:id", get(decks::api::get_version))
         .route("/api/deck-versions/:id/reserve", post(decks::api::reserve))
@@ -77,12 +70,7 @@ pub fn router() -> Router<AppState> {
 /// Routes that serve files rather than pages (kept out of the request log:
 /// a deck builder page loads dozens of card images).
 pub fn files_router() -> Router<AppState> {
-    Router::new()
-        .route("/card-image/:card_data_id", get(cards::images::card_image))
-        .route(
-            "/pokemon/card-image/:card_id/:lang",
-            get(pokemon::images::card_image),
-        )
+    Router::new().route("/card-image/:card_data_id", get(cards::images::card_image))
 }
 
 /// Pages that only read but are private (personal content): behind the login
@@ -115,37 +103,6 @@ pub fn write_router() -> Router<AppState> {
             "/advent-calendar/:year/days/:day/delete",
             post(advent::form::remove_day),
         )
-        .route(
-            "/pokemon/add",
-            get(pokemon::form::add_page).post(pokemon::form::create),
-        )
-        .route(
-            "/pokemon/add/booster",
-            get(pokemon::booster::page).post(pokemon::booster::submit),
-        )
-        .route(
-            "/pokemon/:id/edit",
-            get(pokemon::form::edit_page).post(pokemon::form::update),
-        )
-        .route(
-            "/pokemon/wishlist/add",
-            get(pokemon::wishlist::add_page).post(pokemon::wishlist::create),
-        )
-        .route(
-            "/pokemon/wishlist/:id/edit",
-            get(pokemon::wishlist::edit_page).post(pokemon::wishlist::update),
-        )
-        .route(
-            "/pokemon/wishlist/:id/delete",
-            post(pokemon::wishlist::delete),
-        )
-        .route("/pokemon/wishlist/:id/got", post(pokemon::wishlist::got))
-        .route(
-            "/pokemon/openings/:id/edit",
-            get(pokemon::openings::edit_page).post(pokemon::openings::update),
-        )
-        .route("/pokemon/api/search", get(pokemon::api::search))
-        .route("/pokemon/api/card", get(pokemon::api::card))
         .route(
             "/tournaments/add",
             get(tournaments::form::add_page).post(tournaments::form::create),

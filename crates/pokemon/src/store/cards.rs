@@ -9,21 +9,21 @@
 //! (`pokemon_price`), so a new card has a value at once.
 
 use chrono::NaiveDate;
+use common_domain::CardStatus;
 use pokemon_domain::price::{to_json, variant_prices};
 use pokemon_domain::wish::{CopyKey, Wish};
 use pokemon_domain::{CardInfo, Catalogue, Source, Variant};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use sqlx::SqliteConnection;
-use yugioh_domain::card::CardStatus;
 
 use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
 
 use super::{is_fresh, ptcgio, tcgdex};
-use crate::store::db::{begin_write, today, Money, Pool};
-use crate::web::error::AppResult;
+use common::db::{begin_write, today, Money, Pool};
+use common::web::error::AppResult;
 
 const RECHECK_DAYS: i64 = 30;
 

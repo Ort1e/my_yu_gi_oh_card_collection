@@ -1,0 +1,4 @@
+# Templates: this crate's, then the shared ones (base.html, list_base.html,
+# the navigation bars, form errors, pagination) from `common`.
+[general]
+dirs = ["templates", "../common/templates"]

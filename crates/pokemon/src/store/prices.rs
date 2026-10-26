@@ -11,8 +11,8 @@ use pokemon_domain::{Catalogue, Variant};
 use rust_decimal::Decimal;
 
 use super::{cards, tcgdex};
-use crate::store::db::{begin_write, commit_unless_dry_run, Pool};
-use crate::web::error::AppResult;
+use common::db::{begin_write, commit_unless_dry_run, Pool};
+use common::web::error::AppResult;
 
 pub type VariantPrices = BTreeMap<Variant, Decimal>;
 

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 common = { path = "../common" }
 books = { path = "../books" }
+pokemon = { path = "../pokemon" }
 yugioh-domain = { workspace = true }
 books-domain = { workspace = true }
 pokemon-domain = { workspace = true }

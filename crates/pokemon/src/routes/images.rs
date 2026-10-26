@@ -9,9 +9,9 @@ use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::IntoResponse;
 
-use crate::store::pokemon::cards;
-use crate::web::error::{AppError, AppResult, OrNotFound};
-use crate::AppState;
+use crate::store::cards;
+use common::web::error::{AppError, AppResult, OrNotFound};
+use common::AppState;
 
 /// `(catalogue, tcgdex_id, image, image_fr, image_from)`.
 type Picture = (

@@ -12,17 +12,17 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
+use common_domain::CardStatus;
 use pokemon_domain::{parse_language, Catalogue, Source, Variant, LANGUAGES};
 use serde::Deserialize;
-use yugioh_domain::card::CardStatus;
 
 use super::CopyRow;
-use crate::store::db::{begin_write, today, Pool};
-use crate::store::pokemon::cards::{self, CopyFields};
-use crate::store::pokemon::openings;
-use crate::web::error::{AppError, AppResult, OrNotFound};
-use crate::web::forms::{FormData, Pairs};
-use crate::AppState;
+use crate::store::cards::{self, CopyFields};
+use crate::store::openings;
+use common::db::{begin_write, today, Pool};
+use common::web::error::{AppError, AppResult, OrNotFound};
+use common::web::forms::{FormData, Pairs};
+use common::AppState;
 
 /// A copy's fields as typed, to fill the form again.
 #[derive(Debug, Default)]
@@ -421,7 +421,7 @@ pub struct EditCopyPage {
 
 fn stored_values(copy: &CopyRow) -> CopyValues {
     let text = |value: &Option<String>| value.clone().unwrap_or_default();
-    let money = |value: &Option<crate::store::db::Money>| {
+    let money = |value: &Option<common::db::Money>| {
         value
             .map(|m| m.0.normalize().to_string())
             .unwrap_or_default()

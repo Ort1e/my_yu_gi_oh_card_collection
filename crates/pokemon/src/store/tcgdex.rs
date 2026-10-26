@@ -13,7 +13,7 @@ use reqwest::StatusCode;
 use serde_json::Value;
 use tokio::sync::{Mutex, OnceCell};
 
-use crate::web::error::AppError;
+use common::web::error::AppError;
 
 const BASE_URL: &str = "https://api.tcgdex.net/v2";
 const TIMEOUT: Duration = Duration::from_secs(15);

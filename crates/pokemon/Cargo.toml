@@ -1,0 +1,26 @@
+[package]
+name = "pokemon"
+version = "0.1.0"
+edition = "2021"
+
+# The Pokémon card collection: its pages, data, TCGdex and prices.
+
+[dependencies]
+common = { path = "../common" }
+common-domain = { workspace = true }
+pokemon-domain = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+askama = { workspace = true }
+askama_axum = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rust_decimal = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+common = { path = "../common", features = ["test-support"] }

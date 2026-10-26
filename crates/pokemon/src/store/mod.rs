@@ -20,5 +20,5 @@ pub mod tcgdex;
 /// Whether a `YYYY-MM-DD` date is less than `days` old.
 fn is_fresh(date: &str, days: i64) -> bool {
     date.parse::<chrono::NaiveDate>()
-        .is_ok_and(|d| (crate::store::db::today() - d).num_days() < days)
+        .is_ok_and(|d| (common::db::today() - d).num_days() < days)
 }

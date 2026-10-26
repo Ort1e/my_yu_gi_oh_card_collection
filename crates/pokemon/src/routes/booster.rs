@@ -22,22 +22,22 @@ use askama::Template;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
+use common_domain::CardStatus;
 use pokemon_domain::pulls::{self, Pull};
 use pokemon_domain::{
     default_variant, is_full_art, parse_language, Catalogue, Source, Variant, LANGUAGES,
 };
 use serde::Deserialize;
-use yugioh_domain::card::CardStatus;
 
 use super::form::{find_card, Added};
 use super::{card_names, image_src, rarities};
-use crate::store::db::{begin_write, today};
-use crate::store::pokemon::cards::{self, CopyFields};
-use crate::store::pokemon::openings::{self, Opening};
-use crate::store::pokemon::sets::{self, SetInfo};
-use crate::web::error::{AppError, AppResult};
-use crate::web::forms::{FormData, Pairs};
-use crate::AppState;
+use crate::store::cards::{self, CopyFields};
+use crate::store::openings::{self, Opening};
+use crate::store::sets::{self, SetInfo};
+use common::db::{begin_write, today};
+use common::web::error::{AppError, AppResult};
+use common::web::forms::{FormData, Pairs};
+use common::AppState;
 
 /// The condition a card pulled from a booster is in, unless changed.
 const NEW_CARD: CardStatus = CardStatus::NearMint;

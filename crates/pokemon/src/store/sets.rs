@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{is_fresh, tcgdex};
-use crate::store::db::{begin_write, today, Pool};
-use crate::web::error::{AppError, AppResult};
+use common::db::{begin_write, today, Pool};
+use common::web::error::{AppError, AppResult};
 
 const RECHECK_DAYS: i64 = 7;
 

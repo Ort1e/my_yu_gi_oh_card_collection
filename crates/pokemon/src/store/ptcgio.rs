@@ -19,7 +19,7 @@ use pokemon_domain::fold_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::web::error::AppError;
+use common::web::error::AppError;
 
 const BASE_URL: &str = "https://api.pokemontcg.io/v2";
 const IMAGES_URL: &str = "https://images.pokemontcg.io";

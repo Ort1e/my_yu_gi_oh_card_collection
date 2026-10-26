@@ -217,6 +217,7 @@ dependencies = [
  "dotenvy",
  "hmac",
  "image",
+ "pokemon",
  "pokemon-domain",
  "rand 0.8.8",
  "regex",
@@ -1616,6 +1617,27 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide 0.8.9",
+]
+
+[[package]]
+name = "pokemon"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "askama_axum",
+ "axum",
+ "chrono",
+ "common",
+ "common-domain",
+ "pokemon-domain",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]

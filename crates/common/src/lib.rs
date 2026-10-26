@@ -87,10 +87,16 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
         }
     }
 
+    // the login on the writes and the private reads (axum refuses a layer
+    // on a router without routes: a collection may have none of one kind)
+    let mut protected = write.merge(private);
+    if protected.has_routes() {
+        protected = protected.route_layer(login_required.clone());
+    }
+
     Router::new()
         .merge(public)
-        .merge(write.route_layer(login_required.clone()))
-        .merge(private.route_layer(login_required.clone()))
+        .merge(protected)
         .route("/login", get(auth::page).post(auth::login))
         .route("/logout", post(auth::logout))
         // One INFO line per page or API call: method, path, status and time.

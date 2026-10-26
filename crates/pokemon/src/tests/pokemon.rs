@@ -429,14 +429,10 @@ async fn the_refresh_counts_the_cards_to_price() {
     fixture(&t).await;
     add(&t, HORSEA_IR).await;
     // one card owned, already priced today: nothing to ask; the other unused
-    let report = crate::store::pokemon::prices::refresh(
-        &t.state.pool,
-        &t.state.http,
-        crate::store::db::today(),
-        true,
-    )
-    .await
-    .unwrap();
+    let report =
+        crate::store::prices::refresh(&t.state.pool, &t.state.http, common::db::today(), true)
+            .await
+            .unwrap();
     assert_eq!((report.asked, report.orphans_deleted), (0, 1));
     assert_eq!(
         t.scalar("SELECT count(*) FROM pokemon_card").await,

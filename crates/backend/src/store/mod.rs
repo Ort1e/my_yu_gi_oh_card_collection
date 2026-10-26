@@ -5,7 +5,6 @@
 pub mod card_data;
 pub mod cards;
 pub mod models;
-pub mod pokemon;
 pub mod prices;
 pub mod shipment_files;
 pub mod tournaments;
