@@ -14,7 +14,7 @@
 <div class="card wide-card">
   <div class="card-meta-line">
     <div><strong>Type:</strong> {{ lot.lot_type }}</div>
-    <div><strong>Price:</strong> {{ lot.price }} €</div>
+    <div><strong>Price:</strong> {{ lot.price_text() }}</div>
     <div><strong>Buy date:</strong> {{ lot.buy_date }}</div>
     <div><strong>Received:</strong> {{ lot.received_date.as_deref().unwrap_or("—") }}</div>
     <div><strong>Seller:</strong>

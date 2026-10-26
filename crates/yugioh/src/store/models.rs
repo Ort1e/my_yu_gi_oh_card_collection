@@ -95,6 +95,8 @@ pub struct LotRow {
     pub id: i64,
     pub lot_type: String,
     pub price: Money,
+    /// Given back by the seller (`0.00` when nothing).
+    pub refund: Money,
     pub buy_date: String,
     pub received_date: Option<String>,
     pub seller_id: Option<i64>,
@@ -108,13 +110,23 @@ pub struct LotRow {
 }
 
 impl LotRow {
-    pub const SELECT: &'static str = "SELECT lot.id, lot.lot_type, lot.price, lot.buy_date,
+    pub const SELECT: &'static str =
+        "SELECT lot.id, lot.lot_type, lot.price, lot.refund, lot.buy_date,
             lot.received_date, lot.seller_id, seller.name AS seller, lot.shipment_file,
             (SELECT count(*) FROM unite WHERE unite.lot_id = lot.id) AS card_count
         FROM lot LEFT JOIN seller ON seller.id = lot.seller_id";
 
     pub fn seller_name(&self) -> &str {
         self.seller.as_deref().unwrap_or("No Seller")
+    }
+
+    /// The price, and the refund when there is one: `12.50 € (refunded 2.90 €)`.
+    pub fn price_text(&self) -> String {
+        if self.refund.0.is_zero() {
+            format!("{} €", self.price)
+        } else {
+            format!("{} € (refunded {} €)", self.price, self.refund)
+        }
     }
 
     pub fn title(&self) -> String {

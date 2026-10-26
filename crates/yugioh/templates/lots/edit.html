@@ -34,6 +34,11 @@
       <input type="text" inputmode="decimal" name="no_card_price" id="no_card_price" value="{{ lot.no_card_price }}">
     </p>
     <p>
+      <label for="refund">Refund:</label>
+      <input type="text" inputmode="decimal" name="refund" id="refund" value="{{ lot.refund }}">
+      <small>Given back by the seller (Dateacard refunds the shipping). The price stays what you paid; the lot costs price − refund.</small>
+    </p>
+    <p>
       <label for="seller_select">Seller:</label>
       <select name="seller_select" id="seller_select">
         <option value="">— No seller —</option>

@@ -50,6 +50,11 @@
       <label for="no_card_price">No card price:</label>
       <input type="text" inputmode="decimal" name="no_card_price" id="no_card_price" value="{{ lot.no_card_price }}">
     </p>
+    <p>
+      <label for="refund">Refund:</label>
+      <input type="text" inputmode="decimal" name="refund" id="refund" value="{{ lot.refund }}">
+      <small>Given back by the seller (Dateacard refunds the shipping). The price stays what you paid; the lot costs price − refund.</small>
+    </p>
   </fieldset>
 
   <fieldset>
