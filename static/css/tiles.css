@@ -1,11 +1,14 @@
 /*
  * The card collections' picture grid (templates/partials/card_grid.html,
  * common::web::tiles): the Yu-Gi-Oh! and Pokémon lists, a booster opening.
+ * Every tile of a page has the same size (the biggest one's), and its lines
+ * are always in the same places.
  */
 
 .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    grid-auto-rows: 1fr;            /* every row as tall as the tallest */
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -13,6 +16,7 @@
 .card-tile {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     overflow: hidden;
     border-radius: var(--radius);
     background-color: var(--secondary);
@@ -30,17 +34,42 @@
     opacity: 0.6;
 }
 
-/* Card pictures have the card's own ratio (59 × 86 mm, 63 × 88 mm: close). */
-.card-tile img,
+/* ---------- the picture: the whole card, its own proportions ---------- */
+
+.card-tile-picture {
+    padding: 0.5rem 0.5rem 0;
+}
+
+.card-tile-picture img,
 .card-tile-no-image {
+    display: block;
     width: 100%;
     height: auto;
+    object-fit: contain;
+    /* a card's rounded corners (3 mm) */
+    border-radius: 4.5% / 3.2%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.card-tile.yugioh .card-tile-picture img,
+.card-tile.yugioh .card-tile-no-image {
+    aspect-ratio: 59 / 86;
+}
+
+/* Pokémon pictures have their own transparent corners: no shadow square. */
+.card-tile.pokemon .card-tile-picture img,
+.card-tile.pokemon .card-tile-no-image {
     aspect-ratio: 63 / 88;
-    object-fit: cover;
+}
+
+.card-tile.pokemon .card-tile-picture img {
+    box-shadow: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
 .card-tile-no-image {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 1rem;
@@ -48,21 +77,75 @@
     text-align: center;
 }
 
+/* ---------- the text: the same lines in the same places ---------- */
+
 .card-tile-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.1rem;
     padding: 0.5rem 0.6rem 0.6rem;
-}
-
-.card-tile-name {
-    color: #fff;
-    font-weight: 700;
-}
-
-.card-tile-meta {
-    margin-top: 0.2rem;
     font-size: 0.85rem;
 }
 
+/* The name: two lines kept, even for a short one. */
+.card-tile-name {
+    display: -webkit-box;
+    min-height: 2.6em;
+    overflow: hidden;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+/* One line each, cut with … (the whole text in the tooltip); an empty one
+   keeps its room. */
+.card-tile-line {
+    min-height: 1.3em;
+    overflow: hidden;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-tile-line.english-name {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+.card-tile-print {
+    color: #fff;
+}
+
+/* Tags on the left, the value on the right, at the bottom of the tile. */
+.card-tile-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.3rem;
+    margin-top: auto;
+    padding-top: 0.4rem;
+}
+
+.card-tile-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.card-tile-tags .status-badge {
+    margin: 0;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.8rem;
+}
+
 .card-tile-value {
+    margin-left: auto;
     color: #fff;
     font-weight: 700;
 }

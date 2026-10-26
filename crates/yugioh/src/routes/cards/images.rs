@@ -3,11 +3,14 @@
 //! ygoprodeck URL stored in `card_data.json_data` (ygoprodeck asks not to
 //! hotlink their images).
 
+use std::collections::HashSet;
+
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use common::media;
 use yugioh_domain::card::clean_card_name;
 
+use crate::store::db::Pool;
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::AppState;
 
@@ -17,6 +20,18 @@ fn file_name(en_name: &str) -> String {
         .replace(' ', "_")
         .replace(['/', '\\'], "_");
     format!("{name}.jpg")
+}
+
+/// The picture files the cards use (those of the card data linked to a
+/// card, proxies included): the others are a cache to clean.
+pub async fn used_files(pool: &Pool) -> sqlx::Result<HashSet<String>> {
+    let names: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT en_name FROM card_data
+         WHERE id IN (SELECT card_data_id FROM card WHERE card_data_id IS NOT NULL)",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(names.iter().map(|name| file_name(name)).collect())
 }
 
 pub async fn card_image(

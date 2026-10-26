@@ -3,13 +3,16 @@
 //!   cargo run -p backend -- scrap-ban-list [--all] [--dry-run] [--date YYYY-MM-DD]…
 //!   cargo run -p backend -- clean-cards [--dry-run]
 //!   cargo run -p backend -- refresh-prices [--dry-run]
+//!   cargo run -p backend -- clean-pictures [--dry-run]
 //!   cargo run -p backend -- import-tournament-notes <file.json> [--dry-run]
 //!
 //! `--dry-run` does the work in a transaction that is rolled back and makes
 //! no API call (names unknown locally are only reported).
 
+mod pictures;
 mod prices;
 
+pub use pictures::spawn_daily as spawn_daily_picture_cleanup;
 pub use prices::spawn_weekly as spawn_weekly_price_refresh;
 pub use yugioh::commands::clean_cards::spawn_daily as spawn_daily_cleanup;
 use yugioh::commands::{ban_list, clean_cards, tournament_notes};
@@ -34,6 +37,9 @@ pub const USAGE: &str = "usage:
       fetch today's market prices: every Yu-Gi-Oh! card from ygoprodeck and
       Cardmarket's price guide, the Pokémon cards owned or wished from TCGdex
       (the server does it weekly)
+  backend clean-pictures [--dry-run]
+      delete the cached card pictures (Yu-Gi-Oh!, Pokémon) no card uses any
+      more; downloaded again if needed (the server does it daily)
   backend import-tournament-notes <file.json> [--dry-run]
       one-off: load the tournaments' old notes, transcribed into a JSON file,
       as rounds and games (tournaments that have rounds are skipped)";
@@ -51,6 +57,9 @@ pub enum Command {
         dry_run: bool,
     },
     RefreshPrices {
+        dry_run: bool,
+    },
+    CleanPictures {
         dry_run: bool,
     },
     ImportTournamentNotes {
@@ -83,7 +92,9 @@ impl Command {
         let allowed: &[&str] = match name.as_str() {
             "serve" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
-            "clean-cards" | "refresh-prices" | "import-tournament-notes" => &["--dry-run"],
+            "clean-cards" | "refresh-prices" | "clean-pictures" | "import-tournament-notes" => {
+                &["--dry-run"]
+            }
             other => return Err(format!("unknown command {other:?}")),
         };
         if let Some(bad) = flags.iter().find(|f| !allowed.contains(f)) {
@@ -100,6 +111,9 @@ impl Command {
                 dry_run: has("--dry-run"),
             },
             "refresh-prices" => Command::RefreshPrices {
+                dry_run: has("--dry-run"),
+            },
+            "clean-pictures" => Command::CleanPictures {
                 dry_run: has("--dry-run"),
             },
             "import-tournament-notes" => Command::ImportTournamentNotes {
@@ -136,6 +150,7 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
         } => ban_list::scrap(state, all, dry_run, &dates).await,
         Command::CleanCards { dry_run } => clean_cards::clean(state, dry_run).await,
         Command::RefreshPrices { dry_run } => prices::refresh(state, dry_run).await,
+        Command::CleanPictures { dry_run } => pictures::clean(state, dry_run).await,
         Command::ImportTournamentNotes { file, dry_run } => {
             tournament_notes::import(state, &file, dry_run).await
         }
@@ -196,6 +211,10 @@ mod tests {
         assert_eq!(
             parse(&["refresh-prices", "--dry-run"]),
             Ok(Command::RefreshPrices { dry_run: true })
+        );
+        assert_eq!(
+            parse(&["clean-pictures"]),
+            Ok(Command::CleanPictures { dry_run: false })
         );
         assert_eq!(
             parse(&["import-tournament-notes", "--dry-run", "notes.json"]),

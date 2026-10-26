@@ -1,7 +1,9 @@
 //! Pictures kept in the media folder: downloaded once from their URL, then
 //! served from there (card pictures: ygoprodeck asks not to hotlink theirs,
-//! and TCGdex's are big).
+//! and TCGdex's are big). A cache: the files no card uses any more are
+//! deleted ([`remove_unused`]), and downloaded again if ever needed.
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -52,6 +54,56 @@ pub async fn fetch_once(
     Ok(bytes)
 }
 
+/// What [`remove_unused`] found.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Unused {
+    pub files: usize,
+    pub bytes: u64,
+}
+
+/// A download still being written (`<name>.<pid>.tmp`, renamed when done)
+/// is left alone for this long.
+const TMP_GRACE: Duration = Duration::from_secs(3600);
+
+/// Delete the files of `dir` whose name isn't in `used` (`dry_run`: only
+/// count them). A missing folder has nothing to delete.
+pub async fn remove_unused(
+    dir: &Path,
+    used: &HashSet<String>,
+    dry_run: bool,
+) -> std::io::Result<Unused> {
+    let mut unused = Unused::default();
+    let mut entries = match tokio::fs::read_dir(dir).await {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(unused),
+        Err(e) => return Err(e),
+    };
+
+    while let Some(entry) = entries.next_entry().await? {
+        let metadata = entry.metadata().await?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !metadata.is_file() || used.contains(&name) {
+            continue;
+        }
+
+        let recent = metadata
+            .modified()
+            .ok()
+            .and_then(|at| at.elapsed().ok())
+            .is_some_and(|age| age < TMP_GRACE);
+        if name.ends_with(".tmp") && recent {
+            continue;
+        }
+
+        if !dry_run {
+            tokio::fs::remove_file(entry.path()).await?;
+        }
+        unused.files += 1;
+        unused.bytes += metadata.len();
+    }
+    Ok(unused)
+}
+
 /// A picture's type, from its first bytes.
 pub fn content_type(bytes: &[u8]) -> &'static str {
     match bytes {
@@ -76,6 +128,34 @@ pub fn picture(bytes: Vec<u8>) -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn unused_files_are_deleted() {
+        let dir = std::env::temp_dir().join(format!("media-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["kept.jpg", "old.jpg", "old.webp"] {
+            std::fs::write(dir.join(name), "abc").unwrap();
+        }
+        let used = HashSet::from(["kept.jpg".to_string()]);
+
+        let counted = remove_unused(&dir, &used, true).await.unwrap();
+        assert_eq!(counted, Unused { files: 2, bytes: 6 });
+        assert!(dir.join("old.jpg").exists());
+
+        assert_eq!(remove_unused(&dir, &used, false).await.unwrap(), counted);
+        let mut left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["kept.jpg"]);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(
+            remove_unused(&dir, &used, false).await.unwrap(),
+            Unused::default()
+        );
+    }
 
     #[test]
     fn types_come_from_the_bytes() {

@@ -8,49 +8,56 @@
 {% endblock %}
 
 {% block content %}
-<div class="card-list">
-  <div class="card with-image">
-    {% match card.card_data_id %}{% when Some with (data_id) %}
-    <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-image" width="120px"/>
-    {% when None %}{% endmatch %}
-    <div class="card-content">
-      <div class="card-title">{{ card.name }} {% match card.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}{% endmatch %}</div>
-      {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
-      <div class="card-meta-line">
-        <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}</div>
-        <div class="card-subtitle">
-          Status:
-          {% match card.status() %}
-          {% when Some with (status) %}
-            <span class="status-badge {{ status.code()|lower }}">{{ status.label() }}</span>
-          {% when None %}
-            Unknown
-          {% endmatch %}
-        </div>
-        <div class="card-subtitle">Proxy: {{ card.is_proxy|yes_no }}</div>
-        {% match price %}{% when Some with (price) %}
-        <div class="card-subtitle">Price: {{ price }} €</div>
-        {% when None %}{% endmatch %}
-        {% match market %}{% when Some with (market) %}
-        <div class="card-subtitle">
-          {% if market.from_cardmarket %}
-          <span title="Cardmarket's trend price of this printing (product {% match market.product_id %}{% when Some with (id) %}{{ id }}{% when None %}{% endmatch %})">Market (Cardmarket):</span>
-          {% else %}
-          <span title="ygoprodeck's price of the card name, the cheapest printing's: an estimate. Pick the card's Cardmarket product on its edit page for a precise price.">Market (estimate):</span>
-          {% endif %}
-          {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
-          {% match market.sparkline %}{% when Some with (points) %}
-          <svg class="price-history" width="160" height="32" viewBox="-2 -2 164 36" role="img" aria-label="Price history">
-            <polyline points="{{ points }}" fill="none" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          {% when None %}{% endmatch %}
-        </div>
-        {% when None %}{% endmatch %}
-      </div>
-      <div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>
-    </div>
-  </div>
+<div class="inside-container">
+<p class="back-link"><a href="/cards">← Back to the cards</a></p>
 
+<div class="card-detail">
+  {% match card.card_data_id %}{% when Some with (data_id) %}
+  <figure class="card-detail-picture">
+    <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-detail-image yugioh" width="300" height="437">
+  </figure>
+  {% when None %}{% endmatch %}
+
+  <div class="card">
+    <div class="card-title">{{ card.name }}</div>
+    {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
+    <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}{% if card.is_proxy %} · <strong>Proxy</strong>{% endif %}{% if card.is_sold %} · <strong>Sold</strong>{% endif %}</div>
+    {% match card.rarity %}{% when Some with (rarity) %}
+    <div class="card-subtitle">Rarity: <a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a></div>
+    {% when None %}{% endmatch %}
+    <div class="card-subtitle">
+      Status:
+      {% match card.status() %}
+      {% when Some with (status) %}
+        <span class="status-badge {{ status.code()|lower }}">{{ status.label() }}</span>
+      {% when None %}
+        Unknown
+      {% endmatch %}
+    </div>
+    {% match price %}{% when Some with (price) %}
+    <div class="card-subtitle">Price: {{ price }} €</div>
+    {% when None %}{% endmatch %}
+    {% match market %}{% when Some with (market) %}
+    <div class="card-subtitle">
+      {% if market.from_cardmarket %}
+      <span title="Cardmarket's trend price of this printing (product {% match market.product_id %}{% when Some with (id) %}{{ id }}{% when None %}{% endmatch %})">Market (Cardmarket):</span>
+      {% else %}
+      <span title="ygoprodeck's price of the card name, the cheapest printing's: an estimate. Pick the card's Cardmarket product on its edit page for a precise price.">Market (estimate):</span>
+      {% endif %}
+      {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
+      {% match market.sparkline %}{% when Some with (points) %}
+      <svg class="price-history" width="160" height="32" viewBox="-2 -2 164 36" role="img" aria-label="Price history">
+        <polyline points="{{ points }}" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      {% when None %}{% endmatch %}
+    </div>
+    {% when None %}{% endmatch %}
+    <div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>
+  </div>
+</div>
+</div>
+
+<div class="card-list">
   {% match lot %}{% when Some with (lot) %}
   <h2 class="card-title">Lot Details : </h2>
   {% include "partials/lot_item.html" %}

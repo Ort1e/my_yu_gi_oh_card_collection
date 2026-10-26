@@ -610,6 +610,14 @@ does it weekly by itself (`backend/src/commands/prices.rs::spawn_weekly`,
 Yu-Gi-Oh! refresh is 7 days old; the Pokémon refresh follows it, since it
 keeps no trace of a run that found no price).
 
+`clean-pictures` (`backend/src/commands/pictures.rs`) deletes the cached
+card pictures no card uses any more: in `media/card_images/` those of card
+data no card links to (and old Django duplicates), in
+`media/pokemon_card_images/` those of Pokémon cards no longer owned or
+wished. Each collection lists its files in use (`yugioh::routes::used_card_pictures`,
+`pokemon::routes::images::used_files`); a picture deleted by mistake is just
+downloaded again. The server runs it daily, 15 minutes after it starts.
+
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
 summary line in the log), and the actions that make a cleanup necessary do
@@ -708,13 +716,14 @@ for every collection:
 
 | What | Where | Used by |
 |---|---|---|
-| the picture grid of cards: `CardTile` (picture, names, a line of facts, tags, value, faded when sold), and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
+| the picture grid of cards: `CardTile` (the whole picture in its collection's proportions, `CardShape`; the name on two lines, the other name, the print, the details; at the bottom the condition badge, tags and value; faded when sold), every tile of a page the same size with its lines in the same places; and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
 | the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
 | the advent calendars | the `advent` crate | cards, books |
 | the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
 | one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
 | "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
-| a picture downloaded once into `media/` | `common::media::fetch_once`, `picture` | `/card-image/:id`, `/pokemon/card-image/…` |
+| a picture downloaded once into `media/`, and the ones no card uses deleted (`clean-pictures`, daily) | `common::media::fetch_once`, `picture`, `remove_unused` | `/card-image/:id`, `/pokemon/card-image/…` |
+| a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
 | background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
 | card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
 | photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |

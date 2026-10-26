@@ -388,7 +388,9 @@ A page listing cards (Yu-Gi-Oh! or Pokémon) shows them with the shared grid
 
 1. give the row a `tile(&self) -> CardTile` (see `CardRow::tile` in
    `yugioh/src/store/models.rs`, `CopyRow::tile` in `pokemon/src/routes/mod.rs`):
-   its page, its picture, its names, a line of facts, tags, value, faded;
+   its page, its shape (the collection's proportions), its picture, its
+   names, its print (code, or set and number), its details (rarity,
+   variant), its condition, tags, value, faded;
 2. on the page struct, `fn tiles(&self) -> Vec<CardTile>`;
 3. in the template, load `/static/css/tiles.css` and write
    `{% let tiles = self.tiles() %}{% include "partials/card_grid.html" %}`.

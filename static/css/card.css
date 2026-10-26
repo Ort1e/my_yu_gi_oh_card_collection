@@ -168,9 +168,48 @@ a.rarity-badge:hover {
 /* Card pictures                                                        */
 /* ------------------------------------------------------------------ */
 
-.card-image {
+/* A card's page: its picture beside its box (cards/detail.html,
+   pokemon/detail.html). Stacked on a phone by the wrap. */
+.card-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-detail-picture {
+    max-width: 300px;
+    margin: 0;
+}
+
+.card-detail-picture figcaption {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* The whole card, its own proportions, its rounded corners. */
+.card-detail-image {
     display: block;
+    width: 300px;
+    max-width: 100%;
     height: auto;
+    border-radius: 4.5% / 3.2%;
+}
+
+.card-detail-image.yugioh {
+    aspect-ratio: 59 / 86;
+    object-fit: contain;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.card-detail-image.pokemon {
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+}
+
+.card-detail > .card {
+    flex: 1 1 18rem;
+    margin: 0;
 }
 
 /* A photo in place of a card picture (the advent calendars list). */

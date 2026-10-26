@@ -1,18 +1,21 @@
-{# The cards as a grid of pictures (common::web::tiles::CardTile, static/css/tiles.css): set `tiles` before including. #}
+{# The cards as a grid of pictures (common::web::tiles::CardTile, static/css/tiles.css): set `tiles` before including. Every line is always there, so they line up from tile to tile. #}
 <div class="card-grid">
   {% for tile in tiles %}
-  <a href="{{ tile.href }}" class="card-tile{% if tile.faded %} faded{% endif %}">
-    {% match tile.image %}{% when Some with (src) %}
-    <img src="{{ src }}" alt="{{ tile.name }}" loading="lazy" width="245" height="342">
-    {% when None %}
-    <div class="card-tile-no-image">{{ tile.name }}<br><small>{{ tile.placeholder }}</small></div>
-    {% endmatch %}
+  <a href="{{ tile.href }}" class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">
+    <div class="card-tile-picture">
+      {% match tile.image %}{% when Some with (src) %}
+      <img src="{{ src }}" alt="{{ tile.name }}" loading="lazy">
+      {% when None %}
+      <div class="card-tile-no-image">{{ tile.name }}<br><small>{{ tile.print }}</small></div>
+      {% endmatch %}
+    </div>
     <div class="card-tile-text">
-      <div class="card-tile-name">{{ tile.name }}</div>
-      {% if !tile.other_name.is_empty() %}<div class="english-name">{{ tile.other_name }}</div>{% endif %}
-      <div class="card-tile-meta">{{ tile.meta }}</div>
-      <div class="card-tile-meta">
-        {% for tag in tile.tags %}<span class="tag">{{ tag }}</span> {% endfor %}
+      <div class="card-tile-name" title="{{ tile.name }}">{{ tile.name }}</div>
+      <div class="card-tile-line english-name" title="{{ tile.other_name }}">{{ tile.other_name }}</div>
+      <div class="card-tile-line card-tile-print" title="{{ tile.print }}">{{ tile.print }}</div>
+      <div class="card-tile-line" title="{{ tile.details }}">{{ tile.details }}</div>
+      <div class="card-tile-footer">
+        <span class="card-tile-tags">{% match tile.condition %}{% when Some with ((code, label)) %}<span class="status-badge {{ code|lower }}" title="{{ label }}">{{ code }}</span>{% when None %}{% endmatch %}{% for tag in tile.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</span>
         {% if !tile.value.is_empty() %}<span class="card-tile-value">{{ tile.value }} €</span>{% endif %}
       </div>
     </div>

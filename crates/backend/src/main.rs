@@ -67,6 +67,7 @@ async fn main() {
     let login = state.auth.enabled();
     commands::spawn_daily_cleanup(state.clone());
     commands::spawn_weekly_price_refresh(state.clone());
+    commands::spawn_daily_picture_cleanup(state.clone());
     let app = app(state);
 
     // Local only by default. Serving the LAN (BIND_ADDR=0.0.0.0:3000) needs

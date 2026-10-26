@@ -2,7 +2,7 @@
 
 use yugioh_domain::card::CardStatus;
 
-use common::web::tiles::CardTile;
+use common::web::tiles::{CardShape, CardTile};
 
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
@@ -40,12 +40,7 @@ impl CardRow {
 
     /// The card in a picture grid.
     pub fn tile(&self) -> CardTile {
-        let code = self.code.as_deref().unwrap_or("—");
-        let meta = match self.status() {
-            Some(status) => format!("{code} · {}", status.label()),
-            None => code.to_string(),
-        };
-        let mut tags: Vec<String> = self.rarity.iter().cloned().collect();
+        let mut tags = Vec::new();
         if self.is_proxy {
             tags.push("Proxy".to_string());
         }
@@ -54,11 +49,13 @@ impl CardRow {
         }
         CardTile {
             href: format!("/cards/{}", self.id),
+            shape: CardShape::YuGiOh,
             image: self.card_data_id.map(|id| format!("/card-image/{id}")),
             name: self.name.clone(),
             other_name: self.english_name().unwrap_or_default().to_string(),
-            meta,
-            placeholder: code.to_string(),
+            print: self.code.clone().unwrap_or_default(),
+            details: self.rarity.clone().unwrap_or_default(),
+            condition: self.status().map(|s| (s.code(), s.label())),
             tags,
             value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
             faded: self.is_sold,

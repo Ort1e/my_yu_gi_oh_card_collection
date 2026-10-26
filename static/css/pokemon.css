@@ -50,34 +50,6 @@ label.checkbox input {
 
 /* ---------- a copy's page ---------- */
 
-.pokemon-detail {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 1.5rem;
-}
-
-.pokemon-detail-image {
-    width: 300px;
-    max-width: 100%;
-    height: auto;
-    border-radius: 12px;
-}
-
-.pokemon-detail-picture {
-    max-width: 300px;
-    margin: 0;
-}
-
-.pokemon-detail-picture figcaption {
-    font-size: 0.85rem;
-    color: #555;
-}
-
-.pokemon-detail .card {
-    flex: 1 1 18rem;
-}
-
 .pokemon-history {
     max-width: 28rem;
 }
@@ -336,6 +308,7 @@ form.wish-got {
 /* A number found in no set (booster form): no picture yet. */
 .booster-unknown {
     width: 120px;
+    aspect-ratio: 63 / 88;
     font-size: 3rem;
     border-radius: 6px;
 }

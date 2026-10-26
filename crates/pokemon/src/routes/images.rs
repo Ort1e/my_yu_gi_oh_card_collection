@@ -5,10 +5,13 @@
 //! has no picture of gets the same print's from the Pokémon TCG API
 //! (`cards::find_image`, a full URL, PNG): looked up once.
 
+use std::collections::HashSet;
+
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 
 use crate::store::cards;
+use common::db::Pool;
 use common::media;
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::AppState;
@@ -37,6 +40,21 @@ fn file_name(catalogue: &str, tcgdex_id: &str, print: &str) -> String {
         })
         .collect();
     format!("{catalogue}-{id}-{print}.img")
+}
+
+/// The picture files of the cards owned or wished (every print each may
+/// show): the others are a cache to clean.
+pub async fn used_files(pool: &Pool) -> sqlx::Result<HashSet<String>> {
+    let cards: Vec<(String, String)> =
+        sqlx::query_as("SELECT catalogue, tcgdex_id FROM pokemon_card")
+            .fetch_all(pool)
+            .await?;
+    Ok(cards
+        .iter()
+        .flat_map(|(catalogue, tcgdex_id)| {
+            ["base", "fr", "other"].map(|print| file_name(catalogue, tcgdex_id, print))
+        })
+        .collect())
 }
 
 pub async fn card_image(

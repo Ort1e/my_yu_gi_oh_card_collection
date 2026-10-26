@@ -39,7 +39,7 @@ use common::sql::like_pattern;
 use common::web::error::{AppResult, OrNotFound};
 use common::web::filters;
 use common::web::pagination::{self, Page, PageParam};
-use common::web::tiles::{CardTile, View};
+use common::web::tiles::{dotted, CardShape, CardTile, View};
 use common::AppState;
 
 /// The names a card is shown with: the one of the copy's language first,
@@ -260,10 +260,11 @@ impl CopyRow {
     /// The copy in a picture grid.
     pub fn tile(&self) -> CardTile {
         let (name, other_name) = self.names();
-        let mut meta = format!("{} · {} · {}", self.set_name, self.local_id, self.language);
-        if self.variant != "normal" {
-            meta.push_str(&format!(" · {}", self.variant_label()));
-        }
+        let variant = if self.variant == "normal" {
+            ""
+        } else {
+            self.variant_label()
+        };
         let mut tags = Vec::new();
         if self.full_art {
             tags.push("Full art".to_string());
@@ -276,11 +277,17 @@ impl CopyRow {
         }
         CardTile {
             href: format!("/pokemon/{}", self.id),
+            shape: CardShape::Pokemon,
             image: self.has_image().then(|| self.image_src()),
             name,
             other_name,
-            meta,
-            placeholder: format!("{} {}", self.set_name, self.local_id),
+            print: dotted([
+                self.set_name.as_str(),
+                self.local_id.as_str(),
+                &self.language.to_uppercase(),
+            ]),
+            details: dotted([self.rarity_text(), variant]),
+            condition: self.status().map(|s| (s.code(), s.label())),
             tags,
             value: self.value_text(),
             faded: self.is_sold(),

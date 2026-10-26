@@ -4,27 +4,66 @@
 
 use crate::web::pagination;
 
-/// One card in a picture grid.
+/// One card in a picture grid. Every tile of a page has the same size and
+/// the same lines, in the same places (empty ones keep their room): the
+/// picture, the name (two lines), the other name, the print, the details,
+/// then the condition, the tags and the value at the bottom.
 #[derive(Debug, Default)]
 pub struct CardTile {
     /// Its page.
     pub href: String,
-    /// Its picture; `None`: its name in its place.
+    /// The card's proportions, for its picture.
+    pub shape: CardShape,
+    /// Its picture; `None`: its name and print in its place.
     pub image: Option<String>,
     pub name: String,
-    /// Under the name, empty when none: its English name under a French
-    /// one, the French name under a Japanese one.
+    /// Its name in another language, empty when none: the English name of
+    /// a French card, the French name of a Japanese one.
     pub other_name: String,
-    /// A line of facts: `set · number · language`, `code · condition`.
-    pub meta: String,
-    /// Under the name in the picture's place when it has none.
-    pub placeholder: String,
-    /// Small badges: rarity, Full art, PSA 10, Proxy, Sold.
+    /// Which print: `JUSH-FR040`, `30e Anniversaire · 016`.
+    pub print: String,
+    /// What this print is: `Ultra Rare`, `Illustration rare · Holo`.
+    pub details: String,
+    /// Its condition, `(code, label)`: `("NM", "Near Mint")`, shown as a
+    /// coloured badge (`.status-badge`, card.css); `None` when not noted.
+    pub condition: Option<(&'static str, &'static str)>,
+    /// Badges: Full art, PSA 10, Proxy, Sold.
     pub tags: Vec<String>,
     /// Its value (`12.50`, shown with €), empty when unknown.
     pub value: String,
     /// Faded: sold.
     pub faded: bool,
+}
+
+/// The proportions of a collection's cards (their pictures are shown
+/// whole, never cropped).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CardShape {
+    /// 59 × 86 mm.
+    #[default]
+    YuGiOh,
+    /// 63 × 88 mm.
+    Pokemon,
+}
+
+impl CardShape {
+    /// The class of its tiles (`static/css/tiles.css`).
+    pub fn class(self) -> &'static str {
+        match self {
+            CardShape::YuGiOh => "yugioh",
+            CardShape::Pokemon => "pokemon",
+        }
+    }
+}
+
+/// `parts` that aren't empty, joined by ` · `.
+pub fn dotted<'a>(parts: impl IntoIterator<Item = &'a str>) -> String {
+    parts
+        .into_iter()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
 /// How a list shows its cards: pictures (the default) or a table
@@ -101,6 +140,15 @@ impl View {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dotted_skips_the_empty_parts() {
+        assert_eq!(
+            dotted(["Ultra Rare", "", " Near Mint "]),
+            "Ultra Rare · Near Mint"
+        );
+        assert_eq!(dotted(["", ""]), "");
+    }
 
     #[test]
     fn views() {
