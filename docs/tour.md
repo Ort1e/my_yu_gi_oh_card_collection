@@ -463,7 +463,11 @@ names (`&`, `et`, `and` alike: `domain::pokemon::fold_name`). A code also
 covers its family: TCGdex keeps a Trainer Gallery apart (`swsh10tg`,
 code `ASR:TG`) while its cards print `ASR TG29/TG30` (`sets::in_family`);
 a lettered number alone (`TG29`) lists every card with it
-(`tcgdex::by_number`). A number missing from sets remembered on an earlier
+(`tcgdex::by_number`). A Sword & Shield card prints no code but a
+regulation mark (`F 034/189`): the sets of that size
+(`sets::by_size`, TCGdex `cardCount.official=eq:189`), the card with that
+number and mark. TCGdex's French "localized" code of some sets is their
+name (`151` for 151, printed MEW): a code without a letter is ignored. A number missing from sets remembered on an earlier
 day asks TCGdex again (`sets::are_old`, `sets::forget`). TCGdex has no
 pictures of the Trainer Galleries either: they borrow one (below), the
 the Pokémon TCG API's (below).

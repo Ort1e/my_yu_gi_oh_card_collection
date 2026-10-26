@@ -9,6 +9,11 @@
 //! (`SV3a 071/062 AR`, typed `071/062ar` too): they are read apart
 //! ([`CardRef::rarity`]), not taken for the number.
 //!
+//! Sword & Shield cards print no set code: only the set's symbol, the
+//! number and a **regulation mark**, a letter (`F 034/189`). That letter is
+//! read as the mark ([`CardRef::regulation`]), not a code: the set is then
+//! found by its size (the `/189`) and the card by its mark.
+//!
 //! The `/total` is kept: two sets can share a code (30th Celebration and its
 //! Classic Collection are both `30C`), and the set size tells them apart.
 
@@ -40,6 +45,9 @@ pub struct CardRef {
     pub total: Option<String>,
     /// The Japanese rarity letters printed after it (`AR`), upper case.
     pub rarity: Option<String>,
+    /// The regulation mark before the number (`F` in `F 034/189`), upper
+    /// case: Sword & Shield cards print it instead of a set code.
+    pub regulation: Option<char>,
 }
 
 /// The rarity letters of the Japanese cards (Bulbapedia's list, 2026).
@@ -121,6 +129,19 @@ pub fn parse(text: &str) -> Result<CardRef, CardRefError> {
             CardRefError::Invalid
         });
     }
+    // `F 034/189`: a single letter before a number with its set size is
+    // the regulation mark, not a set code
+    let regulation = match code {
+        Some(mark) if total.is_some() && mark.len() == 1 => {
+            let mark = mark.chars().next().filter(char::is_ascii_alphabetic);
+            if mark.is_none() {
+                return Err(CardRefError::Invalid);
+            }
+            mark.map(|m| m.to_ascii_uppercase())
+        }
+        _ => None,
+    };
+    let code = code.filter(|_| regulation.is_none());
     if code.is_some_and(|code| !is_set_code(code)) {
         return Err(CardRefError::Invalid);
     }
@@ -130,6 +151,7 @@ pub fn parse(text: &str) -> Result<CardRef, CardRefError> {
         number: number.to_string(),
         total: total.map(str::to_string),
         rarity,
+        regulation,
     })
 }
 
@@ -167,7 +189,24 @@ mod tests {
             number: number.to_string(),
             total: total.map(str::to_string),
             rarity: None,
+            regulation: None,
         }
+    }
+
+    #[test]
+    fn reads_regulation_marks() {
+        let mantine = CardRef {
+            regulation: Some('F'),
+            ..card_ref(None, "034", Some("189"))
+        };
+        assert_eq!(parse("F 034/189"), Ok(mantine.clone()));
+        assert_eq!(parse("f 034/189"), Ok(mantine));
+        assert_eq!(
+            parse("F 034"),
+            Err(CardRefError::Invalid),
+            "a lone letter without a set size is not a mark (nor a code)"
+        );
+        assert_eq!(parse("1 034/189"), Err(CardRefError::Invalid));
     }
 
     #[test]

@@ -160,7 +160,11 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
   Gallery card (TG29/TG30) prints its main set's code: `ASR TG29`, or
   `TG29` alone in the finder (every TG29 is listed, with its set). A
   Japanese card: its set id and number, the rarity letters after it are
-  fine (`SV3a 071/062 AR`, `sv3a 071/062ar`), with the language Japanese. Cards come
+  fine (`SV3a 071/062 AR`, `sv3a 071/062ar`), with the language Japanese. A
+  Sword & Shield card prints no set code, only its symbol, the number and a
+  regulation mark: type it as printed, `F 034/189` (the set is found by its
+  size, the mark tells apart the sets of the same size); the results show
+  the set's code (ASR) to use in the booster form. Cards come
   in near mint unless changed.
 - **The openings** (Openings in the header): each booster with its cards
   and value. A card forgotten: the opening's page → **Add cards by

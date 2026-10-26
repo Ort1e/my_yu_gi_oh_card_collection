@@ -131,7 +131,8 @@ function resultButton(card, catalogue) {
 
     const label = document.createElement('span');
     const size = card.official ? `/${String(card.official).padStart(3, '0')}` : '';
-    label.textContent = `${card.name} · ${card.set_name ?? card.set_id} ${card.local_id}${size}`;
+    const code = card.set_code && card.set_code !== card.set_id ? ` (${card.set_code})` : '';
+    label.textContent = `${card.name} · ${card.set_name ?? card.set_id}${code} ${card.local_id}${size}`;
     button.append(label);
 
     button.addEventListener('click', () => {

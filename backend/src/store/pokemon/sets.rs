@@ -160,6 +160,30 @@ pub async fn forget(pool: &Pool, language: &str, code: &str) -> AppResult<()> {
 /// that set, so `30th` also finds `30th-c`) in `language`, the biggest
 /// first; empty when TCGdex knows none. Asks TCGdex only when
 /// `pokemon_set` has no fresh answer: call it before a write transaction.
+/// The sets of `size` cards (the size printed after the numbers, `/189`) in
+/// `language`: a Sword & Shield card prints no set code (`F 034/189`).
+pub async fn by_size(
+    pool: &Pool,
+    http: &reqwest::Client,
+    language: &str,
+    size: i64,
+) -> AppResult<Vec<SetInfo>> {
+    let briefs =
+        tcgdex::sets_where(http, language, "cardCount.official", &format!("eq:{size}")).await?;
+    let mut found: Vec<SetInfo> = Vec::new();
+    for brief in briefs.iter().take(8) {
+        let Some(id) = brief["id"].as_str() else {
+            continue;
+        };
+        for set in by_code(pool, http, language, id).await? {
+            if set.official == Some(size) && !found.iter().any(|known| known.id == set.id) {
+                found.push(set);
+            }
+        }
+    }
+    Ok(found)
+}
+
 pub async fn by_code(
     pool: &Pool,
     http: &reqwest::Client,
@@ -307,6 +331,9 @@ fn printed_code(set: &Value) -> Option<&str> {
     let abbreviation = &set["abbreviation"];
     abbreviation["localized"]
         .as_str()
+        // TCGdex gives some sets their name as French "code" (`151` for
+        // 151, whose cards print MEW): a code has a letter
+        .filter(|code| code.chars().any(|c| c.is_ascii_alphabetic()))
         .or_else(|| abbreviation["official"].as_str())
 }
 
@@ -379,6 +406,14 @@ mod tests {
         assert_eq!(set.card("67").unwrap().image, None);
         assert!(set.card("68").is_none());
         assert!(set.is_secret("067") && !set.is_secret("010") && !set.is_secret("TG05"));
+
+        let mew = json!({"id": "sv03.5", "name": "151",
+                         "abbreviation": {"official": "MEW", "localized": "151"},
+                         "cardCount": {"official": 165}, "cards": []});
+        assert_eq!(
+            from_tcgdex("fr", &mew).unwrap().code.as_deref(),
+            Some("MEW")
+        );
 
         let japanese = json!({"id": "SV6a", "name": "ナイトワンダラー",
                               "cardCount": {"official": 64}, "cards": []});

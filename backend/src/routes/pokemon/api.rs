@@ -83,6 +83,17 @@ pub async fn search(
                 total,
                 ..
             }) => by_code(&state, &language, &code, &number, total.as_deref()).await,
+            // `F 034/189`, `034/189`: no code printed (Sword & Shield): the
+            // set by its size, the card by its regulation mark
+            Ok(CardRef {
+                set_code: None,
+                number,
+                total: Some(total),
+                regulation,
+                ..
+            }) if total.parse::<i64>().is_ok() => {
+                by_size(&state, &language, &number, &total, regulation).await
+            }
             Ok(CardRef {
                 set_code: None,
                 number,
@@ -127,6 +138,7 @@ fn card_json(set: &sets::SetInfo, card: &sets::SetCard) -> Value {
         "local_id": card.local_id,
         "set_id": set.id,
         "set_name": set.name,
+        "set_code": set.code,
         "official": set.official,
         "thumb": card.image.as_ref().map(|i| format!("{i}/low.webp")),
         "secret": set.is_secret(&card.local_id),
@@ -266,6 +278,62 @@ async fn briefs_json(state: &AppState, language: &str, briefs: &[Value]) -> Vec<
             }))
         })
         .collect()
+}
+
+/// `F 034/189`: the cards with this number in the sets of this size, those
+/// with this regulation mark (when given and some have it).
+async fn by_size(
+    state: &AppState,
+    language: &str,
+    number: &str,
+    total: &str,
+    regulation: Option<char>,
+) -> AppResult<Found> {
+    let size: i64 = total.parse().unwrap_or_default();
+    let found = sets::by_size(&state.pool, &state.http, language, size).await?;
+    let mut cards: Vec<(&sets::SetInfo, &sets::SetCard)> = found
+        .iter()
+        .filter_map(|set| Some((set, set.card(number)?)))
+        .collect();
+    if cards.is_empty() {
+        return Ok(Err(answer(
+            StatusCode::NOT_FOUND,
+            format!(
+                "No set of {size} cards has a number {number} in this language: \
+                 check the number, or search by name."
+            ),
+        )));
+    }
+
+    // the regulation mark tells sets of the same size apart (D, E, F…)
+    if let (Some(mark), true) = (regulation, cards.len() > 1) {
+        let mut marked = Vec::new();
+        for (set, card) in &cards {
+            let json = tcgdex::card(&state.http, language, &card.id).await?;
+            let card_mark = json
+                .as_ref()
+                .and_then(|j| j["regulationMark"].as_str())
+                .and_then(|m| m.chars().next());
+            if card_mark == Some(mark) {
+                marked.push((*set, *card));
+            }
+        }
+        if !marked.is_empty() {
+            cards = marked;
+        }
+    }
+
+    let results = cards
+        .iter()
+        .map(|(set, card)| card_json(set, card))
+        .collect();
+    let note = (cards.len() > 1).then(|| {
+        format!(
+            "{} sets have {size} cards and a number {number}: pick the card that is yours.",
+            cards.len()
+        )
+    });
+    Ok(Ok((results, Value::Null, note)))
 }
 
 /// `TG29/TG30` without its code: the cards with this number in every set
