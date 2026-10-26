@@ -1,7 +1,9 @@
 # Spec: deployment, security and repository workflow
 
-Status: **plan, answers in** (2026-10-26). Steps 1–3 can start; the NAS
-steps wait for its model. GitHub settings are changed only after a go.
+Status: **plan, answers in** (2026-10-26). Steps 1 and 2 done on `dev`
+(CI, dependencies; security items 1–7 and 9 with their tests; 8 comes
+with the export, step 3). The NAS steps wait for its exact model (`uname -m`). GitHub
+settings are changed only after a go.
 
 ## What we want
 
@@ -68,9 +70,8 @@ committed by hand. After the move:
    `HttpOnly` and `SameSite=Strict`. Test on the `Set-Cookie` header.
 3. **Password guessing**: a limit per IP (e.g. 5 failures, then 15 minutes
    of refusal), logged. Test.
-4. **Two people**: one password each (`APP_PASSWORDS`), so the friend's can
-   be changed alone; the log says who did what. (To confirm: or one shared
-   password.)
+4. **Two people**: one password each (owner's answer), so the friend's
+   can be changed alone; the log says who did what.
 5. **Security headers** on every answer: Content-Security-Policy (scripts
    from the app and the two CDNs used: Chart.js, ZXing on jsDelivr),
    `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
@@ -136,8 +137,22 @@ the app for the NAS when `main` changes (a container image on GitHub's
 registry, or a binary), and the NAS checks for a new one every night,
 backs up, then restarts on it. Otherwise one command by hand.
 
+## The NAS: a Netgear ReadyNAS
+
+A line Netgear has stopped (no more security updates), running ReadyNAS
+OS 6 (an older Debian with systemd); depending on the model, an ARM or an
+Intel processor. So:
+
+- the app runs as **one static binary** (Rust, musl: no library to
+  install, no Docker), built by the CI for the NAS's processor, started by
+  a systemd service, its data in a folder of a NAS share;
+- Tailscale also runs as its static binary (Tailscale's own packages
+  for ARM and x86);
+- the NAS stays **unreachable from the internet** (no port forwarding, its
+  admin page on the home network only): with no more updates, that is the
+  main protection.
+
 ## Still open
 
-1. Which NAS (brand, model)? Does it run Docker (or Container Manager)?
-   Its processor (Intel/AMD or ARM) decides how the app is built.
-2. The friend: their own password, or the owner's?
+1. The exact model, or its processor: `uname -m` over SSH (`armv7l` or
+   `x86_64`), or System → Overview in its admin page.

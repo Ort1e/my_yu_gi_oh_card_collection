@@ -13,6 +13,7 @@ use axum::Router;
 use sqlx::sqlite::SqlitePoolOptions;
 use tower::ServiceExt;
 
+use crate::web::auth::AuthConfig;
 use crate::AppState;
 
 pub struct TestApp {
@@ -29,8 +30,13 @@ impl Drop for TestApp {
 
 impl TestApp {
     /// `build`: the app under test from its state; `password`: enable the
-    /// login with this password.
+    /// login with this password (user `owner`).
     pub async fn new(build: fn(AppState) -> Router, password: Option<&str>) -> TestApp {
+        TestApp::with_config(build, AuthConfig::password(password)).await
+    }
+
+    /// The same, with these users and settings (private mode, `Secure`…).
+    pub async fn with_config(build: fn(AppState) -> Router, config: AuthConfig) -> TestApp {
         // show handler errors in failing tests' output
         let _ = tracing_subscriber::fmt().with_test_writer().try_init();
         let dir = std::env::temp_dir().join(format!("ygo-test-{:016x}", rand::random::<u64>()));
@@ -43,9 +49,7 @@ impl TestApp {
             .unwrap();
         sqlx::migrate!("../../migrations").run(&pool).await.unwrap();
 
-        let auth = crate::web::auth::Auth::load(&pool, password.map(str::to_string))
-            .await
-            .unwrap();
+        let auth = crate::web::auth::Auth::load(&pool, config).await.unwrap();
         TestApp {
             state: AppState {
                 pool,

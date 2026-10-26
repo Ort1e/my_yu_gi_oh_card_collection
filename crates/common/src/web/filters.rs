@@ -23,6 +23,16 @@ pub fn debt_color(debt: &Decimal, available: &Decimal) -> askama::Result<&'stati
     })
 }
 
+/// JSON to put in a `<script type="application/json">`: `<`, `>` and `&`
+/// written as `\u003c`… so no text in it (a deck or card name) can end the
+/// tag. Read back as is by `JSON.parse`.
+pub fn json_for_script(json: &serde_json::Value) -> String {
+    json.to_string()
+        .replace('<', "\\u003c")
+        .replace('>', "\\u003e")
+        .replace('&', "\\u0026")
+}
+
 pub fn yes_no(b: &bool) -> askama::Result<&'static str> {
     Ok(if *b { "Yes" } else { "No" })
 }
@@ -30,6 +40,18 @@ pub fn yes_no(b: &bool) -> askama::Result<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_cannot_end_its_script_tag() {
+        let json = serde_json::json!({ "name": "</script><script>alert(1)</script> & <!--" });
+        let text = json_for_script(&json);
+        assert!(
+            !text.contains('<') && !text.contains('>') && !text.contains('&'),
+            "{text}"
+        );
+        let back: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(back, json);
+    }
 
     #[test]
     fn money_rounds_half_up() {

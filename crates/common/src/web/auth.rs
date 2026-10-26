@@ -1,16 +1,32 @@
-//! Single-password login guarding every collection's write and private
-//! routes (`Routes::write`, `Routes::private`) and the private media folders
-//! (shipment PDFs, calendar photos: personal data).
+//! Password login guarding every collection's write and private routes
+//! (`Routes::write`, `Routes::private`) and the private media folders
+//! (shipment PDFs, calendar photos: personal data); every page too in
+//! private mode ([`AuthConfig::public_reads`] false, the deployed app).
 //!
-//! The password comes from `APP_PASSWORD`; without it login is disabled and
-//! the server only accepts to listen on a loopback address (see `main`). A
-//! session is a cookie `<expiry>.<signature>`: the expiry as a unix timestamp,
-//! signed with HMAC-SHA256 by a random key generated once and kept in the
-//! `app_secret` table, so restarts don't log out. `SameSite=Strict` keeps
-//! other sites from posting forms with it (CSRF).
+//! The users and their passwords come from the environment
+//! ([`AuthConfig::from_env`]): `APP_PASSWORD` (user `owner`) and
+//! `APP_PASSWORD_<NAME>` (user `<name>`, e.g. a friend's). The login form
+//! asks only for the password: it says who logs in, so two users can't share
+//! one. Without any, login is disabled and the server only accepts to listen
+//! on a loopback address (see `main`).
+//!
+//! A session is a cookie `<user>.<expiry>.<signature>`: the expiry as a unix
+//! timestamp, signed with HMAC-SHA256 together with the user and their
+//! current password, by a random key generated once and kept in the
+//! `app_secret` table: restarts don't log out, changing a password does.
+//! `SameSite=Strict` keeps other sites from posting forms with it (CSRF),
+//! `Secure` (served over HTTPS) keeps it off plain HTTP.
+//!
+//! Wrong passwords: after [`MAX_FAILURES`] from one client, its next tries
+//! are refused for [`LOCKOUT`], the right password too.
+
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use askama::Template;
-use axum::extract::{Query, Request, State};
+use axum::extract::{ConnectInfo, Query, Request, State};
 use axum::http::{header, HeaderMap, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
@@ -20,6 +36,7 @@ use base64::Engine;
 use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
+use tracing::Instrument;
 
 use crate::db::Pool;
 use crate::web::error::AppResult;
@@ -30,16 +47,101 @@ type HmacSha256 = Hmac<Sha256>;
 const COOKIE: &str = "session";
 const SESSION_DAYS: i64 = 30;
 
+/// Wrong passwords allowed from one client before it must wait.
+pub const MAX_FAILURES: u32 = 5;
+/// How long a client that made too many wrong guesses waits.
+pub const LOCKOUT: Duration = Duration::from_secs(15 * 60);
+
+/// Who may log in, and how.
+#[derive(Debug, Clone)]
+pub struct AuthConfig {
+    /// `(name, password)`; none: login disabled.
+    pub users: Vec<(String, String)>,
+    /// The session cookie only over HTTPS (`SECURE_COOKIES=1`).
+    pub secure_cookies: bool,
+    /// The pages that only read are open to all (`PUBLIC_READS=0`: every
+    /// page needs the login).
+    pub public_reads: bool,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        AuthConfig {
+            users: Vec::new(),
+            secure_cookies: false,
+            public_reads: true,
+        }
+    }
+}
+
+impl AuthConfig {
+    /// One user, `owner`, with this password (none: login disabled).
+    pub fn password(password: Option<&str>) -> AuthConfig {
+        AuthConfig {
+            users: password
+                .filter(|p| !p.is_empty())
+                .map(|p| vec![("owner".to_string(), p.to_string())])
+                .unwrap_or_default(),
+            ..AuthConfig::default()
+        }
+    }
+
+    /// From the environment: `APP_PASSWORD`, `APP_PASSWORD_<NAME>`,
+    /// `SECURE_COOKIES`, `PUBLIC_READS`.
+    pub fn from_env() -> Result<AuthConfig, String> {
+        AuthConfig::from_vars(std::env::vars())
+    }
+
+    fn from_vars(vars: impl IntoIterator<Item = (String, String)>) -> Result<AuthConfig, String> {
+        let mut config = AuthConfig::default();
+        let flag = |value: &str| matches!(value.trim(), "1" | "true" | "yes");
+        for (name, value) in vars {
+            if name == "SECURE_COOKIES" {
+                config.secure_cookies = flag(&value);
+            } else if name == "PUBLIC_READS" {
+                config.public_reads = flag(&value);
+            } else if value.is_empty() {
+                continue;
+            } else if name == "APP_PASSWORD" {
+                config.users.push(("owner".to_string(), value));
+            } else if let Some(user) = name.strip_prefix("APP_PASSWORD_") {
+                let user = user.to_lowercase();
+                if user.is_empty() || !user.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                    return Err(format!("{name}: a user name is letters, digits and _"));
+                }
+                config.users.push((user, value));
+            }
+        }
+        config.users.sort();
+
+        for (i, (name, password)) in config.users.iter().enumerate() {
+            if config.users[..i].iter().any(|(other, _)| other == name) {
+                return Err(format!("user {name} is set twice"));
+            }
+            if config.users[..i].iter().any(|(_, other)| other == password) {
+                return Err(
+                    "two users have the same password: the password says who logs in".into(),
+                );
+            }
+        }
+        Ok(config)
+    }
+}
+
 #[derive(Clone)]
 pub struct Auth {
-    /// `None`: login disabled.
-    password: Option<String>,
+    /// `(name, password)`; none: login disabled.
+    users: Arc<Vec<(String, String)>>,
     key: [u8; 32],
+    secure_cookies: bool,
+    public_reads: bool,
+    /// Wrong passwords by client: how many, the latest when.
+    failures: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
 }
 
 impl Auth {
     /// Load the session key, creating it on first use.
-    pub async fn load(pool: &Pool, password: Option<String>) -> sqlx::Result<Auth> {
+    pub async fn load(pool: &Pool, config: AuthConfig) -> sqlx::Result<Auth> {
         sqlx::query("INSERT OR IGNORE INTO app_secret (name, value) VALUES ('session_key', ?)")
             .bind(rand::random::<[u8; 32]>().to_vec())
             .execute(pool)
@@ -53,13 +155,21 @@ impl Auth {
             .map_err(|_| sqlx::Error::Decode("session_key must be 32 bytes".into()))?;
 
         Ok(Auth {
-            password: password.filter(|p| !p.is_empty()),
+            users: Arc::new(config.users),
             key,
+            secure_cookies: config.secure_cookies,
+            public_reads: config.public_reads,
+            failures: Arc::default(),
         })
     }
 
     pub fn enabled(&self) -> bool {
-        self.password.is_some()
+        !self.users.is_empty()
+    }
+
+    /// Whether the pages that only read are open to all.
+    pub fn public_reads(&self) -> bool {
+        self.public_reads || !self.enabled()
     }
 
     fn mac(&self, data: &[u8]) -> HmacSha256 {
@@ -68,45 +178,113 @@ impl Auth {
         mac
     }
 
-    /// Constant-time comparison (of the MACs of both strings).
-    fn password_matches(&self, input: &str) -> bool {
-        let Some(password) = &self.password else {
-            return false;
-        };
-
-        let expected = self.mac(password.as_bytes()).finalize().into_bytes();
-        self.mac(input.as_bytes()).verify_slice(&expected).is_ok()
+    /// The user whose password this is. Every password is compared, in
+    /// constant time (their MACs), so the time says nothing.
+    fn user_with_password(&self, input: &str) -> Option<&str> {
+        let input = self.mac(input.as_bytes()).finalize().into_bytes();
+        let mut found = None;
+        for (name, password) in self.users.iter() {
+            if self.mac(password.as_bytes()).verify_slice(&input).is_ok() {
+                found = Some(name.as_str());
+            }
+        }
+        found
     }
 
-    fn session_cookie(&self, now: i64) -> String {
+    /// The MAC of a session: the user, the expiry and the user's password.
+    fn session_mac(&self, user: &str, expiry: &str) -> Option<HmacSha256> {
+        let (_, password) = self.users.iter().find(|(name, _)| name == user)?;
+        Some(self.mac(format!("{user}.{expiry}.{password}").as_bytes()))
+    }
+
+    fn cookie_attributes(&self, max_age: i64) -> String {
+        let secure = if self.secure_cookies { "; Secure" } else { "" };
+        format!("Path=/; Max-Age={max_age}; HttpOnly; SameSite=Strict{secure}")
+    }
+
+    fn session_cookie(&self, user: &str, now: i64) -> Option<String> {
         let expiry = (now + SESSION_DAYS * 24 * 3600).to_string();
-        let signature = URL_SAFE_NO_PAD.encode(self.mac(expiry.as_bytes()).finalize().into_bytes());
-        format!(
-            "{COOKIE}={expiry}.{signature}; Path=/; Max-Age={}; HttpOnly; SameSite=Strict",
-            SESSION_DAYS * 24 * 3600
-        )
+        let mac = self.session_mac(user, &expiry)?;
+        let signature = URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
+        Some(format!(
+            "{COOKIE}={user}.{expiry}.{signature}; {}",
+            self.cookie_attributes(SESSION_DAYS * 24 * 3600)
+        ))
     }
 
-    fn valid_session(&self, value: &str, now: i64) -> bool {
-        let Some((expiry, signature)) = value.split_once('.') else {
-            return false;
-        };
-        let Ok(signature) = URL_SAFE_NO_PAD.decode(signature) else {
-            return false;
-        };
+    /// The user of a valid, unexpired session.
+    fn session_user<'a>(&self, value: &'a str, now: i64) -> Option<&'a str> {
+        let mut parts = value.splitn(3, '.');
+        let (user, expiry, signature) = (parts.next()?, parts.next()?, parts.next()?);
+        let signature = URL_SAFE_NO_PAD.decode(signature).ok()?;
+        let valid = expiry.parse::<i64>().is_ok_and(|e| e > now)
+            && self
+                .session_mac(user, expiry)?
+                .verify_slice(&signature)
+                .is_ok();
+        valid.then_some(user)
+    }
 
-        expiry.parse::<i64>().is_ok_and(|e| e > now)
-            && self.mac(expiry.as_bytes()).verify_slice(&signature).is_ok()
+    /// The logged-in user of a request (`"local"` with the login disabled).
+    pub fn user(&self, headers: &HeaderMap) -> Option<String> {
+        if !self.enabled() {
+            return Some("local".to_string());
+        }
+
+        let now = chrono::Utc::now().timestamp();
+        session_values(headers)
+            .find_map(|value| self.session_user(value, now))
+            .map(str::to_string)
     }
 
     /// Whether the request may write: login disabled, or a valid session.
     pub fn allows(&self, headers: &HeaderMap) -> bool {
-        if !self.enabled() {
-            return true;
-        }
+        self.user(headers).is_some()
+    }
 
-        let now = chrono::Utc::now().timestamp();
-        session_values(headers).any(|value| self.valid_session(value, now))
+    /// Whether `client` made too many wrong guesses lately; forgets the old
+    /// ones on the way.
+    fn locked_out(&self, client: &str) -> bool {
+        let mut failures = self.failures.lock().expect("not poisoned");
+        failures.retain(|_, (_, last)| last.elapsed() < LOCKOUT);
+        failures
+            .get(client)
+            .is_some_and(|(count, _)| *count >= MAX_FAILURES)
+    }
+
+    fn failed(&self, client: &str) {
+        let mut failures = self.failures.lock().expect("not poisoned");
+        let entry = failures
+            .entry(client.to_string())
+            .or_insert((0, Instant::now()));
+        entry.0 += 1;
+        entry.1 = Instant::now();
+    }
+
+    fn succeeded(&self, client: &str) {
+        self.failures.lock().expect("not poisoned").remove(client);
+    }
+}
+
+/// Who is asking, for the limit on wrong passwords: the address of the
+/// connection, or, behind a proxy on this machine (Tailscale's), the first
+/// address it forwards.
+fn client(connection: Option<SocketAddr>, headers: &HeaderMap) -> String {
+    let forwarded = || {
+        headers
+            .get("x-forwarded-for")?
+            .to_str()
+            .ok()?
+            .split(',')
+            .next()
+            .map(|a| a.trim().to_string())
+    };
+    match connection {
+        Some(addr) if addr.ip().is_loopback() => {
+            forwarded().unwrap_or_else(|| addr.ip().to_string())
+        }
+        Some(addr) => addr.ip().to_string(),
+        None => forwarded().unwrap_or_else(|| "unknown".to_string()),
     }
 }
 
@@ -127,16 +305,19 @@ fn safe_next(next: Option<&str>) -> String {
     }
 }
 
-/// Middleware: let logged-in requests through. Otherwise the API answers
-/// 401 and pages redirect to the login form, which comes back here (or, for
-/// a form post, to the page the form was on).
+/// Middleware: let logged-in requests through (their logs name the user).
+/// Otherwise the API answers 401 and pages redirect to the login form, which
+/// comes back here (or, for a form post, to the page the form was on).
 pub async fn require_login(
     State(state): State<AppState>,
     request: Request,
     next: Next,
 ) -> Response {
-    if state.auth.allows(request.headers()) {
-        return next.run(request).await;
+    if let Some(user) = state.auth.user(request.headers()) {
+        return next
+            .run(request)
+            .instrument(tracing::info_span!("user", name = %user))
+            .await;
     }
 
     let uri = request.uri();
@@ -211,31 +392,51 @@ pub struct LoginForm {
 
 pub async fn login(
     State(state): State<AppState>,
+    connection: Option<ConnectInfo<SocketAddr>>,
+    headers: HeaderMap,
     Form(form): Form<LoginForm>,
 ) -> AppResult<Response> {
     let next = safe_next(form.next.as_deref());
-
-    if !state.auth.password_matches(&form.password) {
-        // slow down guessing
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        tracing::warn!("failed login attempt");
-
+    let client = client(connection.map(|c| c.0), &headers);
+    let refuse = |status, error| {
         let page = LoginPage {
             enabled: state.auth.enabled(),
             logged_in: false,
-            next,
-            error: Some("Wrong password."),
+            next: next.clone(),
+            error: Some(error),
         };
-        return Ok((StatusCode::UNAUTHORIZED, page).into_response());
+        Ok((status, page).into_response())
+    };
+
+    if state.auth.locked_out(&client) {
+        tracing::warn!(client, "login refused: too many wrong passwords");
+        return refuse(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many wrong passwords: try again in 15 minutes.",
+        );
     }
 
-    let cookie = state.auth.session_cookie(chrono::Utc::now().timestamp());
-    tracing::info!("logged in");
+    let now = chrono::Utc::now().timestamp();
+    let Some(cookie) = state
+        .auth
+        .user_with_password(&form.password)
+        .and_then(|user| Some((user, state.auth.session_cookie(user, now)?)))
+    else {
+        state.auth.failed(&client);
+        // slow down guessing
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        tracing::warn!(client, "failed login attempt");
+        return refuse(StatusCode::UNAUTHORIZED, "Wrong password.");
+    };
+
+    state.auth.succeeded(&client);
+    let (user, cookie) = cookie;
+    tracing::info!(user, client, "logged in");
     Ok(([(header::SET_COOKIE, cookie)], Redirect::to(&next)).into_response())
 }
 
-pub async fn logout() -> impl IntoResponse {
-    let cookie = format!("{COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict");
+pub async fn logout(State(state): State<AppState>) -> impl IntoResponse {
+    let cookie = format!("{COOKIE}=; {}", state.auth.cookie_attributes(0));
     tracing::info!("logged out");
     ([(header::SET_COOKIE, cookie)], Redirect::to("/"))
 }
@@ -244,46 +445,138 @@ pub async fn logout() -> impl IntoResponse {
 mod tests {
     use super::*;
 
-    fn auth() -> Auth {
+    fn auth_with(users: &[(&str, &str)]) -> Auth {
         Auth {
-            password: Some("secret".into()),
+            users: Arc::new(
+                users
+                    .iter()
+                    .map(|(u, p)| (u.to_string(), p.to_string()))
+                    .collect(),
+            ),
             key: [7; 32],
+            secure_cookies: false,
+            public_reads: true,
+            failures: Arc::default(),
         }
+    }
+
+    fn auth() -> Auth {
+        auth_with(&[("owner", "secret"), ("friend", "other")])
+    }
+
+    fn cookie_value(cookie: &str) -> &str {
+        cookie
+            .strip_prefix("session=")
+            .and_then(|c| c.split(';').next())
+            .unwrap()
     }
 
     #[test]
     fn sessions_are_signed_and_expire() {
         let auth = auth();
-        let cookie = auth.session_cookie(1000);
-        let value = cookie
-            .strip_prefix("session=")
-            .and_then(|c| c.split(';').next())
-            .unwrap();
-        assert!(auth.valid_session(value, 1000));
-        assert!(!auth.valid_session(value, 1000 + SESSION_DAYS * 24 * 3600));
+        let cookie = auth.session_cookie("friend", 1000).unwrap();
+        let value = cookie_value(&cookie);
+        assert_eq!(auth.session_user(value, 1000), Some("friend"));
+        assert_eq!(
+            auth.session_user(value, 1000 + SESSION_DAYS * 24 * 3600),
+            None
+        );
 
-        let (expiry, signature) = value.split_once('.').unwrap();
-        let forged = format!("{}.{signature}", expiry.parse::<i64>().unwrap() + 1);
-        assert!(!auth.valid_session(&forged, 1000));
-        assert!(!auth.valid_session("garbage", 1000));
+        // another user's name, another expiry: the signature no longer fits
+        let (_, rest) = value.split_once('.').unwrap();
+        assert_eq!(auth.session_user(&format!("owner.{rest}"), 1000), None);
+        let (expiry, signature) = rest.split_once('.').unwrap();
+        let forged = format!("friend.{}.{signature}", expiry.parse::<i64>().unwrap() + 1);
+        assert_eq!(auth.session_user(&forged, 1000), None);
+        assert_eq!(auth.session_user("garbage", 1000), None);
 
-        let other = Auth {
+        let other_key = Auth {
             key: [8; 32],
-            ..auth
+            ..auth.clone()
         };
-        assert!(!other.valid_session(value, 1000));
+        assert_eq!(other_key.session_user(value, 1000), None);
+        // a new password logs the user out
+        let new_password = auth_with(&[("owner", "secret"), ("friend", "changed")]);
+        assert_eq!(new_password.session_user(value, 1000), None);
+        assert!(auth.session_cookie("nobody", 1000).is_none());
     }
 
     #[test]
-    fn password_check() {
-        assert!(auth().password_matches("secret"));
-        assert!(!auth().password_matches("Secret"));
-        assert!(!auth().password_matches(""));
-        let disabled = Auth {
-            password: None,
-            key: [0; 32],
+    fn the_password_says_who_logs_in() {
+        assert_eq!(auth().user_with_password("secret"), Some("owner"));
+        assert_eq!(auth().user_with_password("other"), Some("friend"));
+        assert_eq!(auth().user_with_password("Secret"), None);
+        assert_eq!(auth().user_with_password(""), None);
+        assert_eq!(auth_with(&[]).user_with_password(""), None);
+    }
+
+    #[test]
+    fn the_cookie_is_secure_over_https() {
+        let auth = Auth {
+            secure_cookies: true,
+            ..auth()
         };
-        assert!(!disabled.password_matches(""));
+        let cookie = auth.session_cookie("owner", 1000).unwrap();
+        assert!(
+            cookie.ends_with("HttpOnly; SameSite=Strict; Secure"),
+            "{cookie}"
+        );
+    }
+
+    #[test]
+    fn too_many_wrong_passwords_lock_the_client_out() {
+        let auth = auth();
+        for _ in 0..MAX_FAILURES - 1 {
+            auth.failed("1.2.3.4");
+        }
+        assert!(!auth.locked_out("1.2.3.4"));
+        auth.failed("1.2.3.4");
+        assert!(auth.locked_out("1.2.3.4"));
+        assert!(!auth.locked_out("5.6.7.8"));
+        auth.succeeded("1.2.3.4");
+        assert!(!auth.locked_out("1.2.3.4"));
+    }
+
+    #[test]
+    fn the_client_is_the_proxys_first_address() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "100.64.0.7, 127.0.0.1".parse().unwrap());
+        let local: SocketAddr = "127.0.0.1:5000".parse().unwrap();
+        let remote: SocketAddr = "192.168.1.20:5000".parse().unwrap();
+        assert_eq!(client(Some(local), &headers), "100.64.0.7");
+        // only a proxy on this machine is believed
+        assert_eq!(client(Some(remote), &headers), "192.168.1.20");
+        assert_eq!(client(Some(local), &HeaderMap::new()), "127.0.0.1");
+    }
+
+    #[test]
+    fn users_come_from_the_environment() {
+        let vars = |pairs: &[(&str, &str)]| {
+            AuthConfig::from_vars(
+                pairs
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let config = vars(&[
+            ("APP_PASSWORD", "a"),
+            ("APP_PASSWORD_FRIEND", "b"),
+            ("APP_PASSWORD_EMPTY", ""),
+            ("SECURE_COOKIES", "1"),
+            ("PUBLIC_READS", "0"),
+            ("HOME", "/x"),
+        ])
+        .unwrap();
+        assert_eq!(
+            config.users,
+            [("friend".into(), "b".into()), ("owner".into(), "a".into())]
+        );
+        assert!(config.secure_cookies && !config.public_reads);
+        assert!(vars(&[]).unwrap().public_reads);
+        assert!(vars(&[("APP_PASSWORD", "a"), ("APP_PASSWORD_FRIEND", "a")]).is_err());
+        assert!(vars(&[("APP_PASSWORD", "a"), ("APP_PASSWORD_OWNER", "b")]).is_err());
+        assert!(vars(&[("APP_PASSWORD_A-B", "a")]).is_err());
     }
 
     #[test]

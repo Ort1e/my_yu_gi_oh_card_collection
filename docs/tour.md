@@ -574,13 +574,35 @@ Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 
 ## Login
 
-`common::web::auth`: with `APP_PASSWORD` set, every collection's `write` and
+`common::web::auth`: with a password set, every collection's `write` and
 `private` routes and the private media folders (shipment PDFs, calendar
-photos) require a session cookie. Pages redirect to
-`/login?next=…`, the APIs (`/api/*`, `/books/api/*`) answer 401. Reading stays public. The cookie is
-an expiry date signed with a key stored in the `app_secret` table, so a
-restart doesn't log you out. Without `APP_PASSWORD` there is no login, and
-the server refuses to listen anywhere but `127.0.0.1`.
+photos) require a session cookie. Pages redirect to `/login?next=…`, the
+APIs (`/api/*`, `/books/api/*`, `/pokemon/api/*`) answer 401. Without any
+password there is no login, and the server refuses to listen anywhere but
+`127.0.0.1`.
+
+- **Users**: `APP_PASSWORD` is user `owner`, `APP_PASSWORD_<NAME>` adds
+  user `<name>` (a friend). The form asks only for the password, which says
+  who logs in (so two users can't share one); the logs name the user of
+  each request.
+- **The cookie** is `<user>.<expiry>.<signature>`, signed with the user's
+  current password and a key kept in the `app_secret` table: a restart
+  doesn't log anyone out, changing a password logs that user out.
+  `HttpOnly`, `SameSite=Strict` (no form posted from another site), and
+  `Secure` with `SECURE_COOKIES=1` (behind HTTPS).
+- **Wrong passwords**: after 5 from one client (its address, or the one a
+  proxy on the same machine forwards), 15 minutes of refusal, the right
+  password included.
+- **Private mode**: `PUBLIC_READS=0` puts every page and picture behind the
+  login, reads included (the deployed app); only `/login` and `/static`
+  stay open.
+- **Headers** (`common::web::headers`): a Content-Security-Policy (our
+  files, jsDelivr's scripts, TCGdex's thumbnails), `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy` on every answer.
+- Uploaded photos are read with limits (`common::photos`: 10,000 px a
+  side, 300 MB), the shipment PDFs with `lopdf` ≥ 0.42 (deep nesting
+  refused), and JSON put in a page goes through `filters::json_for_script`.
+  The tests: `backend/src/tests/security.rs`, `yugioh/src/tests/security.rs`.
 
 ## Maintenance commands
 

@@ -41,7 +41,11 @@ async fn main() {
     let env =
         |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.to_string());
     let pool = db::init_pool().await;
-    let auth = auth::Auth::load(&pool, std::env::var("APP_PASSWORD").ok())
+    let auth_config = auth::AuthConfig::from_env().unwrap_or_else(|e| {
+        eprintln!("error: {e}");
+        std::process::exit(2);
+    });
+    let auth = auth::Auth::load(&pool, auth_config)
         .await
         .expect("cannot load the session key");
     let state = AppState {
@@ -74,8 +78,8 @@ async fn main() {
     let app = app(state);
 
     // Local only by default. Serving the LAN (BIND_ADDR=0.0.0.0:3000) needs
-    // APP_PASSWORD: without login anyone could edit, and read the shipment
-    // PDFs (personal data).
+    // a password (APP_PASSWORD…): without login anyone could edit, and read
+    // the shipment PDFs (personal data).
     let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_string());
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
@@ -89,10 +93,14 @@ async fn main() {
         "listening on {local}, login {}",
         if login { "enabled" } else { "disabled" }
     );
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap();
+    // the connection's address: the limit on wrong passwords is per client
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .unwrap();
     pool.close().await;
     tracing::info!("stopped");
 }

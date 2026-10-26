@@ -9,10 +9,31 @@ use std::io::Cursor;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
 
 /// The longest side of the copies, in pixels.
 const MAX_SIDE: u32 = 1600;
+
+/// The biggest photo read: 10,000 px a side (a 48 MP phone photo is
+/// 8,000 × 6,000) and 300 MB of memory, so a small file claiming a huge
+/// picture (a "decompression bomb") is refused instead of filling the
+/// NAS's memory.
+fn limits() -> Limits {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(10_000);
+    limits.max_image_height = Some(10_000);
+    limits.max_alloc = Some(300 * 1024 * 1024);
+    limits
+}
+
+/// A reader of `bytes` with [`limits`].
+fn reader(bytes: &[u8]) -> Result<ImageReader<Cursor<&[u8]>>, PhotoError> {
+    let mut reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| PhotoError(format!("the photo couldn't be read ({e})")))?;
+    reader.limits(limits());
+    Ok(reader)
+}
 const JPEG_QUALITY: u8 = 82;
 
 /// Why a photo was refused, as shown to the user.
@@ -31,6 +52,9 @@ const UNSUPPORTED: &str = "this image format isn't supported: use JPEG, PNG or W
 fn refused(e: image::ImageError) -> PhotoError {
     PhotoError(match e {
         image::ImageError::Unsupported(_) => UNSUPPORTED.to_string(),
+        image::ImageError::Limits(_) => {
+            "the photo is too big (at most 10,000 pixels a side)".to_string()
+        }
         e => format!("the photo couldn't be read ({e})"),
     })
 }
@@ -48,11 +72,7 @@ pub fn extension(bytes: &[u8]) -> Result<&'static str, PhotoError> {
 /// The copy of an uploaded photo: upright, at most [`MAX_SIDE`] px, JPEG,
 /// no metadata.
 pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
-    let mut decoder = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()
-        .map_err(|e| PhotoError(format!("the photo couldn't be read ({e})")))?
-        .into_decoder()
-        .map_err(refused)?;
+    let mut decoder = reader(bytes)?.into_decoder().map_err(refused)?;
     let orientation = decoder.orientation().map_err(refused)?;
     let mut img = DynamicImage::from_decoder(decoder).map_err(refused)?;
     img.apply_orientation(orientation);
@@ -65,7 +85,7 @@ pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
 /// A copy turned a quarter turn (clockwise or not), for a photo that came
 /// out sideways (no EXIF orientation).
 pub fn rotate(bytes: &[u8], clockwise: bool) -> Result<Vec<u8>, PhotoError> {
-    let img = image::load_from_memory(bytes).map_err(refused)?;
+    let img = reader(bytes)?.decode().map_err(refused)?;
     encode(&if clockwise {
         img.rotate90()
     } else {
@@ -133,5 +153,36 @@ mod tests {
     #[test]
     fn not_an_image_is_refused() {
         assert!(web_copy(b"not an image").is_err());
+    }
+
+    /// A PNG's checksum (CRC-32), to forge a header.
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &byte in bytes {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = if crc & 1 == 1 {
+                    (crc >> 1) ^ 0xEDB8_8320
+                } else {
+                    crc >> 1
+                };
+            }
+        }
+        !crc
+    }
+
+    #[test]
+    fn a_huge_picture_in_a_small_file_is_refused() {
+        // a valid 1 × 1 PNG whose header (IHDR) then claims 50,000 × 50,000
+        let mut bomb = png(1, 1);
+        let ihdr = bomb.windows(4).position(|w| w == b"IHDR").unwrap();
+        bomb[ihdr + 4..ihdr + 8].copy_from_slice(&50_000u32.to_be_bytes());
+        bomb[ihdr + 8..ihdr + 12].copy_from_slice(&50_000u32.to_be_bytes());
+        let crc = crc32(&bomb[ihdr..ihdr + 17]);
+        bomb[ihdr + 17..ihdr + 21].copy_from_slice(&crc.to_be_bytes());
+
+        let error = web_copy(&bomb).unwrap_err();
+        assert!(error.0.contains("too big"), "{error}");
+        assert!(rotate(&bomb, true).is_err());
     }
 }
