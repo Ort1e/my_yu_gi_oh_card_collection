@@ -170,10 +170,16 @@ async fn the_lists_show_the_estimates() {
     let t = TestApp::new().await;
     priced_fixture(&t).await;
 
-    // French NM Dark Magicians at 6.00 × 0.9
+    // French NM Dark Magicians at 6.00 × 0.9: on their pictures, and in the table
     let (status, cards) = t.get("/cards").await;
     assert_eq!(status, StatusCode::OK, "{cards}");
-    assert!(cards.contains("Estimate: 5.40 €"), "{cards}");
+    assert!(
+        cards.contains(r#"<span class="card-tile-value">5.40 €</span>"#),
+        "{cards}"
+    );
+    let (status, table) = t.get("/cards?view=table").await;
+    assert_eq!(status, StatusCode::OK, "{table}");
+    assert!(table.contains("<td>5.40</td>"), "{table}");
 
     let (_, lots) = t.get("/lots").await;
     assert!(lots.contains("Estimate: 10.80 €"), "{lots}");

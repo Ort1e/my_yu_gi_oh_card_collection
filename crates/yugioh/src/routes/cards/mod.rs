@@ -16,8 +16,9 @@ use crate::store::prices::history::card_history;
 use crate::store::valuation::fill_lot_estimates;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
-use crate::web::pagination::{self, Page, PAGE_SIZE};
+use crate::web::pagination::{self, Page};
 use crate::AppState;
+use common::web::tiles::{CardTile, View};
 
 /// Card search filters (Django: `CardFilterSerializer` / `filter_cards_queryset`).
 /// `proxy` and `sold` take "true" / "false"; anything else means "all".
@@ -31,6 +32,8 @@ pub struct CardFilter {
     pub card_type: Option<String>,
     pub proxy: Option<String>,
     pub sold: Option<String>,
+    /// `grid` (default), `table`: [`View`].
+    pub view: Option<String>,
 }
 
 impl CardFilter {
@@ -86,6 +89,7 @@ impl CardFilter {
         }
     }
 
+    /// The filters, URL-encoded (without the view).
     fn querystring(&self) -> String {
         pagination::querystring([
             ("name", self.name.as_deref()),
@@ -114,6 +118,7 @@ pub async fn card_types(pool: &crate::store::db::Pool) -> sqlx::Result<Vec<Strin
 pub struct CardsList {
     page_title: &'static str,
     page: Page,
+    view: View,
     total: i64,
     cards: Vec<CardRow>,
     filter: CardFilter,
@@ -121,6 +126,15 @@ pub struct CardsList {
 }
 
 impl CardsList {
+    fn tiles(&self) -> Vec<CardTile> {
+        self.cards.iter().map(CardRow::tile).collect()
+    }
+
+    /// The same filters, in the other view.
+    fn other_view_href(&self) -> String {
+        self.view.other_href("/cards", &self.filter.querystring())
+    }
+
     fn selected(&self, value: &Option<String>, option: &str) -> bool {
         value.as_deref().unwrap_or("") == option
     }
@@ -140,13 +154,19 @@ pub async fn list(
     let mut count = QueryBuilder::new("SELECT count(*) FROM card");
     filter.push_where(&mut count);
     let count: i64 = count.build_query_scalar().fetch_one(pool).await?;
-    let page = Page::new(page.page, count, filter.querystring());
+    let view = View::from_param(filter.view.as_deref());
+    let page = Page::sized(
+        page.page,
+        count,
+        view.keep(&filter.querystring()),
+        view.page_size(),
+    );
 
     let mut select = QueryBuilder::new(format!("SELECT {} FROM card", CardRow::columns()));
     filter.push_where(&mut select);
     select
         .push(" ORDER BY card.en_name, card.id LIMIT ")
-        .push_bind(PAGE_SIZE)
+        .push_bind(page.size)
         .push(" OFFSET ")
         .push_bind(page.offset());
     let cards = select.build_query_as().fetch_all(pool).await?;
@@ -154,6 +174,7 @@ pub async fn list(
     Ok(CardsList {
         page_title: "All Cards",
         page,
+        view,
         total: sqlx::query_scalar("SELECT count(*) FROM card")
             .fetch_one(pool)
             .await?,

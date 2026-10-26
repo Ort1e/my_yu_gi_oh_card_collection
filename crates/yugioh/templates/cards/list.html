@@ -1,15 +1,51 @@
 {% extends "list_base.html" %}
 
+{% block more_css %}
+  <link rel="stylesheet" href="/static/css/tiles.css">
+{% endblock %}
+
+{% block summary %}
+  <p><a href="{{ self.other_view_href() }}">{{ view.other_label() }}</a></p>
+{% endblock %}
+
 {% block items %}
   {% if cards.is_empty() %}
     <p class="card-title">No card.</p>
-  {% else %}
-    <div class="card-list">
-      {% for card in cards %}
-        {% include "partials/card_item.html" %}
-      {% endfor %}
+  {% else if view.is_table() %}
+    <div class="table-scroll">
+    <table class="numbers sortable">
+      <thead>
+        <tr>
+          <th data-sort="text">Card</th>
+          <th data-sort="text" class="text">Code</th>
+          <th data-sort="text" class="text">Rarity</th>
+          <th data-sort="text" class="text">Status</th>
+          <th data-sort="text" class="text">Proxy</th>
+          <th data-sort="number" title="Market price × condition and language: an estimate">Estimate (€)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for card in cards %}
+        <tr>
+          <td><a href="/cards/{{ card.id }}">{{ card.name }}</a>{% if card.is_sold %} <span class="tag">Sold</span>{% endif %}{% match card.english_name() %}{% when Some with (english) %}<div class="cell-note">{{ english }}</div>{% when None %}{% endmatch %}</td>
+          <td class="text">{{ card.code.as_deref().unwrap_or("") }}</td>
+          <td class="text">{{ card.rarity.as_deref().unwrap_or("") }}</td>
+          <td class="text">{% match card.status() %}{% when Some with (status) %}{{ status.label() }}{% when None %}{% endmatch %}</td>
+          <td class="text">{{ card.is_proxy|yes_no }}</td>
+          <td>{% match card.estimate() %}{% when Some with (estimate) %}{{ estimate }}{% when None %}{% endmatch %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     </div>
+  {% else %}
+    {% let tiles = self.tiles() %}
+    {% include "partials/card_grid.html" %}
   {% endif %}
+{% endblock %}
+
+{% block more_js %}
+  <script src="/static/js/tables.js"></script>
 {% endblock %}
 
 {% block filter %}
@@ -18,6 +54,7 @@
   <div class="filter-content">
     <form method="get">
       <h2>Filter cards</h2>
+      <input type="hidden" name="view" value="{{ view.code() }}">
       <label for="name">Name:</label>
       <input type="text" name="name" id="name" value="{{ filter.name.as_deref().unwrap_or("") }}" placeholder="Card name">
 

@@ -19,6 +19,7 @@ use crate::store::{prices, sets};
 use common::db::begin_write;
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::web::forms::{FormData, Pairs};
+use common::web::tiles::CardTile;
 use common::AppState;
 use pokemon_domain::{parse_language, Catalogue, LANGUAGES};
 
@@ -97,6 +98,10 @@ pub struct OpeningPage {
 impl OpeningPage {
     fn value_text(&self) -> String {
         money(Some(self.value))
+    }
+
+    fn tiles(&self) -> Vec<CardTile> {
+        self.copies.iter().map(CopyRow::tile).collect()
     }
 }
 

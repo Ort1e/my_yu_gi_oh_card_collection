@@ -5,11 +5,14 @@
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
   <link rel="stylesheet" href="/static/css/filtering.css">
+  {% block more_css %}{% endblock %}
 {% endblock %}
 
 {% block content %}
 <div class="inside-container">
   <h1 class="card-title">{{ page_title }} ({{ page.count }}/{{ total }}):</h1>
+
+  {% block summary %}{% endblock %}
 
   {% block items %}{% endblock %}
 
@@ -23,4 +26,5 @@
 
 {% block extra_js %}
   <script src="/static/js/filter_modal.js"></script>
+  {% block more_js %}{% endblock %}
 {% endblock %}

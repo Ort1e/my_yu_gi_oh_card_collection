@@ -1,28 +1,25 @@
-{% extends "base.html" %}
+{% extends "list_base.html" %}
 
-{% block title %}Pokémon cards{% endblock %}
 {% block body_class %}pokemon{% endblock %}
 {% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
 
-{% block extra_css %}
-  <link rel="stylesheet" href="/static/css/card.css">
-  <link rel="stylesheet" href="/static/css/filtering.css">
+{% block more_css %}
+  <link rel="stylesheet" href="/static/css/tiles.css">
   <link rel="stylesheet" href="/static/css/pokemon.css">
 {% endblock %}
 
-{% block content %}
-<div class="inside-container">
-  <h1 class="card-title">Pokémon cards ({{ page.count }}/{{ total }}):</h1>
-
+{% block summary %}
   <p class="pokemon-summary">
     Market value: <strong>{{ self.value_text() }} €</strong>
     {% if without_price > 0 %}<span class="muted">({{ without_price }} without a price)</span>{% endif %}
-    · <a href="{{ self.other_view_href() }}">{% if self.is_table() %}Pictures{% else %}Table{% endif %}</a>
+    · <a href="{{ self.other_view_href() }}">{{ view.other_label() }}</a>
   </p>
+{% endblock %}
 
+{% block items %}
   {% if copies.is_empty() %}
     <p class="card-title">{% if total == 0 %}No card yet: add a booster opening or a card with the "Add" menu.{% else %}No card matches these filters.{% endif %}</p>
-  {% else if self.is_table() %}
+  {% else if view.is_table() %}
     <div class="table-scroll">
     <table class="numbers sortable">
       <thead>
@@ -56,23 +53,23 @@
     </table>
     </div>
   {% else %}
-    <div class="pokemon-grid">
-      {% for copy in copies %}
-        {% include "partials/pokemon_item.html" %}
-      {% endfor %}
-    </div>
+    {% let tiles = self.tiles() %}
+    {% include "partials/card_grid.html" %}
   {% endif %}
 
-  {% include "partials/pagination.html" %}
+{% endblock %}
 
+{% block add_button %}
   <a href="/pokemon/add/booster" title="Add a booster opening" class="btn floating-button top">Add cards</a>
+{% endblock %}
 
+{% block filter %}
   <button id="filter-badge" class="floating-button">Filter</button>
   <div id="filter-modal" class="filter-modal hidden">
     <div class="filter-content">
       <form method="get">
         <h2>Filter the cards</h2>
-        <input type="hidden" name="view" value="{{ self.view() }}">
+        <input type="hidden" name="view" value="{{ view.code() }}">
 
         <label for="q">Name:</label>
         <input type="search" name="q" id="q" value="{{ self.q_value() }}" placeholder="French, English or Japanese">
@@ -131,10 +128,8 @@
       </form>
     </div>
   </div>
-</div>
 {% endblock %}
 
-{% block extra_js %}
-  <script src="/static/js/filter_modal.js"></script>
+{% block more_js %}
   <script src="/static/js/tables.js"></script>
 {% endblock %}

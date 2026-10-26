@@ -6,6 +6,7 @@
  *   header.css     the top navigation bar                         (every page)
  *   form.css       forms, fields, buttons, the on/off switch      (every page)
  *   card.css       the green "card" boxes of the lists            (list and detail pages)
+ *   tiles.css      the picture grid of the card lists             (card lists)
  *   filtering.css  the floating buttons and the filter popup      (list pages)
  *   books.css      what only the book pages have (`body.books`)   (every page)
  *   collection.css the collection value page and its tiles         (value page, dashboard, card page)
@@ -137,6 +138,17 @@ body {
 .error ul {
     margin: 0;
     padding-left: 1.25rem;
+}
+
+/* A small badge: "Full art", "PSA 10", "Sold". */
+.tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border-radius: 1rem;
+    background-color: var(--primary);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 /* Done: "Added: …" after saving a book or a card, good news on a list. */

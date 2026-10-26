@@ -6,3 +6,4 @@ pub mod error;
 pub mod filters;
 pub mod forms;
 pub mod pagination;
+pub mod tiles;

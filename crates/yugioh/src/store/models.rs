@@ -2,6 +2,9 @@
 
 use yugioh_domain::card::CardStatus;
 
+use common::web::tiles::CardTile;
+
+use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::valuation::{estimate, MARKET_PRICE};
 
@@ -19,6 +22,8 @@ pub struct CardRow {
     pub name_en: Option<String>,
     /// Its latest market price (`valuation::MARKET_PRICE`).
     pub market_price: Option<Money>,
+    /// In a sale lot (`cards::SOLD_EXISTS`).
+    pub is_sold: bool,
 }
 
 impl CardRow {
@@ -29,8 +34,35 @@ impl CardRow {
              card.card_data_id, \
              (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
               WHERE card_data.id = card.card_data_id) AS name_en, \
-             {MARKET_PRICE} AS market_price"
+             {MARKET_PRICE} AS market_price, {SOLD_EXISTS} AS is_sold"
         )
+    }
+
+    /// The card in a picture grid.
+    pub fn tile(&self) -> CardTile {
+        let code = self.code.as_deref().unwrap_or("—");
+        let meta = match self.status() {
+            Some(status) => format!("{code} · {}", status.label()),
+            None => code.to_string(),
+        };
+        let mut tags: Vec<String> = self.rarity.iter().cloned().collect();
+        if self.is_proxy {
+            tags.push("Proxy".to_string());
+        }
+        if self.is_sold {
+            tags.push("Sold".to_string());
+        }
+        CardTile {
+            href: format!("/cards/{}", self.id),
+            image: self.card_data_id.map(|id| format!("/card-image/{id}")),
+            name: self.name.clone(),
+            other_name: self.english_name().unwrap_or_default().to_string(),
+            meta,
+            placeholder: code.to_string(),
+            tags,
+            value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
+            faded: self.is_sold,
+        }
     }
 
     /// Its estimated value: market price × condition and language factors.

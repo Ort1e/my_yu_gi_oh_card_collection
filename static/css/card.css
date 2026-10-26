@@ -183,34 +183,6 @@ a.rarity-badge:hover {
     border-radius: 6px;
 }
 
-/* The big picture shown when the mouse is over a small one (card list). */
-.image-wrapper {
-    position: relative;
-    flex-shrink: 0;
-}
-
-.image-popup {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 110%;                 /* to the right of the small picture */
-    z-index: 10;
-    padding: 4px;
-    border: 1px solid #ccc;
-    background: #fff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.image-wrapper:hover .image-popup {
-    display: block;
-}
-
-.popup-image {
-    max-width: 600px;
-    max-height: 600px;
-    object-fit: contain;
-}
-
 /* ------------------------------------------------------------------ */
 /* The rarity guide (templates/rarities.html)                           */
 /* ------------------------------------------------------------------ */
@@ -264,10 +236,5 @@ a.rarity-badge:hover {
     .card-photo {
         width: 100px;
         height: 80px;
-    }
-
-    /* No mouse to hover with, and no room beside the picture. */
-    .image-wrapper:hover .image-popup {
-        display: none;
     }
 }

@@ -1,0 +1,21 @@
+{# The cards as a grid of pictures (common::web::tiles::CardTile, static/css/tiles.css): set `tiles` before including. #}
+<div class="card-grid">
+  {% for tile in tiles %}
+  <a href="{{ tile.href }}" class="card-tile{% if tile.faded %} faded{% endif %}">
+    {% match tile.image %}{% when Some with (src) %}
+    <img src="{{ src }}" alt="{{ tile.name }}" loading="lazy" width="245" height="342">
+    {% when None %}
+    <div class="card-tile-no-image">{{ tile.name }}<br><small>{{ tile.placeholder }}</small></div>
+    {% endmatch %}
+    <div class="card-tile-text">
+      <div class="card-tile-name">{{ tile.name }}</div>
+      {% if !tile.other_name.is_empty() %}<div class="english-name">{{ tile.other_name }}</div>{% endif %}
+      <div class="card-tile-meta">{{ tile.meta }}</div>
+      <div class="card-tile-meta">
+        {% for tag in tile.tags %}<span class="tag">{{ tag }}</span> {% endfor %}
+        {% if !tile.value.is_empty() %}<span class="card-tile-value">{{ tile.value }} €</span>{% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>

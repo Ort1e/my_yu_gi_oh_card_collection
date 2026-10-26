@@ -6,6 +6,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/tiles.css">
   <link rel="stylesheet" href="/static/css/pokemon.css">
 {% endblock %}
 
@@ -30,11 +31,8 @@
 {% if copies.is_empty() %}
 <p>No card in this opening.</p>
 {% else %}
-<div class="pokemon-grid">
-  {% for copy in copies %}
-    {% include "partials/pokemon_item.html" %}
-  {% endfor %}
-</div>
+{% let tiles = self.tiles() %}
+{% include "partials/card_grid.html" %}
 {% endif %}
 </div>
 {% endblock %}

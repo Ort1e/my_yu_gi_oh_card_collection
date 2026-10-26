@@ -37,8 +37,7 @@ pub async fn reserve(
         card_type: query.card_type,
         proxy: Some("false".into()),
         sold: Some("false".into()),
-        status: None,
-        rarity: None,
+        ..CardFilter::default()
     };
     let in_version = version_card_ids(&mut conn, id).await?;
 

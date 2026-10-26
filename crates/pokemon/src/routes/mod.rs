@@ -39,10 +39,8 @@ use common::sql::like_pattern;
 use common::web::error::{AppResult, OrNotFound};
 use common::web::filters;
 use common::web::pagination::{self, Page, PageParam};
+use common::web::tiles::{CardTile, View};
 use common::AppState;
-
-/// Copies per page of the picture grid.
-const GRID_PAGE_SIZE: i64 = 24;
 
 /// The names a card is shown with: the one of the copy's language first,
 /// then another one (French under English, the species' French name under
@@ -259,6 +257,36 @@ impl CopyRow {
         money(self.estimate.map(|m| m.0))
     }
 
+    /// The copy in a picture grid.
+    pub fn tile(&self) -> CardTile {
+        let (name, other_name) = self.names();
+        let mut meta = format!("{} · {} · {}", self.set_name, self.local_id, self.language);
+        if self.variant != "normal" {
+            meta.push_str(&format!(" · {}", self.variant_label()));
+        }
+        let mut tags = Vec::new();
+        if self.full_art {
+            tags.push("Full art".to_string());
+        }
+        if self.is_graded() {
+            tags.push(self.grading());
+        }
+        if self.is_sold() {
+            tags.push("Sold".to_string());
+        }
+        CardTile {
+            href: format!("/pokemon/{}", self.id),
+            image: self.has_image().then(|| self.image_src()),
+            name,
+            other_name,
+            meta,
+            placeholder: format!("{} {}", self.set_name, self.local_id),
+            tags,
+            value: self.value_text(),
+            faded: self.is_sold(),
+        }
+    }
+
     fn set_value(&mut self, prices: &HashMap<i64, VariantPrices>) {
         if self.is_sold() {
             self.value = None;
@@ -294,7 +322,7 @@ pub struct PokemonFilter {
     pub sold: Option<String>,
     /// `set` (default), `price`, `added`.
     pub sort: Option<String>,
-    /// `grid` (default), `table`.
+    /// `grid` (default), `table`: [`View`].
     pub view: Option<String>,
 }
 
@@ -362,6 +390,7 @@ impl PokemonFilter {
         }
     }
 
+    /// The filters and the sort, URL-encoded (without the view).
     fn querystring(&self) -> String {
         pagination::querystring([
             ("q", self.q.as_deref()),
@@ -374,12 +403,11 @@ impl PokemonFilter {
             ("source", self.source.as_deref()),
             ("sold", self.sold.as_deref()),
             ("sort", self.sort.as_deref()),
-            ("view", self.view.as_deref()),
         ])
     }
 
-    fn is_table(&self) -> bool {
-        given(&self.view) == Some("table")
+    fn view(&self) -> View {
+        View::from_param(self.view.as_deref())
     }
 
     fn is(value: &Option<String>, option: &str) -> bool {
@@ -439,7 +467,9 @@ async fn filter_options(pool: &Pool) -> sqlx::Result<FilterOptions> {
 #[derive(Template)]
 #[template(path = "pokemon/list.html")]
 pub struct PokemonList {
+    page_title: &'static str,
     page: Page,
+    view: View,
     copies: Vec<CopyRow>,
     /// Every copy ever added (sold ones too).
     total: i64,
@@ -455,8 +485,8 @@ impl PokemonList {
         money(Some(self.value))
     }
 
-    fn is_table(&self) -> bool {
-        self.filter.is_table()
+    fn tiles(&self) -> Vec<CardTile> {
+        self.copies.iter().map(CopyRow::tile).collect()
     }
 
     fn sort_is(&self, option: &str) -> bool {
@@ -505,30 +535,7 @@ impl PokemonList {
 
     /// The same filters, in the other view.
     fn other_view_href(&self) -> String {
-        let mut filter = PokemonFilter {
-            view: Some(if self.is_table() { "grid" } else { "table" }.to_string()),
-            ..PokemonFilter::default()
-        };
-        let f = &self.filter;
-        filter.q.clone_from(&f.q);
-        filter.kind.clone_from(&f.kind);
-        filter.set.clone_from(&f.set);
-        filter.rarity.clone_from(&f.rarity);
-        filter.full_art.clone_from(&f.full_art);
-        filter.language.clone_from(&f.language);
-        filter.graded.clone_from(&f.graded);
-        filter.source.clone_from(&f.source);
-        filter.sold.clone_from(&f.sold);
-        filter.sort.clone_from(&f.sort);
-        format!("/pokemon?{}", filter.querystring())
-    }
-
-    fn view(&self) -> &'static str {
-        if self.is_table() {
-            "table"
-        } else {
-            "grid"
-        }
+        self.view.other_href("/pokemon", &self.filter.querystring())
     }
 }
 
@@ -564,12 +571,14 @@ pub async fn list(
         .count();
     filter.sort(&mut copies);
 
-    let size = if filter.is_table() {
-        100
-    } else {
-        GRID_PAGE_SIZE
-    };
-    let page = Page::sized(page.page, copies.len() as i64, filter.querystring(), size);
+    let view = filter.view();
+    let size = view.page_size();
+    let page = Page::sized(
+        page.page,
+        copies.len() as i64,
+        view.keep(&filter.querystring()),
+        size,
+    );
     let copies = copies
         .into_iter()
         .skip(page.offset() as usize)
@@ -577,7 +586,9 @@ pub async fn list(
         .collect();
 
     Ok(PokemonList {
+        page_title: "Pokémon cards",
         page,
+        view,
         copies,
         total: sqlx::query_scalar("SELECT count(*) FROM pokemon_copy")
             .fetch_one(pool)

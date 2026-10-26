@@ -1,0 +1,79 @@
+/*
+ * The card collections' picture grid (templates/partials/card_grid.html,
+ * common::web::tiles): the Yu-Gi-Oh! and Pokémon lists, a booster opening.
+ */
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-tile {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background-color: var(--secondary);
+    color: var(--text-light);
+    text-decoration: none;
+    transition: transform 0.15s;
+}
+
+.card-tile:hover {
+    transform: translateY(-3px);
+}
+
+/* A card sold: still listed, faded. */
+.card-tile.faded {
+    opacity: 0.6;
+}
+
+/* Card pictures have the card's own ratio (59 × 86 mm, 63 × 88 mm: close). */
+.card-tile img,
+.card-tile-no-image {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 63 / 88;
+    object-fit: cover;
+}
+
+.card-tile-no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: #00000033;
+    text-align: center;
+}
+
+.card-tile-text {
+    padding: 0.5rem 0.6rem 0.6rem;
+}
+
+.card-tile-name {
+    color: #fff;
+    font-weight: 700;
+}
+
+.card-tile-meta {
+    margin-top: 0.2rem;
+    font-size: 0.85rem;
+}
+
+.card-tile-value {
+    color: #fff;
+    font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ */
+/* Phones                                                               */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+    .card-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.6rem;
+    }
+}

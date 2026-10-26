@@ -6,6 +6,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/tiles.css">
   <link rel="stylesheet" href="/static/css/pokemon.css">
 {% endblock %}
 
@@ -83,7 +84,7 @@
     {% for row in preview %}
     <div class="booster-row">
       {% if row.alternatives.is_empty() %}<input type="hidden" name="rows-{{ loop.index0 }}-card" value="{{ row.tcgdex_id }}">{% endif %}
-      {% if row.is_unknown() %}<div class="pokemon-no-image booster-unknown">?</div>{% endif %}
+      {% if row.is_unknown() %}<div class="card-tile-no-image booster-unknown">?</div>{% endif %}
       {% if row.has_image %}<img src="{{ row.image_src() }}" alt="{{ row.name }}" width="120" height="167" loading="lazy">{% endif %}
       <div class="booster-row-fields">
         <div class="finder-card-name">{{ row.name }} <small>No. {{ row.local_id }}</small></div>
