@@ -1,5 +1,5 @@
-// The advent calendar pages (templates/advent/calendar.html,
-// templates/books/advent/calendar.html): doors that open
+// The advent calendar pages, cards and books (crates/advent/templates/advent/
+// calendar.html): doors that open
 // on a click (remembered in this browser), "open / close every door", and the
 // photo shown large.
 

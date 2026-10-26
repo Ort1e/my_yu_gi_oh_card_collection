@@ -7,15 +7,16 @@ everything went. For step-by-step changes, see [recipes.md](recipes.md).
 Suggested reading order, about an hour with the code open next to it:
 
 1. [The big picture](#the-big-picture) (this file)
-2. [Following a page request](#following-a-page-request): `backend/src/routes/sellers/mod.rs`
-3. [Following a form](#following-a-form): `backend/src/routes/sellers/form.rs`, then `lots/form.rs::create`
-4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `backend/src/store/db.rs`
-5. [The domain crate](#the-domain-crate): `domain/src/lib.rs` and one module, e.g. `ydke.rs`
-6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `routes/decks/api/`
-7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `backend/src/store/card_data/`
-8. [Tests](#tests): `backend/src/tests/`
-9. [The books](#the-books): `backend/src/routes/books/`, a second, smaller collection
-10. [The Pokémon cards](#the-pokémon-cards): `backend/src/routes/pokemon/`, a third one, with prices
+2. [Following a page request](#following-a-page-request): `crates/yugioh/src/routes/sellers/mod.rs`
+3. [Following a form](#following-a-form): `crates/yugioh/src/routes/sellers/form.rs`, then `lots/form/add.rs`
+4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `crates/common/src/db.rs`
+5. [The domain crates](#the-domain-crates): `crates/yugioh-domain/src/lib.rs` and one module, e.g. `ydke.rs`
+6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `crates/yugioh/src/routes/decks/api/`
+7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `crates/yugioh/src/store/card_data/`
+8. [Tests](#tests): `crates/*/src/tests/`
+9. [The books](#the-books): `crates/books/`, a second, smaller collection
+10. [The Pokémon cards](#the-pokémon-cards): `crates/pokemon/`, a third one, with prices
+11. [What the collections share](#what-the-collections-share): `crates/common/`, `crates/advent/`
 
 ## The big picture
 
@@ -25,64 +26,87 @@ Suggested reading order, about an hour with the code open next to it:
      HTML pages                 deck builder (Svelte app, static/deck-builder/)
           │                         │  JSON over /api/*
           ▼                         ▼
- ┌──────────────────── backend (axum) ─────────────────────┐
- │ main.rs   AppState, app(): routers + login layer        │
- │ routes/   one module per page group: SQL + handler +    │
- │           template struct                               │
- │ templates/  askama HTML (compiled into the binary)      │
- │ forms.rs, cards.rs, card_data/, auth.rs, db.rs …        │
- └───────┬───────────────────────────┬─────────────────────┘
-         │ pure functions            │ sqlx
-         ▼                           ▼
-   domain/ (no DB, no HTTP)     data/app.db (SQLite, tracked in the data submodule)
-   budget, ydke, monte carlo,        ▲
-   shipment parsing, ban lists       │ migrations/ applied at startup
+ ┌────────────── backend (the binary: main.rs, commands) ──────────────┐
+ │  common::app(state, [yugioh::routes(), books::routes(),             │
+ │                      pokemon::routes()]): routers + login layer     │
+ └────┬──────────────────────┬───────────────────────┬─────────────────┘
+      ▼                      ▼                       ▼
+   yugioh                  books                  pokemon        one crate per collection:
+   routes/ store/          routes/ store/         routes/ store/ pages (SQL + handler +
+   templates/ commands/    templates/             templates/     template struct), writes,
+      │      └──────┬──────────┘                     │           askama templates
+      │          advent (the calendars' engine)      │
+      └──────────────┴──────────┬────────────────────┘
+                                ▼
+   common: AppState, web/ (login, errors, forms, pagination, filters, card tiles),
+           db (pool, Money), photos, http (throttle), media, schedule, base templates
+      │ pure functions                        │ sqlx
+      ▼                                       ▼
+   yugioh-domain, books-domain,          data/app.db (SQLite, tracked in the data submodule)
+   pokemon-domain, common-domain              ▲
+   (no DB, no HTTP)                           │ migrations/ applied at startup
 ```
 
-The Cargo workspace has three crates:
+The Cargo workspace (`crates/*` and `importer`):
 
 | Crate | What it is | Django equivalent |
 |---|---|---|
-| `backend/` | The web server **and** the maintenance commands (one binary) | the project + `views/`, `forms`, `rest_api/`, `management/commands/` |
-| `domain/` | Pure business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
+| `crates/backend/` | The binary: the web server **and** the maintenance commands; wires the collections | the project, `manage.py` |
+| `crates/yugioh/` | The Yu-Gi-Oh! cards: pages, writes, ygoprodeck and Cardmarket, commands, background tasks | `views/`, `forms`, `rest_api/`, `management/commands/` |
+| `crates/books/` | The book collection | (none) |
+| `crates/pokemon/` | The Pokémon cards | (none) |
+| `crates/advent/` | The advent calendars, cards and books: one engine | (models only) |
+| `crates/common/` | What every collection uses: state, web plumbing, DB, photos, base templates, the test harness | settings, base templates |
+| `crates/yugioh-domain/` | Pure Yu-Gi-Oh! business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
+| `crates/books-domain/`, `crates/pokemon-domain/` | The other collections' pure logic | (none) |
+| `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors | |
 | `importer/` | One-off Django `dumpdata` loader, used for the cutover | `loaddata` |
 
-Plus `frontend/` (the Svelte deck builder, built by npm, not Cargo) and
-`migrations/` (SQL files shared by both binaries).
+Dependencies only go down: a collection uses its domain crate, `common`
+(and `advent`); `backend` uses them all; nothing uses `backend`. Plus
+`frontend/` (the Svelte deck builder, built by npm, not Cargo) and
+`migrations/` (SQL files run by both binaries).
+
+Each collection crate has its own `templates/` and an `askama.toml` that
+adds `../common/templates` (`base.html`, `list_base.html`, the navigation
+bars, the shared partials), so its templates extend those by name.
 
 ### What replaced what
 
 | Django | Rust |
 |---|---|
 | `models/*.py` (schema) | `migrations/0002_ygo_schema.sql`, plain SQL |
-| `models/*.py` (methods) | `domain/` for pure logic, SQL in `routes/` or `store/cards.rs` |
+| `models/*.py` (methods) | `crates/*-domain/` for pure logic, SQL in `routes/` or `store/` |
 | ORM queries | raw SQL strings run by `sqlx` (`query_as`, `query_scalar`) |
-| `urls.py` | `routes/mod.rs`: `router()` (reads) and `write_router()` (writes) |
+| `urls.py` | each collection's `Routes` (`public`, `write`, `private`, `files`): `yugioh/src/routes/mod.rs`, `books/src/lib.rs`, `pokemon/src/lib.rs` |
 | class-based views | `async fn` handlers in `routes/<area>/` (`mod.rs` pages, `form.rs` forms) |
-| Django templates | askama templates in `backend/templates/<area>/`, nearly identical syntax |
-| `forms.py` | `web/forms.rs` (`FormData`) + validation in each `routes/<area>/form.rs` |
+| Django templates | askama templates in `crates/<collection>/templates/<area>/`, nearly identical syntax |
+| `forms.py` | `common::web::forms` (`FormData`) + validation in each `routes/<area>/form.rs` |
 | DRF API + serializers | `routes/decks/api/` + `#[derive(Serialize)]` structs |
 | `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
-| Django auth | `web/auth.rs`: one password (`APP_PASSWORD`), signed cookie |
+| Django auth | `common::web::auth`: one password (`APP_PASSWORD`), signed cookie |
 | `runserver` | `cargo run -p backend` |
 
-### Startup (`backend/src/main.rs`)
+### Startup (`crates/backend/src/main.rs`)
 
 `main()`:
 
 1. reads `.env` (`dotenvy`), sets up the logs (`tracing`, level from
    `RUST_LOG`, `info` by default), parses the command line (`commands::Command`);
-2. opens the SQLite pool and runs pending migrations (`db::init_pool`);
+2. opens the SQLite pool and runs pending migrations (`common::db::init_pool`);
 3. builds `AppState`, the struct every handler receives: the DB pool, an
    HTTP client (for ygoprodeck), the media/uploads directories, your
    Cardmarket account name, and the login settings;
-4. either runs a maintenance command, or serves `app(state)` until Ctrl-C;
+4. either runs a maintenance command, or starts the background tasks and
+   serves `app(state)` until Ctrl-C;
 5. closes the pool, which folds the SQLite WAL back into `data/app.db`.
 
-`app()` is the whole URL map: the read router, the write router behind
-the login middleware, `/login`, and the static/media file servers. Its
+`app()` gives the three collections' `Routes` to `common::app`, which
+builds the whole URL map: the public routes, the write and private routes
+behind the login middleware, `/login`, and the static/media file servers
+(each collection names its private media folders). Its
 `TraceLayer` logs one line per page or API call; it sits before the file
 routes (card images, `/static`, `/media`), which are therefore not logged,
 because a `.layer()` only wraps the routes added before it.
@@ -92,7 +116,7 @@ commit, with named fields: `tracing::info!(lot_id, cards = n, "lot created")`.
 
 ## Following a page request
 
-`GET /sellers?page=2`, in `backend/src/routes/sellers/mod.rs`:
+`GET /sellers?page=2`, in `crates/yugioh/src/routes/sellers/mod.rs`:
 
 ```rust
 pub async fn list(
@@ -127,22 +151,27 @@ Things to notice:
   (`#[derive(sqlx::FromRow)]`). Rows used by several pages live in
   `store/models.rs` (`CardRow`, `LotRow`, `DeckVersionRow`), with their `SELECT`
   as a constant next to them.
-- **Errors** (`web/error.rs`): handlers return `AppResult<T>`. `?` turns a
+- **Errors** (`common::web::error`): handlers return `AppResult<T>`. `?` turns a
   `sqlx::Error` into a 500 (logged), `.or_404()` turns a missing row
   (`Option::None`) into a 404, `bad_request("…")` gives a 400 with a JSON
   `{"error": …}` for the API.
-- **Pagination** (`web/pagination.rs`): `Page::new(requested, count, querystring)`
+- **Pagination** (`common::web::pagination`): `Page::new(requested, count, querystring)`
   and `page.offset()`; `partials/pagination.html` renders the links. Filter pages
   (`/cards`, `/lots`) keep their filters in the page links with
   `querystring(…)`.
 - **Template inheritance** works like Django's: `base.html` → `list_base.html`
-  (blocks `items`, `filter`, `add_button`) → `sellers/list.html`. Partials
-  live in `partials/` and are pulled in with `{% include %}`. Filters such as
-  `|money` or `|yes_no` are plain functions in `web/filters.rs`.
+  (blocks `items`, `filter`, `add_button`, and `summary`, `more_css`,
+  `more_js`) → `sellers/list.html`. Partials live in `partials/` and are
+  pulled in with `{% include %}`. Filters such as `|money` or `|yes_no` are
+  plain functions in `common::web::filters`. The shared templates are in
+  `crates/common/templates/`.
+- **Inside the yugioh crate**, `crate::web::…` and `crate::store::db` are
+  re-exports of `common`'s modules (`yugioh/src/web/mod.rs`): the code reads
+  as before the split.
 
 ## Following a form
 
-`POST /sellers/:id/edit`, in `backend/src/routes/sellers/form.rs`:
+`POST /sellers/:id/edit`, in `crates/yugioh/src/routes/sellers/form.rs`:
 
 1. The body arrives as raw `(name, value)` pairs (`Form<Pairs>`) and is
    wrapped in `FormData`, which collects validation errors as it reads:
@@ -156,10 +185,11 @@ Things to notice:
 4. Otherwise: `begin_write(&pool)` opens a write transaction, the
    `UPDATE`/`INSERT`s run on it, `tx.commit()`, then `Redirect::to(…)`.
 
-`lots/form.rs::create` is the same pattern at full size:
+`lots/form/add.rs::create` is the same pattern at full size:
 
 - a lot plus repeated card rows (`cards-0-name`, `cards-0-code`, …, read by
-  `form.card_rows()` / `form.new_cards()`);
+  `form.card_rows()` / `form.new_cards()`, the `CardRows` trait of
+  `yugioh/src/web/card_rows.rs`);
 - an existing seller **or** a new one created on the fly (`SellerChoice`);
 - `cards::insert_lot_cards` creates each card `quantity` times with its
   `unite`;
@@ -175,12 +205,12 @@ Things to notice:
 ### The shipment PDF flow
 
 `POST /lots/add/shipment` (`lot_form::upload`): the PDF is parsed **in
-memory** (`domain::cardmarket::parse_shipment_pdf`), and the form is
+memory** (`yugioh_domain::cardmarket::parse_shipment_pdf`), and the form is
 rendered pre-filled with the dates, total, seller and card lines. The file
 waits in `uploads/pending-<token>.pdf` (deleted after 24 h), and the form
 carries the token in a hidden `pending` field. On save, `create` moves it to
 `media/shipment_files/shipment_<lot id>.pdf`. The file moves are in
-`backend/src/store/shipment_files.rs`.
+`crates/yugioh/src/store/shipment_files.rs`.
 
 The PDFs contain names and addresses: their text is never stored, logged or
 printed, only the parsed fields. Keep it that way (CLAUDE.md, "Privacy
@@ -217,7 +247,7 @@ and applies the new ones at startup, recording a checksum of each. So an
 applied migration must **never be edited** (startup would fail on the
 checksum): changes are new files, `0004_….sql`, and so on.
 
-**Writing safely** (`store/db.rs`): SQLite allows one writer at a time. Every
+**Writing safely** (`common/src/db.rs`): SQLite allows one writer at a time. Every
 transaction that writes starts with `db::begin_write(&pool)` (not
 `pool.begin()`), which takes the write lock up front so concurrent writers
 wait instead of failing with "database is locked". Get new ids with
@@ -228,14 +258,18 @@ write transaction, because they write `card_data` through the pool themselves.
 submodule. Ctrl-C stops the server cleanly, and after that `app.db` alone
 holds everything. See [recipes.md](recipes.md#save-your-data-to-git).
 
-## The domain crate
+## The domain crates
 
-`domain/` holds the logic worth testing on its own, with no database and no
-HTTP. Each function gets plain values and returns plain values:
+`crates/yugioh-domain/` holds the logic worth testing on its own, with no
+database and no HTTP. Each function gets plain values and returns plain
+values (`books-domain`: `book`, `isbn`; `pokemon-domain`: see [the Pokémon
+cards](#the-pokémon-cards); `common-domain`: `CardStatus` and the condition
+factors, which `yugioh-domain` re-exports as `card::CardStatus` and
+`valuation::condition_factor`):
 
 | Module | What |
 |---|---|
-| `card` | name normalisation (`normalize_card_name`, `clean_card_name`), `CardStatus` |
+| `card` | name normalisation (`normalize_card_name`, `clean_card_name`), `CardStatus` (from `common-domain`) |
 | `lot` | `LotType`, shipping cost |
 | `budget` | monthly recap (`recap`, `BudgetTotals`, `available_debt`) for `/budget` and the dashboard |
 | `ydke` | `YdkeDeck::parse` / `to_url` |
@@ -262,7 +296,7 @@ bundle. The app then only talks JSON to `/api/*`:
 |---|---|
 | `src/main.js`: mounts `App` with the version id | |
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
-| `src/api.js`: one function per endpoint | `routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
+| `src/api.js`: one function per endpoint | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.js`: pure helpers (sorting, prices, YDKE URL) | |
 | `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
@@ -284,7 +318,7 @@ of the collection for every other version. In this app a proxy already means
 missing.
 
 - **Building** (`PATCH /api/deck-versions/:id` with `{"is_built": true}`,
-  `decks/api/version.rs`): `domain::built_deck::plan_build` says which cards
+  `decks/api/version.rs`): `yugioh_domain::built_deck::plan_build` says which cards
   change; each of the version's cards shared with other versions becomes a
   proxy there (`store::cards::proxy_copy` + `swap_card`, categories moved),
   except the cards another built version already holds: first built, first
@@ -327,7 +361,7 @@ a version (`clone`) doesn't take it.
 - **Labels** (`deck_label`): archetype/engine names, one table for your decks
   (`deck_deck_label`, on the deck edit page) and the opponents' rounds
   (`tournament_round_label`). Typed comma-separated with suggestions
-  (`domain::tournament::split_labels`), matched case-insensitively, created on
+  (`yugioh_domain::tournament::split_labels`), matched case-insensitively, created on
   the way, deleted when unused; `/tournaments/labels` renames and merges.
 - **Writes** (`store/tournaments.rs`): `insert`/`update` replace the rounds
   (`set_results`), shared by the form and `import-tournament-notes`.
@@ -335,7 +369,7 @@ a version (`clone`) doesn't take it.
   rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
   blank rows skipped, numbered in order. The edit page shows the old free
   `notes` beside the form until "Clear the old notes".
-- **Stats** (`domain::tournament::stats`): rounds (forfeit = win,
+- **Stats** (`yugioh_domain::tournament::stats`): rounds (forfeit = win,
   double loss = loss, byes apart), games (draws and unfinished out of the
   rate), by version, by your deck's labels, matchups, die, first/second.
   `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
@@ -344,32 +378,46 @@ a version (`clone`) doesn't take it.
 
 ## The advent calendar
 
-`/advent-calendar/:year` (`routes/advent/`, `templates/advent/calendar.html`,
-`static/js/advent_calendar.js`, `static/css/advent.css`): 24 doors that open
-on the photo and the card of the day. The tables `advent_calendar` (one per
-year) and `advent_calendar_entry` (day, card, photo) come from Django, which
-had no page for them. The photos are in `media/advent_calendar_photos/<year>/`
+`/advent-calendar/:year` (`static/js/advent_calendar.js`,
+`static/css/advent.css`): 24 doors that open on the photo and the card of
+the day. The tables `advent_calendar` (one per year) and
+`advent_calendar_entry` (day, card, photo) come from Django, which had no
+page for them. The photos are in `media/advent_calendar_photos/<year>/`
 (upright, 1600 px, metadata stripped; the full-size originals in
-`originals/`). They show handwritten notes, so the page and the photos are
-behind the login (`routes::private_router`, `private_files` in `main.rs`).
+`originals/`). They show handwritten notes, so the pages and the photos are
+behind the login.
 
-Calendars are listed at `/advent-calendar`, added at `/advent-calendar/add`
-like the other lists, and filled on their edit page (`routes/advent/form.rs`): for each day, a card of the collection (by code
-or `#id`) and a photo. `store/photos.rs` makes the copy shown on the page
-(upright from the EXIF orientation, 1600 px, re-encoded without metadata)
-and keeps the original in `originals/`; ↺ ↻ turn a photo that came out
-sideways. Each save writes new file names, so browsers never show an old
-photo, and deletes the previous files (`store/calendar_photos.rs`, shared
-with the book calendars). A calendar can have its own lot
-(`advent_calendar.lot_id`, migration 0006, "Create its lot" on the edit
-page): its cards are added on the usual lot page, then suggested in the
-day fields; the lot page links back to the calendar.
+The card and book calendars are one engine, the `advent` crate:
+
+| Piece | Where |
+|---|---|
+| what a collection's calendars are: tables, texts, what is behind a door, how a day field finds it | the `advent::Calendar` trait (`crates/advent/src/lib.rs`) and its `Spec` |
+| the list and a calendar's page | `advent/src/pages.rs`, `advent/templates/advent/{list,calendar}.html` |
+| create a calendar, fill a day (multipart), turn a photo, empty a day | `advent/src/form.rs` (+ `day_form.rs`), `templates/advent/{add,edit}.html` |
+| the photo files: written, turned, deleted | `advent/src/calendar_photos.rs` (resizing: `common::photos`) |
+| the cards: a card by code or `#id`, the door's picture and text, the calendar's lot | `yugioh/src/routes/advent/mod.rs` (`Cards`), `yugioh/templates/advent/{door,lot}.html` |
+| the books: a book by ISBN (looked up and added) or `#id` | `books/src/routes/advent/mod.rs` (`Books`), `books/templates/books/advent/door.html` |
+
+`advent::routes::<Cards>()` gives the routes under the calendar's base
+(`/advent-calendar`, `/books/advent-calendar`), its pages private and its
+photo folder too; each collection merges them into its own `Routes`. A day
+is filled on the edit page with an item (`#id`, a code, an ISBN) and a
+photo; `common::photos` makes the copy shown on the page (upright from the
+EXIF orientation, 1600 px, re-encoded without metadata) and the original is
+kept in `originals/`; ↺ ↻ turn a photo that came out sideways. Each save
+writes new file names, so browsers never show an old photo, and deletes the
+previous files.
+
+A card calendar can have its own lot (`advent_calendar.lot_id`, migration
+0006, "Create its lot" on the edit page, `POST /advent-calendar/:year/lot`,
+in the yugioh crate): its cards are added on the usual lot page, then
+suggested in the day fields; the lot page links back to the calendar.
 
 ## The books
 
 A second collection in the same app and database, with nothing in common
-with the cards: the novels at home. Every route starts with `/books`
-(`routes/books/`, `templates/books/`); the book templates swap the
+with the cards: the novels at home, in `crates/books/`. Every route starts
+with `/books` (`src/routes/`, `templates/books/`); the book templates swap the
 navigation bar (`{% block nav %}` → `partials/books_nav.html`) and the page
 background (`body.books`, `static/css/books.css`). No prices, lots or
 pictures.
@@ -377,15 +425,16 @@ pictures.
 | Piece | Where |
 |---|---|
 | tables (`book`, `book_author`, `book_book_author`, `book_series`, `book_data`, `book_advent_calendar[_entry]`) | `migrations/0007_books.sql` |
-| ISBN parsing, check digits, ISBN-10 → 13 | `domain/src/isbn.rs` |
-| lookup answers → `BookInfo`, series text → name + volume, author sort names, missing volumes | `domain/src/book.rs` |
-| writes: a book with its authors (in order) and series, created on the way; orphans deleted | `store/books.rs` |
-| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data` | `store/book_data.rs` |
-| list (filters, sort by title / surname / added), detail | `routes/books/mod.rs` |
-| add, edit, delete (refused while behind an advent door) | `routes/books/form.rs` |
-| `GET /books/api/isbn/:isbn`, the lookup as JSON | `routes/books/api.rs` |
-| authors, series (with the missing volumes) | `routes/books/authors.rs`, `series.rs` |
-| the book advent calendars (a twin of the card ones, own tables and photo folder) | `routes/books/advent/` |
+| ISBN parsing, check digits, ISBN-10 → 13 | `crates/books-domain/src/isbn.rs` |
+| lookup answers → `BookInfo`, series text → name + volume, author sort names, missing volumes | `crates/books-domain/src/book.rs` |
+| writes: a book with its authors (in order) and series, created on the way; orphans deleted | `src/store/books.rs` |
+| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data` | `src/store/book_data.rs` |
+| the routes | `src/lib.rs` (`routes()`) |
+| list (filters, sort by title / surname / added), detail | `src/routes/mod.rs` |
+| add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
+| `GET /books/api/isbn/:isbn`, the lookup as JSON | `src/routes/api.rs` |
+| authors, series (with the missing volumes) | `src/routes/authors.rs`, `series.rs` |
+| the book advent calendars (the `advent` crate, own tables and photo folder) | `src/routes/advent/mod.rs` |
 
 The add form (`static/js/book_form.js`): "Look up" (or Enter, which USB
 barcode scanners send) calls the API and fills the fields; "Scan" opens the
@@ -403,7 +452,7 @@ tests never call it (they insert `book_data` rows).
 A third collection with its own tables (migration 0012), nothing shared
 with the Yu-Gi-Oh! ones: the owner's Pokémon cards, mostly from boosters
 opened at home, in French, English and Japanese, collected and not played
-(no decks). Every route starts with `/pokemon`; the templates swap the
+(no decks), in `crates/pokemon/`. Every route starts with `/pokemon`; the templates swap the
 navigation bar (`partials/pokemon_nav.html`) and the colours (`body.pokemon`,
 `static/css/pokemon.css`: pale yellow, red header). Reads are public, writes
 and the TCGdex lookups behind the login. Copies are **never deleted** (sold
@@ -412,22 +461,23 @@ instead, like the Yu-Gi-Oh! cards); wishes can be.
 | Piece | Where |
 |---|---|
 | tables: `pokemon_card` (TCGdex's cards, owned or wished only), `pokemon_copy`, `pokemon_wish`, `pokemon_price`, `pokemon_set` (set cache) | `migrations/0012_pokemon.sql` |
-| TCGdex JSON → `CardInfo`, `Variant`, `Source`, `Catalogue`, full art from the rarity | `domain/src/pokemon/mod.rs` |
-| the printed code (`FNE 067/064`), card numbers that match (`67` = `067`) | `domain/src/pokemon/card_ref.rs` |
-| a booster's numbers (`67 45r 12x2`) | `domain/src/pokemon/pulls.rs` |
-| a variant's price from Cardmarket's numbers, a copy's value | `domain/src/pokemon/price.rs` |
-| a wish's price against its maximum, a copy that fulfils it | `domain/src/pokemon/wish.rs` |
-| the TCGdex client (throttled, every call goes through it) | `store/pokemon/tcgdex.rs` |
-| cards cached in `pokemon_card` (`cards::ensure`), copy and wish writes, orphan cards | `store/pokemon/cards.rs` |
-| sets by printed code, with their card lists | `store/pokemon/sets.rs` |
-| prices: latest, history, the weekly refresh | `store/pokemon/prices.rs` |
-| the collection (pictures or table, filters, value), a copy | `routes/pokemon/mod.rs` |
-| add one copy, edit (and sell) | `routes/pokemon/form.rs` |
-| a booster opening: numbers → preview → save | `routes/pokemon/booster.rs` |
-| the wishlist | `routes/pokemon/wishlist.rs` |
-| the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `routes/pokemon/api.rs` |
-| pictures, downloaded once into `media/pokemon_card_images/` | `routes/pokemon/images.rs` |
-| the rarity and variant guide | `routes/pokemon/rarities.rs`, `static/js/pokemon_rarities.js` |
+| TCGdex JSON → `CardInfo`, `Variant`, `Source`, `Catalogue`, full art from the rarity | `crates/pokemon-domain/src/lib.rs` |
+| the printed code (`FNE 067/064`), card numbers that match (`67` = `067`) | `crates/pokemon-domain/src/card_ref.rs` |
+| a booster's numbers (`67 45r 12x2`) | `crates/pokemon-domain/src/pulls.rs` |
+| a variant's price from Cardmarket's numbers, a copy's value | `crates/pokemon-domain/src/price.rs` |
+| a wish's price against its maximum, a copy that fulfils it | `crates/pokemon-domain/src/wish.rs` |
+| the TCGdex client (throttled, every call goes through it) | `src/store/tcgdex.rs` |
+| cards cached in `pokemon_card` (`cards::ensure`), copy and wish writes, orphan cards | `src/store/cards.rs` |
+| sets by printed code, with their card lists | `src/store/sets.rs` |
+| prices: latest, history, the weekly refresh | `src/store/prices.rs` |
+| the routes | `src/lib.rs` (`routes()`) |
+| the collection (the shared picture grid or a table, filters, value), a copy | `src/routes/mod.rs` |
+| add one copy, edit (and sell) | `src/routes/form.rs` |
+| a booster opening: numbers → preview → save | `src/routes/booster.rs` |
+| the wishlist | `src/routes/wishlist.rs` |
+| the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `src/routes/api.rs` |
+| pictures, downloaded once into `media/pokemon_card_images/` (`common::media`) | `src/routes/images.rs` |
+| the rarity and variant guide | `src/routes/rarities.rs`, `static/js/pokemon_rarities.js` (drawn by `rarity_guide.js`) |
 
 **TCGdex** ([tcgdex.dev](https://tcgdex.dev), free, no key) has two
 catalogues: the international cards (one id, `sv06.5-067`, for the French,
@@ -437,7 +487,7 @@ English, German… prints) and the Japanese ones (their own sets and ids,
 types and rarity are the stored labels; French answers translate them) and
 in French (name, set name, picture); a Japanese card in Japanese, then its
 species' French and English names by its Pokédex number. The Pokémon TCG API
-(pokemontcg.io) is being replaced by a paid service: not used.
+(pokemontcg.io) is only asked for the pictures TCGdex lacks (below).
 
 | What | Call | Remembered in |
 |---|---|---|
@@ -459,7 +509,7 @@ reprint is printed with the number of the card it reprints (Pikachu & Zekrom
 GX: 33/181), which TCGdex doesn't keep: a set size that fits none of the
 sets, or a number in none, offers the reprints to pick from
 (`sets::subsets`), and `30C Zekrom` (a code then a name) searches the sets'
-names (`&`, `et`, `and` alike: `domain::pokemon::fold_name`). A code also
+names (`&`, `et`, `and` alike: `pokemon_domain::fold_name`). A code also
 covers its family: TCGdex keeps a Trainer Gallery apart (`swsh10tg`,
 code `ASR:TG`) while its cards print `ASR TG29/TG30` (`sets::in_family`);
 a lettered number alone (`TG29`) lists every card with it
@@ -472,8 +522,8 @@ day asks TCGdex again (`sets::are_old`, `sets::forget`). TCGdex has no
 pictures of the Trainer Galleries either: they borrow one (below), the
 the Pokémon TCG API's (below).
 
-**Booster openings** (migration 0013, `store/pokemon/openings.rs`,
-`routes/pokemon/openings.rs`): the booster form saves a `pokemon_opening`
+**Booster openings** (migration 0013, `src/store/openings.rs`,
+`src/routes/openings.rs`): the booster form saves a `pokemon_opening`
 with its copies (`pokemon_copy.opening_id`); `/pokemon/openings` lists them
 with their value and best card, an opening's page shows its cards and adds
 more (the booster form with `?opening=<id>`, or the one-card form, whose
@@ -487,7 +537,7 @@ one's language.
 **Pictures TCGdex lacks** (migrations 0014, 0015): TCGdex has no picture
 of some prints (the Trainer Galleries, some promos, the Classic Collection
 reprints). The picture route then asks the [Pokémon TCG
-API](https://pokemontcg.io) for the same print, once (`store/pokemon/ptcgio.rs`,
+API](https://pokemontcg.io) for the same print, once (`src/store/ptcgio.rs`,
 `cards::find_image`): its set by printed code and size (`30C`, 30 cards:
 `me55c`), name or id written its way (`sv06.5` → `sv6pt5`); the card by
 number, else by name and artist (it numbers a reprint like the card it
@@ -503,7 +553,7 @@ saved: the card is tried again an hour later. Never another print's picture (an
 earlier version borrowed one by name: often another artwork; 0015 cleared
 them).
 
-**Prices** (`domain::pokemon::price`): TCGdex gives Cardmarket's numbers per
+**Prices** (`pokemon_domain::price`): TCGdex gives Cardmarket's numbers per
 variant (`variants_detailed[].pricing.cardmarket`), else once per card.
 Cardmarket sells a card's normal and reverse holo prints as one product:
 the plain fields are the normal's, the `-holo` ones the **reverse holo**'s;
@@ -520,12 +570,13 @@ shows the picked card's rarity with its symbol and the guide's link, a
 printed variant with its price and how to recognise it; the booster preview
 has the same per row (`static/js/pokemon_booster.js`). The guide
 (`/pokemon/rarities`) is data in `static/js/pokemon_rarities.js`, like the
-Yu-Gi-Oh! one.
+Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 
 ## Login
 
-`web/auth.rs`: with `APP_PASSWORD` set, everything in `write_router()` and the
-shipment PDFs require a session cookie. Pages redirect to
+`common::web::auth`: with `APP_PASSWORD` set, every collection's `write` and
+`private` routes and the private media folders (shipment PDFs, calendar
+photos) require a session cookie. Pages redirect to
 `/login?next=…`, the APIs (`/api/*`, `/books/api/*`) answer 401. Reading stays public. The cookie is
 an expiry date signed with a key stored in the `app_secret` table, so a
 restart doesn't log you out. Without `APP_PASSWORD` there is no login, and
@@ -533,7 +584,8 @@ the server refuses to listen anywhere but `127.0.0.1`.
 
 ## Maintenance commands
 
-`backend/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`:
+`crates/backend/src/commands/` parses and dispatches them; the Yu-Gi-Oh!
+ones live in `crates/yugioh/src/commands/`: `scrap-ban-list` (Konami ban lists → `advanced_ban_list`:
 the EU site's JSON, then the US site's pages for the dates still missing, a
 fallback for when the EU JSON lags behind; the US index only links the current
 list, so `--date 2026-10-19` fetches one not linked yet, and a US page whose table
@@ -544,20 +596,22 @@ language of their code, rarity from the card data when the code was printed in
 one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
 
-`import-tournament-notes <file.json>` (`commands/tournament_notes.rs`,
+`import-tournament-notes <file.json>` (`yugioh/src/commands/tournament_notes.rs`,
 one-off) loads the tournaments' old notes, transcribed into a JSON file of
 the private data submodule, as rounds and games; a tournament that has rounds
 is skipped, so it is safe to run twice.
 
 `refresh-prices` fetches today's market price of every card data
-(`store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
+(`yugioh/src/store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
 Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices), then the
-Pokémon cards owned or wished from TCGdex (`store/pokemon/prices.rs`); the server
-does it weekly by itself (`prices::spawn_weekly`: checked every 6 hours, runs
-when the last refresh is 7 days old).
+Pokémon cards owned or wished from TCGdex (`pokemon/src/store/prices.rs`); the server
+does it weekly by itself (`backend/src/commands/prices.rs::spawn_weekly`,
+`common::schedule::when_due`: checked every 6 hours, runs when the last
+Yu-Gi-Oh! refresh is 7 days old; the Pokémon refresh follows it, since it
+keeps no trace of a run that found no price).
 
 You rarely need `clean-cards` by hand: the server runs it in the background
-5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, one
+5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
 summary line in the log), and the actions that make a cleanup necessary do
 their part themselves (saving deck zones deletes unused proxies, saving new
 cards links, translates and swaps proxies).
@@ -565,15 +619,16 @@ cards links, translates and swaps proxies).
 ## Talking to ygoprodeck
 
 All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
-are in `backend/src/store/card_data/` (the client in `mod.rs`, then
+are in `crates/yugioh/src/store/card_data/` (the client in `mod.rs`, then
 `translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
-second and blocks the IP for an hour above that: `throttle()` keeps every
-call of the server 60 ms apart, and what can be remembered is.
+second and blocks the IP for an hour above that: `YGOPRODECK.wait()` (a
+`common::http::Throttle`) keeps every call of the server 60 ms apart, and
+what can be remembered is.
 
 | What | Call | Remembered in |
 |---|---|---|
 | a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
-| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`) |
+| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
 | a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
 | a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
 | a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
@@ -583,7 +638,7 @@ Two rules: call ygoprodeck **before** opening a write transaction (the calls
 write through the pool), and only through these functions. Tests never call
 it: `TestApp` pre-inserts the card data they need (and translations, in
 `card_translation`). The shapes ygoprodeck answers are reshaped in pure
-functions in `domain/` (`card_set`, `rarity::Rarity::from_label` for its
+functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
 rarity names), which are unit-tested on small synthetic JSON.
 
 ## The collection value
@@ -593,7 +648,7 @@ and a "Market" line on card pages. Two price sources, both refreshed weekly
 by `refresh-prices`:
 
 - **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
-  `domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
+  `yugioh_domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
   MB) downloaded into memory, a price **per printing**. Only what the
   collection needs is kept (migration 0009): the products named like our
   card data, each set code's expansion, the price history of the linked
@@ -615,7 +670,7 @@ by `refresh-prices`:
 Cardmarket's API takes no new users and scraping its site is against its
 terms; the price guide files are its open download.
 
-`domain::valuation` does the sums:
+`yugioh_domain::valuation` does the sums:
 - a copy's price: its product's (`Prices::of`), else its card name's;
 - a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
   × language (non-English 0.9), totals rounded to the cent;
@@ -635,7 +690,8 @@ terms; the price guide files are its open download.
   now, moves under 0.50 € left out (one line per price, the same source on
   both dates).
 
-The lists show estimates too: each card on `/cards` and on a lot's page
+The lists show estimates too: each card on `/cards` (its picture tile, and
+the table view) and on a lot's page
 (`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
 the card's latest price, its product's else its name's), and each purchase
 lot the value of its cards still owned (`fill_lot_estimates`).
@@ -645,16 +701,39 @@ The page loads every row (`store::valuation::owned_copies`, `lots`,
 chart is `static/js/collection_value.js`; the card page's price line is an
 SVG drawn by the server (`cards::sparkline`).
 
+## What the collections share
+
+Besides the plumbing (`common::web`, `common::db`), these were written once
+for every collection:
+
+| What | Where | Used by |
+|---|---|---|
+| the picture grid of cards: `CardTile` (picture, names, a line of facts, tags, value, faded when sold), and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
+| the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
+| the advent calendars | the `advent` crate | cards, books |
+| the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
+| one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
+| "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
+| a picture downloaded once into `media/` | `common::media::fetch_once`, `picture` | `/card-image/:id`, `/pokemon/card-image/…` |
+| background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
+| card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
+| photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
+
 ## Tests
 
-- `domain/`: plain unit tests on values.
-- `backend/src/tests/` (one file per area, helpers in `mod.rs`): `TestApp` creates a migrated SQLite DB in a
-  temporary directory (with two fake `card_data` rows, so nothing calls
-  ygoprodeck) and sends real HTTP requests to `app()`. Each test reads like
-  a scenario: POST a form, check the redirect, check the rows with
-  `app.scalar("SELECT …")`.
-- `domain/tests/real_shipments.rs` (ignored by default): checks the PDF
-  parser against your real shipments and their lots in `data/app.db`.
+- The domain crates: plain unit tests on values.
+- Each collection crate's `src/tests/` (one file per area, helpers in
+  `mod.rs`): `common::testing::TestApp` (feature `test-support`) creates a
+  migrated SQLite DB in a temporary directory and sends real HTTP requests
+  to the collection's routes, behind the real login layer. The yugioh one
+  adds two fake `card_data` rows (`yugioh::testing`), so nothing calls
+  ygoprodeck. Each test reads like a scenario: POST a form, check the
+  redirect, check the rows with `app.scalar("SELECT …")`.
+- `crates/backend/src/tests/`: the whole app (login, pages of every
+  collection).
+- `crates/yugioh-domain/tests/real_shipments.rs` (ignored by default):
+  checks the PDF parser against your real shipments and their lots in
+  `data/app.db`.
 
 `cargo test --workspace` runs everything but the last one. Tests never
 touch `data/app.db`, apart from that ignored test, which opens it

@@ -8,7 +8,7 @@ use sqlx::SqliteConnection;
 
 use common::db::today;
 
-/// The fields of a book, validated (`routes::books::form` builds them from
+/// The fields of a book, validated (`routes::form` builds them from
 /// the form, [`BookFields::from_info`] from a lookup).
 #[derive(Debug, Clone, Default)]
 pub struct BookFields {

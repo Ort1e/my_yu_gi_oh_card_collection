@@ -13,6 +13,7 @@ from the repo root.
 - [Change the database schema](#change-the-database-schema)
 - [Add pure business logic](#add-pure-business-logic)
 - [Add a deck builder feature](#add-a-deck-builder-feature)
+- [Show cards as pictures](#show-cards-as-pictures)
 - [Write a handler test](#write-a-handler-test)
 - [Rust patterns you'll meet](#rust-patterns-youll-meet)
 
@@ -192,9 +193,11 @@ first added. Pictures are a cache in `data/media/pokemon_card_images/`
 
 ## Add a read-only page
 
-Example: a `/tournaments` list.
+Example: a `/tournaments` list, in the Yu-Gi-Oh! crate (`crates/yugioh/`;
+a books or Pokémon page goes in `crates/books/` or `crates/pokemon/` the
+same way).
 
-1. **Handler + template struct**: new folder `backend/src/routes/tournaments/`
+1. **Handler + template struct**: new folder `crates/yugioh/src/routes/tournaments/`
    with a `mod.rs` (copy `sellers/mod.rs` as a starting point; a new area
    gets its own folder, never a loose file in `routes/`):
 
@@ -229,8 +232,9 @@ Example: a `/tournaments` list.
    expects but the SQL doesn't return is an error at request time (the
    compiler doesn't check SQL).
 
-2. **Template**: `backend/templates/tournaments/list.html`, extending
-   `base.html` (or `list_base.html` for a paginated list). Every field of
+2. **Template**: `crates/yugioh/templates/tournaments/list.html`, extending
+   `base.html` (or `list_base.html` for a paginated list; both are in
+   `crates/common/templates/`, found through the crate's `askama.toml`). Every field of
    the struct is a variable; `{% for t in tournaments %}…{% endfor %}`.
    A table of data follows the shared convention (`static/css/style.css`,
    "Data tables"): `<div class="table-scroll"><table class="numbers">`, on
@@ -242,13 +246,16 @@ Example: a `/tournaments` list.
    see `lots/detail.html`).
 
 3. **Route**: in `routes/mod.rs`, `mod tournaments;` and in `router()`:
-   `.route("/tournaments", get(tournaments::list))`.
+   `.route("/tournaments", get(tournaments::list))`. (Books and Pokémon:
+   in `routes()` of their `lib.rs`, in `public`.)
 
-4. **Link** it from `templates/base.html` (the navigation) if needed: in the
-   group it belongs to (`Collection`, `Decks`: a `<details>` menu), or at the
-   top level. `static/js/nav.js` marks the current page by itself.
+4. **Link** it from the navigation bar if needed,
+   `crates/common/templates/partials/yugioh_nav.html` (or `books_nav.html`,
+   `pokemon_nav.html`): in the group it belongs to (`Collection`, `Decks`: a
+   `<details>` menu), or at the top level. `static/js/nav.js` marks the
+   current page by itself.
 
-5. Add the URL to the `pages_render` test in `tests/pages.rs`.
+5. Add the URL to the `pages_render` test in `crates/backend/src/tests/pages.rs`.
 
 A row type needed by several pages goes in `store/models.rs`. A value the template
 must compute is best a method on the struct (`fn full_name(&self) -> String`)
@@ -292,7 +299,7 @@ pub async fn update(
 Then:
 
 - register the route in **`write_router()`** (not `router()`), which puts it
-  behind the login;
+  behind the login (books and Pokémon: `write` in their `routes()`);
 - render errors in the template with `{% include "partials/form_errors.html" %}`;
 - if the form creates cards, use `cards::insert_lot_cards` and then
   `card_data::spawn_link_cards(state, card_ids)` after the commit;
@@ -330,9 +337,11 @@ delete routes for them.
 ## Add pure business logic
 
 Anything computable without the DB (a price rule, a parser, a statistic)
-goes in `domain/`:
+goes in the collection's domain crate, `crates/yugioh-domain/` (or
+`books-domain`, `pokemon-domain`; `common-domain` for what both card
+collections need):
 
-1. a function in the right module (or a new `domain/src/<name>.rs`, plus
+1. a function in the right module (or a new `src/<name>.rs`, plus
    `pub mod <name>;` in `lib.rs`) taking plain values;
 2. unit tests at the bottom of the file:
 
@@ -349,14 +358,14 @@ goes in `domain/`:
    ```
 
 3. call it from the handler, which loads the rows, calls the function and
-   renders the result. `routes/budget/mod.rs` + `domain/src/budget.rs` is the
-   model to follow.
+   renders the result. `yugioh/src/routes/budget/mod.rs` +
+   `yugioh-domain/src/budget.rs` is the model to follow.
 
-`cargo test -p domain` runs these in a second.
+`cargo test -p yugioh-domain` runs these in a second.
 
 ## Add a deck builder feature
 
-1. **Endpoint** in `routes/decks/api/` (the file of its group, or a new one
+1. **Endpoint** in `crates/yugioh/src/routes/decks/api/` (the file of its group, or a new one
    declared and re-exported in `api/mod.rs`): input as a `#[derive(Deserialize)]`
    struct taken with `Json(body): Json<MyInput>`, output as
    `Json<MyOutput>` with `#[derive(Serialize)]`. Bad input →
@@ -369,8 +378,25 @@ goes in `domain/`:
 4. **UI** in a component in `src/lib/` (with its CSS in its `<style>`
    block), wired in `App.svelte`. Pure helpers go in `src/deck.js`.
    Style: 4-space indent, blank lines between logical blocks.
-5. Test the endpoint in `tests/deck_api.rs` (`t.json(…)`, see
+5. Test the endpoint in `crates/yugioh/src/tests/deck_api.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
+
+## Show cards as pictures
+
+A page listing cards (Yu-Gi-Oh! or Pokémon) shows them with the shared grid
+(`common::web::tiles`, see tour.md, "What the collections share"):
+
+1. give the row a `tile(&self) -> CardTile` (see `CardRow::tile` in
+   `yugioh/src/store/models.rs`, `CopyRow::tile` in `pokemon/src/routes/mod.rs`):
+   its page, its picture, its names, a line of facts, tags, value, faded;
+2. on the page struct, `fn tiles(&self) -> Vec<CardTile>`;
+3. in the template, load `/static/css/tiles.css` and write
+   `{% let tiles = self.tiles() %}{% include "partials/card_grid.html" %}`.
+
+For a table view as well, take the `view` parameter (`View::from_param`),
+size the page with `view.page_size()`, keep it in the page links
+(`view.keep(querystring)`) and link the other view
+(`view.other_href(path, querystring)`): `/cards` does all of it.
 
 ## Add next year's advent calendar
 
@@ -393,10 +419,11 @@ Then commit the data (stop the server first): `app.db` and the photos in
 
 ## Write a handler test
 
-In `backend/src/tests/`, in the file of its area (`TestApp` and the shared
-fixtures are in `tests/mod.rs`). `TestApp::new()` gives a fresh migrated DB with
-two `card_data` rows (dark magician, kuriboh), so no test calls
-ygoprodeck:
+In the collection crate's `src/tests/`, in the file of its area (`TestApp`
+and the shared fixtures are in `tests/mod.rs`; the harness itself is
+`common::testing`). In the yugioh crate, `TestApp::new()` gives a fresh
+migrated DB with two `card_data` rows (dark magician, kuriboh), so no test
+calls ygoprodeck:
 
 ```rust
 #[tokio::test]
@@ -418,7 +445,7 @@ async fn edit_seller() {
 Helpers: `t.get(uri)`, `t.post(uri, form)`, `t.json(method, uri, body)`,
 `t.scalar(sql)` (one integer), `t.text(sql)` (one optional string),
 `TestApp::with_password(Some("pw"))` for login tests. Run a single test with
-`cargo test -p backend edit_seller`.
+`cargo test -p yugioh edit_seller`.
 
 ## Rust patterns you'll meet
 

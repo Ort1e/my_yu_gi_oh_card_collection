@@ -5,7 +5,7 @@
 //! 1. The form: the set (its printed code, `FNE`), the language, the date
 //!    and the numbers (`67 45r 12x2`, `pokemon_domain::pulls`).
 //! 2. "Find the cards" (`step=preview`): the set's cards from TCGdex
-//!    (`store::pokemon::sets`), each number matched. Each card is shown
+//!    (`store::sets`), each number matched. Each card is shown
 //!    with its picture, rarity (and the guide's link) and its printed
 //!    variants to choose from, full art pre-ticked from the rarity, near
 //!    mint. When sets share the code (`30C`: 30th Celebration and its

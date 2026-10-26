@@ -12,7 +12,7 @@
 //! - `rarities.rs`: the rarity and variant guide; `images.rs`: card pictures.
 //!
 //! Copies are never deleted (sold instead); wishes are. Card data and
-//! prices: `store::pokemon`; the rules: `pokemon_domain`.
+//! prices: `crate::store`; the rules: `pokemon_domain`.
 
 pub mod api;
 pub mod booster;

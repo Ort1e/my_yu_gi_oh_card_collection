@@ -1,5 +1,6 @@
-//! Single-password login guarding every write route (`routes::write_router`)
-//! and the shipment PDFs (personal data).
+//! Single-password login guarding every collection's write and private
+//! routes (`Routes::write`, `Routes::private`) and the private media folders
+//! (shipment PDFs, calendar photos: personal data).
 //!
 //! The password comes from `APP_PASSWORD`; without it login is disabled and
 //! the server only accepts to listen on a loopback address (see `main`). A

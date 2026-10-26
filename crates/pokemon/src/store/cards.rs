@@ -217,7 +217,7 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
 
 /// For a card TCGdex has no picture of (Trainer Galleries, some promos,
 /// the Classic Collection reprints): the same print's picture from the
-/// Pokémon TCG API (`store::pokemon::ptcgio`), saved in `image` (a full
+/// Pokémon TCG API (`store::ptcgio`), saved in `image` (a full
 /// URL) with `image_from = 'pokemontcg:<its id>'`; `''` when it has none
 /// either. Never another print's: the picture would be wrong (a Trainer
 /// Gallery's artwork is its own). A failure (that service answers 500 now

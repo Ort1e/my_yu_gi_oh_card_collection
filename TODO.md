@@ -1,15 +1,15 @@
 # TODO
 
-- [ ] Split the workspace by collection, to read each one at once: a crate
-      per collection (`yugioh`, `pokemon`, `books`), each with its domain
-      logic, store, routes and templates, and a thin `backend` that only
-      wires them (server, login, shared web plumbing: forms, errors,
-      pagination, `Money`, photos). To study first: askama templates per
-      crate, the shared `TestApp`, the migrations (one folder, run once),
-      and what stays shared (card conditions, valuation factors).
-
 ## Done
 
+- [x] Split by collection (2026-10-26, branch `refactor-crates`): one crate per
+      collection (`yugioh`, `books`, `pokemon`) with its pure domain crate,
+      `common` (state, web plumbing, DB, photos, throttle, media, schedule,
+      base templates, test harness), `common-domain` (conditions), `advent`
+      (one calendar engine for cards and books), a thin `backend` binary.
+      Shared on the way: the Pokémon picture grid for `/cards` too (with a
+      table view), the list page base, one rarity guide renderer. Every
+      route, feature and test kept.
 - [x] Pokémon cards (2026-10-23): `/pokemon`, a third collection (TCGdex card
       data and Cardmarket prices, French/English/Japanese): booster openings,
       single cards, graded copies, sold not deleted, wishlist with price

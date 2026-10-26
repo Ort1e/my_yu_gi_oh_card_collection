@@ -1,4 +1,4 @@
-//! Booster openings (`store::pokemon::openings`): their list, one opening
+//! Booster openings (`store::openings`): their list, one opening
 //! with its cards and value, and its date, language and note (behind the
 //! login; a language changed changes its cards' too).
 //! Cards are added to an opening with the booster form

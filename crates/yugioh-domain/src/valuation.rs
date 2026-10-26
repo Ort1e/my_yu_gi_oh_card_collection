@@ -2,7 +2,7 @@
 //!
 //! Prices ([`Prices`]), refreshed weekly and kept as a history:
 //! - a copy linked to its Cardmarket product (its printing: set and rarity,
-//!   `domain::cardmarket_catalog`) is valued at that product's price;
+//!   `crate::cardmarket_catalog`) is valued at that product's price;
 //! - the others at ygoprodeck's `cardmarket_price`, **one per card name**,
 //!   which follows the cheapest printing: an estimate, usually too low for
 //!   old or high rarity copies.
