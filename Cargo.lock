@@ -205,36 +205,19 @@ name = "backend"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "askama",
- "askama_axum",
  "axum",
- "base64 0.22.1",
  "books",
- "books-domain",
  "chrono",
  "common",
- "common-domain",
  "dotenvy",
- "hmac",
- "image",
  "pokemon",
- "pokemon-domain",
- "rand 0.8.8",
- "regex",
  "reqwest",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
- "sha2",
- "sqlx",
  "tokio",
  "tower 0.4.13",
- "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
- "url",
- "yugioh-domain",
+ "yugioh",
 ]
 
 [[package]]
@@ -3409,6 +3392,35 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "synstructure",
+]
+
+[[package]]
+name = "yugioh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "askama",
+ "askama_axum",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "common",
+ "common-domain",
+ "image",
+ "rand 0.8.8",
+ "regex",
+ "reqwest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "url",
+ "yugioh-domain",
 ]
 
 [[package]]

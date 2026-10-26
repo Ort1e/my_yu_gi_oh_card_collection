@@ -8,19 +8,17 @@
 //! `--dry-run` does the work in a transaction that is rolled back and makes
 //! no API call (names unknown locally are only reported).
 
-mod ban_list;
-mod clean_cards;
 mod prices;
-mod tournament_notes;
 
-pub use clean_cards::spawn_daily as spawn_daily_cleanup;
 pub use prices::spawn_weekly as spawn_weekly_price_refresh;
+pub use yugioh::commands::clean_cards::spawn_daily as spawn_daily_cleanup;
+use yugioh::commands::{ban_list, clean_cards, tournament_notes};
 
 use std::path::PathBuf;
 
 use chrono::NaiveDate;
 
-use crate::AppState;
+use common::AppState;
 
 pub const USAGE: &str = "usage:
   backend                                   run the web server

@@ -1,18 +1,19 @@
+//! The app's binary: reads the settings, opens the database (running the
+//! migrations), then serves every collection (`yugioh`, `books`, `pokemon`,
+//! assembled by `common::app`) or runs a maintenance command.
+
 mod commands;
-mod routes;
-mod store;
 #[cfg(test)]
 mod tests;
-mod web;
 
 use std::path::PathBuf;
 
 use axum::Router;
 use commands::Command;
-use store::db;
+use common::db;
+use common::web::auth;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
-use web::auth;
 
 pub use common::AppState;
 
@@ -107,6 +108,6 @@ async fn shutdown_signal() {
 pub fn app(state: AppState) -> Router {
     common::app(
         state,
-        vec![routes::all(), books::routes(), pokemon::routes()],
+        vec![yugioh::routes(), books::routes(), pokemon::routes()],
     )
 }
