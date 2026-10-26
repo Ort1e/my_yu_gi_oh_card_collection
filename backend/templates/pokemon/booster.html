@@ -111,6 +111,7 @@
         <div>
           {% if !row.rarity.is_empty() %}<a href="{{ row.rarity_href() }}" target="_blank" class="rarity-badge">{{ row.rarity }}</a>{% endif %}
           {% if row.secret %}<span class="tag" title="Its number is above the set size: a chase card">Secret</span>{% endif %}
+          {% if row.owned > 0 %}<span class="tag owned-tag" title="Already in your collection: a duplicate typed twice? (set its copies to 0 to leave it out)">{{ row.owned_text() }}</span>{% endif %}
         </div>
         <div class="field-row">
           <div>

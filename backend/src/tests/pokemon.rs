@@ -819,3 +819,48 @@ async fn japanese_codes_with_their_rarity_letters() {
         assert_eq!(answer["catalogue"], "ja");
     }
 }
+
+#[tokio::test]
+async fn cards_already_owned_are_flagged() {
+    let t = TestApp::new().await;
+    fixture(&t).await;
+    let card = |except: &str| format!("/pokemon/api/card?id=sv06.5-067&lang=fr{except}");
+    let (_, answer) = t.json("GET", &card(""), serde_json::json!(null)).await;
+    assert_eq!(answer["owned"], serde_json::json!([]), "none yet");
+
+    let id = add(&t, HORSEA_IR).await;
+    let (_, answer) = t.json("GET", &card(""), serde_json::json!(null)).await;
+    assert_eq!(
+        answer["owned"],
+        serde_json::json!([{"id": id, "language": "French", "variant": "Holo"}])
+    );
+    // its own edit page: not a duplicate of itself
+    let (_, answer) = t
+        .json(
+            "GET",
+            &card(&format!("&except={id}")),
+            serde_json::json!(null),
+        )
+        .await;
+    assert_eq!(answer["owned"], serde_json::json!([]));
+    let (_, page) = t.get(&format!("/pokemon/{id}/edit")).await;
+    assert!(page.contains(&format!(r#"data-copy-id="{id}""#)));
+
+    // the booster preview tags it; a sold copy is not counted
+    let preview = [
+        ("set", "FNE"),
+        ("language", "fr"),
+        ("obtained_on", "2026-10-26"),
+        ("source", "booster"),
+        ("pulls", "67 10"),
+        ("step", "preview"),
+    ];
+    let (_, page) = t.post("/pokemon/add/booster", &preview).await;
+    assert_eq!(page.matches("You have 1").count(), 1, "{page}");
+    sqlx::query("UPDATE pokemon_copy SET sold_on = '2026-10-26'")
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    let (_, page) = t.post("/pokemon/add/booster", &preview).await;
+    assert!(!page.contains("You have 1"));
+}

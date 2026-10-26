@@ -321,6 +321,32 @@ pub async fn delete_orphans(conn: &mut SqliteConnection) -> sqlx::Result<u64> {
 
 // ---------- copies ----------
 
+/// A copy of a card already in the collection (not sold).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct OwnedCopy {
+    pub id: i64,
+    pub language: String,
+    pub variant: String,
+}
+
+/// The copies of this card in the collection (not sold), but `except` (the
+/// copy being edited): adding one more is most likely a duplicate typed
+/// twice, so the forms warn.
+pub async fn owned_copies(
+    pool: &Pool,
+    card_id: i64,
+    except: Option<i64>,
+) -> sqlx::Result<Vec<OwnedCopy>> {
+    sqlx::query_as(
+        "SELECT id, language, variant FROM pokemon_copy
+         WHERE card_id = ? AND sold_on IS NULL AND id != ? ORDER BY id",
+    )
+    .bind(card_id)
+    .bind(except.unwrap_or(0))
+    .fetch_all(pool)
+    .await
+}
+
 /// A copy's fields, validated.
 #[derive(Debug, Clone)]
 pub struct CopyFields {

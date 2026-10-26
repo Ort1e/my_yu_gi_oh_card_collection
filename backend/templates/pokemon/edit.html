@@ -17,7 +17,7 @@
 
 {% include "partials/form_errors.html" %}
 
-<form method="post" action="/pokemon/{{ id }}/edit" id="copy-form">
+<form method="post" action="/pokemon/{{ id }}/edit" id="copy-form" data-copy-id="{{ id }}">
   {% include "pokemon/copy_fields.html" %}
 
   {% if japanese %}

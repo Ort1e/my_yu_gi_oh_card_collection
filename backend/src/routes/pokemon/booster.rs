@@ -94,6 +94,8 @@ pub struct PreviewRow {
     rarity: String,
     /// Above the set size (`067/064`): a chase card.
     secret: bool,
+    /// Copies of this card already in the collection (a duplicate typed twice?).
+    owned: usize,
     variants: Vec<Variant>,
     variant: Variant,
     full_art: bool,
@@ -117,6 +119,11 @@ impl PreviewRow {
 
     fn variant_is(&self, variant: &Variant) -> bool {
         self.variant == *variant
+    }
+
+    /// `You have 1` / `You have 2`.
+    fn owned_text(&self) -> String {
+        format!("You have {}", self.owned)
     }
 
     /// Several printed variants: the owner has to look (the guide helps).
@@ -395,6 +402,7 @@ fn unknown_row(pull: &Pull, language: &str, subsets: &[&SetInfo]) -> PreviewRow 
         local_id: pull.number.clone(),
         rarity: String::new(),
         secret: false,
+        owned: 0,
         variants: Variant::ALL.to_vec(),
         // the Classic Collection cards are all holo
         variant: pull.variant.unwrap_or(Variant::Holo),
@@ -445,7 +453,9 @@ async fn preview_row(
         card.name_manual.as_deref(),
     );
     let variants = Variant::parse_list(&card.variants);
+    let owned = cards::owned_copies(&state.pool, card_id, None).await?.len();
     Ok(PreviewRow {
+        owned,
         variant: pull.variant.unwrap_or_else(|| default_variant(&variants)),
         full_art: is_full_art(card.rarity.as_deref()),
         tcgdex_id: card.tcgdex_id,

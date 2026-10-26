@@ -238,6 +238,26 @@ label.checkbox input {
     font-weight: 600;
 }
 
+/* "You already have a copy": readable on the red form. */
+.finder-owned {
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    border-left: 4px solid #ffd54f;
+    border-radius: var(--radius);
+    background-color: #00000055;
+    color: #fff;
+    font-weight: 600;
+}
+
+.finder-owned[hidden] {
+    display: none;
+}
+
+.tag.owned-tag {
+    background-color: #ffd54f;
+    color: #000;
+}
+
 .finder-id input {
     max-width: 14rem;
 }

@@ -21,7 +21,9 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use domain::pokemon::card_ref::{self, CardRef};
-use domain::pokemon::{default_variant, is_full_art, parse_language, Catalogue, Variant};
+use domain::pokemon::{
+    default_variant, is_full_art, language_label, parse_language, Catalogue, Variant,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -346,6 +348,8 @@ pub struct CardParams {
     lang: Option<String>,
     /// For a wish in any language: `intl` or `ja`.
     catalogue: Option<String>,
+    /// The copy being edited: not counted among those already owned.
+    except: Option<i64>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -410,6 +414,22 @@ pub async fn card(
         card.name_ja.as_deref(),
         card.name_manual.as_deref(),
     );
+    // copies already in the collection: the form warns (a duplicate typed twice)
+    let owned: Vec<Value> = cards::owned_copies(&state.pool, card.id, params.except)
+        .await?
+        .into_iter()
+        .map(|copy| {
+            let variant = match Variant::from_code(&copy.variant) {
+                Some(variant) => variant.label().to_string(),
+                None => copy.variant.clone(),
+            };
+            json!({
+                "id": copy.id,
+                "language": language_label(&copy.language),
+                "variant": variant,
+            })
+        })
+        .collect();
     let latest = prices::latest(&state.pool).await?;
     let card_prices = latest.get(&card.id);
     let mut variants = Variant::parse_list(&card.variants);
@@ -446,6 +466,7 @@ pub async fn card(
         "variants_known": printed_known,
         "default_variant": default_variant(&Variant::parse_list(&card.variants)).code(),
         "image": has_image.then(|| image_src(card.id, &shown)),
+        "owned": owned,
     }))
     .into_response())
 }

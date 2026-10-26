@@ -169,6 +169,9 @@ async function showCard({ choose = false, secret = false } = {}) {
 
     const params = new URLSearchParams({ id });
 
+    // the edit page: the copy being edited is not "already owned"
+    if (finderForm?.dataset.copyId) params.set('except', finderForm.dataset.copyId);
+
     if (languageField?.value) {
         params.set('lang', languageField.value);
     } else if (catalogueField) {
@@ -213,6 +216,7 @@ async function showCard({ choose = false, secret = false } = {}) {
     document.getElementById('finder-card-hint').textContent = secret
         ? 'Its number is above the set size: a chase card. Check the symbol next to the number.'
         : '';
+    showOwned(card.owned ?? []);
     box.hidden = false;
 
     if (choose && variantField && variantField.value !== '' && card.variants_known) {
@@ -222,6 +226,33 @@ async function showCard({ choose = false, secret = false } = {}) {
     if (choose && suggestFullArt && fullArtField) fullArtField.checked = card.full_art;
 
     showVariants(card);
+}
+
+/**
+ * The copies of this card already in the collection: a warning (a card
+ * typed twice?), with links to them. Saving stays possible.
+ */
+function showOwned(owned) {
+    const box = document.getElementById('finder-card-owned');
+    box.replaceChildren();
+    box.hidden = owned.length === 0;
+
+    if (owned.length === 0) return;
+
+    const count = owned.length === 1 ? 'a copy' : `${owned.length} copies`;
+    box.append(`⚠ You already have ${count} of this card: `);
+
+    owned.forEach((copy, i) => {
+        if (i > 0) box.append(', ');
+
+        const link = document.createElement('a');
+        link.href = `/pokemon/${copy.id}`;
+        link.target = '_blank';
+        link.textContent = `${copy.language}, ${copy.variant}`;
+        box.append(link);
+    });
+
+    box.append('. A duplicate? Saving adds one more.');
 }
 
 /** One button per printed variant: its price and how to recognise it. */
