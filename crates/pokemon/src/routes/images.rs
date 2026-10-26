@@ -6,10 +6,10 @@
 //! (`cards::find_image`, a full URL, PNG): looked up once.
 
 use axum::extract::{Path, State};
-use axum::http::header;
 use axum::response::IntoResponse;
 
 use crate::store::cards;
+use common::media;
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::AppState;
 
@@ -37,38 +37,6 @@ fn file_name(catalogue: &str, tcgdex_id: &str, print: &str) -> String {
         })
         .collect();
     format!("{catalogue}-{id}-{print}.img")
-}
-
-/// The picture's type, from its first bytes (WebP from TCGdex, PNG from
-/// the Pokémon TCG API).
-fn content_type(bytes: &[u8]) -> &'static str {
-    match bytes {
-        [0x89, b'P', b'N', b'G', ..] => "image/png",
-        [0xFF, 0xD8, ..] => "image/jpeg",
-        _ => "image/webp",
-    }
-}
-
-async fn download(state: &AppState, url: &str) -> AppResult<Vec<u8>> {
-    // a TCGdex picture is a base URL: its quality and format are added
-    let url = if url.starts_with(TCGDEX_ASSETS) {
-        format!("{url}/high.webp")
-    } else {
-        url.to_string()
-    };
-    let fail = |e: reqwest::Error| AppError::Internal(format!("downloading {url}: {e}"));
-    let bytes = state
-        .http
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(30))
-        .send()
-        .await
-        .and_then(reqwest::Response::error_for_status)
-        .map_err(fail)?
-        .bytes()
-        .await
-        .map_err(fail)?;
-    Ok(bytes.to_vec())
 }
 
 pub async fn card_image(
@@ -99,36 +67,25 @@ pub async fn card_image(
             (url, print)
         }
     };
-    let dir = state.media_dir.join("pokemon_card_images");
-    let path = dir.join(file_name(&catalogue, &tcgdex_id, print));
-    let bytes = match tokio::fs::read(&path).await {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            let bytes = download(&state, &url).await?;
-            // a temporary file then a rename: a concurrent request never
-            // reads a half-written picture
-            let io =
-                |e: std::io::Error| AppError::Internal(format!("saving {}: {e}", path.display()));
-            tokio::fs::create_dir_all(&dir).await.map_err(io)?;
-            let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
-            tokio::fs::write(&tmp, &bytes).await.map_err(io)?;
-            tokio::fs::rename(&tmp, &path).await.map_err(io)?;
-            bytes
-        }
+    let path = state
+        .media_dir
+        .join("pokemon_card_images")
+        .join(file_name(&catalogue, &tcgdex_id, print));
+    // a TCGdex picture is a base URL: its quality and format are added
+    let url = || {
+        Ok(if url.starts_with(TCGDEX_ASSETS) {
+            format!("{url}/high.webp")
+        } else {
+            url.clone()
+        })
     };
-
-    Ok((
-        [
-            (header::CONTENT_TYPE, content_type(&bytes)),
-            (header::CACHE_CONTROL, "public, max-age=86400"),
-        ],
-        bytes,
-    ))
+    Ok(media::picture(media::fetch_once(&state, &path, url).await?))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::media::content_type;
 
     #[test]
     fn file_names_are_safe() {
