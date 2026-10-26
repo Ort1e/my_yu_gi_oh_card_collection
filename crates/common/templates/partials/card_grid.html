@@ -1,7 +1,7 @@
 {# The cards as a grid of pictures (common::web::tiles::CardTile, static/css/tiles.css): set `tiles` before including. Every line is always there, so they line up from tile to tile. #}
 <div class="card-grid">
   {% for tile in tiles %}
-  <a href="{{ tile.href }}" class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">
+  {% if tile.href.is_empty() %}<div class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">{% else %}<a href="{{ tile.href }}" class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">{% endif %}
     <div class="card-tile-picture">
       {% match tile.image %}{% when Some with (src) %}
       <img src="{{ src }}" alt="{{ tile.name }}" loading="lazy">
@@ -19,6 +19,6 @@
         {% if !tile.value.is_empty() %}<span class="card-tile-value">{{ tile.value }} €</span>{% endif %}
       </div>
     </div>
-  </a>
+  {% if tile.href.is_empty() %}</div>{% else %}</a>{% endif %}
   {% endfor %}
 </div>

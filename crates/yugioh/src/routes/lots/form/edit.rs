@@ -59,6 +59,7 @@ struct StoredLot {
     buy_date: String,
     received_date: Option<String>,
     no_card_price: Money,
+    refund: Money,
     is_cancelled: bool,
     seller_id: Option<i64>,
 }
@@ -68,7 +69,8 @@ pub async fn edit_page(
     Path(id): Path<i64>,
 ) -> AppResult<EditLotPage> {
     let lot: StoredLot = sqlx::query_as(
-        "SELECT lot_type, price, buy_date, received_date, no_card_price, is_cancelled, seller_id
+        "SELECT lot_type, price, buy_date, received_date, no_card_price, refund, is_cancelled,
+                seller_id
          FROM lot WHERE id = ?",
     )
     .bind(id)
@@ -85,6 +87,7 @@ pub async fn edit_page(
             buy_date: lot.buy_date,
             received_date: lot.received_date.unwrap_or_default(),
             no_card_price: lot.no_card_price.0.to_string(),
+            refund: lot.refund.0.to_string(),
         },
         is_cancelled: lot.is_cancelled,
         seller_select: lot.seller_id.map(|id| id.to_string()).unwrap_or_default(),
@@ -135,7 +138,7 @@ pub async fn update(
     }
     let updated = sqlx::query(
         "UPDATE lot SET lot_type = ?, price = ?, buy_date = ?, received_date = ?,
-            no_card_price = ?, is_cancelled = ?, seller_id = ?
+            no_card_price = ?, refund = ?, is_cancelled = ?, seller_id = ?
          WHERE id = ?",
     )
     .bind(lot.lot_type.code())
@@ -143,6 +146,7 @@ pub async fn update(
     .bind(lot.buy_date.to_string())
     .bind(lot.received_date.map(|d| d.to_string()))
     .bind(Money(lot.no_card_price))
+    .bind(Money(lot.refund))
     .bind(form.checked("is_cancelled"))
     .bind(seller_id)
     .bind(id)

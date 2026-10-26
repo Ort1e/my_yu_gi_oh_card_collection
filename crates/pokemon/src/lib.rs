@@ -9,6 +9,7 @@
 //!   wish and opening writes, prices;
 //! - the pure rules: the `pokemon-domain` crate.
 
+pub mod public;
 pub mod routes;
 pub mod store;
 #[cfg(test)]

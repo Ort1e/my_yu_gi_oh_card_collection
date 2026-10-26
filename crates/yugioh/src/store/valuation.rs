@@ -166,40 +166,52 @@ pub async fn fill_lot_estimates(pool: &Pool, lots: &mut [LotRow]) -> sqlx::Resul
 }
 
 /// A purchase lot that isn't cancelled, for the gain by lot.
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct PurchaseLot {
     pub id: i64,
     pub date: String,
+    /// What it cost: the price paid less the refund.
     pub price: Money,
     pub seller: Option<String>,
 }
 
 /// The purchase lots that aren't cancelled, newest first.
 pub async fn purchase_lots(pool: &Pool) -> sqlx::Result<Vec<PurchaseLot>> {
-    sqlx::query_as(
-        "SELECT lot.id, lot.buy_date AS date, lot.price, seller.name AS seller
+    let rows: Vec<(i64, String, Money, Money, Option<String>)> = sqlx::query_as(
+        "SELECT lot.id, lot.buy_date, lot.price, lot.refund, seller.name
          FROM lot LEFT JOIN seller ON seller.id = lot.seller_id
          WHERE lot.lot_type = 'purchase' AND lot.is_cancelled = 0
          ORDER BY lot.buy_date DESC, lot.id DESC",
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, date, price, refund, seller)| PurchaseLot {
+            id,
+            date,
+            price: Money(price.0 - refund.0),
+            seller,
+        })
+        .collect())
 }
 
-/// The lots that aren't cancelled: their date, kind and price.
+/// The lots that aren't cancelled: their date, kind and cost (the price
+/// less the refund, on the lot's date).
 pub async fn lots(pool: &Pool) -> sqlx::Result<Vec<Lot>> {
-    let rows: Vec<(String, String, Money)> =
-        sqlx::query_as("SELECT buy_date, lot_type, price FROM lot WHERE is_cancelled = 0")
+    let rows: Vec<(String, String, Money, Money)> =
+        sqlx::query_as("SELECT buy_date, lot_type, price, refund FROM lot WHERE is_cancelled = 0")
             .fetch_all(pool)
             .await?;
 
     Ok(rows
         .into_iter()
-        .filter_map(|(date, lot_type, price)| {
+        .filter_map(|(date, lot_type, price, refund)| {
             Some(Lot {
                 date: date.parse().ok()?,
                 is_sale: lot_type == "sale",
-                price: price.0,
+                price: price.0 - refund.0,
             })
         })
         .collect())

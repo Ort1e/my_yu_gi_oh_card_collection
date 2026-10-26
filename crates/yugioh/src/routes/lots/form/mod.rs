@@ -29,6 +29,7 @@ pub struct LotValues {
     pub(super) buy_date: String,
     pub(super) received_date: String,
     pub(super) no_card_price: String,
+    pub(super) refund: String,
 }
 
 impl Default for LotValues {
@@ -39,6 +40,7 @@ impl Default for LotValues {
             buy_date: String::new(),
             received_date: String::new(),
             no_card_price: "0.00".to_string(),
+            refund: "0.00".to_string(),
         }
     }
 }
@@ -51,6 +53,7 @@ impl LotValues {
             buy_date: form.text("buy_date"),
             received_date: form.text("received_date"),
             no_card_price: form.text("no_card_price"),
+            refund: form.text("refund"),
         }
     }
 }
@@ -62,6 +65,8 @@ pub(super) struct ValidLot {
     pub(super) buy_date: chrono::NaiveDate,
     pub(super) received_date: Option<chrono::NaiveDate>,
     pub(super) no_card_price: rust_decimal::Decimal,
+    /// What the seller gave back (the shipping, at Dateacard).
+    pub(super) refund: rust_decimal::Decimal,
 }
 
 /// Validate the lot fields. Errors go to `form.errors`: callers must also
@@ -75,12 +80,18 @@ pub(super) fn validate_lot(form: &mut FormData) -> Option<ValidLot> {
     let buy_date = form.required_date("buy_date", "Buy date");
     let received_date = form.date("received_date", "Received date");
     let no_card_price = form.decimal("no_card_price", "No card price");
+    let refund = form.decimal("refund", "Refund").unwrap_or_default();
+    if refund < rust_decimal::Decimal::ZERO || price.is_some_and(|price| refund > price) {
+        form.errors
+            .push("The refund must be between 0 and the price.".into());
+    }
     Some(ValidLot {
         lot_type: lot_type?,
         price: price?,
         buy_date: buy_date?,
         received_date,
         no_card_price: no_card_price.unwrap_or_default(),
+        refund,
     })
 }
 

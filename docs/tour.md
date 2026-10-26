@@ -574,13 +574,35 @@ Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 
 ## Login
 
-`common::web::auth`: with `APP_PASSWORD` set, every collection's `write` and
+`common::web::auth`: with a password set, every collection's `write` and
 `private` routes and the private media folders (shipment PDFs, calendar
-photos) require a session cookie. Pages redirect to
-`/login?next=…`, the APIs (`/api/*`, `/books/api/*`) answer 401. Reading stays public. The cookie is
-an expiry date signed with a key stored in the `app_secret` table, so a
-restart doesn't log you out. Without `APP_PASSWORD` there is no login, and
-the server refuses to listen anywhere but `127.0.0.1`.
+photos) require a session cookie. Pages redirect to `/login?next=…`, the
+APIs (`/api/*`, `/books/api/*`, `/pokemon/api/*`) answer 401. Without any
+password there is no login, and the server refuses to listen anywhere but
+`127.0.0.1`.
+
+- **Users**: `APP_PASSWORD` is user `owner`, `APP_PASSWORD_<NAME>` adds
+  user `<name>` (a friend). The form asks only for the password, which says
+  who logs in (so two users can't share one); the logs name the user of
+  each request.
+- **The cookie** is `<user>.<expiry>.<signature>`, signed with the user's
+  current password and a key kept in the `app_secret` table: a restart
+  doesn't log anyone out, changing a password logs that user out.
+  `HttpOnly`, `SameSite=Strict` (no form posted from another site), and
+  `Secure` with `SECURE_COOKIES=1` (behind HTTPS).
+- **Wrong passwords**: after 5 from one client (its address, or the one a
+  proxy on the same machine forwards), 15 minutes of refusal, the right
+  password included.
+- **Private mode**: `PUBLIC_READS=0` puts every page and picture behind the
+  login, reads included (the deployed app); only `/login` and `/static`
+  stay open.
+- **Headers** (`common::web::headers`): a Content-Security-Policy (our
+  files, jsDelivr's scripts, TCGdex's thumbnails), `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy` on every answer.
+- Uploaded photos are read with limits (`common::photos`: 10,000 px a
+  side, 300 MB), the shipment PDFs with `lopdf` ≥ 0.42 (deep nesting
+  refused), and JSON put in a page goes through `filters::json_for_script`.
+  The tests: `backend/src/tests/security.rs`, `yugioh/src/tests/security.rs`.
 
 ## Maintenance commands
 
@@ -617,6 +639,21 @@ data no card links to (and old Django duplicates), in
 wished. Each collection lists its files in use (`yugioh::routes::used_card_pictures`,
 `pokemon::routes::images::used_files`); a picture deleted by mistake is just
 downloaded again. The server runs it daily, 15 minutes after it starts.
+
+`export-public` (`backend/src/commands/export.rs`, `common::export`) writes
+the **public copy**: static pages to put on the OVH hosting, where nothing
+runs. Each collection gives its section, with only what may be public:
+`yugioh::public` (the cards owned, no proxies or sold ones, identical
+copies on one tile, market estimates), `pokemon::public` (the copies
+owned, then the wishlist: language, variant, priority and today's price,
+not the maximum price nor the notes), `books::public` (title, authors,
+series, format). `common::export::write_site` writes `index.html`, a page
+per section (the same picture grid as the app, tiles without links),
+240 px copies of the pictures and the stylesheets; the pictures the app
+never downloaded are fetched first through its own picture routes. The
+folder is emptied at each export, and refused if it isn't an earlier
+export. `backend/src/tests/export.rs` checks that no seller, price paid,
+note, deck, tournament or budget gets in.
 
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one

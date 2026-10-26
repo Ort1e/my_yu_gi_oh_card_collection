@@ -2,7 +2,10 @@
 //! the pages render, the login guards the writes.
 
 mod auth;
+mod backup;
+mod export;
 mod pages;
+mod security;
 
 use std::ops::Deref;
 
@@ -30,7 +33,12 @@ impl TestApp {
 
     /// `password`: enable the login with this password.
     pub(crate) async fn with_password(password: Option<&str>) -> TestApp {
-        let t = common::testing::TestApp::new(crate::app, password).await;
+        TestApp::with_config(common::web::auth::AuthConfig::password(password)).await
+    }
+
+    /// With these users and settings (private mode, `Secure` cookies…).
+    pub(crate) async fn with_config(config: common::web::auth::AuthConfig) -> TestApp {
+        let t = common::testing::TestApp::with_config(crate::app, config).await;
         yugioh::testing::insert_card_data(&t).await;
         TestApp(t)
     }

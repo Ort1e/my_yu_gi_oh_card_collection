@@ -173,6 +173,7 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
         buy_date: date(shipment.paid),
         received_date: date(shipment.arrived),
         no_card_price: "0.00".to_string(),
+        refund: "0.00".to_string(),
     };
 
     if let Some(name) = shipment.counterparty {
@@ -311,8 +312,9 @@ pub async fn create(
     let mut tx = begin_write(&state.pool).await?;
     let seller_id = seller.find_or_create(&mut tx).await?;
     let lot_id: i64 = sqlx::query(
-        "INSERT INTO lot (lot_type, price, buy_date, received_date, seller_id, no_card_price)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO lot (lot_type, price, buy_date, received_date, seller_id, no_card_price,
+                          refund)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(lot.lot_type.code())
     .bind(Money(lot.price))
@@ -320,6 +322,7 @@ pub async fn create(
     .bind(lot.received_date.map(|d| d.to_string()))
     .bind(seller_id)
     .bind(Money(lot.no_card_price))
+    .bind(Money(lot.refund))
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();

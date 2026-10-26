@@ -92,7 +92,7 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
         available_debt: budget::available_debt(&data.budgets),
         // `</` can't appear in JSON numbers/our labels, but escape it anyway
         // since this is embedded in a <script>.
-        charts: charts.to_string().replace("</", "<\\/"),
+        charts: filters::json_for_script(&charts),
         value,
     })
 }

@@ -19,3 +19,6 @@ venv.bak/
 
 # pending shipment uploads (personal data)
 /uploads/
+
+# the public copy (backend export-public): written, then uploaded
+/public-export/

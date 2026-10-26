@@ -15,7 +15,7 @@ use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::AppState;
 
 /// Same file name as Django: cleaned name, spaces → underscores.
-fn file_name(en_name: &str) -> String {
+pub(crate) fn file_name(en_name: &str) -> String {
     let name = clean_card_name(en_name)
         .replace(' ', "_")
         .replace(['/', '\\'], "_");

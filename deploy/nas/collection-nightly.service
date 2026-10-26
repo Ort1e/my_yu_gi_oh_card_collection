@@ -1,0 +1,10 @@
+# The nightly job: backup, public copy and its upload, update of the app
+# (nightly.sh). Started by collection-nightly.timer; by hand:
+#   systemctl start collection-nightly
+[Unit]
+Description=Card and book collection (nightly: backup, public copy, update)
+RequiresMountsFor=/apps /Data1To /Data500
+
+[Service]
+Type=oneshot
+ExecStart=/apps/collection/deploy/nightly.sh

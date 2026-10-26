@@ -175,7 +175,7 @@ pub fn chart_json(data: &ValueData) -> String {
         "value": points.iter().map(|t| to_f64(t.value)).collect::<Vec<_>>(),
         "net_spent": points.iter().map(|t| to_f64(t.spent - t.sold)).collect::<Vec<_>>(),
     });
-    chart.to_string().replace("</", "<\\/")
+    crate::web::filters::json_for_script(&chart)
 }
 
 pub struct DeckLine {

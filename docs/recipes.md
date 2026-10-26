@@ -6,6 +6,7 @@ from the repo root.
 
 - [Daily workflow](#daily-workflow)
 - [Save your data to git](#save-your-data-to-git)
+- [Run the app on the NAS](#run-the-app-on-the-nas)
 - [Use the app from a phone](#use-the-app-from-a-phone)
 - [Add books](#add-books)
 - [Add a read-only page](#add-a-read-only-page)
@@ -65,7 +66,19 @@ If `data/app.db-wal` still exists after the server stopped (killed with
 Never delete or regenerate `data/app.db`: the importer only works on an
 empty DB, and the Django dump is older than your Rust-era changes.
 
+## Run the app on the NAS
+
+The app's home is the NAS (home network only), which also writes the
+public copy for the OVH hosting every night: everything is in
+[deploy/README.md](../deploy/README.md) (SSH, first install, moving the
+data, the nightly job, the OVH upload, backups to git). Once moved, the
+NAS's data is the live one: the computer's server runs on copies only.
+
 ## Use the app from a phone
+
+Once the app runs on the NAS, a phone on the home Wi-Fi opens
+`http://192.168.1.202:3000`: nothing below is needed. Before that, or for
+the development server:
 
 The phone talks to the server running on the PC, over the home Wi-Fi. By
 default the server only answers the PC itself (`127.0.0.1`).

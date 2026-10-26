@@ -1,0 +1,114 @@
+# Checks of every push to dev or main and of every pull request: the tests
+# never need the private data submodule, so it isn't checked out.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the toolchain of rust-toolchain.toml, with the checks' components
+      - run: rustup show active-toolchain && rustup component add clippy rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # accepted advisories: .cargo/audit.toml
+      - run: cargo audit
+
+  deck-builder:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # what ships in the bundle (chart.js); the build tools (Vite, Svelte 4)
+      # have dev-server advisories, fixed by moving to Vite 8 and Svelte 5
+      - run: npm audit --omit=dev --audit-level=high
+
+  # The app for the NAS (Netgear ReadyNAS: x86_64, Debian 8): static (musl,
+  # so its old libraries don't matter), with the deck builder and the
+  # stylesheets. Built only for main: on pull requests into it (to check)
+  # and on pushes to it; in parallel with the tests, with its own cache
+  # (only the first build compiles everything).
+  nas-build:
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+      - run: rustup target add x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: nas-musl
+          cache-on-failure: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: cargo build --release --locked -p backend --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          binary=target/x86_64-unknown-linux-musl/release/backend
+          # self-contained: Rust's musl builds are static-pie
+          file "$binary" | tee /dev/stderr | grep -qE "statically linked|static-pie linked"
+          mkdir -p dist/collection
+          cp "$binary" dist/collection/backend
+          cp -r static dist/collection/static
+          cp -r deploy/nas dist/collection/deploy
+          git rev-parse --short HEAD > dist/collection/VERSION
+          cp dist/collection/VERSION dist/VERSION
+          tar -czf dist/collection-nas.tar.gz -C dist collection
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nas-build
+          path: |
+            dist/collection-nas.tar.gz
+            dist/VERSION
+          retention-days: 7
+
+  # Published as the release `nas-latest` (which the NAS installs at night,
+  # deploy/nas/update.sh) from main only, once everything else is green.
+  nas-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [rust, audit, deck-builder, nas-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nas-build
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nas-latest
+          name: NAS build (latest main)
+          body: The app for the NAS, built from the latest main. Installed by deploy/nas/update.sh.
+          files: |
+            dist/collection-nas.tar.gz
+            dist/VERSION

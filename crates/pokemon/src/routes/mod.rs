@@ -294,7 +294,7 @@ impl CopyRow {
         }
     }
 
-    fn set_value(&mut self, prices: &HashMap<i64, VariantPrices>) {
+    pub(crate) fn set_value(&mut self, prices: &HashMap<i64, VariantPrices>) {
         if self.is_sold() {
             self.value = None;
             return;

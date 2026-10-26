@@ -57,6 +57,44 @@ pub async fn used_files(pool: &Pool) -> sqlx::Result<HashSet<String>> {
         .collect())
 }
 
+/// The picture shown for a copy in `language` and its print's name in the
+/// file name: the French print's for `fr` when there is one, else the card's
+/// own (TCGdex's, `base`) or a borrowed one (`other`).
+fn print_shown(
+    language: &str,
+    image: Option<String>,
+    image_fr: Option<String>,
+) -> Option<(String, &'static str)> {
+    match (language, image_fr) {
+        ("fr", Some(url)) => Some((url, "fr")),
+        (_, fr) => {
+            let url = image.or(fr)?;
+            let print = if url.starts_with(TCGDEX_ASSETS) {
+                "base"
+            } else {
+                "other"
+            };
+            Some((url, print))
+        }
+    }
+}
+
+/// The file of a copy's picture in the media folder
+/// (`pokemon_card_images/…`), once downloaded.
+pub fn picture_file(
+    catalogue: &str,
+    tcgdex_id: &str,
+    language: &str,
+    image: Option<String>,
+    image_fr: Option<String>,
+) -> Option<String> {
+    let (_, print) = print_shown(language, image, image_fr)?;
+    Some(format!(
+        "pokemon_card_images/{}",
+        file_name(catalogue, tcgdex_id, print)
+    ))
+}
+
 pub async fn card_image(
     State(state): State<AppState>,
     Path((card_id, language)): Path<(i64, String)>,
@@ -73,18 +111,7 @@ pub async fn card_image(
         (None, None, None) => cards::find_image(&state.pool, &state.http, card_id).await?,
         (image, ..) => image,
     };
-    let (url, print) = match (language.as_str(), image_fr) {
-        ("fr", Some(url)) => (url, "fr"),
-        (_, fr) => {
-            let url = image.or(fr).ok_or(AppError::NotFound)?;
-            let print = if url.starts_with(TCGDEX_ASSETS) {
-                "base"
-            } else {
-                "other"
-            };
-            (url, print)
-        }
-    };
+    let (url, print) = print_shown(&language, image, image_fr).ok_or(AppError::NotFound)?;
     let path = state
         .media_dir
         .join("pokemon_card_images")

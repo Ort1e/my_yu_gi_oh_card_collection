@@ -202,6 +202,20 @@ not a card line
 ";
 
     #[test]
+    fn deeply_nested_pdf_objects_are_refused_without_a_crash() {
+        // RUSTSEC-2026-0187: lopdf < 0.42 overflowed its stack on these
+        let depth = 100_000;
+        let mut pdf = b"%PDF-1.4\n1 0 obj\n".to_vec();
+        pdf.extend(std::iter::repeat_n(b'[', depth));
+        pdf.extend(std::iter::repeat_n(b']', depth));
+        pdf.extend(b"\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n");
+        assert_eq!(
+            parse_shipment_pdf(&pdf, "me").unwrap_err(),
+            ShipmentError::UnreadablePdf
+        );
+    }
+
+    #[test]
     fn parses_purchase() {
         let s = parse_shipment(PURCHASE, "me_account").unwrap();
         assert_eq!(s.lot_type, LotType::Purchase);

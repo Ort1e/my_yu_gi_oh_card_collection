@@ -10,6 +10,7 @@
 //! `testing::TestApp` (feature `test-support`).
 
 pub mod db;
+pub mod export;
 pub mod http;
 pub mod media;
 pub mod photos;
@@ -22,7 +23,7 @@ pub mod web;
 use std::path::PathBuf;
 
 use axum::http::{header, HeaderValue};
-use axum::middleware::from_fn_with_state;
+use axum::middleware::{from_fn_with_state, map_response};
 use axum::routing::{get, post};
 use axum::Router;
 use tower_http::services::ServeDir;
@@ -104,11 +105,25 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
         }
     }
 
-    // the login on the writes and the private reads (axum refuses a layer
-    // on a router without routes: a collection may have none of one kind)
+    // the login on the writes and the private reads, and in private mode
+    // (`PUBLIC_READS=0`) on every page and file but the login page and the
+    // CSS/JS (axum refuses a layer on a router without routes: a collection
+    // may have none of one kind)
+    let public_reads = state.auth.public_reads();
     let mut protected = write.merge(private);
+    if !public_reads {
+        protected = protected.merge(public);
+        public = Router::new();
+    }
     if protected.has_routes() {
         protected = protected.route_layer(login_required.clone());
+    }
+    if !public_reads && files.has_routes() {
+        files = files.route_layer(login_required.clone());
+    }
+    let mut media = Router::new().nest_service("/media", ServeDir::new(&state.media_dir));
+    if !public_reads {
+        media = media.layer(login_required.clone());
     }
 
     Router::new()
@@ -137,6 +152,7 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
                 HeaderValue::from_static("no-cache"),
             ),
         )
-        .nest_service("/media", ServeDir::new(&state.media_dir))
+        .merge(media)
+        .layer(map_response(web::headers::security))
         .with_state(state)
 }

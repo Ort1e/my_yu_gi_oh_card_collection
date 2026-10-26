@@ -1,0 +1,10 @@
+# Every night at 3:30 (and at the next boot if the NAS was off then).
+[Unit]
+Description=Card and book collection, every night
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

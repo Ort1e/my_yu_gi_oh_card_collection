@@ -29,6 +29,7 @@ struct LotRecord {
     buy_date: String,
     price: Money,
     no_card_price: Money,
+    refund: Money,
 }
 
 fn parse_date(s: &str) -> AppResult<NaiveDate> {
@@ -39,7 +40,8 @@ fn parse_date(s: &str) -> AppResult<NaiveDate> {
 impl BudgetData {
     pub async fn load(pool: &Pool) -> AppResult<BudgetData> {
         let lot_records: Vec<LotRecord> = sqlx::query_as(
-            "SELECT id, lot_type, is_cancelled, buy_date, price, no_card_price FROM lot ORDER BY id",
+            "SELECT id, lot_type, is_cancelled, buy_date, price, no_card_price, refund
+             FROM lot ORDER BY id",
         )
         .fetch_all(pool)
         .await?;
@@ -65,12 +67,15 @@ impl BudgetData {
                 .collect();
             let lot_type = LotType::from_code(&lot.lot_type)
                 .ok_or_else(|| AppError::Internal(format!("lot {}: bad lot_type", lot.id)))?;
+            // what the lot cost: the price paid, less what the seller gave
+            // back, in the lot's month
+            let cost = lot.price.0 - lot.refund.0;
             lots.push(LotSummary {
                 lot_type,
                 is_cancelled: lot.is_cancelled,
                 buy_date: parse_date(&lot.buy_date)?,
-                price: lot.price.0,
-                shipping_cost: shipping_cost(lot.price.0, lot.no_card_price.0, prices.clone()),
+                price: cost,
+                shipping_cost: shipping_cost(cost, lot.no_card_price.0, prices.clone()),
             });
             lot_unites.push((lot.id, prices));
         }

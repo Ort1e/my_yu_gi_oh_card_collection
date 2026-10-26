@@ -74,6 +74,15 @@ function localName(card, language) {
 }
 
 /** "Dragon à Trois Cornes (Tri-Horned Dragon)", or the English name alone. */
+/** Text from outside (ygoprodeck's names) made safe to put in HTML. */
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+}
+
 function names(card, language) {
     const local = localName(card, language);
 
@@ -295,11 +304,12 @@ function showRarities(pick) {
         const hint = known ? ` ${known.summary}` : '';
         const link = known ? ` <a href="/rarities#${rarityAnchor(known.name)}" target="_blank">guide</a>` : '';
 
-        return `<li><strong>${known?.name ?? name}</strong>:${hint}${link}</li>`;
+        return `<li><strong>${escapeHtml(known?.name ?? name)}</strong>:${hint}${link}</li>`;
     });
 
     const { card, language, prefix } = pick;
-    rarityHelp.innerHTML = `<p>${prefix}${card.number} ${names(card, language)} exists in ${rarities.length} rarities:</p><ul>${items.join('')}</ul>`;
+    const title = `${prefix}${card.number} ${names(card, language)}`;
+    rarityHelp.innerHTML = `<p>${escapeHtml(title)} exists in ${rarities.length} rarities:</p><ul>${items.join('')}</ul>`;
 }
 
 /** Briefly highlight a row that was just filled. */

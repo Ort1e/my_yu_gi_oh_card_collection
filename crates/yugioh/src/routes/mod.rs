@@ -6,7 +6,7 @@
 
 mod advent;
 mod budget;
-mod cards;
+pub(crate) mod cards;
 mod collection;
 mod dashboard;
 mod decks;

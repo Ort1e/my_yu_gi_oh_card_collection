@@ -1,0 +1,26 @@
+{% extends "export/base.html" %}
+
+{% block title %}{{ section.title }}{% endblock %}
+{% block body_class %}{{ section.body_class }}{% endblock %}
+
+{% block content %}
+<h1 class="card-title">{{ section.title }}</h1>
+<p>{{ section.summary }}</p>
+
+{% if tiles.is_empty() %}
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr>{% for heading in self.headings() %}<th{% if !loop.first %} class="text"{% endif %}>{{ heading }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in self.rows() %}
+      <tr>{% for cell in row %}<td{% if !loop.first %} class="text"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% else %}
+  {% include "partials/card_grid.html" %}
+{% endif %}
+{% endblock %}

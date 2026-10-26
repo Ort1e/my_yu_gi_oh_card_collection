@@ -11,6 +11,7 @@ mod decks;
 mod edit_forms;
 mod lots;
 mod rarity;
+mod security;
 mod tournaments;
 
 use std::ops::Deref;
