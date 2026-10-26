@@ -53,8 +53,7 @@ the app itself; the scripts run as root.
        User root
        IdentityFile ~/.ssh/nas_maison
        IdentitiesOnly yes
-       # faster: no Kerberos attempt, and one connection reused for 10 min
-       GSSAPIAuthentication no
+       # faster: one connection reused for 10 minutes
        ControlMaster auto
        ControlPath ~/.ssh/cm-%r@%h:%p
        ControlPersist 10m
