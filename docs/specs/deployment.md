@@ -2,8 +2,8 @@
 
 Status: **in progress** (2026-10-26). On `dev`: step 1 (CI,
 dependencies), step 2 (security items 1–9, with tests), step 3
-(`export-public`, `deploy/nas/upload-ovh.sh`: plain FTP, the free plan
-refusing FTP over TLS and its SFTP the login), step 4 (`deploy/`: the CI's
+(`export-public`, `deploy/nas/upload-ovh.sh`: SFTP, enabled by the owner
+and tested against the hosting), step 4 (`deploy/`: the CI's
 NAS build, `backup`, `fetch-release`, the scripts and `deploy/README.md`).
 Left: the protection of `main` (owner), the first install and the move
 (step 5, with the owner), the scans. GitHub settings are changed only

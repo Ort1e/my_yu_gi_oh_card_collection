@@ -6,9 +6,9 @@
 # EXPORT_DIR.uploaded (checksum and path of each file); delete it to upload
 # everything again.
 #
-# OVH_PROTOCOL=ftp (plain: the password travels unencrypted, what the free
-# plan accepts today) or sftp (once enabled in the OVH panel). Run by
-# nightly.sh, or by hand: sudo /apps/collection/deploy/upload-ovh.sh
+# OVH_PROTOCOL=sftp (enabled in the OVH panel, FTP-SSH tab: encrypted, the
+# NAS's own `sftp`) or ftp (plain: the password travels unencrypted). Run
+# by nightly.sh, or by hand: sudo /apps/collection/deploy/upload-ovh.sh
 set -euo pipefail
 # sort and comm must order alike, whatever the NAS's language
 export LC_ALL=C
@@ -36,37 +36,68 @@ touch "$uploaded"
 (cd "$EXPORT_DIR" && find . -type f ! -name .public-export | sed 's|^\./||' | sort |
     while IFS= read -r file; do sha256sum "$file"; done) > "$work/now"
 
-# curl for one file or one command; sftp checks the server's key in
-# root's known_hosts (add it once: ssh-keyscan OVH_HOST >> /root/.ssh/known_hosts)
-remote="$protocol://$OVH_HOST/"
-[ "$protocol" = sftp ] && remote="$protocol://$OVH_HOST/~/"
-send() {
-    curl -sS --fail --retry 3 --netrc-file "$work/netrc" --ftp-create-dirs \
-        -T "$EXPORT_DIR/$1" "$remote$OVH_DIR/$1"
-}
-remove() {
-    local command="DELE"
-    [ "$protocol" = sftp ] && command="rm"
-    curl -sS --fail --netrc-file "$work/netrc" -Q "$command $OVH_DIR/$1" "$remote" -o /dev/null
-}
-
-sent=0
-while IFS= read -r line; do
-    send "${line#*  }"
-    sent=$((sent + 1))
-done < <(comm -13 <(sort "$uploaded") <(sort "$work/now"))
-
-# the files no longer in the copy (in what was uploaded, not now)
+# the files new or changed, then the files no longer in the copy (in what
+# was uploaded, not now)
+comm -13 <(sort "$uploaded") <(sort "$work/now") | cut -c67- > "$work/send"
 cut -c67- "$uploaded" | sort > "$work/before.paths"
 cut -c67- "$work/now" | sort > "$work/now.paths"
-removed=0
-while IFS= read -r file; do
-    if remove "$file"; then
-        removed=$((removed + 1))
-    else
-        log "could not delete $file on the hosting"
-    fi
-done < <(comm -23 "$work/before.paths" "$work/now.paths")
+comm -23 "$work/before.paths" "$work/now.paths" > "$work/remove"
+sent=$(wc -l < "$work/send")
+removed=$(wc -l < "$work/remove")
+
+if [ "$protocol" = sftp ]; then
+    # one session for everything: the folders (an existing one is no
+    # error: `-`), the files, then the removals. `-o BatchMode=no` before
+    # `-b` (which turns it on; ssh keeps the first value), or the password
+    # is never tried. The password goes through
+    # SSH_ASKPASS (no sshpass on the NAS); the server's key must be in
+    # OVH_KNOWN_HOSTS (deploy/README.md).
+    known_hosts="${OVH_KNOWN_HOSTS:-$APP_DIR/ovh_known_hosts}"
+    [ -s "$known_hosts" ] || { log "no server key in $known_hosts (deploy/README.md)"; exit 1; }
+    {
+        path=""
+        for part in ${OVH_DIR//\// }; do
+            path="$path${path:+/}$part"
+            echo "-mkdir \"$path\""
+        done
+        while IFS= read -r file; do
+            dir=$(dirname "$file")
+            path=""
+            if [ "$dir" != . ]; then
+                for part in ${dir//\// }; do
+                    path="$path/$part"
+                    echo "-mkdir \"$OVH_DIR$path\""
+                done
+            fi
+        done < "$work/send" | awk '!seen[$0]++'
+        # readable by the web server, whatever the NAS's file modes
+        while IFS= read -r file; do
+            echo "put \"$EXPORT_DIR/$file\" \"$OVH_DIR/$file\""
+            echo "chmod 644 \"$OVH_DIR/$file\""
+        done < "$work/send"
+        while IFS= read -r file; do
+            echo "-rm \"$OVH_DIR/$file\""
+        done < "$work/remove"
+    } > "$work/batch"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$OVH_PASSWORD"\n' > "$work/askpass"
+    chmod 700 "$work/askpass"
+    SSH_ASKPASS="$work/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=none \
+        setsid -w sftp -o BatchMode=no -o PubkeyAuthentication=no \
+        -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=30 \
+        -b "$work/batch" "$OVH_USER@$OVH_HOST" < /dev/null > /dev/null \
+        2> >(grep -v 'remote mkdir' >&2)
+else
+    # plain FTP, one curl per file
+    while IFS= read -r file; do
+        curl -sS --fail --retry 3 --netrc-file "$work/netrc" --ftp-create-dirs \
+            -T "$EXPORT_DIR/$file" "ftp://$OVH_HOST/$OVH_DIR/$file"
+    done < "$work/send"
+    while IFS= read -r file; do
+        curl -sS --fail --netrc-file "$work/netrc" -Q "DELE $OVH_DIR/$file" \
+            "ftp://$OVH_HOST/" -o /dev/null ||
+            log "could not delete $file on the hosting"
+    done < "$work/remove"
+fi
 
 cp "$work/now" "$uploaded"
 log "uploaded to $OVH_HOST/$OVH_DIR: $sent files sent, $removed deleted"

@@ -50,6 +50,13 @@ if [ ! -f "$APP_DIR/nightly.env" ]; then
     echo "fill in $APP_DIR/nightly.env (OVH, GitHub token)"
 fi
 
+# the OVH SFTP server's key, the first time (compare the fingerprint
+# printed with deploy/README.md's)
+if [ ! -s "$APP_DIR/ovh_known_hosts" ]; then
+    ssh-keyscan -t ed25519 ftp.cluster129.hosting.ovh.net > "$APP_DIR/ovh_known_hosts" 2> /dev/null || true
+    echo "the OVH server's key: $(ssh-keygen -lf "$APP_DIR/ovh_known_hosts" 2> /dev/null | cut -d' ' -f2)"
+fi
+
 # the services
 cp "$APP_DIR"/deploy/collection.service "$APP_DIR"/deploy/collection-nightly.service \
     "$APP_DIR"/deploy/collection-nightly.timer /etc/systemd/system/

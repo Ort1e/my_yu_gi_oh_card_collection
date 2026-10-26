@@ -53,10 +53,21 @@ the app itself; the scripts run as root.
        User root
        IdentityFile ~/.ssh/nas_maison
        IdentitiesOnly yes
+       # faster: no Kerberos attempt, and one connection reused for 10 min
+       GSSAPIAuthentication no
+       ControlMaster auto
+       ControlPath ~/.ssh/cm-%r@%h:%p
+       ControlPersist 10m
    ```
 
 4. `ssh nas uname -m` answers `x86_64`. Then turn the SSH password login
    off in the admin page (the key is enough).
+5. **Slow logins** (several seconds, even for `ssh nas true`): the NAS's
+   SSH server looks your computer's name up in DNS. On the NAS, in
+   `/etc/ssh/sshd_config`, set `UseDNS no`, then `systemctl restart ssh`
+   (ReadyNAS may rewrite that file when SSH is turned off and on in its
+   admin page: set it again then). `ssh -v nas true` shows where it
+   waits.
 
 The scripts use the host `nas`; another name: `NAS=… deploy/pc/…`.
 
@@ -132,17 +143,20 @@ Each step runs even when the one before failed. To see what happened:
 `upload-ovh.sh` sends the copy into `OVH_DIR` (`www`: the folder the
 domain shows; for a subdomain like `collection.<domain>`, create it in the
 OVH panel, Multisite, pointing to a folder, and put that folder in
-`OVH_DIR`).
+`OVH_DIR`: the script creates it).
 
-- **Today: plain FTP** (`OVH_PROTOCOL=ftp`). The free plan refuses FTP over
-  TLS, and its SFTP refused the login (checked 2026-10-26): the password
-  travels unencrypted every night. What is on the hosting is public
-  anyway; the risk is someone changing the site. Use a password of its
-  own, used nowhere else.
-- **Better: SFTP.** In the OVH panel, the hosting's **FTP-SSH** tab: if the
-  user can have SFTP enabled, enable it, set `OVH_PROTOCOL=sftp`, and add the
-  server's key once on the NAS:
-  `ssh-keyscan ftp.cluster129.hosting.ovh.net >> /root/.ssh/known_hosts`.
+- **SFTP** (`OVH_PROTOCOL=sftp`, enabled in the OVH panel's FTP-SSH tab on
+  2026-10-26): encrypted, one `sftp` session for all the files (the NAS's
+  own `sftp`: its `curl` is too old for OVH's server), the password given
+  through `SSH_ASKPASS` (no `sshpass` on the NAS), every file made readable
+  by the web server (644). Tested against the hosting on 2026-10-26.
+- **The server's key** is checked: `install.sh` writes it into
+  `/apps/collection/ovh_known_hosts` and prints its fingerprint, which must
+  be `SHA256:xhieLplnoEvvl7+a8sq8wLCh/bvOQvQFIVewi+fK2og` (ED25519). If OVH
+  ever changes it, the upload stops: check the new one in the OVH
+  documentation before replacing the file.
+- **Plain FTP** (`OVH_PROTOCOL=ftp`) still works (`curl`), but the password
+  then travels unencrypted. The free plan refuses FTP over TLS.
 - Upload everything again (after cleaning the hosting by hand):
   `rm /Data1To/collection/public-export.uploaded`, then
   `systemctl start collection-nightly`.
