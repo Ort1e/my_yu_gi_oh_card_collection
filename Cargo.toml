@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["backend", "domain", "importer"]
+members = ["crates/*", "importer"]
 
 
 [workspace.dependencies]
@@ -25,7 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 
 # Domain logic (shared by backend / importer / maintenance commands)
-domain = { path = "domain" }
+domain = { path = "crates/domain" }
 regex = "1"
 base64 = "0.22"
 rust_decimal = { version = "1", features = ["serde-with-str"] }

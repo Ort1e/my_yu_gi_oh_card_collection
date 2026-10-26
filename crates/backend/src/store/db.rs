@@ -86,7 +86,7 @@ pub async fn init_pool() -> Pool {
         .await
         .expect("failed to connect to sqlite database");
 
-    sqlx::migrate!("../migrations")
+    sqlx::migrate!("../../migrations")
         .run(&pool)
         .await
         .expect("failed to run migrations");

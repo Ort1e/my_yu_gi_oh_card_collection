@@ -16,7 +16,7 @@ use rust_decimal::Decimal;
 use sqlx::Row;
 
 const ACCOUNT: &str = "0rtie";
-const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 #[tokio::test]
 #[ignore]

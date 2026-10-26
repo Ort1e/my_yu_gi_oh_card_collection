@@ -58,7 +58,7 @@ impl TestApp {
             .connect_with(options)
             .await
             .unwrap();
-        sqlx::migrate!("../migrations").run(&pool).await.unwrap();
+        sqlx::migrate!("../../migrations").run(&pool).await.unwrap();
         sqlx::query(
             "INSERT INTO seller_source (id, name) VALUES (1, 'Cardmarket');
              INSERT INTO card_data (id, en_name, ygopro_id, card_type, json_data)
