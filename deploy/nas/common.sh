@@ -22,5 +22,6 @@ log() {
 # A command of the app (`backup`, `export-public`, `fetch-release`…), as the
 # app's user, from its folder (it reads `static/` and `VERSION` there).
 app() {
-    (cd "$APP_DIR" && runuser -u "$APP_USER" -- "$APP_DIR/backend" "$@")
+    cd "$APP_DIR" || return
+    su -s /bin/sh "$APP_USER" -c 'cd "$1" && shift && exec "$@"' sh "$APP_DIR" "$APP_DIR/backend" "$@"
 }
