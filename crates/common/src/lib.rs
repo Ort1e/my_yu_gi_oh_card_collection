@@ -13,6 +13,7 @@ pub mod db;
 pub mod http;
 pub mod media;
 pub mod photos;
+pub mod schedule;
 pub mod sql;
 #[cfg(feature = "test-support")]
 pub mod testing;

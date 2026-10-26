@@ -28,6 +28,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use common::schedule;
 use sqlx::SqliteConnection;
 use yugioh_domain::card::{clean_card_name, normalize_card_name};
 use yugioh_domain::card_set::single_rarity;
@@ -84,16 +85,17 @@ pub async fn clean(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
 /// a day. New cards are already cleaned when they are saved; this catches the
 /// rest, mainly names ygoprodeck has translated since. Logs a summary.
 pub fn spawn_daily(state: AppState) {
-    tokio::spawn(async move {
-        tokio::time::sleep(DAILY_START_DELAY).await;
-        loop {
+    schedule::every(
+        state,
+        DAILY_START_DELAY,
+        DAILY_INTERVAL,
+        |state| async move {
             match run(&state, false).await {
                 Ok(report) => report.log(),
                 Err(e) => tracing::warn!("background clean-cards: {e:#}"),
             }
-            tokio::time::sleep(DAILY_INTERVAL).await;
-        }
-    });
+        },
+    );
 }
 
 const DAILY_START_DELAY: Duration = Duration::from_secs(5 * 60);

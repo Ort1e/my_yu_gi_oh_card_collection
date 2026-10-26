@@ -3,7 +3,7 @@
 //! Cardmarket's price guide (`store::prices::cardmarket`). The backend runs
 //! it with the Pokémon prices, by hand and every week ([`due`]).
 
-use chrono::NaiveDate;
+use common::schedule::is_due;
 
 use crate::store::db::today;
 use crate::store::prices::cardmarket;
@@ -40,11 +40,11 @@ const REFRESH_EVERY_DAYS: i64 = 7;
 
 /// Whether the last refresh is a week old (or there is none).
 pub async fn due(state: &AppState) -> sqlx::Result<bool> {
-    Ok(is_due(latest_refresh(&state.pool).await?, today()))
-}
-
-fn is_due(latest: Option<NaiveDate>, today: NaiveDate) -> bool {
-    latest.is_none_or(|latest| (today - latest).num_days() >= REFRESH_EVERY_DAYS)
+    Ok(is_due(
+        latest_refresh(&state.pool).await?,
+        REFRESH_EVERY_DAYS,
+        today(),
+    ))
 }
 
 #[cfg(test)]
@@ -54,14 +54,6 @@ mod tests {
     use super::*;
     use crate::store::prices::history::prices_by_date;
     use crate::tests::TestApp;
-
-    #[test]
-    fn refreshes_weekly() {
-        let d = |day| NaiveDate::from_ymd_opt(2026, 10, day).unwrap();
-        assert!(is_due(None, d(19)));
-        assert!(!is_due(Some(d(13)), d(19)));
-        assert!(is_due(Some(d(12)), d(19)));
-    }
 
     #[tokio::test]
     async fn cards_priced_today_are_not_asked_again() {
