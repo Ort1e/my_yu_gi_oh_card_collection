@@ -9,6 +9,7 @@ use crate::store::card_data::spawn_link_cards;
 use crate::store::cards::insert_lot_cards;
 use crate::store::db::{begin_write, exists};
 use crate::web::error::AppResult;
+use crate::web::card_rows::CardRows;
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
 

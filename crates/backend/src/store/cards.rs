@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
 use crate::store::db::Money;
-use crate::web::forms::NewCards;
+use crate::web::card_rows::NewCards;
 
 /// A deck zone and its join table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

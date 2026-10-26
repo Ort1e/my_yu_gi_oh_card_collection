@@ -81,16 +81,22 @@ fn encode(img: &DynamicImage) -> Result<Vec<u8>, PhotoError> {
     Ok(out)
 }
 
+/// A small PNG of `width` × `height`, for tests (here and in the
+/// collections' advent calendar tests).
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_png(width: u32, height: u32) -> Vec<u8> {
+    let img = DynamicImage::new_rgb8(width, height);
+    let mut out = Cursor::new(Vec::new());
+    img.write_to(&mut out, ImageFormat::Png).unwrap();
+    out.into_inner()
+}
+
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
-    /// A small PNG of `width` × `height`, for tests.
-    pub fn png(width: u32, height: u32) -> Vec<u8> {
-        let img = DynamicImage::new_rgb8(width, height);
-        let mut out = Cursor::new(Vec::new());
-        img.write_to(&mut out, ImageFormat::Png).unwrap();
-        out.into_inner()
+    fn png(width: u32, height: u32) -> Vec<u8> {
+        test_png(width, height)
     }
 
     fn size(jpeg: &[u8]) -> (u32, u32) {

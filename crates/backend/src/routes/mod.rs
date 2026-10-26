@@ -22,6 +22,21 @@ use axum::Router;
 
 use crate::AppState;
 
+/// Every route, by who may use them (assembled by `common::app`).
+pub fn all() -> common::Routes {
+    common::Routes {
+        public: router(),
+        write: write_router(),
+        private: private_router(),
+        files: files_router(),
+        private_media: vec![
+            "shipment_files",
+            "advent_calendar_photos",
+            "book_advent_calendar_photos",
+        ],
+    }
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(dashboard::index))

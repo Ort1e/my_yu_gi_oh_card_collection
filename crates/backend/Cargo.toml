@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = { path = "../common" }
 yugioh-domain = { workspace = true }
 books-domain = { workspace = true }
 pokemon-domain = { workspace = true }
@@ -39,5 +40,6 @@ sha2 = { workspace = true }
 image = { workspace = true }
 
 [dev-dependencies]
+common = { path = "../common", features = ["test-support"] }
 tower = { workspace = true, features = ["util"] }
 rust_decimal_macros = { workspace = true }

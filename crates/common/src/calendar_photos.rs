@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::store::photos::{self, PhotoError};
+use crate::photos::{self, PhotoError};
 use crate::web::error::{AppError, AppResult};
 
 /// An uploaded photo, checked and copied (CPU work done off the async

@@ -6,7 +6,7 @@ use axum::extract::multipart::MultipartError;
 use axum::extract::Multipart;
 use axum::response::{IntoResponse, Redirect, Response};
 
-use crate::store::calendar_photos::{self, Processed};
+use crate::calendar_photos::{self, Processed};
 use crate::web::error::{AppError, AppResult};
 
 /// A day's form as posted.

@@ -20,7 +20,7 @@ use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
 
-use crate::store::db::Pool;
+use crate::db::Pool;
 use crate::web::error::AppResult;
 use crate::AppState;
 

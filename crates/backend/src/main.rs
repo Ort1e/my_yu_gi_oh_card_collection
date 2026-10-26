@@ -7,33 +7,14 @@ mod web;
 
 use std::path::PathBuf;
 
-use axum::http::{header, HeaderValue};
-use axum::middleware::from_fn_with_state;
-use axum::routing::{get, post};
 use axum::Router;
 use commands::Command;
 use store::db;
-use tower_http::services::ServeDir;
-use tower_http::set_header::SetResponseHeader;
-use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::level_filters::LevelFilter;
-use tracing::Level;
 use tracing_subscriber::EnvFilter;
 use web::auth;
 
-/// Shared state handed to every handler.
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: db::Pool,
-    pub http: reqwest::Client,
-    /// Django's MEDIA_ROOT: card images and shipment files.
-    pub media_dir: PathBuf,
-    /// Shipment PDFs uploaded but not yet attached to a lot.
-    pub uploads_dir: PathBuf,
-    /// Our Cardmarket username, to tell purchases from sales in shipments.
-    pub cardmarket_account: String,
-    pub auth: auth::Auth,
-}
+pub use common::AppState;
 
 #[tokio::main]
 async fn main() {
@@ -122,52 +103,7 @@ async fn shutdown_signal() {
     }
 }
 
+/// The server: the routes of every collection, assembled by `common::app`.
 pub fn app(state: AppState) -> Router {
-    let login_required = from_fn_with_state(state.clone(), auth::require_login);
-    // personal files: the shipment PDFs (names, addresses) and the advent
-    // calendar photos, cards and books (handwritten notes)
-    let private_files = Router::new()
-        .nest_service(
-            "/media/shipment_files",
-            ServeDir::new(state.media_dir.join("shipment_files")),
-        )
-        .nest_service(
-            "/media/advent_calendar_photos",
-            ServeDir::new(state.media_dir.join("advent_calendar_photos")),
-        )
-        .nest_service(
-            "/media/book_advent_calendar_photos",
-            ServeDir::new(state.media_dir.join("book_advent_calendar_photos")),
-        )
-        .layer(login_required.clone());
-
-    Router::new()
-        .merge(routes::router())
-        .merge(routes::write_router().route_layer(login_required.clone()))
-        .merge(routes::private_router().route_layer(login_required))
-        .route("/login", get(auth::page).post(auth::login))
-        .route("/logout", post(auth::logout))
-        // One INFO line per page or API call: method, path, status and time.
-        // A layer only wraps the routes added before it, so the files below
-        // (card images, CSS, media) are not logged.
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                .on_response(DefaultOnResponse::new().level(Level::INFO)),
-        )
-        .merge(routes::files_router())
-        .merge(private_files)
-        // CSS and the deck builder bundle: `no-cache` makes browsers check for
-        // a newer file on each page load (a 304 when unchanged) instead of
-        // reusing a stale copy after an update.
-        .nest_service(
-            "/static",
-            SetResponseHeader::overriding(
-                ServeDir::new("static"),
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("no-cache"),
-            ),
-        )
-        .nest_service("/media", ServeDir::new(&state.media_dir))
-        .with_state(state)
+    common::app(state, vec![routes::all()])
 }

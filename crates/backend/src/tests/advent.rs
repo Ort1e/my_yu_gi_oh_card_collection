@@ -168,7 +168,7 @@ fn photo_of(t: &TestApp, day: i64) -> impl std::future::Future<Output = Option<S
 async fn a_day_gets_its_card_and_photo() {
     let t = TestApp::new().await;
     calendar(&t).await;
-    let png = crate::store::photos::tests::png(400, 300);
+    let png = common::photos::test_png(400, 300);
 
     // by code, with a photo
     let (status, location) = multipart(

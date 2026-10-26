@@ -99,14 +99,7 @@ impl CardFilter {
     }
 }
 
-/// `%text%` for LIKE, with `\` escaping the wildcards.
-pub fn like_pattern(text: &str) -> String {
-    let escaped = text
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_");
-    format!("%{escaped}%")
-}
+pub use common::sql::like_pattern;
 
 pub async fn card_types(pool: &crate::store::db::Pool) -> sqlx::Result<Vec<String>> {
     sqlx::query_scalar(
@@ -329,10 +322,5 @@ mod tests {
             "0.0,32.0 80.0,0.0 160.0,16.0"
         );
         assert_eq!(sparkline(&[2.0, 2.0]).unwrap(), "0.0,16.0 160.0,16.0");
-    }
-
-    #[test]
-    fn like_pattern_escapes_wildcards() {
-        assert_eq!(like_pattern("50%_off"), "%50\\%\\_off%");
     }
 }

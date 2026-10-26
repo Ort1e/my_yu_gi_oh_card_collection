@@ -1,0 +1,34 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+
+# What every collection uses: the app's state, the web plumbing (login,
+# errors, forms, pagination, template filters), the database (pool, Money,
+# migrations), photos, the base templates, and the test harness
+# (feature `test-support`).
+
+[features]
+test-support = ["dep:tower", "dep:tracing-subscriber"]
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+askama = { workspace = true }
+askama_axum = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rust_decimal = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+base64 = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+image = { workspace = true }
+tower = { workspace = true, features = ["util"], optional = true }
+tracing-subscriber = { workspace = true, optional = true }

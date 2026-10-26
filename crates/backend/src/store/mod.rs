@@ -4,14 +4,13 @@
 
 pub mod book_data;
 pub mod books;
-pub mod calendar_photos;
 pub mod card_data;
 pub mod cards;
-pub mod db;
 pub mod models;
-pub mod photos;
 pub mod pokemon;
 pub mod prices;
 pub mod shipment_files;
 pub mod tournaments;
 pub mod valuation;
+
+pub use common::{calendar_photos, db};

@@ -77,7 +77,7 @@ async fn a_day_gets_its_book_and_photo() {
                            "series": "The Farseer", "volume": 1}),
     )
     .await;
-    let png = crate::store::photos::tests::png(400, 300);
+    let png = common::photos::test_png(400, 300);
 
     // an ISBN not in the list: looked up and added
     let (status, location) = multipart(

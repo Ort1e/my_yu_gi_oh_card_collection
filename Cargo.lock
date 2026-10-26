@@ -211,6 +211,7 @@ dependencies = [
  "base64 0.22.1",
  "books-domain",
  "chrono",
+ "common",
  "common-domain",
  "dotenvy",
  "hmac",
@@ -385,6 +386,32 @@ dependencies = [
  "num-traits",
  "serde",
  "windows-link",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "askama_axum",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "hmac",
+ "image",
+ "rand 0.8.8",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "url",
 ]
 
 [[package]]

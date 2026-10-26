@@ -18,7 +18,8 @@ use crate::store::cards::insert_lot_cards;
 use crate::store::db::{begin_write, exists, Money};
 use crate::store::shipment_files::{self, pending_path, Attached};
 use crate::web::error::{AppError, AppResult};
-use crate::web::forms::{CardRowValues, FormData, Pairs};
+use crate::web::card_rows::{CardRowValues, CardRows};
+use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
 
 /// New-seller fields as typed.
