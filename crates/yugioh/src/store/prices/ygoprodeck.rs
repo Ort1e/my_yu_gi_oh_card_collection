@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 
-use crate::store::card_data::{throttle, API_URL};
+use crate::store::card_data::{API_URL, YGOPRODECK};
 use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};
 use crate::web::error::{AppError, AppResult};
 
@@ -112,7 +112,7 @@ async fn fetch_batch(http: &reqwest::Client, ids: &[i64]) -> AppResult<Value> {
     let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck prices: {e}"));
     let ids: Vec<String> = ids.iter().map(i64::to_string).collect();
 
-    throttle().await;
+    YGOPRODECK.wait().await;
     let response = http
         .get(API_URL)
         .query(&[("id", ids.join(","))])

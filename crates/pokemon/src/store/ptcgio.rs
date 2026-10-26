@@ -19,24 +19,16 @@ use pokemon_domain::fold_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
+use common::http::Throttle;
 use common::web::error::AppError;
 
 const BASE_URL: &str = "https://api.pokemontcg.io/v2";
 const IMAGES_URL: &str = "https://images.pokemontcg.io";
 const TIMEOUT: Duration = Duration::from_secs(20);
-const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1000);
+/// Without a key, and often busy: one request a second.
+static PTCGIO: Throttle = Throttle::new(Duration::from_millis(1000));
 const ATTEMPTS: u32 = 6;
 const SETS_KEPT: Duration = Duration::from_secs(24 * 3600);
-
-static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
-
-async fn throttle() {
-    let mut last = LAST_REQUEST.lock().await;
-    if let Some(at) = *last {
-        tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;
-    }
-    *last = Some(Instant::now());
-}
 
 fn error(why: impl std::fmt::Display) -> AppError {
     AppError::Internal(format!("Pokémon TCG API: {why}"))
@@ -50,7 +42,7 @@ async fn get(
 ) -> Result<Vec<Value>, AppError> {
     let mut why = String::new();
     for attempt in 1..=ATTEMPTS {
-        throttle().await;
+        PTCGIO.wait().await;
         let answer = http
             .get(format!("{BASE_URL}/{path}"))
             .query(query)

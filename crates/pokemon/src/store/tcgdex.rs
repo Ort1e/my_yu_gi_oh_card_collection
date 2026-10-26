@@ -1,35 +1,27 @@
 //! The [TCGdex API](https://tcgdex.dev): free, open source, no key. Every
 //! call of the app to TCGdex goes through here, one at a time with
-//! [`MIN_REQUEST_INTERVAL`] between them (it publishes no limit: be polite).
+//! [`TCGDEX`]'s interval between them.
 //!
 //! Its filters (`?name=`, `?abbreviation.official=`) match "contains,
 //! ignoring the case" (`eq:` would be exact but case-sensitive): callers
 //! keep the exact matches. Answers are reshaped in `pokemon_domain`.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use reqwest::StatusCode;
 use serde_json::Value;
 use tokio::sync::{Mutex, OnceCell};
 
+use common::http::Throttle;
 use common::web::error::AppError;
 
 const BASE_URL: &str = "https://api.tcgdex.net/v2";
 const TIMEOUT: Duration = Duration::from_secs(15);
-const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(100);
+/// TCGdex publishes no limit: be polite.
+static TCGDEX: Throttle = Throttle::new(Duration::from_millis(100));
 /// Name searches: the first results only.
 pub const SEARCH_LIMIT: usize = 60;
-
-static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
-
-async fn throttle() {
-    let mut last = LAST_REQUEST.lock().await;
-    if let Some(at) = *last {
-        tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;
-    }
-    *last = Some(Instant::now());
-}
 
 fn error(what: &str, why: impl std::fmt::Display) -> AppError {
     AppError::Internal(format!("TCGdex {what}: {why}"))
@@ -41,7 +33,7 @@ async fn get(
     path: &str,
     query: &[(&str, &str)],
 ) -> Result<Option<Value>, AppError> {
-    throttle().await;
+    TCGDEX.wait().await;
     let response = http
         .get(format!("{BASE_URL}/{path}"))
         .query(query)

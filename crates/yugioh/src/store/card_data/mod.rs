@@ -1,7 +1,7 @@
 //! `card_data` rows: reference data from the ygoprodeck API
 //! (Django: `CardData.get_or_fetch`, `ImageDownloader.get_card_data`).
 //!
-//! Every call to ygoprodeck goes through this module, `throttle()`d:
+//! Every call to ygoprodeck goes through this module, spaced by [`YGOPRODECK`]:
 //! - here: the client, and a card's data by name or ygopro id;
 //! - [`translations`]: card names in other languages (`card_translation`);
 //! - [`sets`]: the cards of a set (quick add, Cardmarket expansions);
@@ -15,31 +15,20 @@ pub use linking::spawn_link_cards;
 pub use sets::{fetch_set, fetch_set_infos, SetInfo};
 pub use translations::{plan_translations, Translation};
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::Value;
-use tokio::sync::Mutex;
 use yugioh_domain::card::clean_card_name;
 
 use crate::store::db::Pool;
 use crate::web::error::{AppError, AppResult};
+use common::http::Throttle;
 
 pub(crate) const API_URL: &str = "https://db.ygoprodeck.com/api/v7/cardinfo.php";
 pub(super) const SETS_URL: &str = "https://db.ygoprodeck.com/api/v7/cardsets.php";
 
 /// ygoprodeck allows 20 requests per second; stay well below.
-const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(60);
-static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
-
-/// Wait so that two API requests are at least `MIN_REQUEST_INTERVAL` apart.
-pub(crate) async fn throttle() {
-    let mut last = LAST_REQUEST.lock().await;
-    if let Some(at) = *last {
-        tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;
-    }
-    *last = Some(Instant::now());
-}
-
+pub(crate) static YGOPRODECK: Throttle = Throttle::new(Duration::from_millis(60));
 /// Find the `card_data` of a card by its English name, fetching and storing
 /// it from ygoprodeck when unknown. `Ok(None)` when the API doesn't know it.
 pub async fn get_or_fetch(
@@ -97,7 +86,7 @@ pub(super) async fn fetch(
     query: &[(&str, &str)],
 ) -> AppResult<Option<Value>> {
     let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
-    throttle().await;
+    YGOPRODECK.wait().await;
     let response = http
         .get(API_URL)
         .query(query)

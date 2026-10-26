@@ -10,7 +10,7 @@ use crate::store::db::Pool;
 use crate::web::error::{AppError, AppResult};
 
 use super::translations::remember_translation;
-use super::{throttle, API_URL, SETS_URL};
+use super::{API_URL, SETS_URL, YGOPRODECK};
 
 /// The ygoprodeck answers for one set prefix (`"RA05"`), for
 /// `yugioh_domain::card_set::set_cards`. Several sets can share a prefix: their
@@ -32,7 +32,7 @@ static SET_CACHE: Mutex<BTreeMap<String, FetchedSet>> = Mutex::const_new(BTreeMa
 
 /// Fetch every card of the sets whose code is `prefix`, `None` for an
 /// unknown prefix. Calls `cardsets.php`, then `cardinfo.php` in English and
-/// French for each matching set; `throttle()` before each request. Answers
+/// French for each matching set; `YGOPRODECK.wait()` before each request. Answers
 /// are cached ([`SET_CACHE`]), and the French names of a new fetch are
 /// remembered as translations (`card_translation`) for free.
 pub async fn fetch_set(
@@ -47,7 +47,7 @@ pub async fn fetch_set(
     }
 
     let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
-    throttle().await;
+    YGOPRODECK.wait().await;
     let sets: Value = http
         .get(SETS_URL)
         .send()
@@ -131,7 +131,7 @@ async fn fetch_set_cards(
     if let Some(language) = language {
         query.push(("language", language));
     }
-    throttle().await;
+    YGOPRODECK.wait().await;
     let response = http
         .get(API_URL)
         .query(&query)
@@ -169,7 +169,7 @@ pub async fn fetch_set_infos(
     }
 
     let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
-    throttle().await;
+    YGOPRODECK.wait().await;
     let sets: Value = http
         .get(SETS_URL)
         .send()

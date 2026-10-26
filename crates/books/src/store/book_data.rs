@@ -9,14 +9,14 @@
 //! so its failures are only logged. Parsing the answers is
 //! `books_domain::book`'s.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use books_domain::book::{self, BookInfo};
 use books_domain::isbn::Isbn;
 use serde_json::Value;
-use tokio::sync::Mutex;
 
 use common::db::{begin_write, today, Pool};
+use common::http::Throttle;
 use common::web::error::{AppError, AppResult};
 
 const OPEN_LIBRARY_URL: &str = "https://openlibrary.org/api/books";
@@ -29,17 +29,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 const RECHECK_MISSING_DAYS: i64 = 7;
 
 /// Books are added one at a time; this only keeps a burst polite.
-const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(250);
-static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
-
-async fn throttle() {
-    let mut last = LAST_REQUEST.lock().await;
-    if let Some(at) = *last {
-        tokio::time::sleep_until((at + MIN_REQUEST_INTERVAL).into()).await;
-    }
-    *last = Some(Instant::now());
-}
-
+static CATALOGUES: Throttle = Throttle::new(Duration::from_millis(250));
 /// What the catalogues know about an ISBN, `None` when nothing (or no
 /// title). Asks the network only when `book_data` has no fresh answer: call
 /// it **before** opening a write transaction.
@@ -131,7 +121,7 @@ async fn get_json(
     url: &str,
     query: &[(&str, &str)],
 ) -> Result<Value, String> {
-    throttle().await;
+    CATALOGUES.wait().await;
     let response = http
         .get(url)
         .query(query)
