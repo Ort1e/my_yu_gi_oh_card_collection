@@ -1,67 +1,72 @@
 # Spec: deployment, security and repository workflow
 
-Status: **plan, answers in** (2026-10-26). Steps 1 and 2 done on `dev`
-(CI, dependencies; security items 1–9 with their tests). Step 3: the
-export is done (`export-public`, about 21 MB; the Pokémon wishlist is
-public too, owner's request), the upload waits for the protocol the OVH
-plan offers (SFTP or FTP over TLS: its FTP-SSH tab). The NAS steps wait for its exact model (`uname -m`). GitHub
-settings are changed only after a go.
+Status: **in progress** (2026-10-26). On `dev`: step 1 (CI,
+dependencies), step 2 (security items 1–9, with tests), step 3
+(`export-public`, `deploy/nas/upload-ovh.sh`: plain FTP, the free plan
+refusing FTP over TLS and its SFTP the login), step 4 (`deploy/`: the CI's
+NAS build, `backup`, `fetch-release`, the scripts and `deploy/README.md`).
+Left: the protection of `main` (owner), the first install and the move
+(step 5, with the owner), the scans. GitHub settings are changed only
+after a go.
 
-## What we want
+## What we want (owner's answers, 2026-10-26)
 
-- The whole app, for the owner and one friend, from anywhere (phones too).
-- A **public, read-only view of the collection** to share with others:
-  the Yu-Gi-Oh! cards, the Pokémon cards and the books, **with their market
-  value** (owner, 2026-10-26). No lots, sellers, prices paid, budget,
-  decks, tournaments, advent calendars, and nothing that changes data.
-- The owner has a **NAS, always on**, and an **OVH domain name** with the
-  free hosting plan: 100 MB, 1 FTP access, free SSL, static files and PHP
-  only (no program of ours can run there).
+- The whole app for the owner and their friend, who live together:
+  **from the home network only** (computers, phones on the Wi-Fi). No
+  access from outside, so no VPN (Tailscale dropped).
+- A **public, read-only copy** to share with others: the Yu-Gi-Oh! cards,
+  the Pokémon cards and wishlist, the books, **with market values**. No
+  lots, sellers, prices paid, budget, decks, tournaments, advent calendars,
+  notes, and nothing that changes data.
+- The machines: a **Netgear ReadyNAS** (x86_64, 2 GB of memory, ReadyNAS OS
+  6.10.10 = Debian 8, kernel 4.4, `curl`, `sqlite3` and systemd, no `git`;
+  volumes `/Data1To` (also `/apps`, `/home`) and `/Data500`), always on,
+  not reachable from the internet; an **OVH domain name** with the free
+  hosting (100 MB, FTP, free SSL, static files and PHP only: no program of
+  ours can run there).
 
 ## The plan in one picture
 
 ```
- owner, friend (phones, laptops)            anyone
-        │ Tailscale (private network)          │ https://collection.<domain>
-        ▼                                      ▼
- ┌──────────── NAS ─────────────┐        OVH free hosting
- │ the app (all of it, login)    │  FTPS  (static files only:
- │ data/app.db + media (live)    │ ─────► cards grid + card pages,
- │ nightly: backup → data repo   │ nightly  small pictures)
- │          export → OVH         │
- └───────────────────────────────┘
+ owner, friend (home Wi-Fi)                    anyone
+        │ http://192.168.1.202:3000              │ https://collection.<domain>
+        ▼                                        ▼
+ ┌──────────────── NAS ─────────────────┐   OVH free hosting
+ │ /apps/collection       the app        │   (static files only:
+ │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
+ │ /Data500/…-backups     nightly copies  │    small pictures, ~21 MB)
+ │ nightly: backup, export + upload,     │
+ │          update of the app            │
+ └───────────────────────────────────────┘
+        ▲ the owner's computer: pulls the latest copy and commits it to
+          the private data repository (one script, weekly or at will)
 ```
 
-- **Nothing on the NAS is open to the internet**: no port forwarding. The
-  app is reached only through Tailscale (a private VPN, free for personal
-  use). The owner and the friend each install it; the owner shares the NAS
-  with the friend, who can reach the app and nothing else (Tailscale ACL).
-  HTTPS on the private name comes from Tailscale (`tailscale serve`).
-- **The public view is a static copy** written by the app (a new command,
-  `export-public`) and uploaded to the OVH hosting every night. There is no
-  server to attack, only files; the copy holds only what we choose to show.
-  About 650 Yu-Gi-Oh! and 60 Pokémon cards with small pictures (~25 KB
-  each) and the books (no pictures) fit well under 100 MB. Address:
-  `collection.<domain>` (the owner doesn't mind which).
+- **The app is reachable from the home network only**: plain HTTP on the
+  NAS's address, port 3000 (`BIND_ADDR=0.0.0.0:3000`). The box opens no
+  port to the NAS: with no more updates from Netgear, that is its main
+  protection. On the home Wi-Fi (WPA2/WPA3), HTTP is acceptable; the
+  cookie can't be `Secure` then (`SECURE_COOKIES=0`). **Private mode** stays
+  on (`PUBLIC_READS=0`): a guest on the Wi-Fi sees nothing without a
+  password. Two users: `APP_PASSWORD` (owner) and `APP_PASSWORD_<NAME>`.
+- **The public copy** is written by `export-public` and uploaded to the
+  OVH hosting every night: only files there, nothing to attack. Address:
+  `collection.<domain>`.
 
-The other option, exposing a read-only part of the app on the NAS through
-the domain (port forwarding + OVH DynHost, or a Cloudflare tunnel), means a
-program reachable by anyone and the NAS behind it: more risk and more
-work. Not recommended.
+## The data on the NAS
 
-## The data moves to the NAS
-
-Today `data/app.db` on the owner's computer is the live database,
-committed by hand. After the move:
-
-- the NAS holds the live `app.db` and `media/`; the local copy is only for
-  development (a scratch copy, never the live one);
-- every night the NAS makes a safe copy (`VACUUM INTO`, consistent while
-  the server runs), commits it with the new media and pushes to the private
-  data repository, with a deploy key that can push to that repository only;
-- before each update of the app: the same backup, then the update (the
-  migrations run at start). A restore is tested once, then after big
-  changes.
+- **Live**: `/Data1To/collection/app.db` and `media/` (the server's
+  `DATABASE_URL`, `MEDIA_DIR`), `uploads/`. The owner's computer keeps a copy
+  for development only, never the live one.
+- **Nightly copies** on the other volume (other disks): `backend backup
+  --to /Data500/collection-backups` writes `app-YYYY-MM-DD.db` (`VACUUM
+  INTO`: consistent while the server runs), mirrors `media/` and keeps the
+  last 14 days.
+- **To GitHub** (no `git` on the NAS, and installing packages on ReadyNAS
+  is risky): a script on the owner's computer copies the latest copy and
+  the media into the data submodule and commits them (`docs/recipes.md`).
+- **Before each update** of the app: the same backup; the migrations run at
+  start. A restore is tested once, then after big changes.
 
 ## Security work (code, on `dev`, each with tests)
 
@@ -94,11 +99,11 @@ committed by hand. After the move:
    `.cargo/audit.toml`: `rsa` (never built), `sqlx` 0.7 (Postgres/MySQL
    only). Later: sqlx 0.8; the deck builder's build tools (Vite 8,
    Svelte 5: dev-server advisories only, nothing in the bundle).
-10. **The NAS**: its admin page not exposed, automatic updates, Tailscale
-    ACL limited to the app's port, the passwords in its environment only
-    (never in git).
+10. **The NAS**: no port opened by the box, its admin page on the home
+    network only, the passwords in the service's settings file only (never
+    in git, readable by root only).
 11. **Once live**: a scan of the public site (testssl.sh, OWASP ZAP
-    baseline) and of the app over Tailscale (ZAP).
+    baseline) and of the app from the home network (ZAP).
 
 ## Repository: `dev` branch and protection
 
@@ -117,44 +122,26 @@ committed by hand. After the move:
 - The GitHub settings are changed by the owner, or by Claude with `gh`
   after a go (they change who can push what).
 
-## Steps (each one reviewed before the next)
-
-1. Repository: push `dev`, add the CI, then the protection of `main`.
-2. Security work 1–9 on `dev` (tests), merged into `main`.
-3. `export-public` + the FTPS upload; tried on a scratch copy, then the
-   first upload to OVH.
-4. The NAS: the app as a container or a single static binary for its CPU,
-   Tailscale, the nightly backup and export, the update procedure
-   (`docs/recipes.md`).
-5. The move: last local commit of the data, first start on the NAS, the
-   phones switched to the Tailscale address. The local server is no longer
-   started on `data/app.db`.
-6. The scans (11), then this spec moves into `docs/tour.md` / `recipes.md`
-   and is deleted.
-
 ## Updates of the app
 
-Automatic if simple (the owner prefers it, not mandatory): the CI builds
-the app for the NAS when `main` changes (a container image on GitHub's
-registry, or a binary), and the NAS checks for a new one every night,
-backs up, then restarts on it. Otherwise one command by hand.
+Automatic (the owner prefers it): when `main` changes, the CI builds the
+app for the NAS (x86_64, static: musl, so Debian 8's old libraries don't
+matter) with the deck builder and the stylesheets, and publishes it as a
+GitHub release (`nas-latest`). Every night the NAS asks for it (`curl`, a
+read-only token: the repository is private), and when it changed: backup,
+replace, restart. By hand: the same script.
 
-## The NAS: a Netgear ReadyNAS
+## Steps (each one reviewed before the next)
 
-A line Netgear has stopped (no more security updates), running ReadyNAS
-OS 6 (an older Debian with systemd); depending on the model, an ARM or an
-Intel processor. So:
-
-- the app runs as **one static binary** (Rust, musl: no library to
-  install, no Docker), built by the CI for the NAS's processor, started by
-  a systemd service, its data in a folder of a NAS share;
-- Tailscale also runs as its static binary (Tailscale's own packages
-  for ARM and x86);
-- the NAS stays **unreachable from the internet** (no port forwarding, its
-  admin page on the home network only): with no more updates, that is the
-  main protection.
-
-## Still open
-
-1. The exact model, or its processor: `uname -m` over SSH (`armv7l` or
-   `x86_64`), or System → Overview in its admin page.
+1. Repository: `dev`, the CI, the protection of `main` (owner). Done but
+   the protection.
+2. Security work 1–9 on `dev`, with tests. Done.
+3. `export-public` (done), then the upload to OVH (waits for the protocol).
+4. The NAS: the CI build and release, `backend backup`, the service
+   (`deploy/nas/`: systemd unit, settings file, nightly and update
+   scripts), the recipe in `docs/recipes.md`.
+5. The move: the server stopped on the computer, the data committed, then
+   copied to `/Data1To/collection/`, first start on the NAS, the phones and
+   computers on `http://192.168.1.202:3000`.
+6. The scans (11), then this spec moves into `docs/tour.md` / `recipes.md`
+   and is deleted.

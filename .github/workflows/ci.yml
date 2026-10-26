@@ -46,3 +46,46 @@ jobs:
       # what ships in the bundle (chart.js); the build tools (Vite, Svelte 4)
       # have dev-server advisories, fixed by moving to Vite 8 and Svelte 5
       - run: npm audit --omit=dev --audit-level=high
+
+  # The app for the NAS (Netgear ReadyNAS: x86_64, Debian 8): static (musl,
+  # so its old libraries don't matter), with the deck builder and the
+  # stylesheets. Built on every push; from main, published as the release
+  # `nas-latest`, which the NAS installs at night (deploy/nas/update.sh).
+  nas-build:
+    needs: [rust, deck-builder]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: cargo build --release --locked -p backend --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          binary=target/x86_64-unknown-linux-musl/release/backend
+          file "$binary" | grep -q "statically linked"
+          mkdir -p dist/collection
+          cp "$binary" dist/collection/backend
+          cp -r static dist/collection/static
+          cp -r deploy/nas dist/collection/deploy
+          git rev-parse --short HEAD > dist/collection/VERSION
+          cp dist/collection/VERSION dist/VERSION
+          tar -czf dist/collection-nas.tar.gz -C dist collection
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nas-latest
+          name: NAS build (latest main)
+          body: The app for the NAS, built from the latest main. Installed by deploy/nas/update.sh.
+          files: |
+            dist/collection-nas.tar.gz
+            dist/VERSION

@@ -1,0 +1,27 @@
+# The app, started at boot (ReadyNAS OS 6: systemd 215). Installed in
+# /etc/systemd/system by install.sh.
+[Unit]
+Description=Card and book collection (the app)
+After=network.target
+RequiresMountsFor=/apps /Data1To
+
+[Service]
+Type=simple
+User=collection
+Group=collection
+WorkingDirectory=/apps/collection
+EnvironmentFile=/apps/collection/collection.env
+ExecStart=/apps/collection/backend
+# Ctrl-C equivalent: the app closes the database cleanly
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=10
+# no more rights than it needs
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

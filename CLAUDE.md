@@ -61,6 +61,7 @@ Cargo workspace (`Cargo.toml`: `members = ["crates/*", "importer"]`), shared dep
 - **Don't pile files in one folder**: new code and templates go in the folder of their area (or a new one) in the crate of their collection; what two collections share goes in `common` (or a shared crate), never copied.
 - `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, one folder for every collection, embedded by both binaries (`sqlx::migrate!("../../migrations")` in `common::db`).
+- `deploy/` — the deployment (`deploy/README.md`): `nas/` (install, nightly job, update, OVH upload, systemd units, settings examples: the NAS = Netgear ReadyNAS x86_64, Debian 8, home network only; app in `/apps/collection`, data in `/Data1To/collection`, copies in `/Data500/collection-backups`), `pc/` (install on the NAS, move the data, pull its copies into the data submodule). The CI job `nas-build` makes the static (musl) build and the release `nas-latest`.
 - `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte` with their own `<style>`, `api.js` = HTTP client, `deck.js` = pure helpers).
 - `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): **`app.db` (the live database, tracked)**, `media/card_images/`, `media/shipment_files/`, and the Django leftovers `data.json` (dump `app.db` was imported from) and `db.sqlite3` (Django DB). Its `.gitignore` excludes `*.db-wal`/`-shm`/`-journal`.
 
@@ -82,6 +83,8 @@ cargo run -p backend -- clean-cards           # normalise names, relink card dat
 cargo run -p backend -- import-tournament-notes <file.json>   # one-off: the tournaments' old notes, transcribed, as rounds and games (--dry-run)
 cargo run -p backend -- refresh-prices        # today's market prices: ygoprodeck into card_price, then Cardmarket's price guide (links, prices), then the Pokémon cards from TCGdex (--dry-run); the server does it weekly by itself
 cargo run -p backend -- export-public         # the public copy (static pages: Yu-Gi-Oh! and Pokémon cards, Pokémon wishlist, books, market values; nothing else) into public-export/ (--out DIR), for the OVH hosting: common::export + each crate's public section
+cargo run -p backend -- backup --to DIR      # consistent copy while the server runs: DIR/app-DATE.db (VACUUM INTO), media mirrored, --keep 14 days (the NAS runs it nightly)
+backend fetch-release --to DIR                # on the NAS only: downloads the CI's `nas-latest` build when new (GITHUB_TOKEN, GITHUB_REPO; deploy/nas/update.sh)
 cargo run -p backend -- clean-pictures        # delete the cached card pictures (media/card_images, media/pokemon_card_images) no card uses any more (--dry-run); the server does it daily
 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)
