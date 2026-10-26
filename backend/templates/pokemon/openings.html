@@ -22,6 +22,7 @@
   <thead>
     <tr>
       <th data-sort="text">Opened on</th>
+      <th data-sort="text" class="text">Code</th>
       <th data-sort="text" class="text">Set</th>
       <th data-sort="text" class="text">Language</th>
       <th data-sort="number">Cards</th>
@@ -33,6 +34,7 @@
     {% for row in openings %}
     <tr>
       <td><a href="/pokemon/openings/{{ row.opening.id }}">{% match row.opening.opened_on %}{% when Some with (date) %}{{ date }}{% when None %}No date{% endmatch %}</a></td>
+      <td class="text">{{ row.opening.set_code }}</td>
       <td class="text">{{ row.opening.set_name }}</td>
       <td class="text">{{ row.opening.language }}</td>
       <td>{{ row.opening.cards }}</td>

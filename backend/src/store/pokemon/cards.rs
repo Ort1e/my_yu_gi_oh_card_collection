@@ -251,7 +251,11 @@ pub async fn find_image(
     let found = match found {
         Ok(found) => found,
         Err(e) => {
-            tracing::warn!("{e}");
+            // an outside service down, not the app's error: said so
+            tracing::warn!(
+                card_id,
+                "no picture for now, tried again in an hour: {e} (the Pokémon TCG API often fails)"
+            );
             FAILED.lock().await.push((card_id, Instant::now()));
             return Ok(None);
         }

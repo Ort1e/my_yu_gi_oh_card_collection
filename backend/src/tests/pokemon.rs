@@ -644,6 +644,10 @@ async fn openings_are_listed_and_grow() {
     let (status, page) = t.get("/pokemon/openings").await;
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("Booster openings (1)") && page.contains("Fable Nébuleuse"));
+    assert!(
+        page.contains(r#"<td class="text">FNE</td>"#),
+        "the set code"
+    );
     assert!(page.contains("<td>34.43</td>"), "{page}");
 
     // a forgotten card, by number: the form is the opening's

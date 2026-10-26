@@ -489,9 +489,13 @@ API](https://pokemontcg.io) for the same print, once (`store/pokemon/ptcgio.rs`,
 number, else by name and artist (it numbers a reprint like the card it
 reprints: 33). Saved in `image` (a full URL) with `image_from =
 'pokemontcg:<id>'`; `''` = it has none (asked again at the monthly card
-refresh). That service is being replaced by a paid one and answers 500 or
-502 now and then: calls are spaced and retried, a failure is not saved and
-the card is tried again an hour later. Never another print's picture (an
+refresh). That service is being replaced by a paid one and its API answers 500 or
+502 to about half the requests, while its image server is reliable: the
+picture is first taken straight from the image server when the set id and
+number are TCGdex's (`swsh10tg/TG29_hires.png`); the API is asked only
+otherwise (a reprint, another set id), each request tried up to 6 times,
+its set list kept a day. A failure is a warning ("no picture for now"), not
+saved: the card is tried again an hour later. Never another print's picture (an
 earlier version borrowed one by name: often another artwork; 0015 cleared
 them).
 

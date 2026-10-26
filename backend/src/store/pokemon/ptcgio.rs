@@ -4,8 +4,13 @@
 //! looked up by set and number, or by name and artist for a reprint (it
 //! numbers those by the card they reprint: 33 for Pikachu & Zekrom-GX).
 //!
-//! The service is being replaced by a paid one (Scrydex) and answers 500
-//! now and then: calls are spaced out and retried, and a failure is not
+//! The service is being replaced by a paid one (Scrydex) and its API
+//! answers 500 or 502 to about half the requests (checked 2026-10-26),
+//! while its image server is reliable. So the picture is first taken
+//! straight from the image server when the set's id and the number are
+//! the same as TCGdex's (`swsh10tg/TG29`, `swshp/SWSH282`); the API is only
+//! asked otherwise (a reprint, another set id), each request retried up to
+//! [`ATTEMPTS`] times, the set list kept a day. A failure is not
 //! remembered as "no picture" (`cards::find_image` tries again later).
 
 use std::time::{Duration, Instant};
@@ -17,9 +22,11 @@ use tokio::sync::Mutex;
 use crate::web::error::AppError;
 
 const BASE_URL: &str = "https://api.pokemontcg.io/v2";
+const IMAGES_URL: &str = "https://images.pokemontcg.io";
 const TIMEOUT: Duration = Duration::from_secs(20);
 const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1000);
-const ATTEMPTS: u32 = 3;
+const ATTEMPTS: u32 = 6;
+const SETS_KEPT: Duration = Duration::from_secs(24 * 3600);
 
 static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::const_new(None);
 
@@ -61,9 +68,50 @@ async fn get(
             Ok(response) => why = format!("HTTP {}", response.status()),
             Err(e) => why = e.to_string(),
         }
-        tokio::time::sleep(Duration::from_secs(u64::from(attempt) * 2)).await;
+        if attempt < ATTEMPTS {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
-    Err(error(why))
+    Err(error(format!("{why} ({ATTEMPTS} tries)")))
+}
+
+/// The API's sets (id, name, code, size), asked once a day.
+async fn sets(http: &reqwest::Client) -> Result<Vec<Value>, AppError> {
+    static SETS: Mutex<Option<(Instant, Vec<Value>)>> = Mutex::const_new(None);
+    let mut known = SETS.lock().await;
+    if let Some((at, sets)) = known.as_ref() {
+        if at.elapsed() < SETS_KEPT {
+            return Ok(sets.clone());
+        }
+    }
+    let sets = get(
+        http,
+        "sets",
+        &[
+            ("select", "id,name,ptcgoCode,printedTotal,total"),
+            ("pageSize", "250"),
+        ],
+    )
+    .await?;
+    *known = Some((Instant::now(), sets.clone()));
+    Ok(sets)
+}
+
+/// The image server's picture at TCGdex's set id and number, written its
+/// way (`swsh10tg/TG29_hires.png`), when it exists: `(id, URL)`.
+async fn picture_at_same_place(
+    http: &reqwest::Client,
+    wanted: &Wanted<'_>,
+) -> Option<(String, String)> {
+    let set = their_set_id(wanted.set_id);
+    let number = wanted.number.trim_start_matches('0');
+    let url = format!("{IMAGES_URL}/{set}/{number}_hires.png");
+    let response = http.head(&url).timeout(TIMEOUT).send().await.ok()?;
+    let is_png = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .is_some_and(|t| t.as_bytes().starts_with(b"image/"));
+    (response.status().is_success() && is_png).then(|| (format!("{set}-{number}"), url))
 }
 
 /// What is known of the card whose picture is wanted (TCGdex's English
@@ -86,16 +134,11 @@ pub async fn find(
     http: &reqwest::Client,
     wanted: &Wanted<'_>,
 ) -> Result<Option<(String, String)>, AppError> {
-    let sets = get(
-        http,
-        "sets",
-        &[
-            ("select", "id,name,ptcgoCode,printedTotal,total"),
-            ("pageSize", "250"),
-        ],
-    )
-    .await?;
+    if let Some(found) = picture_at_same_place(http, wanted).await {
+        return Ok(Some(found));
+    }
 
+    let sets = sets(http).await?;
     for set_id in matching_sets(&sets, wanted) {
         let number = wanted.number.trim_start_matches('0');
         let by_number = get(
