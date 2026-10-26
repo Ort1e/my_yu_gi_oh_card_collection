@@ -13,6 +13,7 @@ test-support = ["common/test-support"]
 
 [dependencies]
 common = { path = "../common" }
+advent = { path = "../advent" }
 common-domain = { workspace = true }
 yugioh-domain = { workspace = true }
 axum = { workspace = true }

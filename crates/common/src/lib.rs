@@ -9,7 +9,6 @@
 //! them all to [`app`], and each crate's tests give theirs to
 //! `testing::TestApp` (feature `test-support`).
 
-pub mod calendar_photos;
 pub mod db;
 pub mod photos;
 pub mod sql;
@@ -59,6 +58,21 @@ pub struct Routes {
     /// Folders of `media/` with personal files, served behind the login at
     /// `/media/<folder>` (shipment PDFs, advent calendar photos).
     pub private_media: Vec<&'static str>,
+}
+
+impl Routes {
+    /// These routes and `other`'s (a collection's and its advent calendars').
+    pub fn merge(self, other: Routes) -> Routes {
+        let mut private_media = self.private_media;
+        private_media.extend(other.private_media);
+        Routes {
+            public: self.public.merge(other.public),
+            write: self.write.merge(other.write),
+            private: self.private.merge(other.private),
+            files: self.files.merge(other.files),
+            private_media,
+        }
+    }
 }
 
 /// The server: every collection's routes, the login (`/login`, `/logout`

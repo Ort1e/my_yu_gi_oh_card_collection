@@ -1,0 +1,7 @@
+<a class="advent-card advent-book" href="/books/{{ book_id }}">
+  <span class="advent-card-text">
+    <strong>{{ title }}</strong>
+    {% if !self.authors_text().is_empty() %}<span>{{ self.authors_text() }}</span>{% endif %}
+    {% if !self.series_text().is_empty() %}<span class="advent-card-meta">{{ self.series_text() }}</span>{% endif %}
+  </span>
+</a>

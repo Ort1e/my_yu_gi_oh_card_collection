@@ -10,4 +10,4 @@ pub mod shipment_files;
 pub mod tournaments;
 pub mod valuation;
 
-pub use common::{calendar_photos, db};
+pub use common::db;

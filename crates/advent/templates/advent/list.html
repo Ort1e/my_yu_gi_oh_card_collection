@@ -1,7 +1,7 @@
 {% extends "list_base.html" %}
 
-{% block body_class %}books{% endblock %}
-{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+{% block body_class %}{{ spec.section }}{% endblock %}
+{% block nav %}{% if spec.section == "books" %}{% include "partials/books_nav.html" %}{% else %}{% include "partials/yugioh_nav.html" %}{% endif %}{% endblock %}
 
 {% block items %}
   {% if calendars.is_empty() %}
@@ -9,13 +9,13 @@
   {% else %}
     <div class="card-list">
       {% for calendar in calendars %}
-      <a href="/books/advent-calendar/{{ calendar.year }}" class="card-link">
+      <a href="{{ spec.base }}/{{ calendar.year }}" class="card-link">
         <div class="card with-image">
           {% match calendar.photo %}{% when Some with (photo) %}
           <img src="/media/{{ photo }}" alt="" class="card-photo" loading="lazy">
           {% when None %}{% endmatch %}
           <div class="card-content">
-            <div class="card-title">Book advent calendar {{ calendar.year }}</div>
+            <div class="card-title">{{ spec.name }} {{ calendar.year }}</div>
             <div class="card-meta-line">
               <div>{{ calendar.days }} / 24 days filled</div>
             </div>
@@ -28,5 +28,5 @@
 {% endblock %}
 
 {% block add_button %}
-  <a href="/books/advent-calendar/add" title="Add calendar" class="btn floating-button top">Add calendar</a>
+  <a href="{{ spec.base }}/add" title="Add calendar" class="btn floating-button top">Add calendar</a>
 {% endblock %}

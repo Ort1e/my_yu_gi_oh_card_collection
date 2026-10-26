@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Advent calendar {{ year }}{% endblock %}
+{% block title %}{{ spec.name }} {{ year }}{% endblock %}
+{% block body_class %}{{ spec.section }}{% endblock %}
+{% block nav %}{% if spec.section == "books" %}{% include "partials/books_nav.html" %}{% else %}{% include "partials/yugioh_nav.html" %}{% endif %}{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
@@ -8,15 +10,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="inside-container advent" id="advent" data-year="{{ year }}">
-  <h1>Advent calendar {{ year }}</h1>
+<div class="inside-container advent" id="advent" data-year="{{ year }}" data-storage-key="{{ self.storage_key() }}">
+  <h1>{{ spec.name }} {{ year }}</h1>
 
   <div class="advent-toolbar">
-    <a href="/advent-calendar/{{ year }}/edit" class="btn">Edit this calendar</a>
-    {% match lot_id %}{% when Some with (lot) %}<a href="/lots/{{ lot }}" class="btn btn-secondary">Its lot</a>{% when None %}{% endmatch %}
+    <a href="{{ spec.base }}/{{ year }}/edit" class="btn">Edit this calendar</a>
+    {{ toolbar|safe }}
     <button type="button" id="advent-open-all" class="btn-secondary">Open every door</button>
     <button type="button" id="advent-close-all" class="btn-secondary">Close them again</button>
-    <small>{{ self.card_count() }} cards behind the doors. Click a door to open it, a photo to see it large.</small>
+    <small>{{ self.item_count() }} {{ spec.items }} behind the doors. Click a door to open it, a photo to see it large.</small>
   </div>
 
   <div class="advent-grid">
@@ -30,19 +32,7 @@
           <img src="/media/{{ photo }}" alt="Day {{ door.day }}" loading="lazy">
         </button>
         {% when None %}{% endmatch %}
-        <a class="advent-card" href="/cards/{{ e.card_id }}">
-          {% match e.card_data_id %}{% when Some with (data_id) %}
-          <img src="/card-image/{{ data_id }}" alt="{{ e.name }}" loading="lazy">
-          {% when None %}{% endmatch %}
-          <span class="advent-card-text">
-            <strong>{{ e.name }}</strong>
-            {% match e.english_name() %}{% when Some with (english) %}<span class="english-name">{{ english }}</span>{% when None %}{% endmatch %}
-            <span class="advent-card-meta">
-              {{ e.code.as_deref().unwrap_or("") }}
-              {% match e.rarity %}{% when Some with (rarity) %}<span class="rarity-badge">{{ rarity }}</span>{% when None %}{% endmatch %}
-            </span>
-          </span>
-        </a>
+        {{ e.door|safe }}
       </div>
       <button type="button" class="door-front" aria-label="Open day {{ door.day }}">
         <span class="door-number">{{ door.day }}</span>

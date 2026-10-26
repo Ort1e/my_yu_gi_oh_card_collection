@@ -1,0 +1,16 @@
+<div class="advent-lot">
+  {% match lot_id %}
+  {% when Some with (lot) %}
+    <p>
+      <strong>Its lot:</strong> <a href="/lots/{{ lot }}">lot {{ lot }}</a>: add the calendar's cards there
+      (the quick add takes a set code and numbers).
+      {% if free_cards == 0 %}Every card of the lot is behind a door.{% else %}Its {{ free_cards }} cards not behind a door yet are suggested in the card fields.{% endif %}
+    </p>
+  {% when None %}
+    <form method="post" action="/advent-calendar/{{ year }}/lot" class="inline">
+      <span>No dedicated lot for this calendar.</span>
+      <button type="submit" class="btn-secondary">Create its lot</button>
+      <small>A gift lot (0 €, December 1st): add the cards there, they are then suggested for the days.</small>
+    </form>
+  {% endmatch %}
+</div>

@@ -14,7 +14,6 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
-use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::Router;
 use common::{AppState, Routes};
@@ -29,16 +28,7 @@ pub fn routes() -> Routes {
             .route("/books/authors/:id", get(routes::authors::detail))
             .route("/books/series", get(routes::series::list))
             .route("/books/series/:id", get(routes::series::detail)),
-        private: Router::new()
-            .route("/books/advent-calendar", get(routes::advent::list))
-            .route(
-                "/books/advent-calendar/:year",
-                get(routes::advent::calendar),
-            )
-            .route(
-                "/books/advent-calendar/:year/edit",
-                get(routes::advent::form::edit_page),
-            ),
+        private: Router::new(),
         write: Router::new()
             .route(
                 "/books/add",
@@ -49,26 +39,11 @@ pub fn routes() -> Routes {
                 get(routes::form::edit_page).post(routes::form::update),
             )
             .route("/books/:id/delete", post(routes::form::delete))
-            .route("/books/api/isbn/:isbn", get(routes::api::isbn))
-            .route(
-                "/books/advent-calendar/add",
-                get(routes::advent::form::add_page).post(routes::advent::form::create),
-            )
-            .route(
-                "/books/advent-calendar/:year/days/:day",
-                post(routes::advent::form::save_day).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
-            )
-            .route(
-                "/books/advent-calendar/:year/days/:day/rotate",
-                post(routes::advent::form::rotate),
-            )
-            .route(
-                "/books/advent-calendar/:year/days/:day/delete",
-                post(routes::advent::form::remove_day),
-            ),
+            .route("/books/api/isbn/:isbn", get(routes::api::isbn)),
         files: Router::new(),
-        private_media: vec!["book_advent_calendar_photos"],
+        private_media: Vec::new(),
     }
+    .merge(advent::routes::<routes::advent::Books>())
 }
 
 /// The server with the book collection only (its tests).

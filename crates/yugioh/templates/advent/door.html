@@ -1,0 +1,13 @@
+<a class="advent-card" href="/cards/{{ card_id }}">
+  {% match card_data_id %}{% when Some with (data_id) %}
+  <img src="/card-image/{{ data_id }}" alt="{{ name }}" loading="lazy">
+  {% when None %}{% endmatch %}
+  <span class="advent-card-text">
+    <strong>{{ name }}</strong>
+    {% match self.english_name() %}{% when Some with (english) %}<span class="english-name">{{ english }}</span>{% when None %}{% endmatch %}
+    <span class="advent-card-meta">
+      {{ code.as_deref().unwrap_or("") }}
+      {% match rarity %}{% when Some with (rarity) %}<span class="rarity-badge">{{ rarity }}</span>{% when None %}{% endmatch %}
+    </span>
+  </span>
+</a>

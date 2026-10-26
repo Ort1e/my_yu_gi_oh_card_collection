@@ -3,14 +3,14 @@
 //! `book_advent_calendar_photos`), then one per year.
 //!
 //! `<folder>/<year>/03-ab12cd34.jpg` is the copy shown on the pages (upright,
-//! resized, no metadata: `store::photos`), `<folder>/<year>/originals/03-ab12cd34.png`
+//! resized, no metadata: `common::photos`), `<folder>/<year>/originals/03-ab12cd34.png`
 //! the photo as uploaded. Each save writes new file names, so browsers never
 //! show an old photo from their cache, and deletes the previous files.
 
 use std::path::{Path, PathBuf};
 
-use crate::photos::{self, PhotoError};
-use crate::web::error::{AppError, AppResult};
+use common::photos::{self, PhotoError};
+use common::web::error::{AppError, AppResult};
 
 /// An uploaded photo, checked and copied (CPU work done off the async
 /// threads), not written yet.

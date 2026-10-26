@@ -1,0 +1,22 @@
+[package]
+name = "advent"
+version = "0.1.0"
+edition = "2021"
+
+# The advent calendars, one engine for every collection: the pages, the day
+# form and the photo files. Each collection says what is behind a door
+# (`Calendar`).
+
+[dependencies]
+common = { path = "../common" }
+axum = { workspace = true }
+tokio = { workspace = true }
+askama = { workspace = true }
+askama_axum = { workspace = true }
+sqlx = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+common = { path = "../common", features = ["test-support"] }

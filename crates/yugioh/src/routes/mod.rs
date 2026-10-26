@@ -1,7 +1,8 @@
 //! One folder per area of the app: `mod.rs` has its pages (list, detail),
 //! `form.rs` its create/edit forms. Read-only routes go in `router()`, every
-//! write route in `write_router()` (behind the login), and the few private
-//! reads in `private_router()` (behind the login too).
+//! write route in `write_router()` (behind the login). The advent calendars
+//! (private) come from the `advent` crate (`advent/` says what is behind
+//! their doors).
 
 mod advent;
 mod budget;
@@ -25,10 +26,11 @@ pub fn all() -> common::Routes {
     common::Routes {
         public: router(),
         write: write_router(),
-        private: private_router(),
+        private: Router::new(),
         files: files_router(),
-        private_media: vec!["shipment_files", "advent_calendar_photos"],
+        private_media: vec!["shipment_files"],
     }
+    .merge(::advent::routes::<advent::Cards>())
 }
 
 pub fn router() -> Router<AppState> {
@@ -73,36 +75,11 @@ pub fn files_router() -> Router<AppState> {
     Router::new().route("/card-image/:card_data_id", get(cards::images::card_image))
 }
 
-/// Pages that only read but are private (personal content): behind the login
-/// like the write routes. Their files too (see `main::app`).
-pub fn private_router() -> Router<AppState> {
-    Router::new()
-        .route("/advent-calendar", get(advent::list))
-        .route("/advent-calendar/:year", get(advent::calendar))
-        .route("/advent-calendar/:year/edit", get(advent::form::edit_page))
-}
-
 /// Every route that changes data. Kept apart so a login layer can be added
 /// here in one place (see CLAUDE.md, "Auth").
 pub fn write_router() -> Router<AppState> {
     Router::new()
-        .route(
-            "/advent-calendar/add",
-            get(advent::form::add_page).post(advent::form::create),
-        )
-        .route(
-            "/advent-calendar/:year/days/:day",
-            post(advent::form::save_day).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
-        )
-        .route("/advent-calendar/:year/lot", post(advent::form::create_lot))
-        .route(
-            "/advent-calendar/:year/days/:day/rotate",
-            post(advent::form::rotate),
-        )
-        .route(
-            "/advent-calendar/:year/days/:day/delete",
-            post(advent::form::remove_day),
-        )
+        .route("/advent-calendar/:year/lot", post(advent::create_lot))
         .route(
             "/tournaments/add",
             get(tournaments::form::add_page).post(tournaments::form::create),

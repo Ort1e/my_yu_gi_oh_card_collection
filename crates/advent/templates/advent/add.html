@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Add {{ self.a_name() }}{% endblock %}
+{% block body_class %}{{ spec.section }}{% endblock %}
+{% block nav %}{% if spec.section == "books" %}{% include "partials/books_nav.html" %}{% else %}{% include "partials/yugioh_nav.html" %}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+<h1>Create a new {{ spec.name|lower }}</h1>
+<p class="back-link"><a href="{{ spec.base }}">← Back to the calendars</a></p>
+
+{% include "partials/form_errors.html" %}
+
+<form method="post" action="{{ spec.base }}/add">
+  <fieldset>
+    <legend>Calendar</legend>
+    <p>
+      <label for="year">Year:</label>
+      <input type="number" name="year" id="year" value="{{ year }}" min="2000" max="2100" required>
+    </p>
+    <p>Next, you fill its days: for each one, {{ spec.add_help }} and its photo.</p>
+  </fieldset>
+
+  <input type="submit" value="Create the calendar">
+</form>
+</div>
+{% endblock %}

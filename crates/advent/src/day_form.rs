@@ -1,13 +1,12 @@
-//! The day form of the advent calendars, cards (`routes::advent`) and books
-//! (`routes::books::advent`): a field naming the day's item and a photo,
-//! posted as multipart to `…/:year/days/:day`.
+//! The day form: a field naming the day's item (`card`, `book`) and a
+//! photo, posted as multipart to `…/:year/days/:day`.
 
 use axum::extract::multipart::MultipartError;
 use axum::extract::Multipart;
 use axum::response::{IntoResponse, Redirect, Response};
 
 use crate::calendar_photos::{self, Processed};
-use crate::web::error::{AppError, AppResult};
+use common::web::error::{AppError, AppResult};
 
 /// A day's form as posted.
 pub struct DayForm {

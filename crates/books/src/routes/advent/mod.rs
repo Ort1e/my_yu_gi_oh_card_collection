@@ -1,32 +1,27 @@
-//! The book advent calendars: the 24 days of a December, each with the book
-//! received that day and a photo of it. The twin of `routes::advent` (the
-//! card calendars), with its own tables (migration 0007) and photo folder
-//! (`book_advent_calendar_photos`).
-//!
-//! Private (`routes::private_router`, and the photos in `main::app`), like
-//! the card calendars: the photos may show handwritten notes. `form.rs`
-//! creates the calendars and fills their days.
+//! The book advent calendars (the `advent` crate's engine): behind each door
+//! a book, given by its ISBN or `#id`. A book not in the list yet is looked
+//! up by its ISBN and added on the way, so filling the calendar fills the
+//! book list too. Own tables (migration 0007) and photo folder.
 
-pub mod form;
-
+use advent::{Calendar, EditExtras, Pick, Spec};
 use askama::Template;
-use axum::extract::{Path, Query, State};
+use books_domain::isbn::Isbn;
+use sqlx::SqliteConnection;
 
 use super::series_text;
+use crate::store::book_data;
+use crate::store::books::{self, BookFields};
 use common::db::Pool;
-use common::web::error::{AppResult, OrNotFound};
-use common::web::pagination::{Page, PageParam, PAGE_SIZE};
+use common::web::error::AppResult;
 use common::AppState;
 
-/// Photos live under `<media>/book_advent_calendar_photos/<year>/`.
-pub const PHOTO_FOLDER: &str = "book_advent_calendar_photos";
+/// The book calendars.
+pub struct Books;
 
-/// One day of the calendar, with its book.
-#[derive(Debug, sqlx::FromRow)]
-pub struct DayRow {
-    day: i64,
-    /// Relative to the media dir: `book_advent_calendar_photos/2025/01-….jpg`.
-    photo: Option<String>,
+/// A book behind a door: the opened door shows it (`books/advent/door.html`).
+#[derive(Debug, sqlx::FromRow, Template)]
+#[template(path = "books/advent/door.html")]
+pub struct DoorBook {
     book_id: i64,
     title: String,
     authors: Option<String>,
@@ -34,7 +29,7 @@ pub struct DayRow {
     volume: Option<i64>,
 }
 
-impl DayRow {
+impl DoorBook {
     fn authors_text(&self) -> &str {
         self.authors.as_deref().unwrap_or("")
     }
@@ -44,86 +39,27 @@ impl DayRow {
     }
 }
 
-/// A door of the calendar: its day, and what is behind it (if anything).
-pub struct Door {
-    day: i64,
-    entry: Option<DayRow>,
-}
+impl Calendar for Books {
+    const SPEC: &'static Spec = &Spec {
+        base: "/books/advent-calendar",
+        table: "book_advent_calendar",
+        item_column: "book_id",
+        photo_folder: "book_advent_calendar_photos",
+        section: "books",
+        name: "Book advent calendar",
+        item: "book",
+        items: "books",
+        field_label: "Book (ISBN or #id)",
+        example: "e.g. 9780553573398",
+        choose: "its ISBN, or #id",
+        add_help: "its book (by ISBN: a book not in the list yet is added)",
+        edit_help: "For each day: its book, by its <strong>ISBN</strong> (the 13 digits under the barcode, on the back),
+    or <code>#id</code> for a book already in the list (they are suggested in the field); and its photo
+    (JPEG, PNG or WebP). A book not in the list yet is looked up and added.",
+        stays: "the book stays in the list",
+    };
 
-#[derive(Template)]
-#[template(path = "books/advent/calendar.html")]
-pub struct CalendarPage {
-    year: i64,
-    doors: Vec<Door>,
-}
-
-impl CalendarPage {
-    fn book_count(&self) -> usize {
-        self.doors.iter().filter(|d| d.entry.is_some()).count()
-    }
-}
-
-/// A calendar in the list.
-#[derive(Debug, sqlx::FromRow)]
-pub struct CalendarRow {
-    year: i64,
-    days: i64,
-    /// The photo of its first filled day, for the list.
-    photo: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "books/advent/list.html")]
-pub struct CalendarsList {
-    page_title: &'static str,
-    page: Page,
-    total: i64,
-    calendars: Vec<CalendarRow>,
-}
-
-/// `/books/advent-calendar`: every calendar, the latest first.
-pub async fn list(
-    State(state): State<AppState>,
-    Query(param): Query<PageParam>,
-) -> AppResult<CalendarsList> {
-    let pool = &state.pool;
-    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM book_advent_calendar")
-        .fetch_one(pool)
-        .await?;
-    let page = Page::new(param.page, total, String::new());
-    let calendars = sqlx::query_as(
-        "SELECT c.year,
-                (SELECT count(*) FROM book_advent_calendar_entry e WHERE e.calendar_id = c.id) AS days,
-                (SELECT e.photo FROM book_advent_calendar_entry e
-                 WHERE e.calendar_id = c.id AND e.photo IS NOT NULL ORDER BY e.day LIMIT 1) AS photo
-         FROM book_advent_calendar c ORDER BY c.year DESC LIMIT ? OFFSET ?",
-    )
-    .bind(PAGE_SIZE)
-    .bind(page.offset())
-    .fetch_all(pool)
-    .await?;
-
-    Ok(CalendarsList {
-        page_title: "Book advent calendars",
-        page,
-        total,
-        calendars,
-    })
-}
-
-/// The id of the calendar of `year`, a 404 when there is none.
-async fn calendar_id(pool: &Pool, year: i64) -> AppResult<i64> {
-    sqlx::query_scalar("SELECT id FROM book_advent_calendar WHERE year = ?")
-        .bind(year)
-        .fetch_optional(pool)
-        .await?
-        .or_404()
-}
-
-/// The doors 1 to 24 (25 when there is a day 25) of a calendar.
-async fn load_doors(pool: &Pool, calendar_id: i64) -> sqlx::Result<Vec<Door>> {
-    let mut entries: Vec<DayRow> = sqlx::query_as(
-        "SELECT e.day, e.photo, book.id AS book_id, book.title,
+    const ENTRIES: &'static str = "SELECT e.day, e.photo, book.id AS book_id, book.title,
                 (SELECT group_concat(name, ', ') FROM
                     (SELECT a.name FROM book_book_author ba
                      JOIN book_author a ON a.id = ba.author_id
@@ -132,36 +68,89 @@ async fn load_doors(pool: &Pool, calendar_id: i64) -> sqlx::Result<Vec<Door>> {
          FROM book_advent_calendar_entry e
          JOIN book ON book.id = e.book_id
          LEFT JOIN book_series ON book_series.id = book.series_id
-         WHERE e.calendar_id = ? ORDER BY e.day",
-    )
-    .bind(calendar_id)
-    .fetch_all(pool)
-    .await?;
+         WHERE e.calendar_id = ? ORDER BY e.day";
 
-    let last_day = if entries.iter().any(|e| e.day == 25) {
-        25
-    } else {
-        24
-    };
-    Ok((1..=last_day)
-        .map(|day| Door {
-            day,
-            entry: entries
-                .iter()
-                .position(|e| e.day == day)
-                .map(|i| entries.swap_remove(i)),
+    type Item = DoorBook;
+    type New = Box<BookFields>;
+
+    fn id(book: &DoorBook) -> i64 {
+        book.book_id
+    }
+
+    fn href(book: &DoorBook) -> String {
+        format!("/books/{}", book.book_id)
+    }
+
+    fn name(book: &DoorBook) -> &str {
+        &book.title
+    }
+
+    fn detail(book: &DoorBook) -> String {
+        book.authors_text().to_string()
+    }
+
+    /// `#12` (an id) or an ISBN. An ISBN not in the list is looked up
+    /// (network: before any write transaction).
+    async fn find(
+        state: &AppState,
+        text: &str,
+    ) -> AppResult<Result<Pick<Box<BookFields>>, String>> {
+        if let Some(id) = text.strip_prefix('#') {
+            let Ok(id) = id.trim().parse::<i64>() else {
+                return Ok(Err(format!("\"{text}\" is not a book id (#12).")));
+            };
+            let found: Option<i64> = sqlx::query_scalar("SELECT id FROM book WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&state.pool)
+                .await?;
+            return Ok(found
+                .map(Pick::Existing)
+                .ok_or(format!("there is no book #{id} in the list.")));
+        }
+
+        let isbn = match Isbn::parse(text) {
+            Ok(isbn) => isbn,
+            Err(why) => return Ok(Err(format!("\"{text}\": {why}."))),
+        };
+        let mut conn = state.pool.acquire().await?;
+        if let Some(id) = books::with_isbn(&mut conn, &isbn).await? {
+            return Ok(Ok(Pick::Existing(id)));
+        }
+        drop(conn);
+
+        let not_found = || {
+            format!("no catalogue knows the ISBN {isbn}: add the book on the Add page first, then use its #id.")
+        };
+        match book_data::lookup(&state.pool, &state.http, &isbn).await {
+            Ok(Some(info)) => Ok(BookFields::from_info(isbn.clone(), info)
+                .map(|book| Pick::New(Box::new(book)))
+                .ok_or_else(not_found)),
+            Ok(None) => Ok(Err(not_found())),
+            Err(e) => {
+                tracing::warn!(isbn = %isbn, "book lookup failed: {e}");
+                Ok(Err(format!(
+                    "the lookup of {isbn} failed (no internet?): try again, or add the book on the Add page first."
+                )))
+            }
+        }
+    }
+
+    async fn add(conn: &mut SqliteConnection, book: &Box<BookFields>) -> sqlx::Result<i64> {
+        books::insert(conn, book).await
+    }
+
+    /// The books not behind a door of any calendar, suggested in the fields.
+    async fn edit_extras(pool: &Pool, _calendar_id: i64, _year: i64) -> AppResult<EditExtras> {
+        let suggestions = sqlx::query_as(
+            "SELECT id, title FROM book
+             WHERE id NOT IN (SELECT book_id FROM book_advent_calendar_entry)
+             ORDER BY added_on DESC, id DESC",
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(EditExtras {
+            above: String::new(),
+            suggestions,
         })
-        .collect())
-}
-
-/// `/books/advent-calendar/:year`.
-pub async fn calendar(
-    State(state): State<AppState>,
-    Path(year): Path<i64>,
-) -> AppResult<CalendarPage> {
-    let calendar = calendar_id(&state.pool, year).await?;
-    Ok(CalendarPage {
-        year,
-        doors: load_doors(&state.pool, calendar).await?,
-    })
+    }
 }
