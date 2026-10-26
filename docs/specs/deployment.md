@@ -1,8 +1,10 @@
 # Spec: deployment, security and repository workflow
 
 Status: **plan, answers in** (2026-10-26). Steps 1 and 2 done on `dev`
-(CI, dependencies; security items 1–7 and 9 with their tests; 8 comes
-with the export, step 3). The NAS steps wait for its exact model (`uname -m`). GitHub
+(CI, dependencies; security items 1–9 with their tests). Step 3: the
+export is done (`export-public`, about 21 MB; the Pokémon wishlist is
+public too, owner's request), the upload waits for the protocol the OVH
+plan offers (SFTP or FTP over TLS: its FTP-SSH tab). The NAS steps wait for its exact model (`uname -m`). GitHub
 settings are changed only after a go.
 
 ## What we want

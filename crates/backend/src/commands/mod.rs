@@ -4,11 +4,13 @@
 //!   cargo run -p backend -- clean-cards [--dry-run]
 //!   cargo run -p backend -- refresh-prices [--dry-run]
 //!   cargo run -p backend -- clean-pictures [--dry-run]
+//!   cargo run -p backend -- export-public [--out DIR]
 //!   cargo run -p backend -- import-tournament-notes <file.json> [--dry-run]
 //!
 //! `--dry-run` does the work in a transaction that is rolled back and makes
 //! no API call (names unknown locally are only reported).
 
+pub(crate) mod export;
 mod pictures;
 mod prices;
 
@@ -40,6 +42,10 @@ pub const USAGE: &str = "usage:
   backend clean-pictures [--dry-run]
       delete the cached card pictures (Yu-Gi-Oh!, Pokémon) no card uses any
       more; downloaded again if needed (the server does it daily)
+  backend export-public [--out DIR]
+      write the public copy of the collections (static pages: the cards,
+      the Pokémon wishlist, the books, with market values) into DIR
+      (default public-export/), to put on the web hosting
   backend import-tournament-notes <file.json> [--dry-run]
       one-off: load the tournaments' old notes, transcribed into a JSON file,
       as rounds and games (tournaments that have rounds are skipped)";
@@ -62,6 +68,9 @@ pub enum Command {
     CleanPictures {
         dry_run: bool,
     },
+    ExportPublic {
+        out: PathBuf,
+    },
     ImportTournamentNotes {
         file: PathBuf,
         dry_run: bool,
@@ -80,6 +89,11 @@ impl Command {
         } else {
             Vec::new()
         };
+        let out = if name == "export-public" {
+            take_value(&mut flags, "--out")?
+        } else {
+            None
+        };
         let file = if name == "import-tournament-notes" {
             let i = flags
                 .iter()
@@ -90,7 +104,7 @@ impl Command {
             None
         };
         let allowed: &[&str] = match name.as_str() {
-            "serve" => &[],
+            "serve" | "export-public" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
             "clean-cards" | "refresh-prices" | "clean-pictures" | "import-tournament-notes" => {
                 &["--dry-run"]
@@ -116,6 +130,9 @@ impl Command {
             "clean-pictures" => Command::CleanPictures {
                 dry_run: has("--dry-run"),
             },
+            "export-public" => Command::ExportPublic {
+                out: out.map_or_else(|| PathBuf::from("public-export"), PathBuf::from),
+            },
             "import-tournament-notes" => Command::ImportTournamentNotes {
                 file: file.unwrap_or_default(),
                 dry_run: has("--dry-run"),
@@ -123,6 +140,20 @@ impl Command {
             _ => Command::Serve,
         })
     }
+}
+
+/// Remove `flag VALUE` from `flags`: the value, `None` without the flag.
+fn take_value(flags: &mut Vec<&str>, flag: &str) -> Result<Option<String>, String> {
+    let Some(i) = flags.iter().position(|f| *f == flag) else {
+        return Ok(None);
+    };
+    let value = flags
+        .get(i + 1)
+        .filter(|v| !v.starts_with("--"))
+        .ok_or(format!("{flag} needs a value"))?
+        .to_string();
+    flags.drain(i..=i + 1);
+    Ok(Some(value))
 }
 
 /// Remove the `--date YYYY-MM-DD` pairs from `flags` and parse their dates.
@@ -151,6 +182,9 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
         Command::CleanCards { dry_run } => clean_cards::clean(state, dry_run).await,
         Command::RefreshPrices { dry_run } => prices::refresh(state, dry_run).await,
         Command::CleanPictures { dry_run } => pictures::clean(state, dry_run).await,
+        Command::ExportPublic { out } => {
+            export::export(state, &out, std::path::Path::new("static")).await
+        }
         Command::ImportTournamentNotes { file, dry_run } => {
             tournament_notes::import(state, &file, dry_run).await
         }
@@ -216,6 +250,19 @@ mod tests {
             parse(&["clean-pictures"]),
             Ok(Command::CleanPictures { dry_run: false })
         );
+        assert_eq!(
+            parse(&["export-public"]),
+            Ok(Command::ExportPublic {
+                out: PathBuf::from("public-export")
+            })
+        );
+        assert_eq!(
+            parse(&["export-public", "--out", "/tmp/site"]),
+            Ok(Command::ExportPublic {
+                out: PathBuf::from("/tmp/site")
+            })
+        );
+        assert!(parse(&["export-public", "--out"]).is_err());
         assert_eq!(
             parse(&["import-tournament-notes", "--dry-run", "notes.json"]),
             Ok(Command::ImportTournamentNotes {

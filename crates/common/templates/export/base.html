@@ -1,0 +1,32 @@
+{# The public export's pages (common::export): no link to the app, no script. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}My collection{% endblock %}</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="static/css/header.css">
+    <link rel="stylesheet" href="static/css/card.css">
+    <link rel="stylesheet" href="static/css/tiles.css">
+    <link rel="stylesheet" href="static/css/pokemon.css">
+    <link rel="stylesheet" href="static/css/books.css">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="container">
+      <header class="site-header">
+        <nav class="navbar">
+          <div class="logo"><a href="index.html">My collection</a></div>
+          <ul class="nav-links">
+            {% for link in nav %}<li><a href="{{ link.href }}">{{ link.title }}</a></li>{% endfor %}
+          </ul>
+        </nav>
+      </header>
+
+      <div class="inside-container">
+        {% block content %}{% endblock %}
+        <p class="hint">Updated on {{ date }}. Values: market prices (Cardmarket), by condition.</p>
+      </div>
+    </div>
+</body>
+</html>

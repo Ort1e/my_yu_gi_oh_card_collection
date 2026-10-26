@@ -1,0 +1,15 @@
+{% extends "export/base.html" %}
+
+{% block content %}
+<h1>My collection</h1>
+<div class="card-list">
+  {% for section in sections %}
+  <a href="{{ section.slug }}.html" class="card-link">
+    <div class="card">
+      <div class="card-title">{{ section.title }}</div>
+      <div class="card-meta-line"><div>{{ section.summary }}</div></div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -81,6 +81,7 @@ cargo run -p backend -- scrap-ban-list        # import new/current Konami ban li
 cargo run -p backend -- clean-cards           # normalise names, relink card data, replace/delete proxies, rarity from (V.x - …) names, names in their code's language, rarity of single-rarity codes from card data (--dry-run); the server also runs it in the background (5 min after start, then daily)
 cargo run -p backend -- import-tournament-notes <file.json>   # one-off: the tournaments' old notes, transcribed, as rounds and games (--dry-run)
 cargo run -p backend -- refresh-prices        # today's market prices: ygoprodeck into card_price, then Cardmarket's price guide (links, prices), then the Pokémon cards from TCGdex (--dry-run); the server does it weekly by itself
+cargo run -p backend -- export-public         # the public copy (static pages: Yu-Gi-Oh! and Pokémon cards, Pokémon wishlist, books, market values; nothing else) into public-export/ (--out DIR), for the OVH hosting: common::export + each crate's public section
 cargo run -p backend -- clean-pictures        # delete the cached card pictures (media/card_images, media/pokemon_card_images) no card uses any more (--dry-run); the server does it daily
 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)

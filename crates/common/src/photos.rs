@@ -82,6 +82,12 @@ pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
     encode(&img)
 }
 
+/// A small copy, `width` px wide (JPEG): the public export's card pictures.
+pub fn thumbnail(bytes: &[u8], width: u32) -> Result<Vec<u8>, PhotoError> {
+    let img = reader(bytes)?.decode().map_err(refused)?;
+    encode(&img.resize(width, u32::MAX, FilterType::Lanczos3))
+}
+
 /// A copy turned a quarter turn (clockwise or not), for a photo that came
 /// out sideways (no EXIF orientation).
 pub fn rotate(bytes: &[u8], clockwise: bool) -> Result<Vec<u8>, PhotoError> {

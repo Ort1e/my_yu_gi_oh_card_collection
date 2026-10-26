@@ -8,9 +8,9 @@ use crate::web::pagination;
 /// the same lines, in the same places (empty ones keep their room): the
 /// picture, the name (two lines), the other name, the print, the details,
 /// then the condition, the tags and the value at the bottom.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CardTile {
-    /// Its page.
+    /// Its page; empty: no link (the public export has no card pages).
     pub href: String,
     /// The card's proportions, for its picture.
     pub shape: CardShape,

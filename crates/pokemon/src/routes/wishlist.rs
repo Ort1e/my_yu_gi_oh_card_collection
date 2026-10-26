@@ -16,8 +16,10 @@ use super::{card_names, image_src, money, rarities};
 use crate::store::cards::{self, WishFields};
 use crate::store::prices;
 use common::db::{begin_write, Money, Pool};
+use common::export::{Content, ExportCard, Section};
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::web::forms::{FormData, Pairs};
+use common::web::tiles::{dotted, CardShape, CardTile};
 use common::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -159,6 +161,77 @@ impl WishlistPage {
             .filter(|w| w.verdict == Some(Verdict::UnderMax))
             .count()
     }
+}
+
+/// The wishes still wanted, by priority, with today's price.
+async fn wanted(pool: &Pool) -> sqlx::Result<Vec<WishRow>> {
+    let mut wishes: Vec<WishRow> = sqlx::query_as(&format!(
+        "{} WHERE w.got_copy_id IS NULL ORDER BY w.priority, w.added_on, w.id",
+        WishRow::SELECT
+    ))
+    .fetch_all(pool)
+    .await?;
+    let prices = prices::latest(pool).await?;
+    for wish in &mut wishes {
+        let empty = prices::VariantPrices::new();
+        let rule = wish.rule();
+        wish.price = rule.price(prices.get(&wish.card_id).unwrap_or(&empty));
+    }
+    Ok(wishes)
+}
+
+/// The wishlist's page of the public export (owner, 2026-10-26: shown, so
+/// friends know what to look for): the cards wanted, the language and
+/// variant wanted, the priority and today's market price. Not the most the
+/// owner would pay, nor the notes.
+pub async fn public_section(pool: &Pool) -> sqlx::Result<Section> {
+    let wishes = wanted(pool).await?;
+    let count = wishes.len();
+    let cards = wishes
+        .into_iter()
+        .map(|wish| {
+            let (name, other_name) = wish.names();
+            let language = wish.language.as_deref().map_or("", language_label);
+            let variant = wish
+                .variant
+                .as_deref()
+                .and_then(Variant::from_code)
+                .map_or("", Variant::label);
+            let priority = match wish.priority {
+                1 => vec!["Most wanted".to_string()],
+                3 => vec!["Some day".to_string()],
+                _ => Vec::new(),
+            };
+            ExportCard {
+                tile: CardTile {
+                    shape: CardShape::Pokemon,
+                    name,
+                    other_name,
+                    print: dotted([wish.set_name.as_str(), wish.local_id.as_str()]),
+                    details: dotted([wish.rarity_text(), variant, language]),
+                    image: wish.has_image().then(|| wish.image_src()),
+                    tags: priority,
+                    value: money(wish.price),
+                    ..CardTile::default()
+                },
+                picture: super::images::picture_file(
+                    &wish.catalogue,
+                    &wish.tcgdex_id,
+                    wish.shown_language(),
+                    wish.image.clone(),
+                    wish.image_fr.clone(),
+                ),
+            }
+        })
+        .collect();
+
+    Ok(Section {
+        slug: "wishlist",
+        title: "Pokémon wishlist",
+        body_class: "pokemon",
+        summary: format!("{count} cards wanted (market price today)"),
+        content: Content::Cards(cards),
+    })
 }
 
 /// `/pokemon/wishlist`.

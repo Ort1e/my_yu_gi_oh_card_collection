@@ -11,6 +11,7 @@
 //! - the pure rules: the `yugioh-domain` crate.
 
 pub mod commands;
+pub mod public;
 pub mod routes;
 pub mod store;
 #[cfg(any(test, feature = "test-support"))]

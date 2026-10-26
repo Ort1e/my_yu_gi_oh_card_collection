@@ -640,6 +640,21 @@ wished. Each collection lists its files in use (`yugioh::routes::used_card_pictu
 `pokemon::routes::images::used_files`); a picture deleted by mistake is just
 downloaded again. The server runs it daily, 15 minutes after it starts.
 
+`export-public` (`backend/src/commands/export.rs`, `common::export`) writes
+the **public copy**: static pages to put on the OVH hosting, where nothing
+runs. Each collection gives its section, with only what may be public:
+`yugioh::public` (the cards owned, no proxies or sold ones, identical
+copies on one tile, market estimates), `pokemon::public` (the copies
+owned, then the wishlist: language, variant, priority and today's price,
+not the maximum price nor the notes), `books::public` (title, authors,
+series, format). `common::export::write_site` writes `index.html`, a page
+per section (the same picture grid as the app, tiles without links),
+240 px copies of the pictures and the stylesheets; the pictures the app
+never downloaded are fetched first through its own picture routes. The
+folder is emptied at each export, and refused if it isn't an earlier
+export. `backend/src/tests/export.rs` checks that no seller, price paid,
+note, deck, tournament or budget gets in.
+
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
 summary line in the log), and the actions that make a cleanup necessary do

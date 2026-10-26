@@ -10,6 +10,7 @@
 //! `testing::TestApp` (feature `test-support`).
 
 pub mod db;
+pub mod export;
 pub mod http;
 pub mod media;
 pub mod photos;

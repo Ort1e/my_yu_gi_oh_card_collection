@@ -2,6 +2,7 @@
 //! the pages render, the login guards the writes.
 
 mod auth;
+mod export;
 mod pages;
 mod security;
 
