@@ -1,5 +1,5 @@
 // How to recognise each Pokémon card rarity and variant on the physical
-// card. Used by the /pokemon/rarities page (static/js/pokemon_rarity_guide.js),
+// card. Used by the /pokemon/rarities page (static/js/rarity_guide.js),
 // the card finder (static/js/pokemon_finder.js) and the booster form
 // (static/js/pokemon_booster.js).
 //
