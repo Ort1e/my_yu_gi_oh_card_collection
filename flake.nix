@@ -61,6 +61,12 @@
             # Node.js
             ##########################
             nodejs
+
+            ##########################
+            # Deployment (deploy/README.md)
+            ##########################
+            gh               # GitHub: the CI's runs and logs, pull requests, releases
+            shellcheck       # checks deploy/**/*.sh
           ];
 
           #############################################
