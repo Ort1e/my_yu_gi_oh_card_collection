@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use yugioh_domain::card::name_to_translate;
 use yugioh_domain::rarity::split_cardmarket_name;
 
-use crate::store::db::{today, Pool};
+use crate::store::db::{is_fresh, today, Pool};
 use crate::web::error::AppResult;
 
 use super::fetch;
@@ -36,10 +36,7 @@ pub async fn translated_name(
     .await?;
     let today = today();
     if let Some((name, checked_at)) = known {
-        let recent = checked_at
-            .parse::<chrono::NaiveDate>()
-            .is_ok_and(|d| (today - d).num_days() < RECHECK_MISSING_TRANSLATION_DAYS);
-        if name.is_some() || recent {
+        if name.is_some() || is_fresh(&checked_at, RECHECK_MISSING_TRANSLATION_DAYS, today) {
             return Ok(name);
         }
     }

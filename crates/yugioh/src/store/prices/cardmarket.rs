@@ -13,7 +13,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::{Duration, NaiveDate};
+use chrono::NaiveDate;
 use serde_json::Value;
 use sqlx::SqliteConnection;
 use yugioh_domain::card_set::{code_rarities, code_without_language};
@@ -24,7 +24,7 @@ use yugioh_domain::cardmarket_catalog::{
 use yugioh_domain::rarity::Rarity;
 
 use crate::store::card_data::{fetch_set_infos, SetInfo};
-use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};
+use crate::store::db::{begin_write, commit_unless_dry_run, is_fresh, Money, Pool};
 use crate::web::error::{AppError, AppResult};
 
 /// A set code whose expansion wasn't found is looked for again after this.
@@ -109,10 +109,7 @@ async fn sets_to_look_up(pool: &Pool, today: NaiveDate) -> sqlx::Result<Vec<Stri
     let settled: HashSet<String> = known
         .into_iter()
         .filter(|(_, expansion, checked_at)| {
-            let recent = checked_at
-                .parse::<NaiveDate>()
-                .is_ok_and(|d| today - d < Duration::days(RECHECK_EXPANSION_DAYS));
-            expansion.is_some() || recent
+            expansion.is_some() || is_fresh(checked_at, RECHECK_EXPANSION_DAYS, today)
         })
         .map(|(code, _, _)| code)
         .collect();

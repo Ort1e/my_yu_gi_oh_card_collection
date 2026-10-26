@@ -15,7 +15,7 @@ use books_domain::book::{self, BookInfo};
 use books_domain::isbn::Isbn;
 use serde_json::Value;
 
-use common::db::{begin_write, today, Pool};
+use common::db::{begin_write, is_fresh, today, Pool};
 use common::http::Throttle;
 use common::web::error::{AppError, AppResult};
 
@@ -48,11 +48,7 @@ pub async fn lookup(
             return Ok(Some(info));
         }
 
-        let today = today();
-        let recent = checked_at
-            .parse::<chrono::NaiveDate>()
-            .is_ok_and(|d| (today - d).num_days() < RECHECK_MISSING_DAYS);
-        if recent {
+        if is_fresh(&checked_at, RECHECK_MISSING_DAYS, today()) {
             return Ok(None);
         }
     }

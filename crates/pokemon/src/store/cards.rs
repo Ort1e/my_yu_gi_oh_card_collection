@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
 
-use super::{is_fresh, ptcgio, tcgdex};
-use common::db::{begin_write, today, Money, Pool};
+use super::{ptcgio, tcgdex};
+use common::db::{begin_write, is_fresh, today, Money, Pool};
 use common::web::error::AppResult;
 
 const RECHECK_DAYS: i64 = 30;
@@ -45,7 +45,7 @@ pub async fn ensure(
     .fetch_optional(pool)
     .await?;
     if let Some((id, fetched_at)) = &known {
-        if is_fresh(fetched_at, RECHECK_DAYS) {
+        if is_fresh(fetched_at, RECHECK_DAYS, today()) {
             return Ok(Some(*id));
         }
     }

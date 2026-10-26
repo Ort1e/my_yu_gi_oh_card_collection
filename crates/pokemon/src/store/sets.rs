@@ -15,8 +15,8 @@ use pokemon_domain::name_matches;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{is_fresh, tcgdex};
-use common::db::{begin_write, today, Pool};
+use super::tcgdex;
+use common::db::{begin_write, is_fresh, today, Pool};
 use common::web::error::{AppError, AppResult};
 
 const RECHECK_DAYS: i64 = 7;
@@ -268,7 +268,7 @@ async fn remembered(pool: &Pool, language: &str, code: &str) -> sqlx::Result<Vec
     }
     if rows
         .iter()
-        .any(|row| !is_fresh(&row.fetched_at, RECHECK_DAYS))
+        .any(|row| !is_fresh(&row.fetched_at, RECHECK_DAYS, today()))
     {
         return Ok(Vec::new());
     }

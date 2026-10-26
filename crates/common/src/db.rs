@@ -25,6 +25,15 @@ pub fn today() -> NaiveDate {
     chrono::Local::now().date_naive()
 }
 
+/// Whether a cache row checked on `checked_at` (`YYYY-MM-DD`) is less than
+/// `days` old on `today`, so not to be asked again yet. An unreadable date
+/// is not fresh.
+pub fn is_fresh(checked_at: &str, days: i64, today: NaiveDate) -> bool {
+    checked_at
+        .parse::<NaiveDate>()
+        .is_ok_and(|d| (today - d).num_days() < days)
+}
+
 /// Commit, or roll back for a dry run (the maintenance commands and the
 /// refreshes, `--dry-run`).
 pub async fn commit_unless_dry_run(tx: Transaction<'_, Sqlite>, dry_run: bool) -> sqlx::Result<()> {
@@ -146,4 +155,18 @@ pub fn push_ids(qb: &mut QueryBuilder<'_, Sqlite>, ids: impl IntoIterator<Item =
         sep.push_bind(id);
     }
     sep.push_unseparated(")");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn freshness() {
+        let today = NaiveDate::from_ymd_opt(2026, 10, 26).unwrap();
+        assert!(is_fresh("2026-10-26", 7, today));
+        assert!(is_fresh("2026-10-20", 7, today));
+        assert!(!is_fresh("2026-10-19", 7, today));
+        assert!(!is_fresh("someday", 7, today));
+    }
 }
