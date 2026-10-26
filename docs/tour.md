@@ -204,7 +204,7 @@ Things to notice:
 
 ### The shipment PDF flow
 
-`POST /lots/add/shipment` (`lot_form::upload`): the PDF is parsed **in
+`POST /lots/add/shipment` (`lots/form/add.rs::upload`): the PDF is parsed **in
 memory** (`yugioh_domain::cardmarket::parse_shipment_pdf`), and the form is
 rendered pre-filled with the dates, total, seller and card lines. The file
 waits in `uploads/pending-<token>.pdf` (deleted after 24 h), and the form
@@ -245,7 +245,7 @@ Differences from the Django models to keep in mind:
 **Migrations.** `sqlx::migrate!` embeds `migrations/*.sql` into the binary
 and applies the new ones at startup, recording a checksum of each. So an
 applied migration must **never be edited** (startup would fail on the
-checksum): changes are new files, `0004_….sql`, and so on.
+checksum): changes are new files, numbered after the last one (`0016_….sql` next).
 
 **Writing safely** (`common/src/db.rs`): SQLite allows one writer at a time. Every
 transaction that writes starts with `db::begin_write(&pool)` (not

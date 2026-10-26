@@ -311,9 +311,9 @@ delete routes for them.
 
 ## Change the database schema
 
-1. Add `migrations/0004_<what>.sql` (next free number). **Never edit
-   `0002`/`0003`**: they are already applied to `data/app.db`, and sqlx
-   refuses to start if an applied file changed.
+1. Add `migrations/0016_<what>.sql` (the next free number). **Never edit
+   an existing migration**: they are already applied to `data/app.db`, and
+   sqlx refuses to start if an applied file changed.
 2. Write plain SQLite:
 
    ```sql
