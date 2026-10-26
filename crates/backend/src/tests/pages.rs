@@ -48,3 +48,14 @@ async fn deck_builder_page() {
     assert!(page.contains(&format!(r#"data-deck-version-id="{v}""#)));
     assert_eq!(t.get("/deck-builder/999").await.0, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn pages_link_the_two_collections() {
+    let t = TestApp::new().await;
+    let (_, cards) = t.get("/cards").await;
+    assert!(cards.contains(r#"<a href="/books" class="section-switch""#));
+    let (_, books) = t.get("/books").await;
+    assert!(books.contains(r#"<a href="/" class="section-switch""#));
+    assert!(books.contains(r#"<body class="books">"#));
+    assert!(books.contains(r#"name="viewport""#));
+}

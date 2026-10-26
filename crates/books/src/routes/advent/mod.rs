@@ -13,10 +13,10 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 
 use super::series_text;
-use crate::store::db::Pool;
-use crate::web::error::{AppResult, OrNotFound};
-use crate::web::pagination::{Page, PageParam, PAGE_SIZE};
-use crate::AppState;
+use common::db::Pool;
+use common::web::error::{AppResult, OrNotFound};
+use common::web::pagination::{Page, PageParam, PAGE_SIZE};
+use common::AppState;
 
 /// Photos live under `<media>/book_advent_calendar_photos/<year>/`.
 pub const PHOTO_FOLDER: &str = "book_advent_calendar_photos";

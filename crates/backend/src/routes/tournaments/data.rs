@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use yugioh_domain::tournament::{Die, Game, GameResult, RoundRecord, RoundResult};
 use sqlx::QueryBuilder;
+use yugioh_domain::tournament::{Die, Game, GameResult, RoundRecord, RoundResult};
 
 use crate::store::db::push_ids;
 use crate::store::db::Pool;

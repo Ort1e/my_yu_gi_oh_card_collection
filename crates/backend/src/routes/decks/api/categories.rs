@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use yugioh_domain::monte_carlo;
 use serde::{Deserialize, Serialize};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
+use yugioh_domain::monte_carlo;
 
 use crate::store::db::{begin_write, exists};
 use crate::web::error::{bad_request, required, AppError, AppResult, OrNotFound};

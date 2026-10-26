@@ -17,9 +17,9 @@ pub use translations::{plan_translations, Translation};
 
 use std::time::{Duration, Instant};
 
-use yugioh_domain::card::clean_card_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
+use yugioh_domain::card::clean_card_name;
 
 use crate::store::db::Pool;
 use crate::web::error::{AppError, AppResult};

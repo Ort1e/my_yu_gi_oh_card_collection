@@ -4,7 +4,6 @@
 //! reads in `private_router()` (behind the login too).
 
 mod advent;
-mod books;
 mod budget;
 mod cards;
 mod collection;
@@ -29,11 +28,7 @@ pub fn all() -> common::Routes {
         write: write_router(),
         private: private_router(),
         files: files_router(),
-        private_media: vec![
-            "shipment_files",
-            "advent_calendar_photos",
-            "book_advent_calendar_photos",
-        ],
+        private_media: vec!["shipment_files", "advent_calendar_photos"],
     }
 }
 
@@ -56,12 +51,6 @@ pub fn router() -> Router<AppState> {
         .route("/tournaments", get(tournaments::list))
         .route("/tournaments/labels", get(tournaments::labels::list))
         .route("/tournaments/:id", get(tournaments::detail))
-        .route("/books", get(books::list))
-        .route("/books/:id", get(books::detail))
-        .route("/books/authors", get(books::authors::list))
-        .route("/books/authors/:id", get(books::authors::detail))
-        .route("/books/series", get(books::series::list))
-        .route("/books/series/:id", get(books::series::detail))
         .route("/pokemon", get(pokemon::list))
         .route("/pokemon/rarities", get(pokemon::rarities::page))
         .route("/pokemon/wishlist", get(pokemon::wishlist::list))
@@ -103,12 +92,6 @@ pub fn private_router() -> Router<AppState> {
         .route("/advent-calendar", get(advent::list))
         .route("/advent-calendar/:year", get(advent::calendar))
         .route("/advent-calendar/:year/edit", get(advent::form::edit_page))
-        .route("/books/advent-calendar", get(books::advent::list))
-        .route("/books/advent-calendar/:year", get(books::advent::calendar))
-        .route(
-            "/books/advent-calendar/:year/edit",
-            get(books::advent::form::edit_page),
-        )
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
@@ -131,32 +114,6 @@ pub fn write_router() -> Router<AppState> {
         .route(
             "/advent-calendar/:year/days/:day/delete",
             post(advent::form::remove_day),
-        )
-        .route(
-            "/books/add",
-            get(books::form::add_page).post(books::form::create),
-        )
-        .route(
-            "/books/:id/edit",
-            get(books::form::edit_page).post(books::form::update),
-        )
-        .route("/books/:id/delete", post(books::form::delete))
-        .route("/books/api/isbn/:isbn", get(books::api::isbn))
-        .route(
-            "/books/advent-calendar/add",
-            get(books::advent::form::add_page).post(books::advent::form::create),
-        )
-        .route(
-            "/books/advent-calendar/:year/days/:day",
-            post(books::advent::form::save_day).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
-        )
-        .route(
-            "/books/advent-calendar/:year/days/:day/rotate",
-            post(books::advent::form::rotate),
-        )
-        .route(
-            "/books/advent-calendar/:year/days/:day/delete",
-            post(books::advent::form::remove_day),
         )
         .route(
             "/pokemon/add",

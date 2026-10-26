@@ -9,18 +9,18 @@ use askama::Template;
 use axum::extract::{Multipart, Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use chrono::Datelike;
 use books_domain::isbn::Isbn;
+use chrono::Datelike;
 
 use super::{calendar_id, load_doors, Door, PHOTO_FOLDER};
 use crate::store::book_data;
 use crate::store::books::{self, BookFields};
-use crate::store::calendar_photos;
-use crate::store::db::{begin_write, Pool};
-use crate::web::day_form::{back_to, check_day, DayForm};
-use crate::web::error::{AppResult, OrNotFound};
-use crate::web::forms::{FormData, Pairs};
-use crate::AppState;
+use common::calendar_photos;
+use common::db::{begin_write, Pool};
+use common::web::day_form::{back_to, check_day, DayForm};
+use common::web::error::{AppResult, OrNotFound};
+use common::web::forms::{FormData, Pairs};
+use common::AppState;
 
 /// Where the day forms go back to (`day_form::back_to`).
 const EDIT_BASE: &str = "/books/advent-calendar";

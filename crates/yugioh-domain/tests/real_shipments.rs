@@ -10,10 +10,10 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use yugioh_domain::cardmarket::parse_shipment_pdf;
-use yugioh_domain::lot::LotType;
 use rust_decimal::Decimal;
 use sqlx::Row;
+use yugioh_domain::cardmarket::parse_shipment_pdf;
+use yugioh_domain::lot::LotType;
 
 const ACCOUNT: &str = "0rtie";
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");

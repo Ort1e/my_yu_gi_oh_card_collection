@@ -3,9 +3,9 @@
 
 use std::collections::HashSet;
 
-use yugioh_domain::card::normalize_card_name;
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
+use yugioh_domain::card::normalize_card_name;
 
 use crate::store::db::Money;
 use crate::web::card_rows::NewCards;

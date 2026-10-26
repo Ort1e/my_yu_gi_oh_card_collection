@@ -14,14 +14,14 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{Duration, NaiveDate};
+use serde_json::Value;
+use sqlx::SqliteConnection;
 use yugioh_domain::card_set::{code_rarities, code_without_language};
 use yugioh_domain::cardmarket_catalog::{
     expansions, parse_prices, parse_products, pick_expansion, pick_product, Product, ProductPrices,
     PRICES_URL, PRODUCTS_URL,
 };
 use yugioh_domain::rarity::Rarity;
-use serde_json::Value;
-use sqlx::SqliteConnection;
 
 use crate::store::card_data::{fetch_set_infos, SetInfo};
 use crate::store::db::{begin_write, commit_unless_dry_run, Money, Pool};

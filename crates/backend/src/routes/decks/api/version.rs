@@ -12,10 +12,10 @@ use std::collections::{HashMap, HashSet};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use yugioh_domain::built_deck::plan_build;
-use yugioh_domain::ydke::YdkeDeck;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::QueryBuilder;
+use yugioh_domain::built_deck::plan_build;
+use yugioh_domain::ydke::YdkeDeck;
 
 use super::tournament::Tournament;
 use super::{load_cards, ApiCard, Created};

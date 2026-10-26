@@ -18,8 +18,8 @@ use books_domain::isbn::Isbn;
 use serde_json::json;
 
 use crate::store::{book_data, books};
-use crate::web::error::{bad_request, AppResult};
-use crate::AppState;
+use common::web::error::{bad_request, AppResult};
+use common::AppState;
 
 pub async fn isbn(State(state): State<AppState>, Path(text): Path<String>) -> AppResult<Response> {
     let isbn = match Isbn::parse(&text) {

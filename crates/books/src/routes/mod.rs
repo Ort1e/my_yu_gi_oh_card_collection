@@ -20,10 +20,10 @@ use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
-use crate::routes::cards::like_pattern;
-use crate::web::error::{AppResult, OrNotFound};
-use crate::web::pagination::{self, Page, PAGE_SIZE};
-use crate::AppState;
+use common::sql::like_pattern;
+use common::web::error::{AppResult, OrNotFound};
+use common::web::pagination::{self, Page, PAGE_SIZE};
+use common::AppState;
 
 /// A book in a list: its authors joined, its series.
 #[derive(Debug, sqlx::FromRow)]
@@ -233,10 +233,7 @@ impl BookDetail {
 }
 
 /// The authors of a book, in order: `(id, name)`.
-pub async fn book_authors(
-    pool: &crate::store::db::Pool,
-    id: i64,
-) -> sqlx::Result<Vec<(i64, String)>> {
+pub async fn book_authors(pool: &common::db::Pool, id: i64) -> sqlx::Result<Vec<(i64, String)>> {
     sqlx::query_as(
         "SELECT a.id, a.name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
          WHERE ba.book_id = ? ORDER BY ba.position",

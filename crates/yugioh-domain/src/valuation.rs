@@ -38,7 +38,6 @@ pub use common_domain::{condition_factor, EXCELLENT_FACTOR, GOOD_FACTOR, POOR_FA
 /// Language factor of non-English copies (English and unknown: 1).
 pub const NON_ENGLISH_FACTOR: Decimal = Decimal::from_parts(9, 0, 0, false, 1);
 
-
 /// `language`: from the copy's code (`Language::of_code`), `None` for old
 /// codes without one (English sets).
 pub fn language_factor(language: Option<Language>) -> Decimal {

@@ -15,10 +15,10 @@ use books_domain::isbn::Isbn;
 use serde::Deserialize;
 
 use crate::store::books::{self, BookFields};
-use crate::store::db::{begin_write, Pool};
-use crate::web::error::{AppError, AppResult, OrNotFound};
-use crate::web::forms::{FormData, Pairs};
-use crate::AppState;
+use common::db::{begin_write, Pool};
+use common::web::error::{AppError, AppResult, OrNotFound};
+use common::web::forms::{FormData, Pairs};
+use common::AppState;
 
 /// Book fields as typed, to fill the form again.
 #[derive(Debug, Default)]

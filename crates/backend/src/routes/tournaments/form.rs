@@ -10,8 +10,8 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 use serde::Deserialize;
+use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 
 use super::data::{self, RoundView, Which};
 use crate::store::db::{begin_write, Pool};

@@ -45,7 +45,8 @@ async fn deck_version_zones_and_reserve() {
     assert_eq!(deck["main"][0]["price"], "2.25");
     assert_eq!(deck["side"][0]["is_proxy"], true);
     let ydke =
-        yugioh_domain::ydke::YdkeDeck::parse(deck["ydke"]["without_proxies"].as_str().unwrap()).unwrap();
+        yugioh_domain::ydke::YdkeDeck::parse(deck["ydke"]["without_proxies"].as_str().unwrap())
+            .unwrap();
     assert_eq!(ydke.main, vec![46986414]);
     assert!(ydke.side.is_empty());
 

@@ -28,10 +28,10 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use sqlx::SqliteConnection;
 use yugioh_domain::card::{clean_card_name, normalize_card_name};
 use yugioh_domain::card_set::single_rarity;
 use yugioh_domain::rarity::split_cardmarket_name;
-use sqlx::SqliteConnection;
 
 use crate::store::card_data::{get_or_fetch, plan_translations, Translation};
 use crate::store::cards::{delete_orphan_proxies, replace_proxies};

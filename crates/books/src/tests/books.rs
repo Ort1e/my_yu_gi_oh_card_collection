@@ -425,14 +425,3 @@ async fn reading_is_public_writing_needs_the_login() {
     assert!(answer["error"].is_string());
     assert_eq!(t.scalar("SELECT count(*) FROM book").await, 1);
 }
-
-#[tokio::test]
-async fn pages_link_the_two_collections() {
-    let t = TestApp::new().await;
-    let (_, cards) = t.get("/cards").await;
-    assert!(cards.contains(r#"<a href="/books" class="section-switch""#));
-    let (_, books) = t.get("/books").await;
-    assert!(books.contains(r#"<a href="/" class="section-switch""#));
-    assert!(books.contains(r#"<body class="books">"#));
-    assert!(books.contains(r#"name="viewport""#));
-}

@@ -3,8 +3,8 @@
 
 use axum::extract::{Path, State};
 use axum::Json;
-use yugioh_domain::card_set::{self, SetCard};
 use serde::Serialize;
+use yugioh_domain::card_set::{self, SetCard};
 
 use crate::store::card_data::fetch_set;
 use crate::web::error::{bad_request, AppResult};

@@ -35,7 +35,8 @@ impl TestApp {
         let _ = tracing_subscriber::fmt().with_test_writer().try_init();
         let dir = std::env::temp_dir().join(format!("ygo-test-{:016x}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
-        let options = crate::db::connect_options(&format!("sqlite:{}", dir.join("app.db").display()));
+        let options =
+            crate::db::connect_options(&format!("sqlite:{}", dir.join("app.db").display()));
         let pool = SqlitePoolOptions::new()
             .connect_with(options)
             .await
@@ -129,6 +130,49 @@ impl TestApp {
             .fetch_one(&self.state.pool)
             .await
             .unwrap()
+    }
+
+    /// POST a multipart form: text fields, then an optional file `photo`.
+    pub async fn multipart(
+        &self,
+        uri: &str,
+        fields: &[(&str, &str)],
+        photo: Option<&[u8]>,
+    ) -> (StatusCode, String) {
+        let boundary = "XyZboundary";
+        let mut body = Vec::new();
+        for (name, value) in fields {
+            body.extend(
+                format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n")
+                    .as_bytes(),
+            );
+        }
+        if let Some(photo) = photo {
+            body.extend(
+                format!(
+                    "--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"p.png\"\r\n\
+                     Content-Type: image/png\r\n\r\n"
+                )
+                .as_bytes(),
+            );
+            body.extend(photo);
+            body.extend(b"\r\n");
+        }
+        body.extend(format!("--{boundary}--\r\n").as_bytes());
+        let response = self
+            .router()
+            .oneshot(
+                Request::post(uri)
+                    .header(
+                        header::CONTENT_TYPE,
+                        format!("multipart/form-data; boundary={boundary}"),
+                    )
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        read(response).await
     }
 
     /// Run SQL (fixtures), panicking on error.

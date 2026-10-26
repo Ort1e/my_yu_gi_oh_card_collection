@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 
 use askama::Template;
 use axum::extract::State;
-use yugioh_domain::budget::{self, first_of_month, BudgetTotals, RecapEntry};
-use yugioh_domain::lot::LotType;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
+use yugioh_domain::budget::{self, first_of_month, BudgetTotals, RecapEntry};
+use yugioh_domain::lot::LotType;
 
 use super::budget::BudgetData;
 use super::collection::ValueData;

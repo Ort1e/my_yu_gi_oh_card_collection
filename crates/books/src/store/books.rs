@@ -6,7 +6,7 @@ use books_domain::book::{author_sort_name, BookFormat, BookInfo};
 use books_domain::isbn::Isbn;
 use sqlx::SqliteConnection;
 
-use crate::store::db::today;
+use common::db::today;
 
 /// The fields of a book, validated (`routes::books::form` builds them from
 /// the form, [`BookFields::from_info`] from a lookup).

@@ -5,9 +5,9 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 
 use super::BookRow;
-use crate::web::error::{AppResult, OrNotFound};
-use crate::web::pagination::{Page, PageParam, PAGE_SIZE};
-use crate::AppState;
+use common::web::error::{AppResult, OrNotFound};
+use common::web::pagination::{Page, PageParam, PAGE_SIZE};
+use common::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct AuthorRow {

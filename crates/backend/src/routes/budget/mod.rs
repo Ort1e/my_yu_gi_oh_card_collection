@@ -3,9 +3,9 @@ pub mod form;
 use askama::Template;
 use axum::extract::State;
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use yugioh_domain::budget::{self, BudgetSummary, BudgetTotals, LotSummary, RecapEntry};
 use yugioh_domain::lot::{shipping_cost, LotType};
-use rust_decimal::Decimal;
 
 use crate::store::db::today;
 use crate::store::db::{Money, Pool};

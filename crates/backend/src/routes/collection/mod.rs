@@ -10,8 +10,8 @@ pub use data::ValueData;
 use askama::Template;
 use axum::extract::State;
 use chrono::NaiveDate;
-use yugioh_domain::valuation::{unit_totals_on, Totals, UnitTotals};
 use rust_decimal::Decimal;
+use yugioh_domain::valuation::{unit_totals_on, Totals, UnitTotals};
 
 use sections::{
     chart_json, copy_lines, deck_values, lot_lines, moves, percent, top_n, CopyLine, DeckLine,

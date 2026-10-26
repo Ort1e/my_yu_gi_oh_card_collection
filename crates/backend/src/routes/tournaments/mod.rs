@@ -11,8 +11,8 @@ use std::collections::HashMap;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
-use yugioh_domain::tournament::{ordinal, stats, Record, RoundResult, Stats};
 use serde::Deserialize;
+use yugioh_domain::tournament::{ordinal, stats, Record, RoundResult, Stats};
 
 pub use self::data::{deck_labels, label_names};
 use self::data::{RoundView, TournamentRow, Which};

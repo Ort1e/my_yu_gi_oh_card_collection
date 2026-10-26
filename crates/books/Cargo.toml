@@ -1,0 +1,25 @@
+[package]
+name = "books"
+version = "0.1.0"
+edition = "2021"
+
+# The book collection: its pages, data and ISBN lookups.
+
+[dependencies]
+common = { path = "../common" }
+books-domain = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+askama = { workspace = true }
+askama_axum = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+common = { path = "../common", features = ["test-support"] }
+image = { workspace = true }

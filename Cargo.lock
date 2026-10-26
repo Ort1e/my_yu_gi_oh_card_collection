@@ -209,6 +209,7 @@ dependencies = [
  "askama_axum",
  "axum",
  "base64 0.22.1",
+ "books",
  "books-domain",
  "chrono",
  "common",
@@ -278,6 +279,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "books"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "askama_axum",
+ "axum",
+ "books-domain",
+ "chrono",
+ "common",
+ "image",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]

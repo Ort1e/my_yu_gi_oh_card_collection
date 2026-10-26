@@ -1,8 +1,17 @@
 //! The book advent calendars (the twin of `advent.rs`).
 
-use super::advent::multipart;
 use super::books::cache_lookup;
 use super::*;
+
+/// POST a multipart form: text fields, then an optional file `photo`.
+async fn multipart(
+    t: &TestApp,
+    uri: &str,
+    fields: &[(&str, &str)],
+    photo: Option<&[u8]>,
+) -> (StatusCode, String) {
+    t.multipart(uri, fields, photo).await
+}
 
 /// A 2025 book calendar with Circe (book 1) behind door 3.
 async fn calendar(t: &TestApp) {

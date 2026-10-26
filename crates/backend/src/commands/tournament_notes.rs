@@ -12,8 +12,8 @@
 use std::path::Path;
 
 use anyhow::{bail, Context};
-use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 use serde::Deserialize;
+use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 
 use crate::store::db::begin_write;
 use crate::store::tournaments::{self, GameFields, Results, RoundFields};

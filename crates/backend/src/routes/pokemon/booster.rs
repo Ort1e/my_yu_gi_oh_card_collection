@@ -22,12 +22,12 @@ use askama::Template;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use yugioh_domain::card::CardStatus;
 use pokemon_domain::pulls::{self, Pull};
 use pokemon_domain::{
     default_variant, is_full_art, parse_language, Catalogue, Source, Variant, LANGUAGES,
 };
 use serde::Deserialize;
+use yugioh_domain::card::CardStatus;
 
 use super::form::{find_card, Added};
 use super::{card_names, image_src, rarities};

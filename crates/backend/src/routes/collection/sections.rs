@@ -5,11 +5,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use yugioh_domain::card::{CardStatus, Language};
-use yugioh_domain::valuation::{copy_value, history, lot_gain, Prices};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
+use yugioh_domain::card::{CardStatus, Language};
+use yugioh_domain::valuation::{copy_value, history, lot_gain, Prices};
 
 use super::data::ValueData;
 use crate::store::db::Pool;

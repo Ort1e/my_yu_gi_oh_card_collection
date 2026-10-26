@@ -2,8 +2,6 @@
 //! row types, card-row writes and shared SQL, ygoprodeck card data, the
 //! shipment PDF files and uploaded photos.
 
-pub mod book_data;
-pub mod books;
 pub mod card_data;
 pub mod cards;
 pub mod models;

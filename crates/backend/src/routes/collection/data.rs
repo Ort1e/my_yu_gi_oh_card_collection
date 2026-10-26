@@ -4,10 +4,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{Duration, NaiveDate};
+use rust_decimal::Decimal;
 use yugioh_domain::valuation::{
     biggest_moves, totals_on, Copy, Lot, PriceMove, PriceSource, Prices, Totals,
 };
-use rust_decimal::Decimal;
 
 use crate::store::db::{today, Pool};
 use crate::store::prices::history::{latest_prices, prices_by_date};

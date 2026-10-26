@@ -19,8 +19,8 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 
 use super::Variant;
-use common_domain::CardStatus;
 use common_domain::condition_factor;
+use common_domain::CardStatus;
 
 /// Today's price of each variant TCGdex prices, from a card's JSON.
 pub fn variant_prices(card: &Value) -> BTreeMap<Variant, Decimal> {

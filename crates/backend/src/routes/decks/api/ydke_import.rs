@@ -6,9 +6,9 @@ use std::collections::{HashMap, HashSet};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use serde::Deserialize;
 use yugioh_domain::card::normalize_card_name;
 use yugioh_domain::ydke::YdkeDeck;
-use serde::Deserialize;
 
 use super::Created;
 use crate::store::card_data::get_or_fetch_by_ygopro_id;

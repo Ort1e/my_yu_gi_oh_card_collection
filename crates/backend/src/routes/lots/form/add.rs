@@ -9,16 +9,16 @@ use askama::Template;
 use axum::extract::{Multipart, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use yugioh_domain::cardmarket::{parse_shipment_pdf, Shipment};
 use sqlx::{Sqlite, SqliteConnection, Transaction};
+use yugioh_domain::cardmarket::{parse_shipment_pdf, Shipment};
 
 use super::{sellers, validate_lot, LotValues};
 use crate::store::card_data::spawn_link_cards;
 use crate::store::cards::insert_lot_cards;
 use crate::store::db::{begin_write, exists, Money};
 use crate::store::shipment_files::{self, pending_path, Attached};
-use crate::web::error::{AppError, AppResult};
 use crate::web::card_rows::{CardRowValues, CardRows};
+use crate::web::error::{AppError, AppResult};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
 
