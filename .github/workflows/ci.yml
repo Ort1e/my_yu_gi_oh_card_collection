@@ -1,0 +1,48 @@
+# Checks of every push to dev or main and of every pull request: the tests
+# never need the private data submodule, so it isn't checked out.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the toolchain of rust-toolchain.toml, with the checks' components
+      - run: rustup show active-toolchain && rustup component add clippy rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # accepted advisories: .cargo/audit.toml
+      - run: cargo audit
+
+  deck-builder:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # what ships in the bundle (chart.js); the build tools (Vite, Svelte 4)
+      # have dev-server advisories, fixed by moving to Vite 8 and Svelte 5
+      - run: npm audit --omit=dev --audit-level=high

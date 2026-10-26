@@ -1,14 +1,15 @@
 # Spec: deployment, security and repository workflow
 
-Status: **plan, to review** (2026-10-26). Nothing is done yet: each step
-below is started only after the owner's go.
+Status: **plan, answers in** (2026-10-26). Steps 1–3 can start; the NAS
+steps wait for its model. GitHub settings are changed only after a go.
 
 ## What we want
 
 - The whole app, for the owner and one friend, from anywhere (phones too).
-- A **public, read-only view of the collection** to share with others: the
-  cards only. No lots, sellers, budget, decks, tournaments, advent
-  calendars, and nothing that changes data.
+- A **public, read-only view of the collection** to share with others:
+  the Yu-Gi-Oh! cards, the Pokémon cards and the books, **with their market
+  value** (owner, 2026-10-26). No lots, sellers, prices paid, budget,
+  decks, tournaments, advent calendars, and nothing that changes data.
 - The owner has a **NAS, always on**, and an **OVH domain name** with the
   free hosting plan: 100 MB, 1 FTP access, free SSL, static files and PHP
   only (no program of ours can run there).
@@ -36,7 +37,8 @@ below is started only after the owner's go.
   `export-public`) and uploaded to the OVH hosting every night. There is no
   server to attack, only files; the copy holds only what we choose to show.
   About 650 Yu-Gi-Oh! and 60 Pokémon cards with small pictures (~25 KB
-  each) fit well under 100 MB.
+  each) and the books (no pictures) fit well under 100 MB. Address:
+  `collection.<domain>` (the owner doesn't mind which).
 
 The other option, exposing a read-only part of the app on the NAS through
 the domain (port forwarding + OVH DynHost, or a Cloudflare tunnel), means a
@@ -82,7 +84,13 @@ committed by hand. After the move:
    own text, or escaped. A test with a card named `<script>…`.
 8. **The public export**: a test that the exported files contain no lot,
    seller, budget, price paid, deck, tournament or calendar.
-9. **Dependencies**: `cargo audit` and `npm audit` in CI (below).
+9. **Dependencies**: `cargo audit` and `npm audit` in CI (below). Done
+   on `dev`: `cargo update` (rustls, webpki, tokio fixes), `lopdf` 0.42
+   (stack overflow on nested PDFs; same parsing of the 144 real
+   shipments), lopdf's logs capped at `error`. Accepted with reasons in
+   `.cargo/audit.toml`: `rsa` (never built), `sqlx` 0.7 (Postgres/MySQL
+   only). Later: sqlx 0.8; the deck builder's build tools (Vite 8,
+   Svelte 5: dev-server advisories only, nothing in the bundle).
 10. **The NAS**: its admin page not exposed, automatic updates, Tailscale
     ACL limited to the app's port, the passwords in its environment only
     (never in git).
@@ -121,13 +129,15 @@ committed by hand. After the move:
 6. The scans (11), then this spec moves into `docs/tour.md` / `recipes.md`
    and is deleted.
 
-## Questions for the owner
+## Updates of the app
+
+Automatic if simple (the owner prefers it, not mandatory): the CI builds
+the app for the NAS when `main` changes (a container image on GitHub's
+registry, or a binary), and the NAS checks for a new one every night,
+backs up, then restarts on it. Otherwise one command by hand.
+
+## Still open
 
 1. Which NAS (brand, model)? Does it run Docker (or Container Manager)?
    Its processor (Intel/AMD or ARM) decides how the app is built.
 2. The friend: their own password, or the owner's?
-3. The public view: Yu-Gi-Oh! cards and Pokémon cards (the books too?),
-   with their market value or without?
-4. Its address: a subdomain like `collection.<your domain>`?
-5. The app's updates on the NAS: by hand (one command) or automatic when
-   `main` changes?

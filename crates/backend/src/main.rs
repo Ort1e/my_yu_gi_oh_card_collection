@@ -21,9 +21,12 @@ pub use common::AppState;
 async fn main() {
     dotenvy::dotenv().ok();
 
+    // lopdf's debug logs describe the shipment PDFs (personal data): never
+    // shown, even with RUST_LOG=debug (CLAUDE.md, "Privacy rule")
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .from_env_lossy();
+        .from_env_lossy()
+        .add_directive("lopdf=error".parse().expect("a valid directive"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args: Vec<String> = std::env::args().skip(1).collect();

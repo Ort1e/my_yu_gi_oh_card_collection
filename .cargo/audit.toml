@@ -1,0 +1,11 @@
+# `cargo audit` (run by the CI): advisories checked and accepted, with why.
+# Look at them again when sqlx moves to 0.8.
+[advisories]
+ignore = [
+    # rsa (Marvin attack, no fixed version): only in Cargo.lock through
+    # sqlx's MySQL driver, which is never built (`cargo tree -i rsa` is empty).
+    "RUSTSEC-2023-0071",
+    # sqlx 0.7 (casts in the Postgres/MySQL binary protocols): SQLite isn't
+    # concerned; fixed by sqlx 0.8 (a separate upgrade).
+    "RUSTSEC-2024-0363",
+]
