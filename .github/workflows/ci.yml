@@ -49,18 +49,20 @@ jobs:
 
   # The app for the NAS (Netgear ReadyNAS: x86_64, Debian 8): static (musl,
   # so its old libraries don't matter), with the deck builder and the
-  # stylesheets. Built on every push; from main, published as the release
-  # `nas-latest`, which the NAS installs at night (deploy/nas/update.sh).
+  # stylesheets. Built only for main: on pull requests into it (to check)
+  # and on pushes to it; in parallel with the tests, with its own cache
+  # (only the first build compiles everything).
   nas-build:
-    needs: [rust, deck-builder]
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
       - run: rustup target add x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: nas-musl
+          cache-on-failure: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -80,8 +82,28 @@ jobs:
           git rev-parse --short HEAD > dist/collection/VERSION
           cp dist/collection/VERSION dist/VERSION
           tar -czf dist/collection-nas.tar.gz -C dist collection
-      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nas-build
+          path: |
+            dist/collection-nas.tar.gz
+            dist/VERSION
+          retention-days: 7
+
+  # Published as the release `nas-latest` (which the NAS installs at night,
+  # deploy/nas/update.sh) from main only, once everything else is green.
+  nas-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [rust, audit, deck-builder, nas-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nas-build
+          path: dist
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: nas-latest
           name: NAS build (latest main)

@@ -80,9 +80,11 @@ read-only**, an expiry (a year; renew it then). It goes in `nightly.env`
 
 ## 3. First install
 
-The CI builds the app for the NAS on every push to `main` (job
-`nas-build`: static, so the NAS's old Debian doesn't matter) and publishes
-it as the release `nas-latest`. From the computer, at the repository's
+The CI builds the app for the NAS (job `nas-build`: static, so the NAS's
+old Debian doesn't matter) on pull requests into `main` and on pushes to
+it, not on `dev` (an optimized build takes long: about 15 minutes the
+first time, a few minutes once cached); after a push to `main`, with all
+the checks green, `nas-release` publishes it as the release `nas-latest`. From the computer, at the repository's
 root:
 
 ```bash
