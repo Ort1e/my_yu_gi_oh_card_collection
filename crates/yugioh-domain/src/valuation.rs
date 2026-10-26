@@ -32,21 +32,12 @@ use rust_decimal::Decimal;
 
 use crate::card::{CardStatus, Language};
 
-/// Condition factors (MT, NM and unknown: 1).
-pub const EXCELLENT_FACTOR: Decimal = Decimal::from_parts(8, 0, 0, false, 1);
-pub const GOOD_FACTOR: Decimal = Decimal::from_parts(6, 0, 0, false, 1);
-pub const POOR_FACTOR: Decimal = Decimal::from_parts(4, 0, 0, false, 1);
+/// Condition factors (MT, NM and unknown: 1): shared with the Pokémon cards.
+pub use common_domain::{condition_factor, EXCELLENT_FACTOR, GOOD_FACTOR, POOR_FACTOR};
+
 /// Language factor of non-English copies (English and unknown: 1).
 pub const NON_ENGLISH_FACTOR: Decimal = Decimal::from_parts(9, 0, 0, false, 1);
 
-pub fn condition_factor(status: Option<CardStatus>) -> Decimal {
-    match status {
-        Some(CardStatus::Excellent) => EXCELLENT_FACTOR,
-        Some(CardStatus::Good) => GOOD_FACTOR,
-        Some(CardStatus::Poor) => POOR_FACTOR,
-        Some(CardStatus::Mint | CardStatus::NearMint) | None => Decimal::ONE,
-    }
-}
 
 /// `language`: from the copy's code (`Language::of_code`), `None` for old
 /// codes without one (English sets).

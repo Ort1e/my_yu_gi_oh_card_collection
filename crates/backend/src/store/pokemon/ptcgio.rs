@@ -15,7 +15,7 @@
 
 use std::time::{Duration, Instant};
 
-use domain::pokemon::fold_name;
+use pokemon_domain::fold_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
 

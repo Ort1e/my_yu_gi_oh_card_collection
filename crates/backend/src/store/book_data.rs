@@ -7,12 +7,12 @@
 //! the language, series and format. Google Books (no key) fills what Open
 //! Library lacks or finds nothing for; its anonymous quota is often used up,
 //! so its failures are only logged. Parsing the answers is
-//! `domain::book`'s.
+//! `books_domain::book`'s.
 
 use std::time::{Duration, Instant};
 
-use domain::book::{self, BookInfo};
-use domain::isbn::Isbn;
+use books_domain::book::{self, BookInfo};
+use books_domain::isbn::Isbn;
 use serde_json::Value;
 use tokio::sync::Mutex;
 

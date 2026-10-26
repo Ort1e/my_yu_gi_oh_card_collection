@@ -20,7 +20,7 @@ use crate::store::pokemon::{prices, sets};
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
-use domain::pokemon::{parse_language, Catalogue, LANGUAGES};
+use pokemon_domain::{parse_language, Catalogue, LANGUAGES};
 
 /// An opening in the list, with its value.
 pub struct OpeningRow {

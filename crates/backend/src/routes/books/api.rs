@@ -13,8 +13,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use domain::book::BookFormat;
-use domain::isbn::Isbn;
+use books_domain::book::BookFormat;
+use books_domain::isbn::Isbn;
 use serde_json::json;
 
 use crate::store::{book_data, books};

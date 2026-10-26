@@ -20,8 +20,8 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use domain::pokemon::card_ref::{self, CardRef};
-use domain::pokemon::{
+use pokemon_domain::card_ref::{self, CardRef};
+use pokemon_domain::{
     default_variant, is_full_art, language_label, parse_language, Catalogue, Variant,
 };
 use serde::Deserialize;

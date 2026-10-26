@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
-use domain::card::{normalize_card_name, CardStatus};
-use domain::rarity::Rarity;
+use yugioh_domain::card::{normalize_card_name, CardStatus};
+use yugioh_domain::rarity::Rarity;
 use rust_decimal::Decimal;
 
 pub type Pairs = Vec<(String, String)>;

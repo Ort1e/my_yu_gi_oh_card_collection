@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use domain::card::normalize_card_name;
+use yugioh_domain::card::normalize_card_name;
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
@@ -80,7 +80,7 @@ pub const IN_VERSION: &str = "SELECT card_id FROM deck_version_main_deck WHERE d
 
 /// SQL subquery: ids of the cards **locked** by a built version other than
 /// `version_id` (0: by any built version), i.e. its real cards. They are out
-/// of the collection for every other version (`domain::built_deck`). The id
+/// of the collection for every other version (`yugioh_domain::built_deck`). The id
 /// is an integer written in the SQL, so the subquery mixes with any binds.
 pub fn locked_elsewhere(version_id: i64) -> String {
     format!(
@@ -179,8 +179,8 @@ pub async fn insert_lot_cards(
             .bind(&row.name)
             .bind(&row.en_name)
             .bind(&row.code)
-            .bind(row.status.map(domain::card::CardStatus::code))
-            .bind(row.rarity.map(domain::rarity::Rarity::label))
+            .bind(row.status.map(yugioh_domain::card::CardStatus::code))
+            .bind(row.rarity.map(yugioh_domain::rarity::Rarity::label))
             .bind(row.is_proxy)
             .execute(&mut *conn)
             .await?

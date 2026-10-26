@@ -1,9 +1,9 @@
 //! Reading tournaments back with their rounds, games and labels, for the
-//! pages and the stats (`domain::tournament::stats`).
+//! pages and the stats (`yugioh_domain::tournament::stats`).
 
 use std::collections::HashMap;
 
-use domain::tournament::{Die, Game, GameResult, RoundRecord, RoundResult};
+use yugioh_domain::tournament::{Die, Game, GameResult, RoundRecord, RoundResult};
 use sqlx::QueryBuilder;
 
 use crate::store::db::push_ids;

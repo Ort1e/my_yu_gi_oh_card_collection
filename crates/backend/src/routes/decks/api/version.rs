@@ -1,6 +1,6 @@
 //! Load, save, delete and copy a deck version, and build it.
 //!
-//! A built version (`is_built`, `domain::built_deck`) locks its real cards:
+//! A built version (`is_built`, `yugioh_domain::built_deck`) locks its real cards:
 //! building one turns its cards shared with other versions into proxies
 //! there, saving zones with a card locked by another built version is
 //! refused, saving a built version's zones takes its new cards from the
@@ -12,8 +12,8 @@ use std::collections::{HashMap, HashSet};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use domain::built_deck::plan_build;
-use domain::ydke::YdkeDeck;
+use yugioh_domain::built_deck::plan_build;
+use yugioh_domain::ydke::YdkeDeck;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::QueryBuilder;
 

@@ -3,7 +3,7 @@
 //! saved, then moves to `<media>/shipment_files/shipment_<lot id>.pdf`.
 //!
 //! Only the files are handled here; their text (personal data) is parsed in
-//! `domain::cardmarket` and never stored or logged.
+//! `yugioh_domain::cardmarket` and never stored or logged.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;

@@ -17,7 +17,7 @@ pub use translations::{plan_translations, Translation};
 
 use std::time::{Duration, Instant};
 
-use domain::card::clean_card_name;
+use yugioh_domain::card::clean_card_name;
 use serde_json::Value;
 use tokio::sync::Mutex;
 

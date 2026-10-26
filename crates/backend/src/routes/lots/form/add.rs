@@ -9,7 +9,7 @@ use askama::Template;
 use axum::extract::{Multipart, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::cardmarket::{parse_shipment_pdf, Shipment};
+use yugioh_domain::cardmarket::{parse_shipment_pdf, Shipment};
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
 use super::{sellers, validate_lot, LotValues};
@@ -88,12 +88,12 @@ impl AddLotPage {
         CardRowValues::default()
     }
 
-    fn statuses(&self) -> [domain::card::CardStatus; 5] {
-        domain::card::CardStatus::ALL
+    fn statuses(&self) -> [yugioh_domain::card::CardStatus; 5] {
+        yugioh_domain::card::CardStatus::ALL
     }
 
-    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
-        domain::rarity::Rarity::ALL
+    fn rarities(&self) -> [yugioh_domain::rarity::Rarity; 34] {
+        yugioh_domain::rarity::Rarity::ALL
     }
 
     fn lot_type_is(&self, code: &str) -> bool {

@@ -1,13 +1,13 @@
 //! The Pokémon cards' Cardmarket prices (from TCGdex), in `pokemon_price`:
 //! one row per card and date, each variant's price
-//! (`domain::pokemon::price`). Refreshed weekly with the Yu-Gi-Oh! prices
+//! (`pokemon_domain::price`). Refreshed weekly with the Yu-Gi-Oh! prices
 //! (`commands::prices`), for the cards owned (not sold) or wished.
 
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::NaiveDate;
-use domain::pokemon::price::{from_json, to_json, variant_prices};
-use domain::pokemon::{Catalogue, Variant};
+use pokemon_domain::price::{from_json, to_json, variant_prices};
+use pokemon_domain::{Catalogue, Variant};
 use rust_decimal::Decimal;
 
 use super::{cards, tcgdex};

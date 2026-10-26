@@ -11,8 +11,8 @@ use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::card::{normalize_card_name, CardStatus};
-use domain::rarity::Rarity;
+use yugioh_domain::card::{normalize_card_name, CardStatus};
+use yugioh_domain::rarity::Rarity;
 
 use crate::store::card_data::spawn_link_cards;
 use crate::store::db::begin_write;
@@ -211,8 +211,8 @@ pub async fn update(
     .bind(&name)
     .bind(&en_name)
     .bind(form.get("code"))
-    .bind(status.map(domain::card::CardStatus::code))
-    .bind(rarity.map(domain::rarity::Rarity::label))
+    .bind(status.map(yugioh_domain::card::CardStatus::code))
+    .bind(rarity.map(yugioh_domain::rarity::Rarity::label))
     .bind(form.checked("is_proxy"))
     .bind(renamed)
     .bind(renamed)

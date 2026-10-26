@@ -1,5 +1,5 @@
 //! The wishlist: cards wanted, with today's price against the most the
-//! owner wants to pay (`domain::pokemon::wish`). Public to read; adding,
+//! owner wants to pay (`pokemon_domain::wish`). Public to read; adding,
 //! editing, deleting and "Mark got" behind the login. A wish is got with a
 //! copy (`got_copy_id`): the add pages offer it when a new copy fulfils it.
 
@@ -7,8 +7,8 @@ use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::pokemon::wish::{Verdict, Wish};
-use domain::pokemon::{language_label, parse_language, Catalogue, Variant, LANGUAGES};
+use pokemon_domain::wish::{Verdict, Wish};
+use pokemon_domain::{language_label, parse_language, Catalogue, Variant, LANGUAGES};
 use rust_decimal::Decimal;
 
 use super::form::find_card;

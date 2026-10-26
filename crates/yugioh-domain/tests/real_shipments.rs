@@ -2,7 +2,7 @@
 //! submodule, using the lots they were imported into (`data/app.db`) as expected
 //! values. Ignored by default (needs the private data):
 //!
-//!   cargo test -p domain --test real_shipments -- --ignored
+//!   cargo test -p yugioh-domain --test real_shipments -- --ignored
 //!
 //! The PDFs contain personal data: this test only reports counts, lot ids
 //! and rarity codes (`UR`…), never extracted text or names.
@@ -10,8 +10,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use domain::cardmarket::parse_shipment_pdf;
-use domain::lot::LotType;
+use yugioh_domain::cardmarket::parse_shipment_pdf;
+use yugioh_domain::lot::LotType;
 use rust_decimal::Decimal;
 use sqlx::Row;
 
@@ -57,7 +57,7 @@ async fn real_shipments_match_their_lots() {
             if let Some(code) = &card.rarity_code {
                 let entry = rarity_codes.entry(code.clone()).or_insert((
                     0,
-                    domain::rarity::Rarity::from_cardmarket_code(code).is_some(),
+                    yugioh_domain::rarity::Rarity::from_cardmarket_code(code).is_some(),
                 ));
                 entry.0 += 1;
             }

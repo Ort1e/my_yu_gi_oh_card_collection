@@ -4,7 +4,7 @@
 //!
 //! Its filters (`?name=`, `?abbreviation.official=`) match "contains,
 //! ignoring the case" (`eq:` would be exact but case-sensitive): callers
-//! keep the exact matches. Answers are reshaped in `domain::pokemon`.
+//! keep the exact matches. Answers are reshaped in `pokemon_domain`.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};

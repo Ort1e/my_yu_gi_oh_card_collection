@@ -3,8 +3,8 @@ pub mod images;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
-use domain::card::Language;
-use domain::valuation::copy_value;
+use yugioh_domain::card::Language;
+use yugioh_domain::valuation::copy_value;
 use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
@@ -132,8 +132,8 @@ impl CardsList {
         value.as_deref().unwrap_or("") == option
     }
 
-    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
-        domain::rarity::Rarity::ALL
+    fn rarities(&self) -> [yugioh_domain::rarity::Rarity; 34] {
+        yugioh_domain::rarity::Rarity::ALL
     }
 }
 

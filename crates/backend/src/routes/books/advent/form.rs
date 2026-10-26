@@ -10,7 +10,7 @@ use axum::extract::{Multipart, Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 use chrono::Datelike;
-use domain::isbn::Isbn;
+use books_domain::isbn::Isbn;
 
 use super::{calendar_id, load_doors, Door, PHOTO_FOLDER};
 use crate::store::book_data;

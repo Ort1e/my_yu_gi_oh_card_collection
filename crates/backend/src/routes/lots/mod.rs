@@ -174,7 +174,7 @@ impl CopyGroup {
                 english_name: unite.english_name().map(str::to_string),
                 code: unite.code.clone().unwrap_or_default(),
                 rarity: unite.rarity.clone(),
-                status_label: domain::card::CardStatus::from_code(&status)
+                status_label: yugioh_domain::card::CardStatus::from_code(&status)
                     .map(|s| s.label().to_string())
                     .unwrap_or_default(),
                 status,
@@ -190,7 +190,7 @@ impl CopyGroup {
         self.rarity
             .as_deref()
             .and_then(|r| {
-                domain::rarity::Rarity::ALL
+                yugioh_domain::rarity::Rarity::ALL
                     .iter()
                     .position(|x| x.label() == r)
             })
@@ -227,12 +227,12 @@ impl LotDetail {
         CardRowValues::default()
     }
 
-    fn statuses(&self) -> [domain::card::CardStatus; 5] {
-        domain::card::CardStatus::ALL
+    fn statuses(&self) -> [yugioh_domain::card::CardStatus; 5] {
+        yugioh_domain::card::CardStatus::ALL
     }
 
-    fn rarities(&self) -> [domain::rarity::Rarity; 34] {
-        domain::rarity::Rarity::ALL
+    fn rarities(&self) -> [yugioh_domain::rarity::Rarity; 34] {
+        yugioh_domain::rarity::Rarity::ALL
     }
 }
 
@@ -277,7 +277,7 @@ pub async fn load_detail(
     );
 
     // rarities in the order of `Rarity::ALL`
-    let rarities: Vec<RarityCount> = domain::rarity::Rarity::ALL
+    let rarities: Vec<RarityCount> = yugioh_domain::rarity::Rarity::ALL
         .iter()
         .map(|r| RarityCount {
             rarity: r.label().to_string(),

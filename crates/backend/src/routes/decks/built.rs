@@ -1,4 +1,4 @@
-//! `/decks/built`: the built deck versions (`domain::built_deck`), where
+//! `/decks/built`: the built deck versions (`yugioh_domain::built_deck`), where
 //! they live, and the cards still missing to play them for real (their
 //! proxies), then all those missing cards together: the shopping list.
 

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use domain::monte_carlo;
+use yugioh_domain::monte_carlo;
 use serde::{Deserialize, Serialize};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
 

@@ -1,6 +1,6 @@
 //! Rows shared by several pages, with the display helpers the templates use.
 
-use domain::card::CardStatus;
+use yugioh_domain::card::CardStatus;
 
 use crate::store::db::Money;
 use crate::store::valuation::{estimate, MARKET_PRICE};
@@ -99,7 +99,7 @@ pub struct DeckVersionRow {
     pub id: i64,
     pub version_name: String,
     pub deck_name: Option<String>,
-    /// Locks its real cards (`domain::built_deck`).
+    /// Locks its real cards (`yugioh_domain::built_deck`).
     pub is_built: bool,
     pub deck_box: Option<String>,
     pub sleeves: Option<String>,

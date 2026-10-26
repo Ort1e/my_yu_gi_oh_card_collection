@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::NaiveDate;
-use domain::cardmarket_catalog::{Product, ProductPrices};
+use yugioh_domain::cardmarket_catalog::{Product, ProductPrices};
 use rust_decimal_macros::dec;
 
 use super::*;

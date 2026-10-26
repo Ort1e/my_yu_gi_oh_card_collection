@@ -12,7 +12,7 @@
 //! - `rarities.rs`: the rarity and variant guide; `images.rs`: card pictures.
 //!
 //! Copies are never deleted (sold instead); wishes are. Card data and
-//! prices: `store::pokemon`; the rules: `domain::pokemon`.
+//! prices: `store::pokemon`; the rules: `pokemon_domain`.
 
 pub mod api;
 pub mod booster;
@@ -26,9 +26,9 @@ use std::collections::{BTreeSet, HashMap};
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
-use domain::card::CardStatus;
-use domain::pokemon::price::copy_value;
-use domain::pokemon::{language_label, Source, Variant};
+use yugioh_domain::card::CardStatus;
+use pokemon_domain::price::copy_value;
+use pokemon_domain::{language_label, Source, Variant};
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};

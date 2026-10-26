@@ -1,0 +1,10 @@
+[package]
+name = "common-domain"
+version = "0.1.0"
+edition = "2021"
+
+# Pure rules shared by the card collections: no DB, no HTTP.
+
+[dependencies]
+serde = { workspace = true }
+rust_decimal = { workspace = true }

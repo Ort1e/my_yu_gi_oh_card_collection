@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use domain::card::normalize_card_name;
-use domain::ydke::YdkeDeck;
+use yugioh_domain::card::normalize_card_name;
+use yugioh_domain::ydke::YdkeDeck;
 use serde::Deserialize;
 
 use super::Created;

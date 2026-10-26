@@ -1,5 +1,5 @@
 //! `/tournaments`: every tournament with its record, and the stats
-//! (`domain::tournament::stats`); `/tournaments/:id`: one tournament round
+//! (`yugioh_domain::tournament::stats`); `/tournaments/:id`: one tournament round
 //! by round. The forms are in `form.rs`, the labels page in `labels.rs`
 //! (docs/tour.md, "Tournaments").
 
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
-use domain::tournament::{ordinal, stats, Record, RoundResult, Stats};
+use yugioh_domain::tournament::{ordinal, stats, Record, RoundResult, Stats};
 use serde::Deserialize;
 
 pub use self::data::{deck_labels, label_names};
@@ -305,7 +305,7 @@ pub struct RoundLine {
 
 impl RoundLine {
     fn new(round: &RoundView) -> RoundLine {
-        use domain::tournament::GameResult;
+        use yugioh_domain::tournament::GameResult;
 
         RoundLine {
             number: round.number,

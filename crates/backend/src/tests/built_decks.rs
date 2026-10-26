@@ -1,7 +1,7 @@
-//! Built decks: building a version locks its real cards (`domain::built_deck`,
+//! Built decks: building a version locks its real cards (`yugioh_domain::built_deck`,
 //! `decks/api/version.rs`), and the collection reads skip them.
 
-use domain::ydke::YdkeDeck;
+use yugioh_domain::ydke::YdkeDeck;
 use serde_json::{json, Value};
 
 use super::*;

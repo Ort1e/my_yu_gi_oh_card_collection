@@ -13,7 +13,7 @@ use super::translations::remember_translation;
 use super::{throttle, API_URL, SETS_URL};
 
 /// The ygoprodeck answers for one set prefix (`"RA05"`), for
-/// `domain::card_set::set_cards`. Several sets can share a prefix: their
+/// `yugioh_domain::card_set::set_cards`. Several sets can share a prefix: their
 /// cards are put together.
 #[derive(Debug, Clone)]
 pub struct FetchedSet {
@@ -181,12 +181,12 @@ pub async fn fetch_set_infos(
         .map_err(internal)?;
 
     for prefix in prefixes {
-        let (set_names, release) = domain::card_set::sets_with_code(&sets, prefix);
+        let (set_names, release) = yugioh_domain::card_set::sets_with_code(&sets, prefix);
         let mut cards = Vec::new();
         for set_name in &set_names {
             cards.extend(fetch_set_cards(http, set_name, None).await?);
         }
-        let names = domain::card_set::set_card_names(prefix, &cards);
+        let names = yugioh_domain::card_set::set_card_names(prefix, &cards);
         infos.insert(prefix.clone(), SetInfo { names, release });
     }
     Ok(infos)

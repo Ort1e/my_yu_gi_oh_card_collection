@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::IntoResponse;
-use domain::card::clean_card_name;
+use yugioh_domain::card::clean_card_name;
 
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::AppState;

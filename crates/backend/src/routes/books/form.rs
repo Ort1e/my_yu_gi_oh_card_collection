@@ -10,8 +10,8 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::book::{clean_name, split_authors, BookFormat};
-use domain::isbn::Isbn;
+use books_domain::book::{clean_name, split_authors, BookFormat};
+use books_domain::isbn::Isbn;
 use serde::Deserialize;
 
 use crate::store::books::{self, BookFields};

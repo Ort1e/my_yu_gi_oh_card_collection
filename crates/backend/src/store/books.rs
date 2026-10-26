@@ -2,8 +2,8 @@
 //! a book with its authors (in order) and its series, created on the way
 //! when new. Authors and series left without books are deleted.
 
-use domain::book::{author_sort_name, BookFormat, BookInfo};
-use domain::isbn::Isbn;
+use books_domain::book::{author_sort_name, BookFormat, BookInfo};
+use books_domain::isbn::Isbn;
 use sqlx::SqliteConnection;
 
 use crate::store::db::today;
@@ -14,7 +14,7 @@ use crate::store::db::today;
 pub struct BookFields {
     pub isbn: Option<Isbn>,
     pub title: String,
-    /// Cleaned (`domain::book::split_authors`), in order.
+    /// Cleaned (`books_domain::book::split_authors`), in order.
     pub authors: Vec<String>,
     pub publisher: Option<String>,
     pub year: Option<i64>,

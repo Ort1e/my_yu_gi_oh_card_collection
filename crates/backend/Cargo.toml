@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-domain = { workspace = true }
+yugioh-domain = { workspace = true }
+books-domain = { workspace = true }
+pokemon-domain = { workspace = true }
+common-domain = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }

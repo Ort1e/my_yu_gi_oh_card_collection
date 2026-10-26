@@ -1,10 +1,10 @@
 //! `/books/series`: the series, and the volumes of each with the missing
-//! ones (the gaps up to the last volume owned, `domain::book::missing_volumes`).
+//! ones (the gaps up to the last volume owned, `books_domain::book::missing_volumes`).
 //! Series are created and deleted with their books (`store::books`).
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
-use domain::book::missing_volumes;
+use books_domain::book::missing_volumes;
 
 use super::BookRow;
 use crate::web::error::{AppResult, OrNotFound};

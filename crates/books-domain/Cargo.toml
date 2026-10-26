@@ -1,0 +1,11 @@
+[package]
+name = "books-domain"
+version = "0.1.0"
+edition = "2021"
+
+# The book collection's pure rules: no DB, no HTTP.
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }

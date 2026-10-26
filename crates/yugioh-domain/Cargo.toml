@@ -1,11 +1,13 @@
 [package]
-name = "domain"
+name = "yugioh-domain"
 version = "0.1.0"
 edition = "2021"
 
-# Pure business logic ported from the Django models/helpers: no DB, no HTTP.
+# The Yu-Gi-Oh! collection's pure rules (ported from the Django models
+# and helpers): no DB, no HTTP.
 
 [dependencies]
+common-domain = { workspace = true }
 serde = { workspace = true }
 regex = { workspace = true }
 base64 = { workspace = true }

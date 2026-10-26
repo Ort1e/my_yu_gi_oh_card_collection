@@ -1,6 +1,6 @@
 //! `scrap-ban-list` (Django: `scrap_ban_list`).
 //!
-//! Imports the EU JSON lists, then the US HTML pages (see `domain::ban_list`)
+//! Imports the EU JSON lists, then the US HTML pages (see `yugioh_domain::ban_list`)
 //! as a fallback, for when the EU JSON lags behind (it stopped at May 2026 for
 //! a while): a US list is only imported for a date no list was imported for,
 //! even with `--all`. The US lists are the ones the US index links, plus those
@@ -18,7 +18,7 @@ use std::collections::HashSet;
 
 use anyhow::Context;
 use chrono::NaiveDate;
-use domain::ban_list::{
+use yugioh_domain::ban_list::{
     list_url, parse_list, parse_options, parse_us_list, parse_us_list_dates, us_list_url, BanList,
     BanListError, OPTIONS_URL, US_INDEX_URL,
 };
@@ -265,7 +265,7 @@ async fn same_as_previous(
 
 #[cfg(test)]
 mod tests {
-    use domain::ban_list::BanStatus;
+    use yugioh_domain::ban_list::BanStatus;
 
     use super::*;
     use crate::tests::TestApp;

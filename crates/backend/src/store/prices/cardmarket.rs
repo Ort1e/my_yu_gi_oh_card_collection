@@ -1,4 +1,4 @@
-//! Cardmarket's price guide (`domain::cardmarket_catalog`), refreshed with the
+//! Cardmarket's price guide (`yugioh_domain::cardmarket_catalog`), refreshed with the
 //! ygoprodeck prices (`refresh-prices`, weekly): the two files are downloaded
 //! into memory, and only what the collection needs goes to the database
 //! (migration 0009). The files themselves are never written anywhere.
@@ -14,12 +14,12 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{Duration, NaiveDate};
-use domain::card_set::{code_rarities, code_without_language};
-use domain::cardmarket_catalog::{
+use yugioh_domain::card_set::{code_rarities, code_without_language};
+use yugioh_domain::cardmarket_catalog::{
     expansions, parse_prices, parse_products, pick_expansion, pick_product, Product, ProductPrices,
     PRICES_URL, PRODUCTS_URL,
 };
-use domain::rarity::Rarity;
+use yugioh_domain::rarity::Rarity;
 use serde_json::Value;
 use sqlx::SqliteConnection;
 

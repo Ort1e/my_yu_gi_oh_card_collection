@@ -12,7 +12,7 @@
 use std::path::Path;
 
 use anyhow::{bail, Context};
-use domain::tournament::{split_labels, Die, GameResult, RoundResult};
+use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 use serde::Deserialize;
 
 use crate::store::db::begin_write;

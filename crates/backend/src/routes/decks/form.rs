@@ -6,7 +6,7 @@ use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::tournament::split_labels;
+use yugioh_domain::tournament::split_labels;
 
 use crate::routes::tournaments::{deck_labels, label_names};
 use crate::store::cards::delete_orphan_proxies;
@@ -76,7 +76,7 @@ pub struct EditDeckPage {
     errors: Vec<String>,
     name: String,
     description: String,
-    /// Its labels, comma-separated (`domain::tournament::split_labels`).
+    /// Its labels, comma-separated (`yugioh_domain::tournament::split_labels`).
     labels: String,
     label_names: Vec<String>,
 }

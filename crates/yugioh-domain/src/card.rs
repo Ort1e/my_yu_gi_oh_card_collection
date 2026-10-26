@@ -29,55 +29,8 @@ pub fn clean_card_name(name: &str) -> String {
     name.to_lowercase()
 }
 
-/// `card.last_known_status` choices.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum CardStatus {
-    #[serde(rename = "MT")]
-    Mint,
-    #[serde(rename = "NM")]
-    NearMint,
-    #[serde(rename = "EX")]
-    Excellent,
-    #[serde(rename = "G")]
-    Good,
-    #[serde(rename = "P")]
-    Poor,
-}
-
-impl CardStatus {
-    pub const ALL: [CardStatus; 5] = [
-        CardStatus::Mint,
-        CardStatus::NearMint,
-        CardStatus::Excellent,
-        CardStatus::Good,
-        CardStatus::Poor,
-    ];
-
-    /// Value stored in the database.
-    pub fn code(self) -> &'static str {
-        match self {
-            CardStatus::Mint => "MT",
-            CardStatus::NearMint => "NM",
-            CardStatus::Excellent => "EX",
-            CardStatus::Good => "G",
-            CardStatus::Poor => "P",
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            CardStatus::Mint => "Mint",
-            CardStatus::NearMint => "Near Mint",
-            CardStatus::Excellent => "Excellent",
-            CardStatus::Good => "Good",
-            CardStatus::Poor => "Poor",
-        }
-    }
-
-    pub fn from_code(code: &str) -> Option<CardStatus> {
-        CardStatus::ALL.into_iter().find(|s| s.code() == code)
-    }
-}
+/// `card.last_known_status` choices: shared with the Pokémon cards.
+pub use common_domain::CardStatus;
 
 /// The language of a card, as written in its code (`RA05-FR037`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -9,10 +9,10 @@
 //! (`pokemon_price`), so a new card has a value at once.
 
 use chrono::NaiveDate;
-use domain::card::CardStatus;
-use domain::pokemon::price::{to_json, variant_prices};
-use domain::pokemon::wish::{CopyKey, Wish};
-use domain::pokemon::{CardInfo, Catalogue, Source, Variant};
+use yugioh_domain::card::CardStatus;
+use pokemon_domain::price::{to_json, variant_prices};
+use pokemon_domain::wish::{CopyKey, Wish};
+use pokemon_domain::{CardInfo, Catalogue, Source, Variant};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use sqlx::SqliteConnection;

@@ -1,10 +1,10 @@
 //! The stored prices, ygoprodeck's (`card_price`) and Cardmarket's
-//! (`cardmarket_price`), as `domain::valuation::Prices` by refresh date.
+//! (`cardmarket_price`), as `yugioh_domain::valuation::Prices` by refresh date.
 
 use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
-use domain::valuation::Prices;
+use yugioh_domain::valuation::Prices;
 
 use crate::store::db::{Money, Pool};
 

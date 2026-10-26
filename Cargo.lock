@@ -209,11 +209,13 @@ dependencies = [
  "askama_axum",
  "axum",
  "base64 0.22.1",
+ "books-domain",
  "chrono",
- "domain",
+ "common-domain",
  "dotenvy",
  "hmac",
  "image",
+ "pokemon-domain",
  "rand 0.8.8",
  "regex",
  "reqwest",
@@ -229,6 +231,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "yugioh-domain",
 ]
 
 [[package]]
@@ -274,6 +277,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "books-domain"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -373,6 +385,14 @@ dependencies = [
  "num-traits",
  "serde",
  "windows-link",
+]
+
+[[package]]
+name = "common-domain"
+version = "0.1.0"
+dependencies = [
+ "rust_decimal",
+ "serde",
 ]
 
 [[package]]
@@ -517,24 +537,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.4",
-]
-
-[[package]]
-name = "domain"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "html-escape",
- "lopdf",
- "rand 0.8.8",
- "regex",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
 ]
 
 [[package]]
@@ -1566,6 +1568,17 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide 0.8.9",
+]
+
+[[package]]
+name = "pokemon-domain"
+version = "0.1.0"
+dependencies = [
+ "common-domain",
+ "regex",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde_json",
 ]
 
 [[package]]
@@ -3326,6 +3339,25 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "synstructure",
+]
+
+[[package]]
+name = "yugioh-domain"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "common-domain",
+ "html-escape",
+ "lopdf",
+ "rand 0.8.8",
+ "regex",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 //! `/collection/value`: what the collection is worth at market prices
-//! (`domain::valuation`; prices from `store::prices`, copies and lots from
+//! (`yugioh_domain::valuation`; prices from `store::prices`, copies and lots from
 //! `store::valuation`). [`data`] loads, [`sections`] builds each table.
 
 mod data;
@@ -10,7 +10,7 @@ pub use data::ValueData;
 use askama::Template;
 use axum::extract::State;
 use chrono::NaiveDate;
-use domain::valuation::{unit_totals_on, Totals, UnitTotals};
+use yugioh_domain::valuation::{unit_totals_on, Totals, UnitTotals};
 use rust_decimal::Decimal;
 
 use sections::{

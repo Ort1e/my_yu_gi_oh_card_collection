@@ -5,8 +5,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use domain::card::{CardStatus, Language};
-use domain::valuation::{copy_value, history, lot_gain, Prices};
+use yugioh_domain::card::{CardStatus, Language};
+use yugioh_domain::valuation::{copy_value, history, lot_gain, Prices};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
@@ -119,7 +119,7 @@ fn period(data: &ValueData, before: NaiveDate, after: NaiveDate, title: String) 
     Moves { title, lines }
 }
 
-/// A purchase lot against its full price (`domain::valuation::lot_gain`).
+/// A purchase lot against its full price (`yugioh_domain::valuation::lot_gain`).
 #[derive(Clone)]
 pub struct LotLine {
     pub id: i64,
@@ -139,7 +139,7 @@ pub struct LotLine {
 /// Each purchase lot with cards against its full price (the lots without
 /// cards, sleeves or boxes, are left out).
 pub fn lot_lines(data: &ValueData, lots: Vec<PurchaseLot>, today: NaiveDate) -> Vec<LotLine> {
-    let mut by_lot: HashMap<i64, Vec<&domain::valuation::Copy>> = HashMap::new();
+    let mut by_lot: HashMap<i64, Vec<&yugioh_domain::valuation::Copy>> = HashMap::new();
     for owned in &data.owned {
         by_lot.entry(owned.lot_id).or_default().push(&owned.copy);
     }

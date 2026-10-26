@@ -4,7 +4,7 @@
 //! any use are deleted (docs/tour.md, "Tournaments").
 
 use chrono::NaiveDate;
-use domain::tournament::{Die, GameResult, RoundResult};
+use yugioh_domain::tournament::{Die, GameResult, RoundResult};
 use sqlx::SqliteConnection;
 
 /// The name, date and place of a tournament, and the version played.

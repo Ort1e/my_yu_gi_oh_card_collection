@@ -24,8 +24,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 
-# Domain logic (shared by backend / importer / maintenance commands)
-domain = { path = "crates/domain" }
+# Pure domain crates (no DB, no HTTP), one per collection + what they share
+common-domain = { path = "crates/common-domain" }
+yugioh-domain = { path = "crates/yugioh-domain" }
+books-domain = { path = "crates/books-domain" }
+pokemon-domain = { path = "crates/pokemon-domain" }
 regex = "1"
 base64 = "0.22"
 rust_decimal = { version = "1", features = ["serde-with-str"] }

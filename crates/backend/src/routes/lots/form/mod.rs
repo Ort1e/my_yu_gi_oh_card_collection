@@ -16,7 +16,7 @@ pub use add::{create, page, upload};
 pub use cards::add_cards;
 pub use edit::{edit_page, update};
 
-use domain::lot::LotType;
+use yugioh_domain::lot::LotType;
 
 use crate::web::forms::FormData;
 use crate::AppState;

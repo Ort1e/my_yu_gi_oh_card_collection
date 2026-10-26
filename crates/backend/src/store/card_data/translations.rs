@@ -4,8 +4,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use domain::card::name_to_translate;
-use domain::rarity::split_cardmarket_name;
+use yugioh_domain::card::name_to_translate;
+use yugioh_domain::rarity::split_cardmarket_name;
 
 use crate::store::db::{today, Pool};
 use crate::web::error::AppResult;

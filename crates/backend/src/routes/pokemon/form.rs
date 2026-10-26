@@ -12,8 +12,8 @@ use askama::Template;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::card::CardStatus;
-use domain::pokemon::{parse_language, Catalogue, Source, Variant, LANGUAGES};
+use yugioh_domain::card::CardStatus;
+use pokemon_domain::{parse_language, Catalogue, Source, Variant, LANGUAGES};
 use serde::Deserialize;
 
 use super::CopyRow;
@@ -294,7 +294,7 @@ pub async fn added(pool: &Pool, ids: &[i64]) -> AppResult<Vec<Added>> {
         let Some(copy) = copy else {
             continue;
         };
-        let key = domain::pokemon::wish::CopyKey {
+        let key = pokemon_domain::wish::CopyKey {
             card_id: copy.card_id,
             language: copy.language.clone(),
             variant: copy.variant_value().unwrap_or(Variant::Normal),

@@ -1,11 +1,11 @@
-//! What `domain::valuation` values, read from the collection: the owned
+//! What `yugioh_domain::valuation` values, read from the collection: the owned
 //! copies, the lots, and the estimates of the list pages (a card's latest
 //! market price, `MARKET_PRICE`, with its condition and language).
 
 use std::collections::HashMap;
 
-use domain::card::{CardStatus, Language};
-use domain::valuation::{copy_value, Copy, Lot};
+use yugioh_domain::card::{CardStatus, Language};
+use yugioh_domain::valuation::{copy_value, Copy, Lot};
 use rust_decimal::Decimal;
 use sqlx::QueryBuilder;
 

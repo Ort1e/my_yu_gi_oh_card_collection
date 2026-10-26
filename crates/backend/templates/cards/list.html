@@ -27,7 +27,7 @@
       <label for="status">Status:</label>
       <select name="status" id="status">
         <option value="" {% if self.selected(filter.status, "") %}selected{% endif %}>All</option>
-        {% for status in domain::card::CardStatus::ALL %}
+        {% for status in yugioh_domain::card::CardStatus::ALL %}
         <option value="{{ status.code() }}" {% if self.selected(filter.status, status.code()) %}selected{% endif %}>{{ status.code() }}</option>
         {% endfor %}
       </select>

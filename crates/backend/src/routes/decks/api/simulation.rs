@@ -2,7 +2,7 @@
 
 use axum::extract::{Path, State};
 use axum::Json;
-use domain::monte_carlo::{self, Category, SimulationResult};
+use yugioh_domain::monte_carlo::{self, Category, SimulationResult};
 use serde::Deserialize;
 
 use super::categories::load_categories;

@@ -7,7 +7,7 @@
 //! barcode scan of `static/js/book_form.js`), `authors.rs` and `series.rs`
 //! list them, `api.rs` is the lookup's JSON. Book writes are in
 //! `store::books`, the lookup in `store::book_data`, the pure rules in
-//! `domain::book` / `domain::isbn`.
+//! `books_domain::book` / `books_domain::isbn`.
 
 pub mod advent;
 pub mod api;

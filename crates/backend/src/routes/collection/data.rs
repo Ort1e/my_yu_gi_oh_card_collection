@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{Duration, NaiveDate};
-use domain::valuation::{
+use yugioh_domain::valuation::{
     biggest_moves, totals_on, Copy, Lot, PriceMove, PriceSource, Prices, Totals,
 };
 use rust_decimal::Decimal;
@@ -16,7 +16,7 @@ use crate::store::valuation::{lots, owned_copies, OwnedCopy};
 pub struct ValueData {
     /// The copies with their card (name, code, lot), in the order of `copies`.
     pub owned: Vec<OwnedCopy>,
-    /// The same copies, as `domain::valuation` takes them.
+    /// The same copies, as `yugioh_domain::valuation` takes them.
     pub copies: Vec<Copy>,
     pub lots: Vec<Lot>,
     pub by_date: BTreeMap<NaiveDate, Prices>,

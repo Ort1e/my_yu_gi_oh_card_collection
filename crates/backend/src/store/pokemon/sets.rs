@@ -10,8 +10,8 @@
 //! Gallery apart, coded `ASR:TG`, while its cards print `ASR` (TG29/TG30). A number found in both is told apart by the set size
 //! printed after it (`/128`, `/030`); else both are offered ([`cards`]).
 
-use domain::pokemon::card_ref::{is_set_size, same_number};
-use domain::pokemon::name_matches;
+use pokemon_domain::card_ref::{is_set_size, same_number};
+use pokemon_domain::name_matches;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

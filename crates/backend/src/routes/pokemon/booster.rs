@@ -3,7 +3,7 @@
 //! form adds forgotten cards to an opening (`?opening=<id>`).
 //!
 //! 1. The form: the set (its printed code, `FNE`), the language, the date
-//!    and the numbers (`67 45r 12x2`, `domain::pokemon::pulls`).
+//!    and the numbers (`67 45r 12x2`, `pokemon_domain::pulls`).
 //! 2. "Find the cards" (`step=preview`): the set's cards from TCGdex
 //!    (`store::pokemon::sets`), each number matched. Each card is shown
 //!    with its picture, rarity (and the guide's link) and its printed
@@ -22,9 +22,9 @@ use askama::Template;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
-use domain::card::CardStatus;
-use domain::pokemon::pulls::{self, Pull};
-use domain::pokemon::{
+use yugioh_domain::card::CardStatus;
+use pokemon_domain::pulls::{self, Pull};
+use pokemon_domain::{
     default_variant, is_full_art, parse_language, Catalogue, Source, Variant, LANGUAGES,
 };
 use serde::Deserialize;
@@ -295,7 +295,7 @@ async fn preview(
             errors.push(format!(
                 "Set: TCGdex knows no set \"{code}\" in {}. Type the code printed at the \
                  bottom of the cards (FNE, SFA, 30C; Japanese: SV6a).",
-                domain::pokemon::language_label(language)
+                pokemon_domain::language_label(language)
             ));
             return Ok(None);
         }
