@@ -70,8 +70,12 @@ if [ "$protocol" = sftp ]; then
                 done
             fi
         done < "$work/send" | awk '!seen[$0]++'
-        # readable by the web server, whatever the NAS's file modes
+        # readable by the web server, whatever the NAS's file modes; the
+        # target removed first (no error if absent): OVH's `www/index.html`
+        # is a link of theirs to a page we can't write, and a put would
+        # follow it
         while IFS= read -r file; do
+            echo "-rm \"$OVH_DIR/$file\""
             echo "put \"$EXPORT_DIR/$file\" \"$OVH_DIR/$file\""
             echo "chmod 644 \"$OVH_DIR/$file\""
         done < "$work/send"
@@ -87,9 +91,10 @@ if [ "$protocol" = sftp ]; then
     if command -v setsid > /dev/null; then detach=(setsid -w); fi
     SSH_ASKPASS="$work/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=none \
         "${detach[@]}" sftp -o BatchMode=no -o PubkeyAuthentication=no \
-        -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=30 \
+        -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" -o CheckHostIP=no \
+        -o ConnectTimeout=30 \
         -b "$work/batch" "$OVH_USER@$OVH_HOST" < /dev/null > /dev/null \
-        2> >(grep -v 'remote mkdir' >&2)
+        2> >(grep -vE "remote mkdir|Couldn't create directory|Couldn't delete file" >&2)
 else
     # plain FTP, one curl per file
     while IFS= read -r file; do
