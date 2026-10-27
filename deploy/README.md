@@ -141,10 +141,13 @@ Each step runs even when the one before failed. To see what happened:
 
 ## The OVH hosting
 
-`upload-ovh.sh` sends the copy into `OVH_DIR` (`www`: the folder the
-domain shows; for a subdomain like `collection.<domain>`, create it in the
-OVH panel, Multisite, pointing to a folder, and put that folder in
-`OVH_DIR`: the script creates it).
+`upload-ovh.sh` sends the copy into `OVH_DIR`, a folder the script
+creates. The free plan allows **one attached domain** (no subdomain like
+`collection.<domain>`: "Attached Domains limit"), so the copy lives in a
+subfolder of the site: `OVH_DIR=www/collection` → `https://<domain>/collection/`,
+the domain's root (`www/`) staying free for a personal site. The copy's
+links are relative, so any folder works; the script only ever deletes the
+files it uploaded itself.
 
 - **SFTP** (`OVH_PROTOCOL=sftp`, enabled in the OVH panel's FTP-SSH tab on
   2026-10-26): encrypted, one `sftp` session for all the files (the NAS's
