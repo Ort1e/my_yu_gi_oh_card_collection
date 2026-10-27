@@ -55,9 +55,15 @@ jobs:
   nas-build:
     if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
     runs-on: ubuntu-latest
+    env:
+      # The NAS's processor is far older than the runners': plain x86-64,
+      # no AVX. Without this, SQLite's C code came out with AVX (`vpxor` in
+      # sqlite3_initialize) and every command died of SIGILL on the NAS.
+      RUSTFLAGS: -C target-cpu=x86-64
+      CFLAGS_x86_64_unknown_linux_musl: -march=x86-64 -mtune=generic
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools qemu-user
       - run: rustup target add x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
@@ -71,6 +77,14 @@ jobs:
       - run: npm ci && npm run build
         working-directory: frontend
       - run: cargo build --release --locked -p backend --target x86_64-unknown-linux-musl
+      # a real command (a backup opens SQLite) on an emulated basic x86-64
+      # processor: an instruction the NAS lacks fails here, not there
+      - name: Runs on an old processor
+        run: |
+          mkdir -p /tmp/smoke
+          DATABASE_URL=sqlite:/tmp/smoke/app.db MEDIA_DIR=/tmp/smoke/media \
+            qemu-x86_64 -cpu qemu64 target/x86_64-unknown-linux-musl/release/backend \
+            backup --to /tmp/smoke/backups
       - name: Package
         run: |
           binary=target/x86_64-unknown-linux-musl/release/backend
