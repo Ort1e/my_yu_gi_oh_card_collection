@@ -81,8 +81,12 @@ if [ "$protocol" = sftp ]; then
     } > "$work/batch"
     printf '#!/bin/sh\nprintf "%%s\\n" "$OVH_PASSWORD"\n' > "$work/askpass"
     chmod 700 "$work/askpass"
+    # ssh uses SSH_ASKPASS without a terminal: under systemd there is none;
+    # by hand, setsid leaves it (when the NAS has setsid; else sftp asks)
+    detach=()
+    if command -v setsid > /dev/null; then detach=(setsid -w); fi
     SSH_ASKPASS="$work/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=none \
-        setsid -w sftp -o BatchMode=no -o PubkeyAuthentication=no \
+        "${detach[@]}" sftp -o BatchMode=no -o PubkeyAuthentication=no \
         -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=30 \
         -b "$work/batch" "$OVH_USER@$OVH_HOST" < /dev/null > /dev/null \
         2> >(grep -v 'remote mkdir' >&2)

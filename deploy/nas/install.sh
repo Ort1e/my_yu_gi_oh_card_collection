@@ -18,6 +18,17 @@ APP_USER=collection
 [ "$(id -u)" = 0 ] || { echo "run it as root (sudo)"; exit 1; }
 [ -x "$from/backend" ] || { echo "run it from the unpacked release"; exit 1; }
 
+# the commands the scripts use (ReadyNAS lacks some of Debian's, e.g. runuser)
+missing=""
+for command in su useradd install systemctl curl tar sha256sum comm cut awk find \
+    mktemp readlink seq sftp ssh-keyscan ssh-keygen; do
+    command -v "$command" > /dev/null || missing="$missing $command"
+done
+if [ -n "$missing" ]; then
+    echo "missing on this NAS:$missing (tell Claude, or install them before going on)"
+    exit 1
+fi
+
 # the app's own user: no login, no shell
 if ! id "$APP_USER" > /dev/null 2>&1; then
     useradd --system --home-dir "$APP_DIR" --no-create-home --shell /usr/sbin/nologin "$APP_USER"
