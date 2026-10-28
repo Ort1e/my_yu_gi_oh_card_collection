@@ -15,7 +15,7 @@
 //! cards.html                /cards
 //! cards-page-2.html         /cards?page=2 (only `page` and `view` are kept)
 //! cards-12.html             /cards/12
-//! img/card-image-12.jpg     /card-image/12, 360 px wide
+//! img/card-image-12.webp    /card-image/12, 480 px wide
 //! static/…                  the stylesheets and scripts the pages use
 //! ```
 
@@ -38,8 +38,9 @@ const MARKER: &str = ".public-export";
 
 /// The largest width of the pictures' copies (the grids, the card pages,
 /// the picture seen large on hover or full screen). The OVH free plan has
-/// 100 MB: at 360 px the ~640 pictures are about 46 MB, at 600 px 102 MB.
-const PICTURE_WIDTH: u32 = 360;
+/// 100 MB: the ~640 pictures (2026-10) are about 49 MB as WebP at 480 px
+/// (73 MB as JPEG; 600 px would be 67 MB as WebP, 101 MB as JPEG).
+const PICTURE_WIDTH: u32 = 480;
 
 /// The query parameters a copied page keeps: the others (filters) aren't
 /// in the copy.
@@ -120,7 +121,7 @@ pub async fn write_site(site: Site<'_>, out: &Path) -> anyhow::Result<Written> {
         };
 
         if kind.starts_with("image/") {
-            let name = format!("img/{}.jpg", flat_name(&address));
+            let name = format!("img/{}.webp", flat_name(&address));
             let copy =
                 tokio::task::spawn_blocking(move || photos::thumbnail(&bytes, PICTURE_WIDTH))
                     .await?;
@@ -372,13 +373,13 @@ mod tests {
             ("/cards/12".to_string(), "cards-12.html".to_string()),
             (
                 "/card-image/3".to_string(),
-                "img/card-image-3.jpg".to_string(),
+                "img/card-image-3.webp".to_string(),
             ),
         ]);
         let html = r#"<a href="&#x2f;cards&#x2f;12"><img src="/card-image/3"></a> <a href="/lots/1">lot</a> <link href="/static/css/a.css"> <a href="https://x.org/">x</a>"#;
         assert_eq!(
             rewrite(html, "/cards", &files),
-            r##"<a href="cards-12.html"><img src="img/card-image-3.jpg"></a> <a href="#">lot</a> <link href="static/css/a.css"> <a href="https://x.org/">x</a>"##
+            r##"<a href="cards-12.html"><img src="img/card-image-3.webp"></a> <a href="#">lot</a> <link href="static/css/a.css"> <a href="https://x.org/">x</a>"##
         );
     }
 }

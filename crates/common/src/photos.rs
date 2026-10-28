@@ -1,7 +1,8 @@
 //! Photos uploaded through the app (the advent calendar). The copy shown on
 //! the pages is made upright from the EXIF orientation, resized and
 //! re-encoded as JPEG **without metadata** (phone photos may carry the GPS
-//! position); the original is kept as uploaded, next to it.
+//! position); the original is kept as uploaded, next to it. Also the public
+//! copy's card pictures ([`thumbnail`], WebP).
 //!
 //! CPU work: call these in `tokio::task::spawn_blocking`.
 
@@ -35,6 +36,10 @@ fn reader(bytes: &[u8]) -> Result<ImageReader<Cursor<&[u8]>>, PhotoError> {
     Ok(reader)
 }
 const JPEG_QUALITY: u8 = 82;
+/// The public copy's WebP pictures: measured on the card pictures, as close
+/// to the originals as JPEG at [`JPEG_QUALITY`] (DSSIM about 0.001) and a
+/// third smaller.
+const WEBP_QUALITY: f32 = 85.0;
 
 /// Why a photo was refused, as shown to the user.
 #[derive(Debug, PartialEq, Eq)]
@@ -82,14 +87,27 @@ pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
     encode(&img)
 }
 
-/// A copy at most `width` px wide (JPEG, never enlarged): the public
-/// export's card pictures.
+/// A copy at most `width` px wide, never enlarged, as lossy WebP with its
+/// transparency (the Pokémon cards' corners): the public export's card
+/// pictures.
 pub fn thumbnail(bytes: &[u8], width: u32) -> Result<Vec<u8>, PhotoError> {
-    let img = reader(bytes)?.decode().map_err(refused)?;
-    if img.width() <= width {
-        return encode(&img);
+    let mut img = reader(bytes)?.decode().map_err(refused)?;
+    if img.width() > width {
+        img = img.resize(width, u32::MAX, FilterType::Lanczos3);
     }
-    encode(&img.resize(width, u32::MAX, FilterType::Lanczos3))
+    let (width, height) = (img.width(), img.height());
+    let pixels;
+    let encoder = if img.color().has_alpha() {
+        pixels = img.to_rgba8().into_raw();
+        webp::Encoder::from_rgba(&pixels, width, height)
+    } else {
+        pixels = img.to_rgb8().into_raw();
+        webp::Encoder::from_rgb(&pixels, width, height)
+    };
+    let webp = encoder
+        .encode_simple(false, WEBP_QUALITY)
+        .map_err(|e| PhotoError(format!("the picture couldn't be written ({e:?})")))?;
+    Ok(webp.to_vec())
 }
 
 /// A copy turned a quarter turn (clockwise or not), for a photo that came
@@ -147,9 +165,23 @@ mod tests {
     }
 
     #[test]
-    fn thumbnails_are_never_enlarged() {
-        assert_eq!(size(&thumbnail(&png(1200, 1650), 600).unwrap()), (600, 825));
+    fn thumbnails_are_webp_and_never_enlarged() {
+        let copy = thumbnail(&png(1200, 1650), 600).unwrap();
+        assert_eq!(image::guess_format(&copy).unwrap(), ImageFormat::WebP);
+        assert_eq!(size(&copy), (600, 825));
         assert_eq!(size(&thumbnail(&png(421, 614), 600).unwrap()), (421, 614));
+    }
+
+    #[test]
+    fn thumbnails_keep_the_transparency() {
+        let mut img = image::RgbaImage::new(100, 140);
+        img.put_pixel(50, 70, image::Rgba([255, 0, 0, 255]));
+        let mut original = Cursor::new(Vec::new());
+        img.write_to(&mut original, ImageFormat::Png).unwrap();
+
+        let copy = image::load_from_memory(&thumbnail(original.get_ref(), 600).unwrap()).unwrap();
+        assert!(copy.color().has_alpha());
+        assert_eq!(copy.to_rgba8().get_pixel(0, 0)[3], 0, "a corner stays transparent");
     }
 
     #[test]
