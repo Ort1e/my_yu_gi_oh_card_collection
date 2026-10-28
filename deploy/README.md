@@ -1,10 +1,10 @@
 # Deploying: the app on the NAS, the public copy on OVH
 
 The app runs on the NAS (a Netgear ReadyNAS), reachable **from the home
-network only**. Every morning the NAS backs the data up, writes the **public
-copy** (the cards, the Pokémon wishlist and the books, with market values)
-and uploads it to the **OVH hosting**, then updates the app when `main` has
-a new build. Why it is built this way: [Why this setup](#why-this-setup),
+network only**. Every morning the NAS backs the data up, updates the app
+when `main` has a new build, then writes the **public copy** (the cards, the
+Pokémon wishlist and the books, with market values) and uploads it to the
+**OVH hosting**. Why it is built this way: [Why this setup](#why-this-setup),
 at the end.
 
 ```
@@ -13,7 +13,7 @@ deploy/
   nas/                      on the NAS (in the app's archive, /apps/collection/deploy/)
     install.sh              first install (folders, user, settings, services)
     update.sh               new build of main → backup, replace, restart (or back)
-    nightly.sh              the nightly job: backup, public copy + upload, update
+    nightly.sh              the nightly job: backup, update, public copy + upload
     upload-ovh.sh           the public copy → the OVH hosting (changed files only)
     common.sh               the settings and the app's commands, for the scripts
     collection.service      the app, started at boot
@@ -137,13 +137,15 @@ start the job by hand once (below).
 1. **backup**: `backend backup --to /Data500/collection-backups`: the
    database copied while the app runs (`app-YYYY-MM-DD.db`, 14 days kept),
    the media mirrored;
-2. **public copy**: `backend export-public` into
-   `/Data1To/collection/public-export`, then `upload-ovh.sh`: only the files
-   changed since the last upload are sent, the removed ones deleted there;
-3. **update**: `update.sh`: when the release `nas-latest` has a new build
+2. **update**: `update.sh`: when the release `nas-latest` has a new build
    of `main`: a backup, then the new version replaces the old (kept in
    `/apps/collection/previous/`) and starts; if it doesn't answer within 30
-   seconds, back to the previous version and its database.
+   seconds, back to the previous version and its database;
+3. **public copy**, by the version just installed (a change to the copy is
+   online the same morning): `backend export-public` into
+   `/Data1To/collection/public-export`, then `upload-ovh.sh`: only the files
+   changed since the last upload are sent, the removed ones deleted there.
+   If the copy fails, nothing is uploaded: yesterday's stays online.
 
 Each step runs even when the one before failed. To see what happened:
 `ssh nas journalctl -u collection-nightly -n 50`. To run it now:
