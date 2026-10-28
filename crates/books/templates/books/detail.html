@@ -25,13 +25,17 @@
     {% match book.format %}{% when Some with (format) %}<div class="card-subtitle">Format: {{ format }}</div>{% when None %}{% endmatch %}
     {% match book.page_count %}{% when Some with (pages) %}<div class="card-subtitle">Pages: {{ pages }}</div>{% when None %}{% endmatch %}
     {% match book.language %}{% when Some with (language) %}<div class="card-subtitle">Language: {{ language }}</div>{% when None %}{% endmatch %}
+    {% if !common::export::public_copy() %}
     {% match book.isbn %}{% when Some with (isbn) %}<div class="card-subtitle">ISBN: {{ isbn }}</div>{% when None %}{% endmatch %}
+    {% endif %}
     <div class="card-subtitle">Added on {{ book.added_on }} · book #{{ book.id }}</div>
+    {% if !common::export::public_copy() %}
     {% match book.notes %}{% when Some with (notes) %}<p class="book-notes">{{ notes }}</p>{% when None %}{% endmatch %}
     {% for (year, day) in calendar_days %}
     <div class="card-subtitle">🎄 Day {{ day }} of the <a href="/books/advent-calendar/{{ year }}" class="on-card">{{ year }} advent calendar</a></div>
     {% endfor %}
     <div class="button-row"><a href="/books/{{ book.id }}/edit" class="btn">Edit</a></div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

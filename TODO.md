@@ -12,13 +12,10 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   app on the phone (it may send every page through the internet); another
   browser. If it still fails: does `http://192.168.1.202:3000/login` show
   anything, and what error does the browser give.
-- **A better public copy**: the app's own layout (header, colours of each
-  collection) for the public pages, and the Yu-Gi-Oh! collection's
-  statistics (value, counts, by rarity / set…; to be chosen). A spec first.
-- **Two kinds of users**: the main password (`APP_PASSWORD`) can do
-  everything; a secondary one sees everything but can only change the
-  books. A role per user in `common::web::auth` and a check on each
-  collection's `write` routes.
+- Maybe: statistics for the Pokémon cards and the books too (by set,
+  rarity, language; by author, series, format), like `/collection/stats`.
+- Maybe: hide the add/edit buttons a user can't use (they get a "Not
+  allowed" page today).
 - **Formats** in the deck builder (Edison…): `docs/specs/formats.md`
   (`format::first_release` and `check` are the owner's).
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
@@ -29,6 +26,10 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-28: the public copy made of the app's own pages (crawled in
+  "public copy" mode), `/collection/stats`, the card seen large on hover.
+- 2026-10-28: users who change the books only (`APP_ACCESS_<NAME>`, by
+  default for every user but the owner).
 - 2026-10-28: the nightly job at 7:30 (the NAS is off from 22:00 to 7:00,
   so it never ran at 3:30), after the network.
 

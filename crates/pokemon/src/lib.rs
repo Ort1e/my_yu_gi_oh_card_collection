@@ -9,7 +9,6 @@
 //!   wish and opening writes, prices;
 //! - the pure rules: the `pokemon-domain` crate.
 
-pub mod public;
 pub mod routes;
 pub mod store;
 #[cfg(test)]
@@ -22,6 +21,7 @@ use common::{AppState, Routes};
 /// The Pokémon collection's routes (assembled by `common::app`).
 pub fn routes() -> Routes {
     Routes {
+        collection: "pokemon",
         public: Router::new()
             .route("/pokemon", get(routes::list))
             .route("/pokemon/rarities", get(routes::rarities::page))

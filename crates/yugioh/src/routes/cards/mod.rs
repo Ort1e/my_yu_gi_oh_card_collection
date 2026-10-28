@@ -147,9 +147,15 @@ impl CardsList {
 pub async fn list(
     State(state): State<AppState>,
     Query(page): Query<pagination::PageParam>,
-    Query(filter): Query<CardFilter>,
+    Query(mut filter): Query<CardFilter>,
 ) -> AppResult<CardsList> {
     let pool = &state.pool;
+    let public = common::export::public_copy();
+    if public {
+        // the cards owned only
+        filter.proxy = Some("false".into());
+        filter.sold = Some("false".into());
+    }
 
     let mut count = QueryBuilder::new("SELECT count(*) FROM card");
     filter.push_where(&mut count);
@@ -175,9 +181,13 @@ pub async fn list(
         page_title: "All Cards",
         page,
         view,
-        total: sqlx::query_scalar("SELECT count(*) FROM card")
-            .fetch_one(pool)
-            .await?,
+        total: if public {
+            count
+        } else {
+            sqlx::query_scalar("SELECT count(*) FROM card")
+                .fetch_one(pool)
+                .await?
+        },
         cards,
         filter,
         card_types: card_types(pool).await?,

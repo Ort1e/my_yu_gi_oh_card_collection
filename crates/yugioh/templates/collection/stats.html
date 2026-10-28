@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Collection statistics{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/collection.css">
+  <link rel="stylesheet" href="/static/css/tiles.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Collection statistics</h1>
+
+  <div class="value-tiles">
+    <div class="value-tile">
+      <div class="value-label">Cards</div>
+      <div class="value-amount">{{ copies }}</div>
+      <div class="value-detail">{{ distinct }} different</div>
+    </div>
+    <div class="value-tile">
+      <div class="value-label">Market value</div>
+      <div class="value-amount">{{ value|money }} €</div>
+      <div class="value-detail">{% match last_refresh %}{% when Some with (date) %}prices of {{ date }}{% when None %}no price yet{% endmatch %}{% if without_price > 0 %}, {{ without_price }} without a price{% endif %}</div>
+    </div>
+  </div>
+  <p class="value-note">Market value: Cardmarket's trend price of each card's printing, else ygoprodeck's estimate,
+    lowered by its condition (EX ×0.8, G ×0.6, P ×0.4) and language (non-English ×0.9).</p>
+
+  {% if last_refresh.is_some() %}
+  <h2>Value over time</h2>
+  <canvas id="value_chart" width="400" height="160"></canvas>
+  {% endif %}
+
+  {% for (title, lines) in tables %}
+  <h2>{{ title }}</h2>
+  <div class="table-scroll">
+  <table class="numbers sortable">
+    <thead>
+      <tr><th data-sort="text"></th><th data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th data-sort="number">Share of the value</th></tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr><td>{{ line.label }}</td><td>{{ line.copies }}</td><td>{{ line.value|money }}</td><td>{{ line.share }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endfor %}
+
+  <h2>The most valuable</h2>
+  {% let tiles = self.top_tiles() %}
+  {% include "partials/card_grid.html" %}
+
+  <h2>Latest added</h2>
+  {% let tiles = self.recent_tiles() %}
+  {% include "partials/card_grid.html" %}
+
+  {% include "partials/price_moves.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+<script src="/static/js/card_preview.js"></script>
+{% if last_refresh.is_some() %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script id="value-chart-data" type="application/json">{{ chart|safe }}</script>
+<script src="/static/js/collection_value.js"></script>
+{% endif %}
+{% endblock %}

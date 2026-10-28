@@ -10,6 +10,11 @@
 //! one. Without any, login is disabled and the server only accepts to listen
 //! on a loopback address (see `main`).
 //!
+//! What a user may change ([`Changes`]): the owner everything; another user
+//! only the books, unless `APP_ACCESS_<NAME>` says `all` or lists the
+//! collections (`books,pokemon`). Every logged-in user reads everything.
+//! [`require_access`] checks it on each collection's write routes.
+//!
 //! A session is a cookie `<user>.<expiry>.<signature>`: the expiry as a unix
 //! timestamp, signed with HMAC-SHA256 together with the user and their
 //! current password, by a random key generated once and kept in the
@@ -52,11 +57,104 @@ pub const MAX_FAILURES: u32 = 5;
 /// How long a client that made too many wrong guesses waits.
 pub const LOCKOUT: Duration = Duration::from_secs(15 * 60);
 
+/// The collections, by the name their `Routes::collection` and
+/// `APP_ACCESS_<NAME>` use, and how a page names them.
+pub const COLLECTIONS: [(&str, &str); 3] = [
+    ("yugioh", "the Yu-Gi-Oh! cards"),
+    ("books", "the books"),
+    ("pokemon", "the Pokémon cards"),
+];
+
+/// What a user may change. Reading is open to every logged-in user.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Changes {
+    Everything,
+    /// These collections only ([`COLLECTIONS`] names).
+    Only(Vec<String>),
+}
+
+impl Changes {
+    /// A user's rights when `APP_ACCESS_<NAME>` doesn't say: the books.
+    pub fn books() -> Changes {
+        Changes::Only(vec!["books".to_string()])
+    }
+
+    pub fn allows(&self, collection: &str) -> bool {
+        match self {
+            Changes::Everything => true,
+            Changes::Only(collections) => collections.iter().any(|c| c == collection),
+        }
+    }
+
+    /// `all`, or collection names separated by commas.
+    fn parse(value: &str) -> Result<Changes, String> {
+        if value.trim().eq_ignore_ascii_case("all") {
+            return Ok(Changes::Everything);
+        }
+
+        let mut collections = Vec::new();
+        for name in value.split(',').map(|n| n.trim().to_lowercase()) {
+            if !COLLECTIONS.iter().any(|(known, _)| *known == name) {
+                let known: Vec<_> = COLLECTIONS.iter().map(|(n, _)| *n).collect();
+                return Err(format!(
+                    "{name:?} is no collection: all, or some of {}",
+                    known.join(", ")
+                ));
+            }
+            if !collections.contains(&name) {
+                collections.push(name);
+            }
+        }
+        Ok(Changes::Only(collections))
+    }
+
+    /// "the books and the Pokémon cards", for the pages.
+    pub fn describe(&self) -> String {
+        match self {
+            Changes::Everything => "everything".to_string(),
+            Changes::Only(collections) => {
+                let labels: Vec<_> = collections.iter().map(|c| label(c)).collect();
+                match labels.split_last() {
+                    None => "nothing".to_string(),
+                    Some((last, [])) => last.to_string(),
+                    Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                }
+            }
+        }
+    }
+}
+
+/// How a page names a collection.
+fn label(collection: &str) -> &str {
+    COLLECTIONS
+        .iter()
+        .find(|(name, _)| *name == collection)
+        .map_or(collection, |(_, label)| label)
+}
+
+/// One person who may log in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct User {
+    pub name: String,
+    pub password: String,
+    pub changes: Changes,
+}
+
+impl User {
+    pub fn new(name: &str, password: &str, changes: Changes) -> User {
+        User {
+            name: name.to_string(),
+            password: password.to_string(),
+            changes,
+        }
+    }
+}
+
 /// Who may log in, and how.
 #[derive(Debug, Clone)]
 pub struct AuthConfig {
-    /// `(name, password)`; none: login disabled.
-    pub users: Vec<(String, String)>,
+    /// None: login disabled.
+    pub users: Vec<User>,
     /// The session cookie only over HTTPS (`SECURE_COOKIES=1`).
     pub secure_cookies: bool,
     /// The pages that only read are open to all (`PUBLIC_READS=0`: every
@@ -80,21 +178,29 @@ impl AuthConfig {
         AuthConfig {
             users: password
                 .filter(|p| !p.is_empty())
-                .map(|p| vec![("owner".to_string(), p.to_string())])
+                .map(|p| vec![User::new("owner", p, Changes::Everything)])
                 .unwrap_or_default(),
             ..AuthConfig::default()
         }
     }
 
     /// From the environment: `APP_PASSWORD`, `APP_PASSWORD_<NAME>`,
-    /// `SECURE_COOKIES`, `PUBLIC_READS`.
+    /// `APP_ACCESS_<NAME>`, `SECURE_COOKIES`, `PUBLIC_READS`.
     pub fn from_env() -> Result<AuthConfig, String> {
         AuthConfig::from_vars(std::env::vars())
     }
 
     fn from_vars(vars: impl IntoIterator<Item = (String, String)>) -> Result<AuthConfig, String> {
         let mut config = AuthConfig::default();
+        let mut access = Vec::new();
         let flag = |value: &str| matches!(value.trim(), "1" | "true" | "yes");
+        let user_name = |var: &str, user: &str| {
+            let user = user.to_lowercase();
+            if user.is_empty() || !user.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(format!("{var}: a user name is letters, digits and _"));
+            }
+            Ok(user)
+        };
         for (name, value) in vars {
             if name == "SECURE_COOKIES" {
                 config.secure_cookies = flag(&value);
@@ -103,26 +209,48 @@ impl AuthConfig {
             } else if value.is_empty() {
                 continue;
             } else if name == "APP_PASSWORD" {
-                config.users.push(("owner".to_string(), value));
+                config
+                    .users
+                    .push(User::new("owner", &value, Changes::Everything));
             } else if let Some(user) = name.strip_prefix("APP_PASSWORD_") {
-                let user = user.to_lowercase();
-                if user.is_empty() || !user.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                    return Err(format!("{name}: a user name is letters, digits and _"));
-                }
-                config.users.push((user, value));
+                let user = user_name(&name, user)?;
+                config
+                    .users
+                    .push(User::new(&user, &value, Changes::books()));
+            } else if let Some(user) = name.strip_prefix("APP_ACCESS_") {
+                let changes = Changes::parse(&value).map_err(|e| format!("{name}: {e}"))?;
+                access.push((user_name(&name, user)?, changes));
             }
         }
-        config.users.sort();
+        config.users.sort_by(|a, b| a.name.cmp(&b.name));
 
-        for (i, (name, password)) in config.users.iter().enumerate() {
-            if config.users[..i].iter().any(|(other, _)| other == name) {
-                return Err(format!("user {name} is set twice"));
+        for (i, user) in config.users.iter().enumerate() {
+            if config.users[..i]
+                .iter()
+                .any(|other| other.name == user.name)
+            {
+                return Err(format!("user {} is set twice", user.name));
             }
-            if config.users[..i].iter().any(|(_, other)| other == password) {
+            if config.users[..i]
+                .iter()
+                .any(|other| other.password == user.password)
+            {
                 return Err(
                     "two users have the same password: the password says who logs in".into(),
                 );
             }
+        }
+        for (name, changes) in access {
+            if name == "owner" {
+                return Err("APP_ACCESS_OWNER: the owner can change everything".into());
+            }
+            let Some(user) = config.users.iter_mut().find(|u| u.name == name) else {
+                return Err(format!(
+                    "APP_ACCESS_{}: no APP_PASSWORD_{0} for this user",
+                    name.to_uppercase()
+                ));
+            };
+            user.changes = changes;
         }
         Ok(config)
     }
@@ -130,8 +258,8 @@ impl AuthConfig {
 
 #[derive(Clone)]
 pub struct Auth {
-    /// `(name, password)`; none: login disabled.
-    users: Arc<Vec<(String, String)>>,
+    /// None: login disabled.
+    users: Arc<Vec<User>>,
     key: [u8; 32],
     secure_cookies: bool,
     public_reads: bool,
@@ -183,9 +311,13 @@ impl Auth {
     fn user_with_password(&self, input: &str) -> Option<&str> {
         let input = self.mac(input.as_bytes()).finalize().into_bytes();
         let mut found = None;
-        for (name, password) in self.users.iter() {
-            if self.mac(password.as_bytes()).verify_slice(&input).is_ok() {
-                found = Some(name.as_str());
+        for user in self.users.iter() {
+            if self
+                .mac(user.password.as_bytes())
+                .verify_slice(&input)
+                .is_ok()
+            {
+                found = Some(user.name.as_str());
             }
         }
         found
@@ -193,8 +325,20 @@ impl Auth {
 
     /// The MAC of a session: the user, the expiry and the user's password.
     fn session_mac(&self, user: &str, expiry: &str) -> Option<HmacSha256> {
-        let (_, password) = self.users.iter().find(|(name, _)| name == user)?;
+        let password = &self.users.iter().find(|u| u.name == user)?.password;
         Some(self.mac(format!("{user}.{expiry}.{password}").as_bytes()))
+    }
+
+    /// What `user` may change (everything with the login disabled: the
+    /// user `local`).
+    pub fn changes(&self, user: &str) -> Changes {
+        if !self.enabled() {
+            return Changes::Everything;
+        }
+        self.users
+            .iter()
+            .find(|u| u.name == user)
+            .map_or(Changes::Only(Vec::new()), |u| u.changes.clone())
     }
 
     fn cookie_attributes(&self, max_age: i64) -> String {
@@ -321,12 +465,7 @@ pub async fn require_login(
     }
 
     let uri = request.uri();
-    // the JSON APIs: the deck builder's, the books' ISBN lookup, the Pokémon finder
-    let path = uri.path();
-    if ["/api/", "/books/api/", "/pokemon/api/"]
-        .iter()
-        .any(|prefix| path.starts_with(prefix))
-    {
+    if is_api(uri.path()) {
         return (
             StatusCode::UNAUTHORIZED,
             axum::Json(serde_json::json!({ "error": "Log in to make changes." })),
@@ -357,11 +496,71 @@ pub async fn require_login(
     Redirect::to(&format!("/login?{query}")).into_response()
 }
 
+/// The JSON APIs: the deck builder's, the books' ISBN lookup, the Pokémon
+/// finder. They answer errors in JSON.
+fn is_api(path: &str) -> bool {
+    ["/api/", "/books/api/", "/pokemon/api/"]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+}
+
+#[derive(Template)]
+#[template(path = "forbidden.html")]
+pub struct ForbiddenPage {
+    collection: &'static str,
+    allowed: String,
+}
+
+/// Middleware on a collection's write routes, inside [`require_login`]:
+/// let through the users who may change `collection` (an empty name: the
+/// users who may change everything). Otherwise a 403, in JSON for the APIs.
+pub async fn require_access(
+    State((state, collection)): State<(AppState, &'static str)>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let user = state.auth.user(request.headers()).unwrap_or_default();
+    let changes = state.auth.changes(&user);
+    let allowed = if collection.is_empty() {
+        changes == Changes::Everything
+    } else {
+        changes.allows(collection)
+    };
+    if allowed {
+        return next.run(request).await;
+    }
+
+    tracing::warn!(
+        user,
+        path = request.uri().path(),
+        "change refused: not allowed"
+    );
+    let collection = if collection.is_empty() {
+        "this"
+    } else {
+        label(collection)
+    };
+    if is_api(request.uri().path()) {
+        let error = format!("Your login can't change {collection}.");
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({ "error": error })),
+        )
+            .into_response();
+    }
+    let page = ForbiddenPage {
+        collection,
+        allowed: changes.describe(),
+    };
+    (StatusCode::FORBIDDEN, page).into_response()
+}
+
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct LoginPage {
     enabled: bool,
-    logged_in: bool,
+    /// The logged-in user and what they may change.
+    who: Option<(String, String)>,
     next: String,
     error: Option<&'static str>,
 }
@@ -376,9 +575,17 @@ pub async fn page(
     headers: HeaderMap,
     Query(param): Query<NextParam>,
 ) -> LoginPage {
+    let who = state
+        .auth
+        .user(&headers)
+        .filter(|_| state.auth.enabled())
+        .map(|user| {
+            let changes = state.auth.changes(&user).describe();
+            (user, changes)
+        });
     LoginPage {
         enabled: state.auth.enabled(),
-        logged_in: state.auth.enabled() && state.auth.allows(&headers),
+        who,
         next: safe_next(param.next.as_deref()),
         error: None,
     }
@@ -401,7 +608,7 @@ pub async fn login(
     let refuse = |status, error| {
         let page = LoginPage {
             enabled: state.auth.enabled(),
-            logged_in: false,
+            who: None,
             next: next.clone(),
             error: Some(error),
         };
@@ -450,7 +657,7 @@ mod tests {
             users: Arc::new(
                 users
                     .iter()
-                    .map(|(u, p)| (u.to_string(), p.to_string()))
+                    .map(|(u, p)| User::new(u, p, Changes::Everything))
                     .collect(),
             ),
             key: [7; 32],
@@ -570,13 +777,77 @@ mod tests {
         .unwrap();
         assert_eq!(
             config.users,
-            [("friend".into(), "b".into()), ("owner".into(), "a".into())]
+            [
+                User::new("friend", "b", Changes::books()),
+                User::new("owner", "a", Changes::Everything)
+            ]
         );
         assert!(config.secure_cookies && !config.public_reads);
         assert!(vars(&[]).unwrap().public_reads);
         assert!(vars(&[("APP_PASSWORD", "a"), ("APP_PASSWORD_FRIEND", "a")]).is_err());
         assert!(vars(&[("APP_PASSWORD", "a"), ("APP_PASSWORD_OWNER", "b")]).is_err());
         assert!(vars(&[("APP_PASSWORD_A-B", "a")]).is_err());
+
+        // what a user may change: the books unless APP_ACCESS_<NAME> says
+        let changes = |pairs: &[(&str, &str)]| {
+            let config = vars(pairs)?;
+            Ok::<_, String>(
+                config
+                    .users
+                    .iter()
+                    .find(|u| u.name == "friend")
+                    .unwrap()
+                    .changes
+                    .clone(),
+            )
+        };
+        let friend = ("APP_PASSWORD_FRIEND", "b");
+        assert_eq!(
+            changes(&[friend, ("APP_ACCESS_FRIEND", "all")]),
+            Ok(Changes::Everything)
+        );
+        assert_eq!(
+            changes(&[friend, ("APP_ACCESS_FRIEND", "ALL ")]),
+            Ok(Changes::Everything)
+        );
+        assert_eq!(
+            changes(&[friend, ("APP_ACCESS_FRIEND", "Books, pokemon,books")]),
+            Ok(Changes::Only(vec!["books".into(), "pokemon".into()]))
+        );
+        assert_eq!(
+            changes(&[("APP_ACCESS_FRIEND", "yugioh"), friend]),
+            Ok(Changes::Only(vec!["yugioh".into()]))
+        );
+        // an empty value: the default
+        assert_eq!(
+            changes(&[friend, ("APP_ACCESS_FRIEND", "")]),
+            Ok(Changes::books())
+        );
+        assert!(changes(&[friend, ("APP_ACCESS_FRIEND", "cards")]).is_err());
+        assert!(vars(&[("APP_PASSWORD", "a"), ("APP_ACCESS_OWNER", "books")]).is_err());
+        assert!(vars(&[("APP_PASSWORD", "a"), ("APP_ACCESS_NOBODY", "all")]).is_err());
+    }
+
+    #[test]
+    fn changes_allow_their_collections() {
+        assert!(Changes::Everything.allows("yugioh"));
+        assert!(Changes::books().allows("books"));
+        assert!(!Changes::books().allows("pokemon"));
+        assert!(!Changes::books().allows(""));
+
+        assert_eq!(Changes::Everything.describe(), "everything");
+        assert_eq!(Changes::books().describe(), "the books");
+        let all = Changes::Only(vec!["yugioh".into(), "books".into(), "pokemon".into()]);
+        assert_eq!(
+            all.describe(),
+            "the Yu-Gi-Oh! cards, the books and the Pokémon cards"
+        );
+        assert_eq!(Changes::Only(Vec::new()).describe(), "nothing");
+
+        let auth = auth_with(&[("owner", "secret")]);
+        assert_eq!(auth.changes("owner"), Changes::Everything);
+        assert_eq!(auth.changes("nobody"), Changes::Only(Vec::new()));
+        assert_eq!(auth_with(&[]).changes("local"), Changes::Everything);
     }
 
     #[test]

@@ -8,8 +8,8 @@
 
   {% if !enabled %}
     <p>No password is set (<code>APP_PASSWORD</code>): login is disabled and changes are allowed.</p>
-  {% else if logged_in %}
-    <p>You are logged in.</p>
+  {% else if let Some((user, changes)) = who %}
+    <p>You are logged in as <strong>{{ user }}</strong>: you can see everything and change {{ changes }}.</p>
     <form method="post" action="/logout">
       <input type="submit" value="Log out">
     </form>

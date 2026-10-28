@@ -17,6 +17,7 @@ async fn pages_render() {
         "/budget/manage",
         "/rarities",
         "/collection/value",
+        "/collection/stats",
     ] {
         let (status, body) = t.get(uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {body}");

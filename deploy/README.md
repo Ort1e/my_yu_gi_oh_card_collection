@@ -208,7 +208,9 @@ copying `data/app.db` there, never the NAS's live database.
   behind the login (`PUBLIC_READS=0`: a guest on the Wi-Fi sees nothing),
   5 wrong passwords → 15 minutes of refusal.
 - One password per person (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`): one can
-  be changed alone, and the log names who did what.
+  be changed alone, and the log names who did what. The owner changes
+  everything; the others see everything but change only the books, unless
+  `APP_ACCESS_<NAME>=all` (or a list: `books,pokemon`) in `collection.env`.
 - Every answer carries a Content-Security-Policy, `X-Frame-Options: DENY`,
   `nosniff` and a `Referrer-Policy`; uploaded photos and PDFs are read
   with limits (huge images, deeply nested PDFs refused). Tests:

@@ -35,33 +35,35 @@
       {% if copy.condition_label().is_empty() %}not noted{% else %}<span class="status-badge {{ copy.condition_code()|lower }}">{{ copy.condition_label() }}</span>{% endif %}
     </div>
     {% if copy.is_graded() %}
-    <div class="card-subtitle">Graded: {{ copy.grading() }}{% match copy.cert_number %}{% when Some with (cert) %} · certificate {{ cert }}{% when None %}{% endmatch %}</div>
+    <div class="card-subtitle">Graded: {{ copy.grading() }}{% if !common::export::public_copy() %}{% match copy.cert_number %}{% when Some with (cert) %} · certificate {{ cert }}{% when None %}{% endmatch %}{% endif %}</div>
     {% endif %}
     <div class="card-subtitle">
-      {{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %} on {{ date }}{% when None %}{% endmatch %}{% if !copy.price_text().is_empty() %} · paid {{ copy.price_text() }} €{% endif %}
+      {{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %} on {{ date }}{% when None %}{% endmatch %}{% if !copy.price_text().is_empty() && !common::export::public_copy() %} · paid {{ copy.price_text() }} €{% endif %}
     </div>
     {% match copy.sold_on %}{% when Some with (date) %}
-    <div class="card-subtitle"><strong>Sold</strong> on {{ date }}{% if !copy.sold_price_text().is_empty() %} for {{ copy.sold_price_text() }} €{% endif %}</div>
+    <div class="card-subtitle"><strong>Sold</strong> on {{ date }}{% if !copy.sold_price_text().is_empty() && !common::export::public_copy() %} for {{ copy.sold_price_text() }} €{% endif %}</div>
     {% when None %}
     <div class="card-subtitle" title="Cardmarket's trend for its variant × its condition{% if copy.is_graded() %}, or your estimate{% endif %}">
       Value: {% if copy.value_text().is_empty() %}no price{% else %}{{ copy.value_text() }} €{% endif %}
       {% if !copy.estimate_text().is_empty() %}<small>(your estimate)</small>{% else if !self.market_text().is_empty() %}<small>(market {{ self.market_text() }} €)</small>{% endif %}
     </div>
     {% endmatch %}
+    {% if !common::export::public_copy() %}
     {% match copy.opening_id %}{% when Some with (opening_id) %}<div class="card-subtitle">From <a href="/pokemon/openings/{{ opening_id }}">a booster opening</a></div>{% when None %}{% endmatch %}
     {% match copy.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
+    {% endif %}
     {% for wish_id in wishes_got %}<div class="card-subtitle">★ Got from the <a href="/pokemon/wishlist" class="on-card">wishlist</a></div>{% endfor %}
     <div class="card-subtitle"><small>Added on {{ copy.added_on }} · copy #{{ copy.id }}</small></div>
-    <div class="button-row"><a href="/pokemon/{{ copy.id }}/edit" class="btn">Edit{% if !copy.is_sold() %} or mark sold{% endif %}</a></div>
+    {% if !common::export::public_copy() %}<div class="button-row"><a href="/pokemon/{{ copy.id }}/edit" class="btn">Edit{% if !copy.is_sold() %} or mark sold{% endif %}</a></div>{% endif %}
   </div>
 </div>
 
 {% if !others.is_empty() %}
 <h2>Other copies of this card</h2>
 <ul>
-  {% for (id, language, variant, sold) in others %}
+  {% for (id, language, variant, sold) in others %}{% if !sold || !common::export::public_copy() %}
   <li><a href="/pokemon/{{ id }}">Copy #{{ id }}</a>: {{ language }}, {{ variant }}{% if sold %} (sold){% endif %}</li>
-  {% endfor %}
+  {% endif %}{% endfor %}
 </ul>
 {% endif %}
 

@@ -297,6 +297,11 @@ same way).
 
 5. Add the URL to the `pages_render` test in `crates/backend/src/tests/pages.rs`.
 
+6. **In the public copy too?** Add its path to `START` (or `public()`) in
+   `crates/backend/src/commands/export.rs`, and put whatever is private in
+   its template inside `{% if !common::export::public_copy() %}`; add a
+   private word of it to `crates/backend/src/tests/export.rs`.
+
 A row type needed by several pages goes in `store/models.rs`. A value the template
 must compute is best a method on the struct (`fn full_name(&self) -> String`)
 called as `{{ row.full_name() }}`: askama is awkward with method arguments

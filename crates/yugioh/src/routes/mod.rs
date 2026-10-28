@@ -26,6 +26,7 @@ pub use cards::images::used_files as used_card_pictures;
 /// Every route, by who may use them (assembled by `common::app`).
 pub fn all() -> common::Routes {
     common::Routes {
+        collection: "yugioh",
         public: router(),
         write: write_router(),
         private: Router::new(),
@@ -42,6 +43,7 @@ pub fn router() -> Router<AppState> {
         .route("/cards", get(cards::list))
         .route("/cards/:id", get(cards::detail))
         .route("/collection/value", get(collection::page))
+        .route("/collection/stats", get(collection::stats::page))
         .route("/sellers", get(sellers::list))
         .route("/sellers/:id", get(sellers::detail))
         .route("/lots", get(lots::list))

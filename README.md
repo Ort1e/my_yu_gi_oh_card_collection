@@ -85,6 +85,7 @@ Settings come from the environment or `.env` (gitignored):
 | `BIND_ADDR` | `127.0.0.1:3000` | where to listen; a network address needs a password |
 | `APP_PASSWORD` | none | the owner's password; none = no login (loopback only) |
 | `APP_PASSWORD_<NAME>` | none | more users, one password each |
+| `APP_ACCESS_<NAME>` | `books` | what that user may change: `all`, or a list (`books,pokemon`); everyone reads everything |
 | `PUBLIC_READS` | `1` | `0` puts every page behind the login (the NAS) |
 | `SECURE_COOKIES` | `0` | `1` behind HTTPS |
 | `MEDIA_DIR`, `UPLOADS_DIR` | `data/media`, `uploads` | pictures and files, pending uploads |

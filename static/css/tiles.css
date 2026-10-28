@@ -154,6 +154,22 @@
 /* Phones                                                               */
 /* ------------------------------------------------------------------ */
 
+/* The card seen large on hover (static/js/card_preview.js): placed by the
+   script, never in the mouse's way. */
+.card-preview {
+    position: fixed;
+    z-index: 1000;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    background: #fff;
+    pointer-events: none;
+}
+
+.card-preview[hidden] {
+    display: none;
+}
+
 @media (max-width: 760px) {
     .card-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

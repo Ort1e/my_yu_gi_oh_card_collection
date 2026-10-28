@@ -13,6 +13,7 @@ pub mod cardmarket_catalog;
 pub mod lot;
 pub mod monte_carlo;
 pub mod rarity;
+pub mod stats;
 pub mod tournament;
 pub mod valuation;
 pub mod ydke;
