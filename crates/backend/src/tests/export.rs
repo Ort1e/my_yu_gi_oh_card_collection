@@ -1,5 +1,5 @@
 //! The public export (`export-public`) shows the collections and nothing
-//! private (docs/specs/deployment.md, item 8).
+//! private (deploy/README.md, "Security").
 
 use super::*;
 

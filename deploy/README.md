@@ -4,7 +4,8 @@ The app runs on the NAS (a Netgear ReadyNAS), reachable **from the home
 network only**. Every night the NAS backs the data up, writes the **public
 copy** (the cards, the Pokémon wishlist and the books, with market values)
 and uploads it to the **OVH hosting**, then updates the app when `main` has
-a new build. Why it is built this way: `docs/specs/deployment.md`.
+a new build. Why it is built this way: [Why this setup](#why-this-setup),
+at the end.
 
 ```
 deploy/
@@ -37,6 +38,10 @@ On the NAS:
 
 The app runs as the user `collection`, which can write the data but not
 the app itself; the scripts run as root.
+
+The NAS (Netgear ReadyNAS, x86_64, 2 GB, ReadyNAS OS 6.10 = Debian 8 with
+systemd, `curl` and `sqlite3` but no `git`) is at `192.168.1.202`. It is
+**on from 7:00 to 22:00** only, switched off otherwise.
 
 ## 1. SSH to the NAS (once)
 
@@ -122,7 +127,13 @@ the server on `data/app.db` again (work on a copy, see below).
 
 ## Every night (3:30, by itself)
 
-`collection-nightly.timer` runs `nightly.sh`:
+`collection-nightly.timer` runs `nightly.sh`.
+
+**Known problem**: the NAS is off at 3:30. The timer is `Persistent`, so
+systemd should run a missed night at the next boot, but it only catches up
+once the timer has run at least once, and the network may not be up yet
+then. The upload of 2026-10-28 didn't happen. To fix (TODO.md): move the
+job to an hour when the NAS is on.
 
 1. **backup**: `backend backup --to /Data500/collection-backups`: the
    database copied while the app runs (`app-YYYY-MM-DD.db`, 14 days kept),
@@ -190,15 +201,49 @@ copying `data/app.db` there, never the NAS's live database.
 | back to the previous version | stop the app, move `/apps/collection/previous/*` back, start it (and the database of `/Data500/collection-backups` if a migration ran) |
 | change a password | edit `collection.env`, `systemctl restart collection` (that user is logged out) |
 
-## Security, in short
+## Security
 
 - The box opens **no port** to the NAS: Netgear no longer updates the
   ReadyNAS, so it must stay unreachable from the internet. The app is for
   the home network only, in plain HTTP (`SECURE_COOKIES=0`), every page
-  behind the login (`PUBLIC_READS=0`), 5 wrong passwords → 15 minutes of
-  refusal.
+  behind the login (`PUBLIC_READS=0`: a guest on the Wi-Fi sees nothing),
+  5 wrong passwords → 15 minutes of refusal.
+- One password per person (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`): one can
+  be changed alone, and the log names who did what.
+- Every answer carries a Content-Security-Policy, `X-Frame-Options: DENY`,
+  `nosniff` and a `Referrer-Policy`; uploaded photos and PDFs are read
+  with limits (huge images, deeply nested PDFs refused). Tests:
+  `crates/backend/src/tests/security.rs`, `crates/yugioh/src/tests/security.rs`.
+- The CI runs `cargo audit` and `npm audit`; the advisories accepted on
+  purpose are explained in `.cargo/audit.toml`.
 - The settings files are readable by root (and `collection.env` by the
   app's user): never copy them into git.
 - The public copy holds only the collections and the wishlist: a test
   checks that no seller, price paid, note, deck, tournament or budget gets
   in (`crates/backend/src/tests/export.rs`).
+- `main` is protected on GitHub: no force push, no deletion, changes
+  through a pull request from `dev` with the four checks green (rust,
+  audit, deck-builder, nas-build).
+
+## Why this setup
+
+- **Who uses it**: the owner and a friend living together, from the home
+  network only (computers, phones on the Wi-Fi). No access from outside,
+  so no VPN.
+- **What is public**: a read-only copy of the Yu-Gi-Oh! cards, the
+  Pokémon cards and wishlist and the books, with market values. No lots,
+  sellers, prices paid, budget, decks, tournaments, advent calendars or
+  notes.
+- **The NAS** is always at home and holds the disks: the app and the live
+  data live there. It can't run modern programs from its old Debian, so
+  the CI builds one **static** binary (musl, for any x86-64 processor:
+  the NAS's is older than the CI's) and the NAS only downloads it.
+- **The OVH hosting** (free plan: 100 MB, static files and PHP, no
+  program of ours can run there) gets only files: the public copy, about
+  20 MB, nothing to attack.
+- **The copies**: every night on the NAS's other volume (other disks), and
+  weekly into the private data repository from the computer, since the
+  NAS has no `git` (and installing packages on a ReadyNAS is risky).
+
+Still to do once: a scan of the public site (testssl.sh, OWASP ZAP
+baseline) and of the app from the home network (TODO.md).

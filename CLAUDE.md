@@ -8,7 +8,7 @@ booster pulls, French/English/Japanese, wishlist, Cardmarket prices from TCGdex)
 
 ## History — read first
 
-- `main` is the **Rust app** (the one in use). Its live data is `data/app.db` (data submodule).
+- `main` is the **Rust app** (the one in use), deployed on the owner's NAS (`deploy/README.md`). Its live data is on the NAS (`/Data1To/collection/app.db`); `data/app.db` (data submodule) is a copy brought by `deploy/pc/pull-backup.sh`.
 - It replaced a **Django** app (cutover 2026-10-13). The Django code is only in history, at tag
   `django-final`: `git show django-final:my_ygo_cards/models/deck.py`,
   `git ls-tree -r --name-only django-final`, or `git archive django-final my_ygo_cards | tar -x -C <scratch dir>`.
@@ -94,8 +94,8 @@ cd frontend && npm run dev                    # hot reload at http://localhost:5
 ```
 
 `.env` sets `DATABASE_URL=sqlite:data/app.db` (the default too). Both binaries create the DB file if missing.
-`data/app.db` is **real data tracked in git**: don't delete/rebuild it, and don't run tests or experiments against it (use a scratch DB). The server closes the pool on Ctrl-C/SIGTERM (graceful shutdown), which checkpoints the WAL into `app.db`; commit it in the submodule only with the server stopped, then bump the submodule pointer here.
-Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (user `owner`) and `APP_PASSWORD_<NAME>` (more users; none = login disabled, then only a loopback `BIND_ADDR` is accepted), `PUBLIC_READS` (`1`; `0` = every page behind the login), `SECURE_COOKIES` (`0`; `1` behind HTTPS), `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`, gitignored), `CARDMARKET_ACCOUNT` (`0rtie`). The work goes on `dev` (CI: `.github/workflows/ci.yml`), `main` = what runs.
+`data/app.db` is **real data tracked in git** (the NAS's latest copy): don't delete/rebuild it, and don't run tests or experiments against it (use a scratch DB). The server closes the pool on Ctrl-C/SIGTERM (graceful shutdown), which checkpoints the WAL into `app.db`. The submodule is updated from the NAS by `deploy/pc/pull-backup.sh` (never commit a local server's changes to it).
+Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (user `owner`) and `APP_PASSWORD_<NAME>` (more users; none = login disabled, then only a loopback `BIND_ADDR` is accepted), `PUBLIC_READS` (`1`; `0` = every page behind the login), `SECURE_COOKIES` (`0`; `1` behind HTTPS), `MEDIA_DIR` (`data/media`), `UPLOADS_DIR` (`uploads`, gitignored), `CARDMARKET_ACCOUNT` (`0rtie`). The work goes on `dev` (CI: `.github/workflows/ci.yml`), `main` = what runs (the NAS installs each new build of `main` at night). Pull requests `dev` → `main` are **rare**: several tested changes at a time, not one per change (owner's decision, 2026-10-28).
 
 ## Routes
 
@@ -122,6 +122,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (use
 - Django MTI `CardConditionalCategory(CardCategory)` → **flattened** into `card_category` with nullable `condition_description`, `categorie_true_id`, `categorie_false_id`. "Is conditional" = `condition_description IS NOT NULL`.
 - `card.rarity` (0004): the label of `yugioh_domain::rarity::Rarity` (`Ultra Rare`), NULL when unknown; no CHECK, the forms validate against `Rarity::ALL`.
 - `advent_calendar.lot_id` (0006): the calendar's own lot (created from its edit page, `POST /advent-calendar/:year/lot`), NULL when none.
+- `lot.refund` (0016): money the seller gave back (Dateacard refunds the shipping), `'0.00'` when none; a lot's cost is `price - refund` (budget, valuation), `price` stays what was paid.
 - Books (0007): `book` (`isbn` = ISBN-13 digits, UNIQUE: one row per edition/format; nullable), `book_author` (`sort_name` surname first), `book_book_author` (ordered by `position`), `book_series`, `book_data` (ISBN lookup cache: JSON of `books_domain::book::BookInfo`, NULL = nothing found, asked again after 7 days), `book_advent_calendar[_entry]` (own tables, not shared with the card calendars). **Books can be deleted** (unlike cards); authors/series without books are deleted with them.
 - `card_price` (0008): ygoprodeck's market price per `(card_data_id, date)`, weekly, never pruned; `cardmarket_price` EUR (used), `tcgplayer_price` USD (kept for later), NULL = none (`"0"` too). Totals are never stored: computed from these rows and the lot dates (`yugioh_domain::valuation`).
 - Cardmarket (0009): `cardmarket_expansion` (set code → idExpansion, NULL = not found), `cardmarket_product` (products named like our card data, latest prices), `cardmarket_price` (history of the linked products), `card.cardmarket_product_id` + `card.cardmarket_product_manual` (1 = chosen on the edit page, kept by the refreshes). Never store the downloaded files.
@@ -131,7 +132,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (use
 - `card_translation` (0005): ygoprodeck card names in other languages by `(ygopro_id, language)`, a cache: a name found is kept, `name` NULL = no translation on `checked_at`, asked again after 7 days (`card_data::translated_name`). Never ask ygoprodeck for a translation without it.
 - Domain names are kept from Django (some French): `unite` (one card in a lot), `apport` (one-off budget contribution), `categorie_true/false`.
 - `0002` mirrors Django's constraints (UNIQUE, CHECK on choice fields, nullability, ON DELETE; PROTECT → RESTRICT). Empty Django FileFields (`""`) are imported as NULL.
-- `sqlx::migrate!` checksums applied migrations. Cutover is done: **never edit an existing migration**, only add new numbered files (next: `0016_…sql`). They run on `data/app.db` at the next startup.
+- `sqlx::migrate!` checksums applied migrations. Cutover is done: **never edit an existing migration**, only add new numbered files (next: `0017_…sql`). They run on the NAS's database when it starts the next build of `main`.
 - sqlx 0.7 + SQLite concurrency (see `common/src/db.rs`): write transactions start with `db::begin_write(&pool)`, never `pool.begin()`; never `INSERT … RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. Do network calls (ygoprodeck, Open Library) **before** opening a write transaction: they write card data through the pool.
 - SQLite + FKs: never drop/rebuild a parent table in a migration while `foreign_keys` is on — `DROP TABLE` fires ON DELETE CASCADE in children.
 
