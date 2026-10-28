@@ -1,74 +1,102 @@
 //! `export-public`: the public copy of the collections (`common::export`),
-//! written into a folder to put on the web hosting: the Yu-Gi-Oh! cards,
-//! the Pokémon cards and wishlist, the books. Nothing else of the app.
+//! written into a folder to put on the web hosting: the app's own pages of
+//! the Yu-Gi-Oh! cards and their statistics, the Pokémon cards and
+//! wishlist, the books, the rarity guides. Nothing else of the app: only
+//! the addresses of [`public`] are asked for, and the templates leave out
+//! what is private (`common::export::public_copy`).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use axum::body::Body;
-use axum::http::Request;
-use common::export::{Content, Section};
+use common::export::Site;
 use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
-use tower::ServiceExt;
 
-/// Write the copy into `out`, the stylesheets from `static_dir` (`static`).
+/// The pages the copy starts from; the first one is its home page.
+const START: [&str; 9] = [
+    "/cards",
+    "/collection/stats",
+    "/rarities",
+    "/pokemon",
+    "/pokemon/wishlist",
+    "/pokemon/rarities",
+    "/books",
+    "/books/authors",
+    "/books/series",
+];
+
+/// The addresses the copy may hold: the start pages, a card's, a copy's, a
+/// book's, an author's, a series' page, and the card pictures.
+fn public(path: &str) -> bool {
+    const NUMBERED: [&str; 5] = [
+        "/cards/",
+        "/pokemon/",
+        "/books/",
+        "/books/authors/",
+        "/books/series/",
+    ];
+    START.contains(&path)
+        || NUMBERED.iter().any(|prefix| {
+            path.strip_prefix(prefix)
+                .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+        })
+        || path.starts_with("/card-image/")
+        || path.starts_with("/pokemon/card-image/")
+}
+
+/// Write the copy into `out`, the stylesheets and scripts from
+/// `static_dir` (`static`).
 pub(crate) async fn export(state: &AppState, out: &Path, static_dir: &Path) -> anyhow::Result<()> {
-    let pool = &state.pool;
-    let mut sections = vec![yugioh::public::section(pool).await?];
-    sections.extend(pokemon::public::sections(pool).await?);
-    sections.push(books::public::section(pool).await?);
-    let fetched = fetch_missing_pictures(state, &sections).await?;
-
-    let media = state.media_dir.clone();
-    let folder = PathBuf::from(out);
-    let static_dir = PathBuf::from(static_dir);
-    let written = tokio::task::spawn_blocking(move || {
-        common::export::write_site(sections, &media, &static_dir, &folder)
-    })
-    .await??;
+    // the app asked here, not over the network: no login
+    let mut local = state.clone();
+    local.auth = Auth::load(&state.pool, AuthConfig::default()).await?;
+    let site = Site {
+        app: crate::app(local),
+        start: &START,
+        public,
+        static_dir,
+    };
+    let written = common::export::write_site(site, out).await?;
 
     println!(
-        "{}: {} pages, {} pictures ({fetched} downloaded now, {} without one), {:.1} MB",
+        "{}: {} pages, {} pictures, {} missing, {:.1} MB",
         out.display(),
         written.pages,
         written.pictures,
-        written.missing_pictures,
+        written.missing,
         written.bytes as f64 / 1_000_000.0
     );
     Ok(())
 }
 
-/// The pictures the app hasn't downloaded yet (a page never showed them):
-/// asked to the app's own picture routes, which download them into the
-/// media folder like a page would (throttled, cached). The login is
-/// bypassed: the app is asked here, not over the network. How many.
-async fn fetch_missing_pictures(state: &AppState, sections: &[Section]) -> anyhow::Result<usize> {
-    let mut local = state.clone();
-    local.auth = Auth::load(&state.pool, AuthConfig::default()).await?;
-    let app = crate::app(local);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let mut fetched = 0;
-    for section in sections {
-        let Content::Cards(cards) = &section.content else {
-            continue;
-        };
-        for card in cards {
-            let (Some(url), Some(picture)) = (&card.tile.image, &card.picture) else {
-                continue;
-            };
-            if state.media_dir.join(picture).exists() {
-                continue;
-            }
-            let response = app
-                .clone()
-                .oneshot(Request::get(url).body(Body::empty())?)
-                .await?;
-            if response.status().is_success() {
-                fetched += 1;
-            } else {
-                tracing::warn!(url, status = %response.status(), "picture not found");
-            }
+    #[test]
+    fn only_the_public_addresses() {
+        for path in [
+            "/cards",
+            "/cards/12",
+            "/books/series/3",
+            "/pokemon/7",
+            "/card-image/1",
+        ] {
+            assert!(public(path), "{path}");
+        }
+        for path in [
+            "/",
+            "/lots",
+            "/lots/1",
+            "/sellers/1",
+            "/cards/12/edit",
+            "/pokemon/openings",
+            "/pokemon/add",
+            "/budget",
+            "/decks/1",
+            "/books/advent-calendar",
+            "/media/shipment_files/x.pdf",
+        ] {
+            assert!(!public(path), "{path}");
         }
     }
-    Ok(fetched)
 }

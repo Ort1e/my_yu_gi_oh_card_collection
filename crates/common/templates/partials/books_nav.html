@@ -1,13 +1,18 @@
+{# In the public copy (common::export::public_copy): its pages only. #}
 <div class="logo">
   <a href="/books">My Books</a>
 </div>
 <ul class="nav-links" id="nav-links">
   <li><a href="/books">Books</a></li>
-  <li><a href="/books/add">Add</a></li>
+  {% if !common::export::public_copy() %}<li><a href="/books/add">Add</a></li>{% endif %}
   <li><a href="/books/authors">Authors</a></li>
   <li><a href="/books/series">Series</a></li>
+  {% if common::export::public_copy() %}
+  <li><a href="/cards" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
+  {% else %}
   <li><a href="/books/advent-calendar">Advent</a></li>
   <li><a href="/" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
+  {% endif %}
   <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
-  <li><a href="/login">Account</a></li>
+  {% if !common::export::public_copy() %}<li><a href="/login">Account</a></li>{% endif %}
 </ul>

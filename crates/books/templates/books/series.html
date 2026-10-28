@@ -16,8 +16,10 @@
   {% if !missing.is_empty() %}
   <div class="missing-volumes">
     <strong>Missing volume{% if missing.len() != 1 %}s{% endif %}: {{ self.missing_text() }}.</strong>
+    {% if !common::export::public_copy() %}
     Got one? Add it:
     {% for volume in missing %}<a href="{{ self.add_href(volume) }}" class="btn btn-small btn-secondary">#{{ volume }}</a> {% endfor %}
+    {% endif %}
     <br><small>Only the gaps up to the last volume you have: the series may have more.</small>
   </div>
   {% endif %}

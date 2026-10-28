@@ -191,3 +191,34 @@ async fn the_lists_show_the_estimates() {
     let (_, seller) = t.get("/sellers/1").await;
     assert!(seller.contains("Estimate: 10.80 €"), "{seller}");
 }
+
+#[tokio::test]
+async fn the_statistics_show_the_cards_owned_without_what_they_cost() {
+    let t = TestApp::new().await;
+    let cards = priced_fixture(&t).await;
+    sqlx::query("UPDATE unite SET price = '8.00' WHERE card_id = ?")
+        .bind(cards[1])
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+
+    let (status, body) = t.get("/collection/stats").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    // the 2 Dark Magicians at 5.40, not the proxy
+    let totals = &body[..body.find("Value over time").unwrap()];
+    assert!(
+        totals.contains(r#"<div class="value-amount">2</div>"#),
+        "{totals}"
+    );
+    assert!(totals.contains("10.80 €"), "{totals}");
+    let rarity = &body[body.find("By rarity").unwrap()..];
+    let rarity = &rarity[..rarity.find("</table>").unwrap()];
+    assert!(
+        rarity.contains("<td>2</td><td>10.80</td><td>100.0 %</td>"),
+        "{rarity}"
+    );
+    // the chart without what was spent, no price paid anywhere
+    assert!(body.contains(r#""value":["#), "{body}");
+    assert!(!body.contains("net_spent"));
+    assert!(!body.contains("8.00"), "{body}");
+}

@@ -9,7 +9,6 @@
 //!   (`book_data.rs`);
 //! - the pure rules: the `books-domain` crate.
 
-pub mod public;
 pub mod routes;
 pub mod store;
 #[cfg(test)]

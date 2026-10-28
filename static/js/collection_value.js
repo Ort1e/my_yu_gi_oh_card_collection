@@ -1,7 +1,8 @@
 // Chart of /collection/value (templates/collection/value.html): the value of
 // the copies owned at each price refresh, and what the lots cost by then
 // (purchases − sales). The data is in `#value-chart-data`, built by
-// routes/collection/mod.rs.
+// routes/collection/mod.rs. Also /collection/stats, whose data has no
+// `net_spent` (the prices paid stay private): the value line only.
 
 const chart = JSON.parse(document.getElementById('value-chart-data').textContent);
 
@@ -19,7 +20,7 @@ new Chart(document.getElementById('value_chart'), {
                 tension: 0.3,
                 fill: true,
             },
-            {
+            chart.net_spent && {
                 label: 'Spent − sold (€)',
                 data: chart.net_spent,
                 borderColor: 'rgba(0, 24, 163, 1)',
@@ -28,7 +29,7 @@ new Chart(document.getElementById('value_chart'), {
                 tension: 0.3,
                 fill: false,
             },
-        ],
+        ].filter(Boolean),
     },
     options: {
         responsive: true,

@@ -12,17 +12,17 @@
 {% block content %}
 <div class="inside-container">
 <h1>Wishlist ({{ wanted.len() }})</h1>
-{% if self.under_max() > 0 %}
+{% if self.under_max() > 0 && !common::export::public_copy() %}
 <p class="success">{{ self.under_max() }} {% if self.under_max() == 1 %}card is{% else %}cards are{% endif %} at or under your price today.</p>
 {% endif %}
-<p>Prices: Cardmarket's trend, refreshed every week. <a href="/pokemon/wishlist/add" class="btn">Add a wish</a></p>
+<p>Prices: Cardmarket's trend, refreshed every week.{% if !common::export::public_copy() %} <a href="/pokemon/wishlist/add" class="btn">Add a wish</a>{% endif %}</p>
 
 {% if wanted.is_empty() %}
 <p>No wish yet.</p>
 {% else %}
 <div class="wish-list">
   {% for wish in wanted %}
-  <div class="wish {{ wish.verdict_class() }}">
+  <div class="wish{% if !common::export::public_copy() %} {{ wish.verdict_class() }}{% endif %}">
     {% if wish.has_image() %}<img src="{{ wish.image_src() }}" alt="{{ wish.name() }}" width="120" height="167" loading="lazy">{% endif %}
     <div class="wish-text">
       <div class="finder-card-name">{{ wish.name() }} <span class="priority" title="Priority (1: most wanted)">P{{ wish.priority }}</span></div>
@@ -32,21 +32,25 @@
       <div>Language: {{ wish.language_text() }} · Variant: {{ wish.variant_text() }}</div>
       <div class="wish-prices">
         Today: <strong>{% if wish.price_text().is_empty() %}no price{% else %}{{ wish.price_text() }} €{% endif %}</strong>
+        {% if !common::export::public_copy() %}
         {% if !wish.max_text().is_empty() %}· your max: {{ wish.max_text() }} €{% endif %}
         {% if !wish.verdict_label().is_empty() %}<span class="verdict">{{ wish.verdict_label() }}</span>{% endif %}
+        {% endif %}
       </div>
+      {% if !common::export::public_copy() %}
       {% match wish.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
       <div class="button-row">
         <a href="/pokemon/add?{{ wish.got_it_href() }}" class="btn">I got it</a>
         <a href="/pokemon/wishlist/{{ wish.id }}/edit" class="btn btn-secondary">Edit</a>
       </div>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-{% if !got.is_empty() %}
+{% if !got.is_empty() && !common::export::public_copy() %}
 <details class="wishes-got">
   <summary>Wishes got ({{ got.len() }})</summary>
   <ul>

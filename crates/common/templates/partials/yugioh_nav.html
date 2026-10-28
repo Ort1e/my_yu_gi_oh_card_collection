@@ -1,3 +1,16 @@
+{# In the public copy (common::export::public_copy): its pages only. #}
+{% if common::export::public_copy() %}
+<div class="logo">
+  <a href="/cards">My yu-gi-oh Cards</a>
+</div>
+<ul class="nav-links" id="nav-links">
+  <li><a href="/cards">Cards</a></li>
+  <li><a href="/collection/stats">Statistics</a></li>
+  <li><a href="/rarities">Rarities</a></li>
+  <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
+  <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
+</ul>
+{% else %}
 <div class="logo">
   <a href="/">My yu-gi-oh Cards</a>
 </div>
@@ -10,6 +23,7 @@
         <li><a href="/lots">Lots</a></li>
         <li><a href="/sellers">Sellers</a></li>
         <li><a href="/collection/value">Value</a></li>
+        <li><a href="/collection/stats">Statistics</a></li>
         <li><a href="/rarities">Rarities</a></li>
       </ul>
     </details>
@@ -30,3 +44,4 @@
   <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
   <li><a href="/login">Account</a></li>
 </ul>
+{% endif %}

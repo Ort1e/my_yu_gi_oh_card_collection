@@ -1,9 +1,11 @@
 //! `/collection/value`: what the collection is worth at market prices
 //! (`yugioh_domain::valuation`; prices from `store::prices`, copies and lots from
 //! `store::valuation`). [`data`] loads, [`sections`] builds each table.
+//! [`stats`]: `/collection/stats`, the public part of these numbers.
 
 mod data;
 mod sections;
+pub mod stats;
 
 pub use data::ValueData;
 

@@ -33,25 +33,66 @@ async fn the_public_copy_holds_nothing_private() {
     )
     .await;
 
+    // a picture the app has (the copy never downloads one in tests)
+    std::fs::create_dir_all(t.state.media_dir.join("card_images")).unwrap();
+    std::fs::write(
+        t.state.media_dir.join("card_images/dark_magician.jpg"),
+        common::photos::test_png(600, 870),
+    )
+    .unwrap();
+
     let out = t.state.media_dir.parent().unwrap().join("site");
     let static_dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../static"));
     crate::commands::export::export(&t.state, &out, static_dir)
         .await
         .unwrap();
 
-    let mut pages = String::new();
-    for page in ["index", "yugioh", "pokemon", "wishlist", "books"] {
-        pages += &std::fs::read_to_string(out.join(format!("{page}.html"))).unwrap();
+    // the app's pages: the lists, a card's, a copy's, a book's, the statistics
+    for page in [
+        "index.html",
+        "cards.html",
+        "cards-view-table.html",
+        "cards-1.html",
+        "collection-stats.html",
+        "rarities.html",
+        "pokemon.html",
+        "pokemon-1.html",
+        "pokemon-wishlist.html",
+        "books.html",
+        "books-1.html",
+        "img/card-image-1.jpg",
+        "static/css/style.css",
+        "static/js/card_preview.js",
+    ] {
+        assert!(out.join(page).exists(), "{page} is missing");
     }
-    // shown: the collections
+    let mut pages = String::new();
+    for entry in std::fs::read_dir(&out).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "html") {
+            pages += &std::fs::read_to_string(&path).unwrap();
+        }
+    }
+    // shown: the collections, the app's layout
     for shown in [
         "Magicien Sombre",
         "Hypotrempe",
         "Hypocéan",
-        "Most wanted",
         "Assassin&#x27;s Apprentice",
+        "Collection statistics",
+        r#"href="collection-stats.html""#,
+        r#"src="img/card-image-1.jpg""#,
     ] {
         assert!(pages.contains(shown), "{shown} is missing");
+    }
+    // a page of the copy links only to the copy's files
+    for (i, _) in pages.match_indices("href=\"") {
+        let link = &pages[i + 6..];
+        let link = &link[..link.find('"').unwrap()];
+        let inside = link == "#"
+            || link.starts_with("https://")
+            || out.join(link.split('#').next().unwrap()).exists();
+        assert!(inside, "{link}: not in the copy");
     }
     // never: sellers, prices paid, lots, decks, tournaments, budget, notes,
     // wishes' maximum price, ISBNs, proxies, links to the app
@@ -71,7 +112,13 @@ async fn the_public_copy_holds_nothing_private() {
         "Kuriboh Proxy",
         "/lots",
         "/login",
+        "lots-",
+        "sellers",
+        "Budget",
         "href=\"/",
+        "src=\"/",
+        "Edit",
+        "your max",
     ] {
         assert!(!pages.contains(private), "{private} is in the public copy");
     }

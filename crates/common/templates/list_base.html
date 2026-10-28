@@ -18,9 +18,11 @@
 
   {% include "partials/pagination.html" %}
 
+  {% if !common::export::public_copy() %}
   {% block add_button %}{% endblock %}
 
   {% block filter %}{% endblock %}
+  {% endif %}
 </div>
 {% endblock %}
 

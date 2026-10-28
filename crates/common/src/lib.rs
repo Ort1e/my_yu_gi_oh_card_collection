@@ -9,6 +9,9 @@
 //! them all to [`app`], and each crate's tests give theirs to
 //! `testing::TestApp` (feature `test-support`).
 
+// `common::export::public_copy()` in the shared templates, from here too
+extern crate self as common;
+
 pub mod db;
 pub mod export;
 pub mod http;

@@ -1,8 +1,10 @@
+{# In the public copy (common::export::public_copy): its pages only. #}
 <div class="logo">
   <a href="/pokemon">My Pokémon Cards</a>
 </div>
 <ul class="nav-links" id="nav-links">
   <li><a href="/pokemon">Collection</a></li>
+  {% if !common::export::public_copy() %}
   <li><a href="/pokemon/openings">Openings</a></li>
   <li class="nav-group">
     <details>
@@ -13,9 +15,14 @@
       </ul>
     </details>
   </li>
+  {% endif %}
   <li><a href="/pokemon/wishlist">Wishlist</a></li>
   <li><a href="/pokemon/rarities">Rarities</a></li>
+  {% if common::export::public_copy() %}
+  <li><a href="/cards" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
+  {% else %}
   <li><a href="/" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
+  {% endif %}
   <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
-  <li><a href="/login">Account</a></li>
+  {% if !common::export::public_copy() %}<li><a href="/login">Account</a></li>{% endif %}
 </ul>

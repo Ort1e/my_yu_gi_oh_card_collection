@@ -653,19 +653,39 @@ downloaded again. The server runs it daily, 15 minutes after it starts.
 
 `export-public` (`backend/src/commands/export.rs`, `common::export`) writes
 the **public copy**: static pages to put on the OVH hosting, where nothing
-runs. Each collection gives its section, with only what may be public:
-`yugioh::public` (the cards owned, no proxies or sold ones, identical
-copies on one tile, market estimates), `pokemon::public` (the copies
-owned, then the wishlist: language, variant, priority and today's price,
-not the maximum price nor the notes), `books::public` (title, authors,
-series, format). `common::export::write_site` writes `index.html`, a page
-per section (the same picture grid as the app, tiles without links),
-240 px copies of the pictures and the stylesheets; the pictures the app
-never downloaded are fetched first through its own picture routes. The
-folder is emptied at each export, and refused if it isn't an earlier
-export. `backend/src/tests/export.rs` checks that no seller, price paid,
-note, deck, tournament or budget gets in. The NAS writes it and uploads it
-every morning ([Where it runs](#where-it-runs)).
+runs. They are **the app's own pages**, saved as files:
+
+1. the exporter builds the app in-process (no login, no network) and asks
+   it for its pages like a browser, inside `common::export::public_copy()`
+   (a tokio task-local, true only there);
+2. it starts from `START` (`/cards`, `/collection/stats`, `/rarities`,
+   `/pokemon`, the wishlist and guide, `/books`, authors, series) and
+   follows the links, **only** to the addresses `public()` accepts: those,
+   a card's, a copy's, a book's, an author's or a series' page (by id),
+   and the picture routes. `/lots`, `/sellers`, `/decks`… are never asked
+   for, whatever links to them;
+3. each page is saved under a flat name (`/cards?page=2` →
+   `cards-page-2.html`, `/cards/12` → `cards-12.html`; only the `page` and
+   `view` parameters are kept: filters aren't in the copy), its links
+   rewritten to these files (`#` for anything else), the pictures as
+   360 px JPEGs (`img/card-image-12.jpg`), the `/static` files it uses
+   copied. The first start page is also `index.html`.
+
+In that mode the templates leave out what is private:
+`{% if !common::export::public_copy() %}` around the private menus
+(`partials/*_nav.html`), the add buttons and filters (`list_base.html`), a
+card's lot, price paid and decks, the Pokémon copies' price paid, notes,
+certificate and opening, the wishlist's maximum prices, verdicts and
+notes, a book's ISBN and notes. The card list shows the cards owned only
+(no proxy, not sold). A page added to the copy is a path in `START` or
+`public()`, and a look at its template for anything private.
+
+The folder is emptied at each export, and refused if it isn't an earlier
+export. `backend/src/tests/export.rs` runs it on a database full of
+private things and checks that every page is there, every link stays in
+the copy, and no seller, price paid, note, ISBN, deck, tournament or budget
+gets in. The NAS writes it and uploads it every morning ([Where it
+runs](#where-it-runs)).
 
 `backup --to DIR [--keep DAYS]` (`backend/src/commands/backup.rs`) copies
 the data while the server runs: `DIR/app-YYYY-MM-DD.db` by SQLite's

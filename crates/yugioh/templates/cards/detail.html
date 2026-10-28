@@ -34,9 +34,11 @@
         Unknown
       {% endmatch %}
     </div>
+    {% if !common::export::public_copy() %}
     {% match price %}{% when Some with (price) %}
     <div class="card-subtitle">Price: {{ price }} €</div>
     {% when None %}{% endmatch %}
+    {% endif %}
     {% match market %}{% when Some with (market) %}
     <div class="card-subtitle">
       {% if market.from_cardmarket %}
@@ -52,11 +54,12 @@
       {% when None %}{% endmatch %}
     </div>
     {% when None %}{% endmatch %}
-    <div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>
+    {% if !common::export::public_copy() %}<div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>{% endif %}
   </div>
 </div>
 </div>
 
+{% if !common::export::public_copy() %}
 <div class="card-list">
   {% match lot %}{% when Some with (lot) %}
   <h2 class="card-title">Lot Details : </h2>
@@ -70,4 +73,5 @@
     <p>No deck versions include this card.</p>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}
