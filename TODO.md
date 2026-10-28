@@ -4,15 +4,6 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
-- **The nightly job didn't run on 2026-10-28** (no upload of the public
-  copy). Likely cause: the NAS is **on from 7:00 to 22:00 only**, and the
-  timer is set for 3:30. Its `Persistent=true` only catches up at boot
-  once the timer has run at least once (systemd keeps a stamp of the last
-  run), and the network may not be up that early in the boot. To check:
-  `ssh nas journalctl -u collection-nightly -b`,
-  `ssh nas systemctl list-timers collection-nightly`. Fix: move the timer
-  to an hour when the NAS is on (e.g. 21:30, or at lunchtime), maybe
-  `After=network-online.target` on the service.
 - **The app doesn't load on the friend's phone** (works everywhere else).
   To try, in order: `http://` typed in full (Chrome's "Always use secure
   connections", Firefox/Brave HTTPS-only, Samsung Internet send it to
@@ -37,6 +28,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 ## Done
 
 One line each; the details are in `docs/tour.md` and the git history.
+
+- 2026-10-28: the nightly job at 7:30 (the NAS is off from 22:00 to 7:00,
+  so it never ran at 3:30), after the network.
 
 - 2026-10-27: deployed: the app on the NAS (CI's static build, systemd,
   nightly backup, export and update), the public copy on the OVH hosting

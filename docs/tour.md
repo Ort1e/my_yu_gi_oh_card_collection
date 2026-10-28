@@ -658,7 +658,7 @@ never downloaded are fetched first through its own picture routes. The
 folder is emptied at each export, and refused if it isn't an earlier
 export. `backend/src/tests/export.rs` checks that no seller, price paid,
 note, deck, tournament or budget gets in. The NAS writes it and uploads it
-every night ([Where it runs](#where-it-runs)).
+every morning ([Where it runs](#where-it-runs)).
 
 `backup --to DIR [--keep DAYS]` (`backend/src/commands/backup.rs`) copies
 the data while the server runs: `DIR/app-YYYY-MM-DD.db` by SQLite's
@@ -803,7 +803,7 @@ for every collection:
   binary (musl, for any x86-64 processor) with the deck builder and the
   stylesheets, on pull requests into `main` and pushes to it;
   `nas-release` publishes it as the release `nas-latest` once every check
-  is green. The NAS downloads it at night (`fetch-release`), backs up,
+  is green. The NAS downloads it every morning (`fetch-release`), backs up,
   replaces and restarts, and goes back to the previous version if the new
   one doesn't answer.
 - **The public copy** (`export-public`) is uploaded over SFTP to the OVH

@@ -14,7 +14,7 @@ A personal web app for three collections at home:
 - **Pokémon cards**: mostly booster openings, in French, English and
   Japanese, with a wishlist and Cardmarket prices.
 
-It runs on a NAS at home, for the home network only. Every night the NAS
+It runs on a NAS at home, for the home network only. Every morning the NAS
 backs the data up and puts a read-only **public copy** (the three
 collections with their market values, nothing else) on a web hosting.
 
@@ -117,4 +117,4 @@ cd frontend && npm run dev             # deck builder hot reload, http://localho
 
 Work goes on `dev`; `main` is what runs on the NAS. A pull request from
 `dev` into `main` (with the CI green) gathers several changes, and the NAS
-installs the new build of `main` the following night.
+installs the new build of `main` the next morning (7:30).

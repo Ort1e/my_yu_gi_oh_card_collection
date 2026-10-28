@@ -1,5 +1,5 @@
 //! `backup --to DIR [--keep DAYS]`: a copy of the data that can be made
-//! while the server runs (the NAS does it every night, onto its other
+//! while the server runs (the NAS does it every morning, onto its other
 //! volume; deploy/README.md):
 //!
 //! - `DIR/app-YYYY-MM-DD.db`: the database, by SQLite's `VACUUM INTO` (a

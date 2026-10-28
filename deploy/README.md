@@ -1,7 +1,7 @@
 # Deploying: the app on the NAS, the public copy on OVH
 
 The app runs on the NAS (a Netgear ReadyNAS), reachable **from the home
-network only**. Every night the NAS backs the data up, writes the **public
+network only**. Every morning the NAS backs the data up, writes the **public
 copy** (the cards, the Pokémon wishlist and the books, with market values)
 and uploads it to the **OVH hosting**, then updates the app when `main` has
 a new build. Why it is built this way: [Why this setup](#why-this-setup),
@@ -17,7 +17,7 @@ deploy/
     upload-ovh.sh           the public copy → the OVH hosting (changed files only)
     common.sh               the settings and the app's commands, for the scripts
     collection.service      the app, started at boot
-    collection-nightly.*    the nightly job and its timer (3:30)
+    collection-nightly.*    the nightly job and its timer (7:30)
     collection.env.example  the app's settings (passwords)
     nightly.env.example     the nightly job's settings (OVH, GitHub token)
   pc/                       on the computer
@@ -125,15 +125,14 @@ Open **http://192.168.1.202:3000** (computers and phones on the home
 Wi-Fi) and log in. From now on the NAS's data is the live one: don't start
 the server on `data/app.db` again (work on a copy, see below).
 
-## Every night (3:30, by itself)
+## Every morning (7:30, by itself)
 
-`collection-nightly.timer` runs `nightly.sh`.
-
-**Known problem**: the NAS is off at 3:30. The timer is `Persistent`, so
-systemd should run a missed night at the next boot, but it only catches up
-once the timer has run at least once, and the network may not be up yet
-then. The upload of 2026-10-28 didn't happen. To fix (TODO.md): move the
-job to an hour when the NAS is on.
+`collection-nightly.timer` runs `nightly.sh` at 7:30, half an hour after
+the NAS starts (it is off from 22:00 to 7:00: the job was at 3:30 until
+2026-10-28 and never ran). A day the NAS starts later, the job runs as
+soon as it is up with the network (`Persistent=true`). systemd only
+catches up once the timer has run at least once: after a first install,
+start the job by hand once (below).
 
 1. **backup**: `backend backup --to /Data500/collection-backups`: the
    database copied while the app runs (`app-YYYY-MM-DD.db`, 14 days kept),
@@ -241,7 +240,7 @@ copying `data/app.db` there, never the NAS's live database.
 - **The OVH hosting** (free plan: 100 MB, static files and PHP, no
   program of ours can run there) gets only files: the public copy, about
   20 MB, nothing to attack.
-- **The copies**: every night on the NAS's other volume (other disks), and
+- **The copies**: every morning on the NAS's other volume (other disks), and
   weekly into the private data repository from the computer, since the
   NAS has no `git` (and installing packages on a ReadyNAS is risky).
 

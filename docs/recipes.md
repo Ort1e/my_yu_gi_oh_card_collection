@@ -64,13 +64,13 @@ cargo clippy --workspace --all-targets
    pull request from `dev` into `main`: `gh pr create --base main --head dev`.
    The CI also builds the NAS version there (`nas-build`, a few minutes).
 3. Merge it once the four checks are green. The release `nas-latest` is
-   published, and the NAS installs it the following night (a backup
+   published, and the NAS installs it the next morning (7:30) (a backup
    first, migrations run at start). Now:
    `ssh nas /apps/collection/deploy/update.sh`.
 
 ## Back the data up to git
 
-The NAS copies its data every night onto its other disks
+The NAS copies its data every morning onto its other disks
 (`/Data500/collection-backups`, 14 days). Once a week or so, bring the
 latest copy into the private `data` submodule from the computer:
 
@@ -91,7 +91,7 @@ If a `.db-wal` file sits next to a database after its server stopped
 ## Run the app on the NAS
 
 The app's home is the NAS (home network only, on from 7:00 to 22:00),
-which also writes the public copy for the OVH hosting every night:
+which also writes the public copy for the OVH hosting every morning:
 everything is in [deploy/README.md](../deploy/README.md) (SSH, first
 install, the nightly job, updates, the OVH upload, backups to git, what to
 type when something goes wrong).
