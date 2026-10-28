@@ -22,7 +22,11 @@
 
     picture.addEventListener('click', () => {
         const ratio = (picture.naturalWidth || 59) / (picture.naturalHeight || 86);
-        const height = Math.min(window.innerHeight * 0.9, (window.innerWidth * 0.94 - 16) / ratio, 1100);
+
+        // never more than 1.5 times the picture's own size: blurred beyond
+        // (the public copy's are 360 px wide)
+        const natural = picture.naturalHeight ? picture.naturalHeight * 1.5 : 1100;
+        const height = Math.min(window.innerHeight * 0.9, (window.innerWidth * 0.94 - 16) / ratio, natural);
 
         large.src = picture.currentSrc || picture.src;
         large.style.height = `${height}px`;

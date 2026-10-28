@@ -37,9 +37,9 @@ use crate::photos;
 const MARKER: &str = ".public-export";
 
 /// The largest width of the pictures' copies (the grids, the card pages,
-/// the picture seen large on hover or full screen): ygoprodeck's are 421 px
-/// wide and kept as they are, TCGdex's 600 px.
-const PICTURE_WIDTH: u32 = 600;
+/// the picture seen large on hover or full screen). The OVH free plan has
+/// 100 MB: at 360 px the ~640 pictures are about 46 MB, at 600 px 102 MB.
+const PICTURE_WIDTH: u32 = 360;
 
 /// The query parameters a copied page keeps: the others (filters) aren't
 /// in the copy.
