@@ -14,7 +14,7 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   anything, and what error does the browser give.
 - **A better public copy**: the app's own layout (header, colours of each
   collection) for the public pages, and the Yu-Gi-Oh! collection's
-  statistics (value, counts, by rarity / set…; to be chosen). A spec first.
+  statistics: `docs/specs/public-copy.md` (to review).
 - Maybe: hide the add/edit buttons a user can't use (they get a "Not
   allowed" page today).
 - **Formats** in the deck builder (Edison…): `docs/specs/formats.md`
