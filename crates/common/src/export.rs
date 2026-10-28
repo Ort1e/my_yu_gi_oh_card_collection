@@ -36,9 +36,10 @@ use crate::photos;
 /// missing or empty one) is emptied and written again.
 const MARKER: &str = ".public-export";
 
-/// The width of the pictures' copies (the grids, the card pages, the
-/// picture seen large on hover).
-const PICTURE_WIDTH: u32 = 360;
+/// The largest width of the pictures' copies (the grids, the card pages,
+/// the picture seen large on hover or full screen): ygoprodeck's are 421 px
+/// wide and kept as they are, TCGdex's 600 px.
+const PICTURE_WIDTH: u32 = 600;
 
 /// The query parameters a copied page keeps: the others (filters) aren't
 /// in the copy.

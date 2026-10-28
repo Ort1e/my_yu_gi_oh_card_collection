@@ -82,9 +82,13 @@ pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
     encode(&img)
 }
 
-/// A small copy, `width` px wide (JPEG): the public export's card pictures.
+/// A copy at most `width` px wide (JPEG, never enlarged): the public
+/// export's card pictures.
 pub fn thumbnail(bytes: &[u8], width: u32) -> Result<Vec<u8>, PhotoError> {
     let img = reader(bytes)?.decode().map_err(refused)?;
+    if img.width() <= width {
+        return encode(&img);
+    }
     encode(&img.resize(width, u32::MAX, FilterType::Lanczos3))
 }
 
@@ -140,6 +144,12 @@ mod tests {
             (800, 600),
             "not enlarged"
         );
+    }
+
+    #[test]
+    fn thumbnails_are_never_enlarged() {
+        assert_eq!(size(&thumbnail(&png(1200, 1650), 600).unwrap()), (600, 825));
+        assert_eq!(size(&thumbnail(&png(421, 614), 600).unwrap()), (421, 614));
     }
 
     #[test]

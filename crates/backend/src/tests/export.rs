@@ -63,6 +63,8 @@ async fn the_public_copy_holds_nothing_private() {
         "img/card-image-1.jpg",
         "static/css/style.css",
         "static/js/card_preview.js",
+        "static/js/card_zoom.js",
+        "static/js/back_link.js",
     ] {
         assert!(out.join(page).exists(), "{page} is missing");
     }

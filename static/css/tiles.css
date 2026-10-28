@@ -85,7 +85,7 @@
     flex-direction: column;
     gap: 0.1rem;
     padding: 0.5rem 0.6rem 0.6rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
 
 /* The name: two lines kept, even for a short one. */
@@ -94,7 +94,7 @@
     min-height: 2.6em;
     overflow: hidden;
     color: #fff;
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 700;
     line-height: 1.3;
     -webkit-box-orient: vertical;
@@ -114,7 +114,7 @@
 
 .card-tile-line.english-name {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
 }
 
 .card-tile-print {
@@ -141,7 +141,7 @@
 .card-tile-tags .status-badge {
     margin: 0;
     padding: 0.05rem 0.4rem;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
 }
 
 .card-tile-value {
