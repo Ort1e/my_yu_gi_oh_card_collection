@@ -181,7 +181,11 @@ mod tests {
 
         let copy = image::load_from_memory(&thumbnail(original.get_ref(), 600).unwrap()).unwrap();
         assert!(copy.color().has_alpha());
-        assert_eq!(copy.to_rgba8().get_pixel(0, 0)[3], 0, "a corner stays transparent");
+        assert_eq!(
+            copy.to_rgba8().get_pixel(0, 0)[3],
+            0,
+            "a corner stays transparent"
+        );
     }
 
     #[test]
