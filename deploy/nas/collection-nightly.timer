@@ -1,9 +1,13 @@
-# Every night at 3:30 (and at the next boot if the NAS was off then).
+# Every morning at 7:30, half an hour after the NAS starts (it is on from
+# 7:00 to 22:00), and at the next boot if the NAS was off then. The
+# catching up needs a first run: systemd remembers the last one.
+# (Named "nightly" from when it ran at night: renaming the units would
+# leave the old ones enabled on the NAS.)
 [Unit]
-Description=Card and book collection, every night
+Description=Card and book collection, every morning
 
 [Timer]
-OnCalendar=*-*-* 03:30:00
+OnCalendar=*-*-* 07:30:00
 Persistent=true
 
 [Install]

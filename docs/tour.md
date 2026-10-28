@@ -17,6 +17,7 @@ Suggested reading order, about an hour with the code open next to it:
 9. [The books](#the-books): `crates/books/`, a second, smaller collection
 10. [The Pokémon cards](#the-pokémon-cards): `crates/pokemon/`, a third one, with prices
 11. [What the collections share](#what-the-collections-share): `crates/common/`, `crates/advent/`
+12. [Where it runs](#where-it-runs): the NAS, the public copy, `deploy/`
 
 ## The big picture
 
@@ -42,7 +43,7 @@ Suggested reading order, about an hour with the code open next to it:
            db (pool, Money), photos, http (throttle), media, schedule, base templates
       │ pure functions                        │ sqlx
       ▼                                       ▼
-   yugioh-domain, books-domain,          data/app.db (SQLite, tracked in the data submodule)
+   yugioh-domain, books-domain,          app.db (SQLite: live on the NAS, copies in the data submodule)
    pokemon-domain, common-domain              ▲
    (no DB, no HTTP)                           │ migrations/ applied at startup
 ```
@@ -86,7 +87,7 @@ bars, the shared partials), so its templates extend those by name.
 | `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
-| Django auth | `common::web::auth`: one password (`APP_PASSWORD`), signed cookie |
+| Django auth | `common::web::auth`: one password per user (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`), signed cookie |
 | `runserver` | `cargo run -p backend` |
 
 ### Startup (`crates/backend/src/main.rs`)
@@ -101,7 +102,7 @@ bars, the shared partials), so its templates extend those by name.
    Cardmarket account name, and the login settings;
 4. either runs a maintenance command, or starts the background tasks and
    serves `app(state)` until Ctrl-C;
-5. closes the pool, which folds the SQLite WAL back into `data/app.db`.
+5. closes the pool, which folds the SQLite WAL back into the database file.
 
 `app()` gives the three collections' `Routes` to `common::app`, which
 builds the whole URL map: the public routes, the write and private routes
@@ -245,7 +246,7 @@ Differences from the Django models to keep in mind:
 **Migrations.** `sqlx::migrate!` embeds `migrations/*.sql` into the binary
 and applies the new ones at startup, recording a checksum of each. So an
 applied migration must **never be edited** (startup would fail on the
-checksum): changes are new files, numbered after the last one (`0016_….sql` next).
+checksum): changes are new files, numbered after the last one (`0017_….sql` next).
 
 **Writing safely** (`common/src/db.rs`): SQLite allows one writer at a time. Every
 transaction that writes starts with `db::begin_write(&pool)` (not
@@ -254,9 +255,12 @@ wait instead of failing with "database is locked". Get new ids with
 `.execute(…)?.last_insert_rowid()`. Do ygoprodeck calls *before* opening a
 write transaction, because they write `card_data` through the pool themselves.
 
-**The data lives in git.** `data/app.db` is tracked in the private `data`
-submodule. Ctrl-C stops the server cleanly, and after that `app.db` alone
-holds everything. See [recipes.md](recipes.md#save-your-data-to-git).
+**Where the data lives.** The live database is on the NAS
+(`/Data1To/collection/app.db`). The private `data` submodule keeps copies
+(`data/app.db`, the media), brought from the NAS's nightly backups; on the
+computer the server runs on such a copy. Ctrl-C (or SIGTERM) stops the
+server cleanly, and after that `app.db` alone holds everything. See
+[recipes.md](recipes.md#back-the-data-up-to-git).
 
 ## The domain crates
 
@@ -519,8 +523,8 @@ regulation mark (`F 034/189`): the sets of that size
 number and mark. TCGdex's French "localized" code of some sets is their
 name (`151` for 151, printed MEW): a code without a letter is ignored. A number missing from sets remembered on an earlier
 day asks TCGdex again (`sets::are_old`, `sets::forget`). TCGdex has no
-pictures of the Trainer Galleries either: they borrow one (below), the
-the Pokémon TCG API's (below).
+pictures of the Trainer Galleries either: they come from the Pokémon TCG
+API (below).
 
 **Booster openings** (migration 0013, `src/store/openings.rs`,
 `src/routes/openings.rs`): the booster form saves a `pokemon_opening`
@@ -579,7 +583,7 @@ Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 photos) require a session cookie. Pages redirect to `/login?next=…`, the
 APIs (`/api/*`, `/books/api/*`, `/pokemon/api/*`) answer 401. Without any
 password there is no login, and the server refuses to listen anywhere but
-`127.0.0.1`.
+a loopback address (`127.0.0.1`).
 
 - **Users**: `APP_PASSWORD` is user `owner`, `APP_PASSWORD_<NAME>` adds
   user `<name>` (a friend). The form asks only for the password, which says
@@ -653,7 +657,15 @@ per section (the same picture grid as the app, tiles without links),
 never downloaded are fetched first through its own picture routes. The
 folder is emptied at each export, and refused if it isn't an earlier
 export. `backend/src/tests/export.rs` checks that no seller, price paid,
-note, deck, tournament or budget gets in.
+note, deck, tournament or budget gets in. The NAS writes it and uploads it
+every morning ([Where it runs](#where-it-runs)).
+
+`backup --to DIR [--keep DAYS]` (`backend/src/commands/backup.rs`) copies
+the data while the server runs: `DIR/app-YYYY-MM-DD.db` by SQLite's
+`VACUUM INTO` (consistent even with writes going on), the media folder
+mirrored, the copies older than 14 days deleted. `fetch-release --to DIR`
+(`release.rs`, on the NAS only) downloads the CI's latest build of `main`
+when it is new.
 
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
@@ -721,7 +733,9 @@ terms; the price guide files are its open download.
   × language (non-English 0.9), totals rounded to the cent;
 - a copy counts on date D when its purchase lot (not cancelled) is dated on
   or before D and it has no sale lot by D; proxies never count;
-- the **gain/loss uses the lot prices** (`lot.price`, shipping included):
+- the **gain/loss uses the lot prices** (`lot.price`, shipping included,
+  less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
+  migration 0016; the budget counts the same cost in the lot's month):
   value of the copies owned + sale lots − purchase lots, up to D. Unite
   prices can't do it: many lots were bought as a whole, without a price per
   card;
@@ -765,6 +779,37 @@ for every collection:
 | card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
 | photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
 
+## Where it runs
+
+```
+ computers, phones (home Wi-Fi)                  anyone
+        │ http://192.168.1.202:3000              │ https://<domain>/collection/
+        ▼                                        ▼
+ ┌──────────────── NAS ─────────────────┐   OVH free hosting
+ │ /apps/collection       the app        │   (static files only:
+ │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
+ │ /Data500/…-backups     nightly copies  │    small pictures, ~20 MB)
+ │ nightly: backup, export + upload,     │
+ │          update of the app            │
+ └───────────────────────────────────────┘
+        ▲ the computer: pulls the latest copy into the data submodule
+          (deploy/pc/pull-backup.sh)
+```
+
+- **The app** runs on the NAS (a ReadyNAS on Debian 8) as a systemd
+  service, for the home network only, every page behind the login
+  (`PUBLIC_READS=0`).
+- **Its build** comes from the CI: the job `nas-build` makes one static
+  binary (musl, for any x86-64 processor) with the deck builder and the
+  stylesheets, on pull requests into `main` and pushes to it;
+  `nas-release` publishes it as the release `nas-latest` once every check
+  is green. The NAS downloads it every morning (`fetch-release`), backs up,
+  replaces and restarts, and goes back to the previous version if the new
+  one doesn't answer.
+- **The public copy** (`export-public`) is uploaded over SFTP to the OVH
+  hosting, changed files only.
+- The scripts and the step-by-step guide: [deploy/README.md](../deploy/README.md).
+
 ## Tests
 
 - The domain crates: plain unit tests on values.
@@ -779,7 +824,7 @@ for every collection:
   collection).
 - `crates/yugioh-domain/tests/real_shipments.rs` (ignored by default):
   checks the PDF parser against your real shipments and their lots in
-  `data/app.db`.
+  `data/app.db` (the copy pulled from the NAS).
 
 `cargo test --workspace` runs everything but the last one. Tests never
 touch `data/app.db`, apart from that ignored test, which opens it

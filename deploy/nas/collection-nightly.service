@@ -4,6 +4,9 @@
 [Unit]
 Description=Card and book collection (nightly: backup, public copy, update)
 RequiresMountsFor=/apps /Data1To /Data500
+# run at boot when a day was missed: the upload and the update need the network
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=oneshot

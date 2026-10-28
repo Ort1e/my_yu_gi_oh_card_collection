@@ -1,4 +1,4 @@
-//! The protections of the deployed app (docs/specs/deployment.md): private
+//! The protections of the deployed app (deploy/README.md, "Security"): private
 //! mode, two users, the cookie, the limit on wrong passwords, the security
 //! headers, the media folder.
 

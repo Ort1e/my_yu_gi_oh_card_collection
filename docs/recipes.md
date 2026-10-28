@@ -4,11 +4,19 @@ Step-by-step guides for the usual changes. Read [tour.md](tour.md) first for
 how the pieces fit. Everything runs inside the Nix shell (direnv loads it),
 from the repo root.
 
-- [Daily workflow](#daily-workflow)
-- [Save your data to git](#save-your-data-to-git)
-- [Run the app on the NAS](#run-the-app-on-the-nas)
+Using the app:
+
 - [Use the app from a phone](#use-the-app-from-a-phone)
 - [Add books](#add-books)
+- [Add Pokémon cards](#add-pokémon-cards)
+- [Add next year's advent calendar](#add-next-years-advent-calendar)
+- [Back the data up to git](#back-the-data-up-to-git)
+- [Run the app on the NAS](#run-the-app-on-the-nas)
+
+Changing it:
+
+- [Daily workflow](#daily-workflow)
+- [Ship a change to the NAS](#ship-a-change-to-the-nas)
 - [Add a read-only page](#add-a-read-only-page)
 - [Add a form that changes data](#add-a-form-that-changes-data)
 - [Change the database schema](#change-the-database-schema)
@@ -20,11 +28,18 @@ from the repo root.
 
 ## Daily workflow
 
+The live data is on the NAS; on the computer, `data/app.db` is a copy
+(from `deploy/pc/pull-backup.sh`). Run the development server on a copy
+of it, so that trying things never changes what will be committed:
+
 ```bash
-cargo run -p backend              # http://127.0.0.1:3000, Ctrl-C to stop
+cp data/app.db /tmp/dev.db
+DATABASE_URL=sqlite:/tmp/dev.db cargo run -p backend   # http://127.0.0.1:3000, Ctrl-C to stop
 cargo test --workspace            # all tests (temporary DBs, never data/app.db)
 cargo clippy --workspace --all-targets
 ```
+
+(`DATABASE_URL=sqlite:/tmp/dev.db` can go in `.env` instead.)
 
 - Rust code or **templates** changed → stop and `cargo run` again (templates
   are compiled into the binary). `cargo install cargo-watch` +
@@ -37,51 +52,79 @@ cargo clippy --workspace --all-targets
   plus one per change to the collection ("lot created lot_id=153 cards=4").
   `RUST_LOG=debug cargo run -p backend` adds the SQL and more detail;
   `RUST_LOG=info,sqlx=warn`-style lists tune it per module (see `EnvFilter`).
-- To look at the data: `sqlite3 data/app.db` (read-only queries are
-  harmless while the server runs).
+- To look at the data: `sqlite3 /tmp/dev.db` (read-only queries are
+  harmless while the server runs). On the NAS's live data:
+  `ssh nas sqlite3 -readonly /Data1To/collection/app.db`.
 
-## Save your data to git
+## Ship a change to the NAS
 
-`data/app.db` is the real collection, tracked in the private `data`
-submodule. While the server runs, recent writes sit in `data/app.db-wal`
-(gitignored). Stopping the server with Ctrl-C (or SIGTERM) writes them
-into `app.db` and removes the WAL. So:
+1. Commit on `dev` and push: the CI checks it (fmt, clippy, tests, audit,
+   the deck builder).
+2. When a few changes are ready and tested (not after each one), open a
+   pull request from `dev` into `main`: `gh pr create --base main --head dev`.
+   The CI also builds the NAS version there (`nas-build`, a few minutes).
+3. Merge it once the four checks are green. The release `nas-latest` is
+   published, and the NAS installs it the next morning (7:30) (a backup
+   first, migrations run at start). Now:
+   `ssh nas /apps/collection/deploy/update.sh`.
+
+## Back the data up to git
+
+The NAS copies its data every morning onto its other disks
+(`/Data500/collection-backups`, 14 days). Once a week or so, bring the
+latest copy into the private `data` submodule from the computer:
 
 ```bash
-# 1. stop the server (Ctrl-C)
-# 2. commit the data, in the submodule
-git -C data add -A
-git -C data commit -m "add lot from <seller>"
-git -C data push
-# 3. record the new data version in the app repo
-git add data
-git commit -m "update data"
-git push
+deploy/pc/pull-backup.sh            # the newest copy → data/, committed in the submodule
+deploy/pc/pull-backup.sh --push     # and pushed, with the pointer committed here
 ```
 
-If `data/app.db-wal` still exists after the server stopped (killed with
-`kill -9`, crash…), open and close the DB once to fold it in:
-`sqlite3 data/app.db "PRAGMA wal_checkpoint(TRUNCATE);"`.
+Never commit a `data/app.db` changed by the development server: the NAS's
+copy would replace it the next time anyway. Never delete or regenerate
+it either: the importer only works on an empty DB, and the Django dump is
+older than the Rust-era changes.
 
-Never delete or regenerate `data/app.db`: the importer only works on an
-empty DB, and the Django dump is older than your Rust-era changes.
+If a `.db-wal` file sits next to a database after its server stopped
+(killed with `kill -9`, crash…), open and close the DB once to fold it in:
+`sqlite3 <file>.db "PRAGMA wal_checkpoint(TRUNCATE);"`.
 
 ## Run the app on the NAS
 
-The app's home is the NAS (home network only), which also writes the
-public copy for the OVH hosting every night: everything is in
-[deploy/README.md](../deploy/README.md) (SSH, first install, moving the
-data, the nightly job, the OVH upload, backups to git). Once moved, the
-NAS's data is the live one: the computer's server runs on copies only.
+The app's home is the NAS (home network only, on from 7:00 to 22:00),
+which also writes the public copy for the OVH hosting every morning:
+everything is in [deploy/README.md](../deploy/README.md) (SSH, first
+install, the nightly job, updates, the OVH upload, backups to git, what to
+type when something goes wrong).
 
 ## Use the app from a phone
 
-Once the app runs on the NAS, a phone on the home Wi-Fi opens
-`http://192.168.1.202:3000`: nothing below is needed. Before that, or for
-the development server:
+On the home Wi-Fi (not mobile data), open **`http://192.168.1.202:3000`**
+and log in with your own password. Bookmark it, or "Add to home screen"
+for an app-like icon; the session lasts, restarts included.
 
-The phone talks to the server running on the PC, over the home Wi-Fi. By
-default the server only answers the PC itself (`127.0.0.1`).
+**If the page doesn't load** on one phone while it works elsewhere:
+
+- the phone is on the home Wi-Fi, not a guest network (guests can't see
+  the NAS) nor mobile data (a weak Wi-Fi makes some phones switch);
+- type `http://` in full: browsers set to "HTTPS only" or "Always use
+  secure connections" (Chrome, Firefox, Brave, Samsung Internet) try
+  `https://…`, which the NAS doesn't serve; the setting can allow this one
+  site;
+- no VPN, ad blocker app or "private DNS" app running on the phone: some
+  send every page through the internet, where the NAS can't be reached;
+- another browser on the same phone, and `http://192.168.1.202:3000/login`
+  directly.
+
+**Limits:** it's plain HTTP. Fine at home, but the password crosses the
+Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
+book barcode scan takes a photo instead). Never forward port 3000 on the
+box: the NAS must stay unreachable from the internet.
+
+### The development server from a phone
+
+To try a change on a phone before it ships, the phone talks to the server
+running on the PC, over the home Wi-Fi. By default the server only answers
+the PC itself (`127.0.0.1`).
 
 **Once:**
 
@@ -92,12 +135,8 @@ default the server only answers the PC itself (`127.0.0.1`).
    ```
    then apply it: `sudo nixos-rebuild switch --flake /etc/nixos` (or your
    usual rebuild command).
-2. **Give the PC a fixed address.** In the internet box's admin page
-   (often `http://192.168.1.1`), look for "DHCP" → "static lease" /
-   "reservation" and reserve the PC's current address for it. To see
-   that address: `hostname -I`, the first `192.168.…` one (the `172.…`
-   ones are Docker's). Without this, the address may change some day and
-   the phone's bookmark stops working.
+2. **Find the PC's address**: `hostname -I`, the first `192.168.…` one
+   (the `172.…` ones are Docker's).
 3. **Listen on the network, with a password.** Add to `.env` (gitignored,
    read at startup):
    ```bash
@@ -112,25 +151,13 @@ default the server only answers the PC itself (`127.0.0.1`).
 
 1. `cargo run -p backend` on the PC; the log says
    `listening on 0.0.0.0:3000, login enabled`.
-2. On the phone, **on the home Wi-Fi** (not mobile data):
-   `http://<PC address>:3000`, e.g. `http://192.168.1.51:3000`. Bookmark
-   it, or "Add to home screen" for an app-like icon.
-3. Reading pages works directly; editing asks for the password once (the
-   session lasts, restarts included).
+2. On the phone, on the home Wi-Fi: `http://<PC address>:3000`, e.g.
+   `http://192.168.1.51:3000`.
 
-**If the page doesn't load:** the server running? Phone on the same
-Wi-Fi (some boxes have a separate guest network that can't see the PC)?
-Port open (`sudo iptables -L nixos-fw -n | grep 3000`)? From the PC itself,
-`http://192.168.1.51:3000` must work too.
-
-**Limits:** it's plain HTTP. Fine at home, but the password crosses the
-Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
-book barcode scan takes a photo instead). Don't forward port 3000 on the
-box to reach it from outside. For outside access and HTTPS, the clean way
-is Tailscale (`services.tailscale.enable = true;` on the PC, the app on the
-phone, then `tailscale serve`); not set up yet.
-
-To go back to PC-only: remove `BIND_ADDR` from `.env`.
+If it doesn't load: the checks above, plus the port
+(`sudo iptables -L nixos-fw -n | grep 3000`); from the PC itself,
+`http://<PC address>:3000` must work too. To go back to PC-only: remove
+`BIND_ADDR` from `.env`.
 
 ## Add books
 
@@ -153,9 +180,9 @@ door: empty that day first).
 
 **Book advent calendar:** Books → **Advent** → **Add calendar**, then for
 each day its book (its ISBN: a book not in the list yet is looked up and
-added; or `#id`) and its photo. Photos in
-`data/media/book_advent_calendar_photos/<year>/`: commit them with the
-data, like the card calendars.
+added; or `#id`) and its photo. The photos go into
+`media/book_advent_calendar_photos/<year>/` on the NAS, and into git with
+the data (see [Back the data up to git](#back-the-data-up-to-git)).
 
 ## Add Pokémon cards
 
@@ -201,8 +228,8 @@ In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
   price or none). Cards are never deleted.
 
 Prices come with the weekly refresh (`refresh-prices`), and when a card is
-first added. Pictures are a cache in `data/media/pokemon_card_images/`
-(not committed, like `card_images/`): downloaded again when missing.
+first added. Pictures are a cache in `media/pokemon_card_images/` (not
+backed up to git, like `card_images/`): downloaded again when missing.
 
 ## Add a read-only page
 
@@ -324,9 +351,9 @@ delete routes for them.
 
 ## Change the database schema
 
-1. Add `migrations/0016_<what>.sql` (the next free number). **Never edit
-   an existing migration**: they are already applied to `data/app.db`, and
-   sqlx refuses to start if an applied file changed.
+1. Add `migrations/0017_<what>.sql` (the next free number). **Never edit
+   an existing migration**: they are already applied to the NAS's
+   database, and sqlx refuses to start if an applied file changed.
 2. Write plain SQLite:
 
    ```sql
@@ -339,13 +366,16 @@ delete routes for them.
      constraints). Those changes need a new table + copy + rename, and then
      **never** `DROP` a table that other tables reference while foreign
      keys are on: `ON DELETE CASCADE` would empty the children. Ask for
-     help or test on a copy first: `cp data/app.db /tmp/try.db` and
-     `DATABASE_URL=sqlite:/tmp/try.db cargo run -p backend`.
+     help, and test on a copy of the real data first (below).
 3. Update the row structs and SQL that use the table, and the importer only
    if you still care about importing Django dumps (you don't need to).
 4. `cargo test --workspace`: tests run all migrations on a fresh DB.
-5. The next `cargo run -p backend` applies it to `data/app.db`. Commit the
-   migration in the app repo and the DB in the data repo.
+5. Try it on a copy of the real data: `deploy/pc/pull-backup.sh`, then
+   `cp data/app.db /tmp/try.db` and
+   `DATABASE_URL=sqlite:/tmp/try.db cargo run -p backend` (it applies the
+   migration at start).
+6. Commit it on `dev`. The NAS applies it when it installs the next build
+   of `main`, after a backup ([Ship a change to the NAS](#ship-a-change-to-the-nas)).
 
 ## Add pure business logic
 
@@ -429,8 +459,8 @@ All in the app, behind the login:
    photo. Save. Days can be filled one at a time, through December.
 4. A photo still sideways (some phones don't record the orientation): ↺ ↻.
 
-Then commit the data (stop the server first): `app.db` and the photos in
-`data/media/advent_calendar_photos/<year>/` (`media/.gitignore` keeps them).
+The photos go into `media/advent_calendar_photos/<year>/` on the NAS, and
+into git with the data (see [Back the data up to git](#back-the-data-up-to-git)).
 
 ## Write a handler test
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # From the computer: put a build of the app on the NAS and run its
-# install.sh (the first time; afterwards the NAS updates itself at night).
+# install.sh (the first time; afterwards the NAS updates itself every morning).
 #
 #   deploy/pc/install-on-nas.sh [collection-nas.tar.gz]
 #

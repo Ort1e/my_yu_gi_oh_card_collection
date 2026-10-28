@@ -1,5 +1,5 @@
 #!/bin/bash
-# The nightly job (collection-nightly.timer, 3:30): each step runs even
+# The nightly job (collection-nightly.timer, 7:30 in the morning): each step runs even
 # when the one before failed; the job fails if any did (see
 # `journalctl -u collection-nightly`).
 #
