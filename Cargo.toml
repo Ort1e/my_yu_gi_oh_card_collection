@@ -45,3 +45,6 @@ sha2 = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 # advent calendar photos: EXIF orientation, resize, re-encode without metadata
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+# the public copy's card pictures as lossy WebP (libwebp, C, SSE2 only by
+# default: fine for the NAS's old Atom); `image` only writes lossless WebP
+webp = { version = "0.3", default-features = false }

@@ -60,9 +60,11 @@ async fn the_public_copy_holds_nothing_private() {
         "pokemon-wishlist.html",
         "books.html",
         "books-1.html",
-        "img/card-image-1.jpg",
+        "img/card-image-1.webp",
         "static/css/style.css",
         "static/js/card_preview.js",
+        "static/js/card_zoom.js",
+        "static/js/back_link.js",
     ] {
         assert!(out.join(page).exists(), "{page} is missing");
     }
@@ -81,7 +83,7 @@ async fn the_public_copy_holds_nothing_private() {
         "Assassin&#x27;s Apprentice",
         "Collection statistics",
         r#"href="collection-stats.html""#,
-        r#"src="img/card-image-1.jpg""#,
+        r#"src="img/card-image-1.webp""#,
     ] {
         assert!(pages.contains(shown), "{shown} is missing");
     }

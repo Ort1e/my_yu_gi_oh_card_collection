@@ -668,7 +668,9 @@ runs. They are **the app's own pages**, saved as files:
    `cards-page-2.html`, `/cards/12` → `cards-12.html`; only the `page` and
    `view` parameters are kept: filters aren't in the copy), its links
    rewritten to these files (`#` for anything else), the pictures as
-   360 px JPEGs (`img/card-image-12.jpg`), the `/static` files it uses
+   WebP at most 480 px wide (`img/card-image-12.webp`: about a third
+   smaller than JPEG for the same look; the OVH plan has 100 MB), the
+   `/static` files it uses
    copied. The first start page is also `index.html`.
 
 In that mode the templates leave out what is private:
