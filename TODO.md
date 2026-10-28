@@ -28,10 +28,6 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   everything; a secondary one sees everything but can only change the
   books. A role per user in `common::web::auth` and a check on each
   collection's `write` routes.
-- **Public or private repository**: the owner is deciding. If private:
-  `GITHUB_TOKEN` in the NAS's `nightly.env` (deploy/README.md, "Updates
-  without a token"), the protection of `main` needs a paid plan, and the
-  CI minutes become limited (2,000 a month).
 - **Formats** in the deck builder (Edison…): `docs/specs/formats.md`
   (`format::first_release` and `check` are the owner's).
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
