@@ -12,6 +12,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   app on the phone (it may send every page through the internet); another
   browser. If it still fails: does `http://192.168.1.202:3000/login` show
   anything, and what error does the browser give.
+- **Testers of the public copy:** after the 2026-10-28 changes (back link,
+  full screen card, bigger tile text), is the text still too small on
+  phones? If so: bigger text on phones everywhere, not only the tiles.
 - Maybe: statistics for the Pokémon cards and the books too (by set,
   rarity, language; by author, series, format), like `/collection/stats`.
 - Maybe: hide the add/edit buttons a user can't use (they get a "Not
@@ -26,6 +29,10 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-28: testers' feedback: back to the list page you came from, a
+  card full screen on tap, bigger tile text; the copy's pictures as WebP
+  at 480 px (48 MB in all, the OVH plan has 100 MB); the morning job
+  updates the app before writing the copy.
 - 2026-10-28: the public copy made of the app's own pages (crawled in
   "public copy" mode), `/collection/stats`, the card seen large on hover.
 - 2026-10-28: users who change the books only (`APP_ACCESS_<NAME>`, by
