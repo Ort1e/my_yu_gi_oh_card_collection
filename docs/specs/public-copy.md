@@ -1,6 +1,6 @@
 # Spec: a nicer public copy
 
-Status: **to review** (2026-10-28). The owner asked for the public copy
+Status: **decided, not built** (2026-10-28). The owner asked for the public copy
 (`export-public`, on the OVH hosting) to look like the app, and to show
 the Yu-Gi-Oh! collection's statistics; "all of them" for the statistics
 proposed. Still public only: the cards and books owned, the Pokémon
@@ -58,7 +58,26 @@ search, no script.
   not `/cards`), no login link, no app-only menu. `common::export` renders
   them with a `public: true` flag; the app keeps its pages as they are.
 
-## 2. The Yu-Gi-Oh! statistics (`yugioh-stats.html`)
+## 2. The card seen large on hover (app and copy)
+
+Owner's addition. In every card grid (`partials/card_grid.html`: `/cards`,
+`/pokemon`, a booster opening, the copy's pages), with a mouse, hovering a
+card's picture shows it **large beside it** (about 80 % of the window's
+height, up to 560 px), on the side with room, until the mouse leaves.
+Phones and tablets (no hover) are unchanged.
+
+- `static/js/card_preview.js` (+ `.card-preview` in `tiles.css`): one
+  floating picture, a short delay so moving across the grid doesn't
+  flicker, the card's proportions from its tile (Yu-Gi-Oh! 59 × 86,
+  Pokémon 63 × 88), hidden on scroll.
+- The app shows the full picture (the tile's own). The copy has only small
+  copies: they become **360 px wide** (instead of 240), one copy for the
+  grid, the preview and the card pages. About 40 MB on the hosting (of 100;
+  22 MB today).
+- `CardTile::preview`: a larger picture than the tile's when there is one
+  (none in the app).
+
+## 3. The Yu-Gi-Oh! statistics (`yugioh-stats.html`)
 
 All from the copies owned today (no proxy, not sold) and the market prices
 (the same estimate as the cards' tiles: Cardmarket product, else
@@ -86,8 +105,7 @@ the per-card pages, the chart data, the stylesheets, the tests (that no
 private data gets in: the existing `backend/src/tests/export.rs` extended
 to the new pages; each page written).
 
-**To ask the owner** (business logic, `yugioh-domain/src/stats.rs`; Claude
-leaves stubs and tests if they're the owner's):
+Claude too, the owner decided (`yugioh-domain/src/stats.rs`):
 
 - `kind(card_type: &str) -> CardKind`: ygoprodeck's `type` ("XYZ Monster",
   "Pendulum Effect Monster", "Spell Card"…) → Monster / Extra Deck / Spell
@@ -97,18 +115,14 @@ leaves stubs and tests if they're the owner's):
 - `set_prefix(code: &str) -> Option<&str>` (`MAMO-FR023` → `MAMO`), maybe
   from `card_set::code_without_language`.
 
-## To decide
+## Decided (owner, 2026-10-28)
 
-1. **Pagination or one page with a search script?** Pages of 48 look like
-   the app and need no script; one page with a filter (name, rarity, set)
-   finds a card faster. Proposed: pages (like the app), and the table view
-   with `tables.js`'s search for finding.
-2. **A page per card**: yes (proposed), or the tiles stay without links.
-   About 900 small pages (~3 MB): the hosting has 100 MB, the copy uses 22
-   MB today.
-3. **Statistics for the Pokémon cards and the books** too (copies by set,
-   rarity, language; books by author, series, format)? Proposed: later.
-4. The **stats functions**: the owner's, or Claude's?
+1. **Pages of 48 cards** like the app, and the table view (one sortable
+   page with `tables.js`'s search) for finding a card.
+2. **A page per card** (Yu-Gi-Oh! and Pokémon copies): tiles become links.
+3. Statistics for the Pokémon cards and the books: **later**.
+4. The stats functions (`kind`, `breakdown`, `set_prefix`): **Claude's**
+   (simple grouping).
 
 ## Tests
 
