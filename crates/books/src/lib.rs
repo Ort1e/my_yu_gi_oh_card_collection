@@ -22,6 +22,7 @@ use common::{AppState, Routes};
 /// The book collection's routes (assembled by `common::app`).
 pub fn routes() -> Routes {
     Routes {
+        collection: "books",
         public: Router::new()
             .route("/books", get(routes::list))
             .route("/books/:id", get(routes::detail))

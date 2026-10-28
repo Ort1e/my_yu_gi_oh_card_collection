@@ -49,10 +49,14 @@ pub struct AppState {
 /// A collection's routes, by who may use them.
 #[derive(Default)]
 pub struct Routes {
+    /// The collection's name in `auth::COLLECTIONS` (`books`…): its writes
+    /// are for the users who may change it (empty: those who may change
+    /// everything).
+    pub collection: &'static str,
     /// Pages and JSON that only read: public.
     pub public: Router<AppState>,
     /// Every route that changes data (and the lookups that write a cache):
-    /// behind the login.
+    /// behind the login, for the users who may change the collection.
     pub write: Router<AppState>,
     /// Private reads (the advent calendars): behind the login too.
     pub private: Router<AppState>,
@@ -65,11 +69,13 @@ pub struct Routes {
 }
 
 impl Routes {
-    /// These routes and `other`'s (a collection's and its advent calendars').
+    /// These routes and `other`'s (a collection's and its advent calendars'),
+    /// all of this collection.
     pub fn merge(self, other: Routes) -> Routes {
         let mut private_media = self.private_media;
         private_media.extend(other.private_media);
         Routes {
+            collection: self.collection,
             public: self.public.merge(other.public),
             write: self.write.merge(other.write),
             private: self.private.merge(other.private),
@@ -94,7 +100,15 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
     let mut private_files = Router::new();
     for routes in collections {
         public = public.merge(routes.public);
-        write = write.merge(routes.write);
+        // inside the login layer added below: the user is known
+        let mut collection_write = routes.write;
+        if collection_write.has_routes() {
+            collection_write = collection_write.route_layer(from_fn_with_state(
+                (state.clone(), routes.collection),
+                auth::require_access,
+            ));
+        }
+        write = write.merge(collection_write);
         private = private.merge(routes.private);
         files = files.merge(routes.files);
         for folder in routes.private_media {

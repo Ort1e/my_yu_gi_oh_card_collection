@@ -22,6 +22,7 @@ use common::{AppState, Routes};
 /// The Pokémon collection's routes (assembled by `common::app`).
 pub fn routes() -> Routes {
     Routes {
+        collection: "pokemon",
         public: Router::new()
             .route("/pokemon", get(routes::list))
             .route("/pokemon/rarities", get(routes::rarities::page))

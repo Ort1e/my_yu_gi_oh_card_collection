@@ -589,6 +589,13 @@ a loopback address (`127.0.0.1`).
   user `<name>` (a friend). The form asks only for the password, which says
   who logs in (so two users can't share one); the logs name the user of
   each request.
+- **What each may change** (`auth::Changes`): the owner everything; another
+  user the books only, unless `APP_ACCESS_<NAME>` says `all` or lists the
+  collections (`books,pokemon`). Everyone logged in reads everything. Each
+  collection's `Routes` names itself (`collection: "books"`), and
+  `common::app` puts `auth::require_access` on its `write` routes, inside
+  the login: a refusal is a 403 page, or JSON for the APIs. `/login` says
+  who is logged in and what they may change.
 - **The cookie** is `<user>.<expiry>.<signature>`, signed with the user's
   current password and a key kept in the `app_secret` table: a restart
   doesn't log anyone out, changing a password logs that user out.

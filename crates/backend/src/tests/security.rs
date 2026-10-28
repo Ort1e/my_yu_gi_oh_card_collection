@@ -1,16 +1,18 @@
 //! The protections of the deployed app (deploy/README.md, "Security"): private
-//! mode, two users, the cookie, the limit on wrong passwords, the security
-//! headers, the media folder.
+//! mode, two users and what each may change, the cookie, the limit on wrong
+//! passwords, the security headers, the media folder.
 
 use super::*;
-use common::web::auth::{AuthConfig, MAX_FAILURES};
+use common::testing::read;
+use common::web::auth::{AuthConfig, Changes, User, MAX_FAILURES};
 
-/// The deployed settings: two users, everything private, HTTPS.
+/// The deployed settings: the owner and a friend who changes the books
+/// only, everything private, HTTPS.
 fn deployed() -> AuthConfig {
     AuthConfig {
         users: vec![
-            ("friend".into(), "friend-pw".into()),
-            ("owner".into(), "owner-pw".into()),
+            User::new("friend", "friend-pw", Changes::books()),
+            User::new("owner", "owner-pw", Changes::Everything),
         ],
         secure_cookies: true,
         public_reads: false,
@@ -34,6 +36,27 @@ async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
         .get(header::SET_COOKIE)
         .map(|c| c.to_str().unwrap().to_string());
     (response.status(), cookie)
+}
+
+/// Send `request` with the session `cookie`: (status, Location or body).
+async fn send_with(
+    t: &TestApp,
+    request: axum::http::request::Builder,
+    body: &str,
+    cookie: &str,
+) -> (StatusCode, String) {
+    let cookie = cookie.split(';').next().unwrap();
+    let response = t
+        .router()
+        .oneshot(
+            request
+                .header(header::COOKIE, cookie)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    read(response).await
 }
 
 async fn get_with(t: &TestApp, uri: &str, cookie: &str) -> StatusCode {
@@ -139,6 +162,89 @@ async fn each_user_has_a_password_and_a_secure_cookie() {
     assert!(
         cleared.contains("Max-Age=0") && cleared.ends_with("; Secure"),
         "{cleared}"
+    );
+}
+
+#[tokio::test]
+async fn the_friend_sees_everything_and_changes_the_books_only() {
+    let t = TestApp::with_config(deployed()).await;
+    t.exec(
+        "INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy)
+             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 1, 0)",
+    )
+    .await;
+    // the rights are checked before the handler: a missing version will do
+    let version_id = 999;
+    let (_, friend) = login(&t, "friend-pw").await;
+    let friend = friend.unwrap();
+
+    for page in PAGES {
+        assert_eq!(get_with(&t, page, &friend).await, StatusCode::OK, "{page}");
+    }
+    let (_, page) = send_with(&t, Request::get("/login"), "", &friend).await;
+    assert!(page.contains("change the books"), "{page}");
+
+    // the books, their calendars and the ISBN lookup's page: allowed
+    for page in ["/books/add", "/books/advent-calendar/add"] {
+        assert_eq!(get_with(&t, page, &friend).await, StatusCode::OK, "{page}");
+    }
+    let form = Request::post("/books/add")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded");
+    let (status, _) = send_with(&t, form, "title=Dune&authors=Frank+Herbert", &friend).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(t.scalar("SELECT count(*) FROM book").await, 1);
+
+    // the other collections' changes: refused, the reads still open
+    for page in [
+        "/lots/add",
+        "/advent-calendar/add",
+        "/pokemon/add",
+        "/pokemon/wishlist/add",
+    ] {
+        let (status, body) = send_with(&t, Request::get(page), "", &friend).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{page}");
+        assert!(
+            body.contains("can see everything, and change the books"),
+            "{page}: {body}"
+        );
+    }
+    let form = Request::post("/sellers/1/edit")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded");
+    assert_eq!(
+        send_with(&t, form, "name=Renamed", &friend).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let patch = Request::patch(format!("/api/deck-versions/{version_id}"))
+        .header(header::CONTENT_TYPE, "application/json");
+    let (status, body) = send_with(&t, patch, r#"{"name": "mine"}"#, &friend).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(
+        body.contains(r#""error":"Your login can't change the Yu-Gi-Oh! cards.""#),
+        "{body}"
+    );
+    let deck = format!("/api/deck-versions/{version_id}");
+    // a read: through to the handler
+    assert_eq!(get_with(&t, &deck, &friend).await, StatusCode::NOT_FOUND);
+
+    // the owner changes everything
+    let (_, owner) = login(&t, "owner-pw").await;
+    let owner = owner.unwrap();
+    for page in ["/lots/add", "/pokemon/add", "/books/add"] {
+        assert_eq!(get_with(&t, page, &owner).await, StatusCode::OK, "{page}");
+    }
+}
+
+#[tokio::test]
+async fn app_access_gives_a_user_more() {
+    let mut config = deployed();
+    config.users[0].changes = Changes::Only(vec!["books".into(), "pokemon".into()]);
+    let t = TestApp::with_config(config).await;
+    let (_, friend) = login(&t, "friend-pw").await;
+    let friend = friend.unwrap();
+    assert_eq!(get_with(&t, "/pokemon/add", &friend).await, StatusCode::OK);
+    assert_eq!(
+        get_with(&t, "/lots/add", &friend).await,
+        StatusCode::FORBIDDEN
     );
 }
 

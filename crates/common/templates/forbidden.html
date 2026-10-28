@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Not allowed{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <h1>Not allowed</h1>
+  <p>Your login can't change {{ collection }}: it can see everything, and change {{ allowed }}.</p>
+  <p><a href="/">Home</a> · <a href="/books">The books</a> · <a href="/login">Who am I logged in as?</a></p>
+</div>
+{% endblock %}
