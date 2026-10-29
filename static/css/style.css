@@ -112,7 +112,12 @@ body {
 }
 
 /* A picture seen large over the page, in a <dialog> (advent calendar photos;
-   a card's picture on its page: static/js/card_zoom.js, sized by the script). */
+   a card's picture marked `data-zoom`: static/js/card_zoom.js, sized by the
+   script). */
+img[data-zoom] {
+    cursor: zoom-in;
+}
+
 .lightbox {
     max-width: min(94vw, 1100px);
     padding: 0.5rem;

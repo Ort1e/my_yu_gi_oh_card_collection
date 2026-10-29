@@ -148,7 +148,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<StatsPage> {
     sets.truncate(SETS);
 
     let languages = breakdown(cards.iter().map(|c| {
-        let language = c.code.as_deref().and_then(Language::from_code);
+        let language = c.code.as_deref().and_then(Language::of_code);
         (label(language.map(Language::code)), value_of(c))
     }));
 

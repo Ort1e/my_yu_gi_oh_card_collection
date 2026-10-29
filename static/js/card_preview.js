@@ -1,14 +1,15 @@
 // The card seen large: hovering a picture of a card grid
-// (partials/card_grid.html) shows it large beside it, on the side with room,
-// until the mouse leaves (`.card-preview`, tiles.css). With a mouse only:
-// phones and tablets keep the grid as it is. In the app and the public copy.
+// (partials/card_grid.html) or one marked `data-zoom` (the Pokémon wishlist)
+// shows it large beside it, on the side with room, until the mouse leaves
+// (`.card-preview`, tiles.css). With a mouse only: phones and tablets keep
+// the page as it is (card_zoom.js, a tap). In the app and the public copy.
 
 (function () {
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
         return;
     }
 
-    const pictures = document.querySelectorAll('.card-tile-picture img');
+    const pictures = document.querySelectorAll('.card-tile-picture img, img[data-zoom]:not(.card-detail-image)');
 
     if (pictures.length === 0) {
         return;
@@ -20,9 +21,18 @@
     preview.hidden = true;
     document.body.appendChild(preview);
 
-    // the card's proportions (Yu-Gi-Oh! 59 × 86 mm, Pokémon 63 × 88)
+    // the card's proportions (Yu-Gi-Oh! 59 × 86 mm, Pokémon 63 × 88); out of
+    // a grid, the picture's own
     function ratio(picture) {
-        return picture.closest('.card-tile.pokemon') ? 63 / 88 : 59 / 86;
+        if (picture.closest('.card-tile.yugioh')) {
+            return 59 / 86;
+        }
+
+        if (picture.closest('.card-tile') || !picture.naturalHeight) {
+            return 63 / 88;
+        }
+
+        return picture.naturalWidth / picture.naturalHeight;
     }
 
     let timer = null;
