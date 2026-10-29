@@ -181,7 +181,10 @@ async fn a_version_shows_its_cards_by_zone() {
     assert_eq!(page.matches(r#"class="card-tile yugioh"#).count(), 3);
     // the proxy, in the side deck after the main deck's cards
     let side = &page[page.find("Side Deck (1)").unwrap()..];
-    assert!(side.contains("Kuriboh") && side.contains("Proxy"), "{side}");
+    assert!(side.contains("Kuriboh"), "{side}");
+    assert!(side.contains(r#"class="card-tile yugioh proxy""#), "{side}");
+    assert!(side.contains(r#"<span class="card-tile-proxy">Proxy</span>"#));
+    assert_eq!(page.matches("card-tile-proxy").count(), 1, "the proxy only");
 
     assert_eq!(t.get("/deck-versions/999").await.0, StatusCode::NOT_FOUND);
 }

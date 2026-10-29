@@ -27,12 +27,15 @@ pub struct CardTile {
     /// Its condition, `(code, label)`: `("NM", "Near Mint")`, shown as a
     /// coloured badge (`.status-badge`, card.css); `None` when not noted.
     pub condition: Option<(&'static str, &'static str)>,
-    /// Badges: Full art, PSA 10, Proxy, Sold.
+    /// Badges: Full art, PSA 10, Sold.
     pub tags: Vec<String>,
     /// Its value (`12.50`, shown with €), empty when unknown.
     pub value: String,
     /// Faded: sold.
     pub faded: bool,
+    /// A Yu-Gi-Oh! proxy (a stand-in, not owned): red border and "Proxy"
+    /// badge on the picture, as in the deck builder.
+    pub proxy: bool,
 }
 
 /// The proportions of a collection's cards (their pictures are shown

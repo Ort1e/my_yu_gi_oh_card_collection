@@ -37,7 +37,28 @@
 /* ---------- the picture: the whole card, its own proportions ---------- */
 
 .card-tile-picture {
+    position: relative;
     padding: 0.5rem 0.5rem 0;
+}
+
+/* A proxy (a stand-in, not owned): red border and badge, as in the deck
+   builder (frontend/src/lib/CardTile.svelte). */
+.card-tile.proxy {
+    border: 2px solid red;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+}
+
+.card-tile-proxy {
+    position: absolute;
+    bottom: 0.4rem;
+    left: 0.9rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 0, 0, 0.85);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    pointer-events: none;
 }
 
 .card-tile-picture img,

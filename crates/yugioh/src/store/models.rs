@@ -41,9 +41,6 @@ impl CardRow {
     /// The card in a picture grid.
     pub fn tile(&self) -> CardTile {
         let mut tags = Vec::new();
-        if self.is_proxy {
-            tags.push("Proxy".to_string());
-        }
         if self.is_sold {
             tags.push("Sold".to_string());
         }
@@ -59,6 +56,7 @@ impl CardRow {
             tags,
             value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
             faded: self.is_sold,
+            proxy: self.is_proxy,
         }
     }
 
