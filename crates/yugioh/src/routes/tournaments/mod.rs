@@ -183,7 +183,7 @@ fn sections(s: &Stats, version_names: &HashMap<i64, String>) -> Vec<StatSection>
                         .get(id)
                         .cloned()
                         .unwrap_or_else(|| format!("Version #{id}"));
-                    StatLine::new(name, Some(format!("/deck-builder/{id}")), r)
+                    StatLine::new(name, Some(format!("/deck-versions/{id}")), r)
                 })
                 .collect(),
         },
