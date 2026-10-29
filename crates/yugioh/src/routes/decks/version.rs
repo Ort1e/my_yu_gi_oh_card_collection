@@ -1,5 +1,9 @@
 //! `/deck-versions/:id`: a deck version's cards, read-only, as the card grid:
-//! the Main, Extra and Side Decks, monsters then spells then traps, by name.
+//! the Main, Extra and Side Decks, each by kind (monsters, Extra Deck
+//! monsters, spells, traps: `yugioh_domain::stats::kind`), then by English
+//! name ignoring case and accents (`yugioh_domain::card::sort_name`), so the
+//! copies of a card sit together whatever their language. The deck builder
+//! sorts the same way (`frontend/src/deck.js`).
 //! The deck builder (`/deck-builder/:id`) is a button away in the app; the
 //! public copy shows only the versions on the public site (`PUBLIC_VERSION`),
 //! without the tournament or the buttons. `POST /deck-versions/:id/public`
@@ -11,6 +15,7 @@ use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::Redirect;
 use axum::Form;
+use yugioh_domain::card::sort_name;
 use yugioh_domain::stats::{kind, CardKind};
 
 use super::PUBLIC_VERSION;
@@ -109,9 +114,16 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
             Some(Some(card_type)) => kind(card_type),
             _ => CardKind::Other,
         };
-        let mut cards: Vec<(CardKind, CardRow)> =
-            rows.into_iter().map(|row| (kind_of(&row), row)).collect();
-        cards.sort_by(|(a, x), (b, y)| a.cmp(b).then_with(|| x.name.cmp(&y.name)));
+        // (kind, English name, name shown, id): the same card's copies
+        // together, the French ones after the English ones
+        let mut cards: Vec<((CardKind, String, String, i64), CardRow)> = rows
+            .into_iter()
+            .map(|row| {
+                let english = sort_name(row.name_en.as_deref().unwrap_or(&row.name));
+                ((kind_of(&row), english, sort_name(&row.name), row.id), row)
+            })
+            .collect();
+        cards.sort_by(|(a, _), (b, _)| a.cmp(b));
         zones.push(ZoneCards {
             name,
             tiles: cards.iter().map(|(_, card)| card.tile()).collect(),

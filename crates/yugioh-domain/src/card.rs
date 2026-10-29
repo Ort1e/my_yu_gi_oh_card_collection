@@ -29,6 +29,29 @@ pub fn clean_card_name(name: &str) -> String {
     name.to_lowercase()
 }
 
+/// A name as sorted in a deck: trimmed, lowercase, without accents
+/// (`Élégant` sorts with `elegant`, not after `zombie`). The deck builder
+/// sorts the same way (`frontend/src/deck.js`, `sortName`).
+pub fn sort_name(name: &str) -> String {
+    let mut sorted = String::with_capacity(name.len());
+    for c in name.trim().to_lowercase().chars() {
+        match c {
+            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => sorted.push('a'),
+            'ç' => sorted.push('c'),
+            'è' | 'é' | 'ê' | 'ë' => sorted.push('e'),
+            'ì' | 'í' | 'î' | 'ï' => sorted.push('i'),
+            'ñ' => sorted.push('n'),
+            'ò' | 'ó' | 'ô' | 'õ' | 'ö' => sorted.push('o'),
+            'ù' | 'ú' | 'û' | 'ü' => sorted.push('u'),
+            'ý' | 'ÿ' => sorted.push('y'),
+            'æ' => sorted.push_str("ae"),
+            'œ' => sorted.push_str("oe"),
+            c => sorted.push(c),
+        }
+    }
+    sorted
+}
+
 /// `card.last_known_status` choices: shared with the Pokémon cards.
 pub use common_domain::CardStatus;
 
@@ -145,6 +168,13 @@ pub fn name_to_translate(name: &str, code: &str, english_name: &str) -> Option<L
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sort_names_ignore_case_and_accents() {
+        assert_eq!(sort_name(" Élégant Œuf "), "elegant oeuf");
+        assert_eq!(sort_name("Dark Magician"), "dark magician");
+        assert!(sort_name("Épée") < sort_name("Zombie"));
+    }
 
     // Ported from my_ygo_cards/tests/test_normalize_card_name.py
 

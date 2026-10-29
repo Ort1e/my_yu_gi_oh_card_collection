@@ -233,3 +233,42 @@ async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
     assert!(page.contains("On the public site: played in a tournament."));
     assert!(!page.contains("Show on the public site"));
 }
+
+#[tokio::test]
+async fn a_version_sorts_by_kind_then_english_name() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    t.exec(&format!(
+        "UPDATE card_data SET json_data = '{{\"name\": \"Dark Magician\"}}' WHERE id = 1;
+         UPDATE card_data SET json_data = '{{\"name\": \"Kuriboh\"}}' WHERE id = 2;
+         INSERT INTO card_data (id, en_name, ygopro_id, card_type, json_data)
+             VALUES (3, 'pot of greed', 55144522, 'Spell Card', '{{\"name\": \"Pot of Greed\"}}');
+         INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES
+             (10, 'Pot de Cupidité', 'pot of greed', 'LOB-FR119', 3, 0),
+             (11, 'Dark Magician', 'dark magician', 'LOB-EN005', 1, 0);
+         INSERT INTO deck_version_main_deck (deck_version_id, card_id)
+             SELECT {version}, id FROM card;"
+    ))
+    .await;
+
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    let names: Vec<&str> = page
+        .match_indices(r#"<div class="card-tile-name" title=""#)
+        .map(|(i, start)| {
+            let name = &page[i + start.len()..];
+            &name[..name.find('"').unwrap()]
+        })
+        .collect();
+    // the monsters by English name (the French Dark Magicians with the
+    // English one), then the spell
+    assert_eq!(
+        names,
+        [
+            "Dark Magician",
+            "Magicien Sombre",
+            "Magicien Sombre",
+            "Kuriboh",
+            "Pot de Cupidité"
+        ]
+    );
+}
