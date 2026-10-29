@@ -51,6 +51,7 @@ pub fn router() -> Router<AppState> {
         .route("/decks", get(decks::list))
         .route("/decks/built", get(decks::built::page))
         .route("/decks/:id", get(decks::detail))
+        .route("/deck-versions/:id", get(decks::version::page))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))
         .route("/tournaments", get(tournaments::list))

@@ -79,14 +79,16 @@ pub struct EditDeckPage {
     /// Its labels, comma-separated (`yugioh_domain::tournament::split_labels`).
     labels: String,
     label_names: Vec<String>,
+    /// Shown on the public site with all its versions (`deck.is_public`).
+    is_public: bool,
 }
 
 pub async fn edit_page(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> AppResult<EditDeckPage> {
-    let (name, description): (String, Option<String>) =
-        sqlx::query_as("SELECT name, description FROM deck WHERE id = ?")
+    let (name, description, is_public): (String, Option<String>, bool) =
+        sqlx::query_as("SELECT name, description, is_public FROM deck WHERE id = ?")
             .bind(id)
             .fetch_optional(&state.pool)
             .await?
@@ -99,6 +101,7 @@ pub async fn edit_page(
         description: description.unwrap_or_default(),
         labels: deck_labels(&state.pool, id).await?.join(", "),
         label_names: label_names(&state.pool).await?,
+        is_public,
     })
 }
 
@@ -108,6 +111,7 @@ pub async fn update(
     Form(pairs): Form<Pairs>,
 ) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
+    let is_public = form.get("is_public").is_some();
     let Some(name) = form.required("name", "Name") else {
         return Ok(EditDeckPage {
             id,
@@ -115,19 +119,22 @@ pub async fn update(
             description: form.text("description"),
             labels: form.text("labels"),
             label_names: label_names(&state.pool).await?,
+            is_public,
             errors: form.errors,
         }
         .into_response());
     };
 
     let mut tx = begin_write(&state.pool).await?;
-    let updated = sqlx::query("UPDATE deck SET name = ?, description = ? WHERE id = ?")
-        .bind(&name)
-        .bind(form.get("description"))
-        .bind(id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
+    let updated =
+        sqlx::query("UPDATE deck SET name = ?, description = ?, is_public = ? WHERE id = ?")
+            .bind(&name)
+            .bind(form.get("description"))
+            .bind(is_public)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
     if updated == 0 {
         return Err(AppError::NotFound);
     }

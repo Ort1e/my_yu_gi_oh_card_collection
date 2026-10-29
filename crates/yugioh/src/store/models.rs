@@ -139,6 +139,7 @@ impl LotRow {
 pub struct DeckVersionRow {
     pub id: i64,
     pub version_name: String,
+    pub deck_id: Option<i64>,
     pub deck_name: Option<String>,
     /// Locks its real cards (`yugioh_domain::built_deck`).
     pub is_built: bool,
@@ -148,7 +149,7 @@ pub struct DeckVersionRow {
 
 impl DeckVersionRow {
     pub const SELECT: &'static str = "SELECT deck_version.id, deck_version.version_name,
-            deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
+            deck_version.deck_id, deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
             deck_version.sleeves
         FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id";
 

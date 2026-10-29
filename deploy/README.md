@@ -2,8 +2,9 @@
 
 The app runs on the NAS (a Netgear ReadyNAS), reachable **from the home
 network only**. Every morning the NAS backs the data up, updates the app
-when `main` has a new build, then writes the **public copy** (the cards, the
-Pokémon wishlist and the books, with market values) and uploads it to the
+when `main` has a new build, then writes the **public copy** (the cards and the
+decks played in tournaments, the Pokémon wishlist and the books, with
+market values) and uploads it to the
 **OVH hosting**. Why it is built this way: [Why this setup](#why-this-setup),
 at the end.
 

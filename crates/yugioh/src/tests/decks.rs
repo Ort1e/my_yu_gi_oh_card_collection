@@ -1,4 +1,5 @@
-//! Decks: list sorts, creation, edition, versions, deletion.
+//! Decks: list sorts, creation, edition, a version's cards, versions,
+//! deletion.
 
 use super::*;
 
@@ -83,16 +84,25 @@ async fn deck_edit_versions_and_delete() {
     let (status, _) = t
         .post(
             &format!("/decks/{deck}/edit"),
-            &[("name", "Renamed"), ("description", "desc")],
+            &[
+                ("name", "Renamed"),
+                ("description", "desc"),
+                ("is_public", "1"),
+            ],
         )
         .await;
     assert_eq!(status, StatusCode::SEE_OTHER);
     assert_eq!(
-        t.text("SELECT name || ' ' || description FROM deck")
+        t.text("SELECT name || ' ' || description || ' ' || is_public FROM deck")
             .await
             .as_deref(),
-        Some("Renamed desc")
+        Some("Renamed desc 1")
     );
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(page.contains("Public site: shown, every version"), "{page}");
+    t.post(&format!("/decks/{deck}/edit"), &[("name", "Renamed")])
+        .await;
+    assert_eq!(t.scalar("SELECT is_public FROM deck").await, 0);
     let (status, page) = t
         .post(&format!("/decks/{deck}/edit"), &[("name", " ")])
         .await;
@@ -145,4 +155,42 @@ async fn deck_edit_versions_and_delete() {
         t.post(&format!("/decks/{deck}/delete"), &[]).await.0,
         StatusCode::NOT_FOUND
     );
+}
+
+#[tokio::test]
+async fn a_version_shows_its_cards_by_zone() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    t.exec(&format!(
+        "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
+         UPDATE deck_version SET tournament_id = 1, deck_box = 'red box';
+         INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
+         INSERT INTO deck_version_side_deck VALUES ({version}, {});",
+        cards[0], cards[1], cards[2]
+    ))
+    .await;
+
+    // the deck's page links to it
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(
+        page.contains(&format!(r#"href="/deck-versions/{version}""#)),
+        "{page}"
+    );
+
+    let (status, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("Test - v1"));
+    assert!(page.contains("Main Deck (2)"), "{page}");
+    assert!(page.contains("Side Deck (1)"), "{page}");
+    assert!(!page.contains("Extra Deck ("), "an empty zone isn't shown");
+    assert!(page.contains("Deck box: red box"));
+    assert!(page.contains(r#"href="/tournaments/1""#));
+    assert!(page.contains(&format!(r#"href="/deck-builder/{version}""#)));
+    assert_eq!(page.matches(r#"class="card-tile yugioh"#).count(), 3);
+    // the proxy, in the side deck after the main deck's cards
+    let side = &page[page.find("Side Deck (1)").unwrap()..];
+    assert!(side.contains("Kuriboh") && side.contains("Proxy"), "{side}");
+
+    assert_eq!(t.get("/deck-versions/999").await.0, StatusCode::NOT_FOUND);
 }

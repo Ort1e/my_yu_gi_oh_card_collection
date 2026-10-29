@@ -16,7 +16,8 @@ A personal web app for three collections at home:
 
 It runs on a NAS at home, for the home network only. Every morning the NAS
 backs the data up and puts a read-only **public copy** (the three
-collections with their market values, nothing else) on a web hosting.
+collections with their market values and the decks played in tournaments,
+nothing else) on a web hosting.
 
 Written in Rust; it replaced the original Django app in October 2026 (still
 in the history, tag `django-final`).

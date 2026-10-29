@@ -62,11 +62,11 @@
 {% if !common::export::public_copy() %}
 <div class="card-list">
   {% match lot %}{% when Some with (lot) %}
-  <h2 class="card-title">Lot Details : </h2>
+  <h2 class="card-title">Lot details</h2>
   {% include "partials/lot_item.html" %}
   {% when None %}{% endmatch %}
 
-  <h2 class="card-title">Deck Versions : </h2>
+  <h2 class="card-title">Deck versions</h2>
   {% for version in versions %}
     {% include "partials/deck_version_item.html" %}
   {% else %}
