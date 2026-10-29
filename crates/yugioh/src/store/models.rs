@@ -41,9 +41,6 @@ impl CardRow {
     /// The card in a picture grid.
     pub fn tile(&self) -> CardTile {
         let mut tags = Vec::new();
-        if self.is_proxy {
-            tags.push("Proxy".to_string());
-        }
         if self.is_sold {
             tags.push("Sold".to_string());
         }
@@ -59,6 +56,7 @@ impl CardRow {
             tags,
             value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
             faded: self.is_sold,
+            proxy: self.is_proxy,
         }
     }
 
@@ -139,18 +137,28 @@ impl LotRow {
 pub struct DeckVersionRow {
     pub id: i64,
     pub version_name: String,
+    pub deck_id: Option<i64>,
     pub deck_name: Option<String>,
     /// Locks its real cards (`yugioh_domain::built_deck`).
     pub is_built: bool,
     pub deck_box: Option<String>,
     pub sleeves: Option<String>,
+    /// Shown on the public site by hand (`deck_version.is_public`).
+    pub is_public: bool,
+    /// Played in a tournament: on the public site anyway.
+    pub played: bool,
 }
 
 impl DeckVersionRow {
     pub const SELECT: &'static str = "SELECT deck_version.id, deck_version.version_name,
-            deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
-            deck_version.sleeves
+            deck_version.deck_id, deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
+            deck_version.sleeves, deck_version.is_public,
+            deck_version.tournament_id IS NOT NULL AS played
         FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id";
+
+    pub fn on_public_site(&self) -> bool {
+        self.is_public || self.played
+    }
 
     /// "Deck - version", as Django's `DeckVersion.name`.
     pub fn full_name(&self) -> String {

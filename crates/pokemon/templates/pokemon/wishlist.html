@@ -23,7 +23,7 @@
 <div class="wish-list">
   {% for wish in wanted %}
   <div class="wish{% if !common::export::public_copy() %} {{ wish.verdict_class() }}{% endif %}">
-    {% if wish.has_image() %}<img src="{{ wish.image_src() }}" alt="{{ wish.name() }}" width="120" height="167" loading="lazy">{% endif %}
+    {% if wish.has_image() %}<img src="{{ wish.image_src() }}" alt="{{ wish.name() }}" width="120" height="167" loading="lazy" data-zoom>{% endif %}
     <div class="wish-text">
       <div class="finder-card-name">{{ wish.name() }} <span class="priority" title="Priority (1: most wanted)">P{{ wish.priority }}</span></div>
       {% if !wish.other_name().is_empty() %}<div class="english-name">{{ wish.other_name() }}</div>{% endif %}
@@ -67,4 +67,9 @@
 </details>
 {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/card_preview.js"></script>
+<script src="/static/js/card_zoom.js"></script>
 {% endblock %}

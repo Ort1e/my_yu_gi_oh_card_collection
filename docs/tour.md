@@ -658,27 +658,32 @@ runs. They are **the app's own pages**, saved as files:
 1. the exporter builds the app in-process (no login, no network) and asks
    it for its pages like a browser, inside `common::export::public_copy()`
    (a tokio task-local, true only there);
-2. it starts from `START` (`/cards`, `/collection/stats`, `/rarities`,
-   `/pokemon`, the wishlist and guide, `/books`, authors, series) and
-   follows the links, **only** to the addresses `public()` accepts: those,
-   a card's, a copy's, a book's, an author's or a series' page (by id),
-   and the picture routes. `/lots`, `/sellers`, `/decks`… are never asked
-   for, whatever links to them;
+2. it starts from `START` (`/cards`, `/collection/stats`, `/decks`,
+   `/rarities`, `/pokemon`, the wishlist and guide, `/books`, authors,
+   series) and follows the links, **only** to the addresses `public()`
+   accepts: those, a card's, a deck's, a deck version's, a copy's, a
+   book's, an author's or a series' page (by id), and the picture routes.
+   `/lots`, `/sellers`, `/tournaments`, the deck builder… are never asked
+   for, whatever links to them. A page can also refuse: a deck not on the
+   public site answers 404 in that mode (only the versions played in a
+   tournament or shown by hand, the button on a version's page, and their
+   decks), so it isn't in the copy;
 3. each page is saved under a flat name (`/cards?page=2` →
    `cards-page-2.html`, `/cards/12` → `cards-12.html`; only the `page` and
    `view` parameters are kept: filters aren't in the copy), its links
    rewritten to these files (`#` for anything else), the pictures as
    WebP at most 480 px wide (`img/card-image-12.webp`: about a third
    smaller than JPEG for the same look; the OVH plan has 100 MB), the
-   `/static` files it uses
-   copied. The first start page is also `index.html`.
+   `/static` files it uses copied. The first start page is also
+   `index.html`.
 
 In that mode the templates leave out what is private:
 `{% if !common::export::public_copy() %}` around the private menus
 (`partials/*_nav.html`), the add buttons and filters (`list_base.html`), a
 card's lot, price paid and decks, the Pokémon copies' price paid, notes,
 certificate and opening, the wishlist's maximum prices, verdicts and
-notes, a book's ISBN and notes. The card list shows the cards owned only
+notes, a book's ISBN and notes, a deck's buttons, tournaments and deck
+builder. The card list shows the cards owned only
 (no proxy, not sold). A page added to the copy is a path in `START` or
 `public()`, and a look at its template for anything private.
 

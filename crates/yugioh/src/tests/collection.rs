@@ -217,6 +217,13 @@ async fn the_statistics_show_the_cards_owned_without_what_they_cost() {
         rarity.contains("<td>2</td><td>10.80</td><td>100.0 %</td>"),
         "{rarity}"
     );
+    // the language of the code (LOB-FR005)
+    let language = &body[body.find("By language").unwrap()..];
+    let language = &language[..language.find("</table>").unwrap()];
+    assert!(
+        language.contains("<td>FR</td><td>2</td><td>10.80</td>"),
+        "{language}"
+    );
     // the chart without what was spent, no price paid anywhere
     assert!(body.contains(r#""value":["#), "{body}");
     assert!(!body.contains("net_spent"));

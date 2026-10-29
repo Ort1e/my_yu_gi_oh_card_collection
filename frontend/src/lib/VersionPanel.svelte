@@ -1,6 +1,7 @@
 <script>
-    // The control panel: switch, rename, copy or delete the version, choose the
-    // ban list, build it, note its deck box and sleeves, save. Saving needs the
+    // The control panel: switch, rename, copy or delete the version, see its
+    // read-only page (/deck-versions/:id), choose the ban list, build it, note
+    // its deck box and sleeves, save. Saving needs the
     // zones, so it is left to App.svelte ("save" event); building changes the
     // zones, so the new version goes back to App.svelte too ("reload" event).
     import { createEventDispatcher } from 'svelte';
@@ -100,6 +101,13 @@
         }
     }
 
+    // the read-only page shows the saved cards
+    function view(e) {
+        if (dirty && !confirm('The read-only page shows the saved deck: unsaved changes are not included. Continue?')) {
+            e.preventDefault();
+        }
+    }
+
     async function remove() {
         if (!confirm('Are you sure you want to delete this deck version?')) return;
 
@@ -123,6 +131,7 @@
     <div class="button-row">
         <button type="button" class="btn-secondary" on:click={rename}>Rename</button>
         <button type="button" class="btn-secondary" on:click={newVersion}>Copy as new version</button>
+        <a class="btn btn-secondary" href="/deck-versions/{deckVersionId}" on:click={view}>Read-only view</a>
         <button type="button" class="btn-danger" on:click={remove}>Delete</button>
     </div>
 </div>

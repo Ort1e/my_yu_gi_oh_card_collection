@@ -59,6 +59,10 @@ async fn adding_a_tournament_with_rounds_games_and_labels() {
             .await,
         1
     );
+    // the deck played: its read-only page, from the tournament and the list
+    let link = format!(r#"href="/deck-versions/{v}""#);
+    assert!(t.get("/tournaments/1").await.1.contains(&link));
+    assert!(t.get("/tournaments").await.1.contains(&link));
     assert_eq!(
         t.text("SELECT group_concat(result, ',') FROM (SELECT result FROM tournament_round ORDER BY number)")
             .await

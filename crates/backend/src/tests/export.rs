@@ -17,6 +17,13 @@ async fn the_public_copy_holds_nothing_private() {
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
          INSERT INTO deck (id, name) VALUES (1, 'Secret deck');
          INSERT INTO tournament (id, name, date) VALUES (1, 'Secret tournament', '2025-07-01');
+         -- public: a version played in a tournament, a version shown by hand
+         INSERT INTO deck (id, name) VALUES (2, 'Played deck'), (3, 'Ticked deck');
+         INSERT INTO deck_version (id, deck_id, version_name, tournament_id, is_public) VALUES
+             (10, 2, 'Played version', 1, 0), (11, 2, 'Draft version', NULL, 0),
+             (12, 3, 'Any version', NULL, 1), (14, 3, 'Hidden version', NULL, 0),
+             (13, 1, 'Secret version', NULL, 0);
+         INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
                                    name_en, rarity, category, variants, json, fetched_at)
@@ -60,6 +67,10 @@ async fn the_public_copy_holds_nothing_private() {
         "pokemon-wishlist.html",
         "books.html",
         "books-1.html",
+        "decks.html",
+        "decks-2.html",
+        "deck-versions-10.html",
+        "deck-versions-12.html",
         "img/card-image-1.webp",
         "static/css/style.css",
         "static/js/card_preview.js",
@@ -82,6 +93,10 @@ async fn the_public_copy_holds_nothing_private() {
         "Hypocéan",
         "Assassin&#x27;s Apprentice",
         "Collection statistics",
+        "Played deck",
+        "Played version",
+        "Ticked deck",
+        "Any version",
         r#"href="collection-stats.html""#,
         r#"src="img/card-image-1.webp""#,
     ] {
@@ -96,8 +111,9 @@ async fn the_public_copy_holds_nothing_private() {
             || out.join(link.split('#').next().unwrap()).exists();
         assert!(inside, "{link}: not in the copy");
     }
-    // never: sellers, prices paid, lots, decks, tournaments, budget, notes,
-    // wishes' maximum price, ISBNs, proxies, links to the app
+    // never: sellers, prices paid, lots, private decks and versions,
+    // tournaments, budget, notes, wishes' maximum price, ISBNs, proxies (but
+    // in a public deck), the deck builder, links to the app
     for private in [
         "Privatename",
         "123.45",
@@ -106,6 +122,10 @@ async fn the_public_copy_holds_nothing_private() {
         "33.33",
         "55.55",
         "Secret deck",
+        "Secret version",
+        "Draft version",
+        "Hidden version",
+        "deck-builder",
         "Secret tournament",
         "secret note",
         "wish note",

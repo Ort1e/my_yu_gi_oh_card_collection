@@ -1,13 +1,14 @@
 {# The cards as a grid of pictures (common::web::tiles::CardTile, static/css/tiles.css): set `tiles` before including. Every line is always there, so they line up from tile to tile. #}
 <div class="card-grid">
   {% for tile in tiles %}
-  {% if tile.href.is_empty() %}<div class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">{% else %}<a href="{{ tile.href }}" class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}">{% endif %}
+  {% if tile.href.is_empty() %}<div class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}{% if tile.proxy %} proxy{% endif %}">{% else %}<a href="{{ tile.href }}" class="card-tile {{ tile.shape.class() }}{% if tile.faded %} faded{% endif %}{% if tile.proxy %} proxy{% endif %}">{% endif %}
     <div class="card-tile-picture">
       {% match tile.image %}{% when Some with (src) %}
       <img src="{{ src }}" alt="{{ tile.name }}" loading="lazy">
       {% when None %}
       <div class="card-tile-no-image">{{ tile.name }}<br><small>{{ tile.print }}</small></div>
       {% endmatch %}
+      {% if tile.proxy %}<span class="card-tile-proxy">Proxy</span>{% endif %}
     </div>
     <div class="card-tile-text">
       <div class="card-tile-name" title="{{ tile.name }}">{{ tile.name }}</div>

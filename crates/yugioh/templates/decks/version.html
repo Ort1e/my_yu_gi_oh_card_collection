@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ version.full_name() }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/tiles.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<p class="back-link"><a href="{{ self.deck_href() }}">← Back to the deck</a></p>
+
+<div class="card wide-card">
+  <div class="card-title">{{ version.full_name() }}{% if version.is_built %} <span class="built-badge" title="Built: its cards are locked, out of the collection for the other decks">Built</span>{% endif %}</div>
+  <div class="card-meta-line">
+    {% for zone in zones %}<div>{{ zone.name }}: {{ zone.tiles.len() }}</div>{% endfor %}
+    {% match version.deck_box %}{% when Some with (deck_box) %}<div>Deck box: {{ deck_box }}</div>{% when None %}{% endmatch %}
+    {% match version.sleeves %}{% when Some with (sleeves) %}<div>Sleeves: {{ sleeves }}</div>{% when None %}{% endmatch %}
+    {% match played %}{% when Some with (played) %}<div>Played at <a href="/tournaments/{{ played.id }}" class="on-card">{{ played.name }}</a> ({{ played.date }})</div>{% when None %}{% endmatch %}
+  </div>
+  {% if !common::export::public_copy() %}
+  <div class="button-row">
+    <a href="/deck-builder/{{ version.id }}" class="btn">Open in the deck builder</a>
+    {% if version.played %}
+    <span>On the public site: played in a tournament.</span>
+    {% else %}
+    <form method="post" action="/deck-versions/{{ version.id }}/public" class="inline">
+      <input type="hidden" name="is_public" value="{% if version.is_public %}0{% else %}1{% endif %}">
+      <button type="submit" class="btn-secondary">{% if version.is_public %}Hide from the public site{% else %}Show on the public site{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% for zone in zones %}
+{% if !zone.tiles.is_empty() %}
+<h2>{{ zone.name }} ({{ zone.tiles.len() }})</h2>
+{% let tiles = zone.tiles() %}
+{% include "partials/card_grid.html" %}
+{% endif %}
+{% endfor %}
+{% if self.no_card() %}
+<p>No card in this version yet.</p>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/card_preview.js"></script>
+{% endblock %}

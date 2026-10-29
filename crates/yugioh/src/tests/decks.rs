@@ -1,4 +1,5 @@
-//! Decks: list sorts, creation, edition, versions, deletion.
+//! Decks: list sorts, creation, edition, a version's cards, versions,
+//! deletion.
 
 use super::*;
 
@@ -144,5 +145,130 @@ async fn deck_edit_versions_and_delete() {
     assert_eq!(
         t.post(&format!("/decks/{deck}/delete"), &[]).await.0,
         StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn a_version_shows_its_cards_by_zone() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    t.exec(&format!(
+        "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
+         UPDATE deck_version SET tournament_id = 1, deck_box = 'red box';
+         INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
+         INSERT INTO deck_version_side_deck VALUES ({version}, {});",
+        cards[0], cards[1], cards[2]
+    ))
+    .await;
+
+    // the deck's page links to it
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(
+        page.contains(&format!(r#"href="/deck-versions/{version}""#)),
+        "{page}"
+    );
+
+    let (status, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("Test - v1"));
+    assert!(page.contains("Main Deck (2)"), "{page}");
+    assert!(page.contains("Side Deck (1)"), "{page}");
+    assert!(!page.contains("Extra Deck ("), "an empty zone isn't shown");
+    assert!(page.contains("Deck box: red box"));
+    assert!(page.contains(r#"href="/tournaments/1""#));
+    assert!(page.contains(&format!(r#"href="/deck-builder/{version}""#)));
+    assert_eq!(page.matches(r#"class="card-tile yugioh"#).count(), 3);
+    // the proxy, in the side deck after the main deck's cards
+    let side = &page[page.find("Side Deck (1)").unwrap()..];
+    assert!(side.contains("Kuriboh"), "{side}");
+    assert!(side.contains(r#"class="card-tile yugioh proxy""#), "{side}");
+    assert!(side.contains(r#"<span class="card-tile-proxy">Proxy</span>"#));
+    assert_eq!(page.matches("card-tile-proxy").count(), 1, "the proxy only");
+
+    assert_eq!(t.get("/deck-versions/999").await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let is_public = || t.scalar("SELECT is_public FROM deck_version");
+
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("Show on the public site"), "{page}");
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(!page.contains(r#"title="Shown on the public site""#));
+
+    let path = format!("/deck-versions/{version}/public");
+    let (status, location) = t.post(&path, &[("is_public", "1")]).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(location, format!("/deck-versions/{version}"));
+    assert_eq!(is_public().await, 1);
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("Hide from the public site"), "{page}");
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(
+        page.contains(r#"title="Shown on the public site""#),
+        "{page}"
+    );
+
+    t.post(&path, &[("is_public", "0")]).await;
+    assert_eq!(is_public().await, 0);
+    assert_eq!(
+        t.post("/deck-versions/999/public", &[("is_public", "1")])
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+
+    // played in a tournament: shown anyway, no button
+    t.exec(
+        "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
+         UPDATE deck_version SET tournament_id = 1;",
+    )
+    .await;
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("On the public site: played in a tournament."));
+    assert!(!page.contains("Show on the public site"));
+}
+
+#[tokio::test]
+async fn a_version_sorts_by_kind_then_english_name() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    t.exec(&format!(
+        "UPDATE card_data SET json_data = '{{\"name\": \"Dark Magician\"}}' WHERE id = 1;
+         UPDATE card_data SET json_data = '{{\"name\": \"Kuriboh\"}}' WHERE id = 2;
+         INSERT INTO card_data (id, en_name, ygopro_id, card_type, json_data)
+             VALUES (3, 'pot of greed', 55144522, 'Spell Card', '{{\"name\": \"Pot of Greed\"}}');
+         INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES
+             (10, 'Pot de Cupidité', 'pot of greed', 'LOB-FR119', 3, 0),
+             (11, 'Dark Magician', 'dark magician', 'LOB-EN005', 1, 0);
+         INSERT INTO deck_version_main_deck (deck_version_id, card_id)
+             SELECT {version}, id FROM card;"
+    ))
+    .await;
+
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    let names: Vec<&str> = page
+        .match_indices(r#"<div class="card-tile-name" title=""#)
+        .map(|(i, start)| {
+            let name = &page[i + start.len()..];
+            &name[..name.find('"').unwrap()]
+        })
+        .collect();
+    // the monsters by English name (the French Dark Magicians with the
+    // English one), then the spell
+    assert_eq!(
+        names,
+        [
+            "Dark Magician",
+            "Magicien Sombre",
+            "Magicien Sombre",
+            "Kuriboh",
+            "Pot de Cupidité"
+        ]
     );
 }

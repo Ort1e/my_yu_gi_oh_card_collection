@@ -13,21 +13,26 @@
     <div class="card-meta-line">
       <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
       {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
+      {% if !common::export::public_copy() %}
       {% if has_tournaments %}<div><a href="/tournaments?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
+      {% endif %}
     </div>
+    {% if !common::export::public_copy() %}
     <div class="button-row">
       <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
       <form method="post" action="/decks/{{ deck.id }}/delete" class="inline">
         <button type="submit" class="btn-danger" onclick="return confirm('Delete this deck and all its versions?')">Delete</button>
       </form>
     </div>
+    {% endif %}
   </div>
 
-  <h2 class="card-title">Versions : </h2>
+  <h2 class="card-title">Versions</h2>
   {% for version in versions %}
     {% include "partials/deck_version_item.html" %}
   {% endfor %}
 
+  {% if !common::export::public_copy() %}
   <form method="post" action="/decks/{{ deck.id }}/versions">
     <fieldset>
       <legend>New empty version</legend>
@@ -38,5 +43,6 @@
     </fieldset>
     <input type="submit" value="Create the version">
   </form>
+  {% endif %}
 </div>
 {% endblock %}

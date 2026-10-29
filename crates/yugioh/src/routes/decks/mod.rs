@@ -1,6 +1,17 @@
+//! The decks: the list, a deck's page with its versions, a version's cards
+//! (`version.rs`), the built decks, the forms; the deck builder's shell
+//! page and its JSON API.
+//!
+//! In the public copy (`common::export::public_copy`), only the versions
+//! played in a tournament or shown by hand (`deck_version.is_public`, the
+//! button on the version's page), and the decks that have one:
+//! [`PUBLIC_VERSION`], [`PUBLIC_DECK`]. The others answer 404 there, so the
+//! copy leaves them out.
+
 pub mod api;
 pub mod built;
 pub mod form;
+pub mod version;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
@@ -12,6 +23,15 @@ use crate::store::models::{version_full_name, DeckVersionRow};
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
 use crate::AppState;
+
+/// SQL: whether `deck_version` is on the public site.
+pub const PUBLIC_VERSION: &str =
+    "(deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL)";
+
+/// SQL: whether `deck` is on the public site: one of its versions is.
+pub const PUBLIC_DECK: &str =
+    "EXISTS (SELECT 1 FROM deck_version WHERE deck_version.deck_id = deck.id
+     AND (deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL))";
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct DeckRow {
@@ -79,16 +99,22 @@ pub async fn list(
     Query(sort): Query<DeckSort>,
 ) -> AppResult<DecksList> {
     let pool = &state.pool;
-    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM deck")
+    let (decks_shown, versions_shown) = if common::export::public_copy() {
+        (PUBLIC_DECK, PUBLIC_VERSION)
+    } else {
+        ("1", "1")
+    };
+    let total: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM deck WHERE {decks_shown}"))
         .fetch_one(pool)
         .await?;
     let page = Page::new(param.page, total, sort.querystring());
     let decks = sqlx::query_as(&format!(
         "SELECT deck.id, deck.name, deck.description,
-           (SELECT count(*) FROM deck_version v WHERE v.deck_id = deck.id) AS versions,
+           (SELECT count(*) FROM deck_version WHERE deck_version.deck_id = deck.id
+            AND {versions_shown}) AS versions,
            (SELECT max(t.date) FROM deck_version v JOIN tournament t ON t.id = v.tournament_id
             WHERE v.deck_id = deck.id) AS last_tournament
-         FROM deck{} LIMIT ? OFFSET ?",
+         FROM deck WHERE {decks_shown}{} LIMIT ? OFFSET ?",
         sort.order_by()
     ))
     .bind(PAGE_SIZE)
@@ -113,6 +139,7 @@ pub struct DeckDetail {
     labels: String,
     /// Whether a version of it was played in a tournament.
     has_tournaments: bool,
+    /// Its versions (in the public copy, those on the public site).
     versions: Vec<DeckVersionRow>,
     /// Errors of the "new version" form.
     errors: Vec<String>,
@@ -123,14 +150,27 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
 }
 
 pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult<DeckDetail> {
-    let deck = sqlx::query_as("SELECT id, name, description FROM deck WHERE id = ?")
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .or_404()?;
+    let public = common::export::public_copy();
+    let deck = sqlx::query_as(&format!(
+        "SELECT id, name, description FROM deck WHERE id = ?{}",
+        if public {
+            format!(" AND {PUBLIC_DECK}")
+        } else {
+            String::new()
+        }
+    ))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .or_404()?;
     let versions = sqlx::query_as(&format!(
-        "{} WHERE deck_version.deck_id = ? ORDER BY deck_version.version_name DESC",
-        DeckVersionRow::SELECT
+        "{} WHERE deck_version.deck_id = ?{} ORDER BY deck_version.version_name DESC",
+        DeckVersionRow::SELECT,
+        if public {
+            format!(" AND {PUBLIC_VERSION}")
+        } else {
+            String::new()
+        }
     ))
     .bind(id)
     .fetch_all(pool)

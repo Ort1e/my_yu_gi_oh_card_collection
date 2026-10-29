@@ -746,7 +746,10 @@ async fn trainer_galleries_answer_to_their_main_code() {
              name_en, rarity, category, variants, json, fetched_at)
          VALUES ('intl', 'swsh10tg-TG29', 'swsh10tg', 'Astres Radieux Galerie de Dresseurs',
                  'TG29', 'Sylveroy Cavalier du Froid VMAX', 'Ice Rider Calyrex VMAX',
-                 'Secret Rare', 'Pokemon', 'holo', '{}', date('now'));
+                 'Secret Rare', 'Pokemon', 'holo', '{}', date('now')),
+                -- the booster's pull 1, here so that nothing asks TCGdex
+                ('intl', 'swsh10-001', 'swsh10', 'Astres Radieux', '001', 'Mimigal', 'Spinarak',
+                 'Common', 'Pokemon', 'normal', '{}', date('now'));
          INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
              ('fr', 'swsh10', 'Astres Radieux', 'ASR', 189,
               '[{\"id\":\"swsh10-001\",\"localId\":\"001\",\"name\":\"Mimigal\"}]', date('now')),
