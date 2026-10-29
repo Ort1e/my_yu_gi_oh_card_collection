@@ -665,8 +665,9 @@ runs. They are **the app's own pages**, saved as files:
    book's, an author's or a series' page (by id), and the picture routes.
    `/lots`, `/sellers`, `/tournaments`, the deck builder… are never asked
    for, whatever links to them. A page can also refuse: a deck not on the
-   public site answers 404 in that mode (played in a tournament: its
-   versions played; ticked "public": all), so it isn't in the copy;
+   public site answers 404 in that mode (only the versions played in a
+   tournament or shown by hand, the button on a version's page, and their
+   decks), so it isn't in the copy;
 3. each page is saved under a flat name (`/cards?page=2` →
    `cards-page-2.html`, `/cards/12` → `cards-12.html`; only the `page` and
    `view` parameters are kept: filters aren't in the copy), its links

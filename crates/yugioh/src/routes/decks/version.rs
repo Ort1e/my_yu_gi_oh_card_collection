@@ -2,18 +2,23 @@
 //! the Main, Extra and Side Decks, monsters then spells then traps, by name.
 //! The deck builder (`/deck-builder/:id`) is a button away in the app; the
 //! public copy shows only the versions on the public site (`PUBLIC_VERSION`),
-//! without the tournament or the button.
+//! without the tournament or the buttons. `POST /deck-versions/:id/public`
+//! shows or hides a version there.
 
 use std::collections::HashMap;
 
 use askama::Template;
 use axum::extract::{Path, State};
+use axum::response::Redirect;
+use axum::Form;
 use yugioh_domain::stats::{kind, CardKind};
 
 use super::PUBLIC_VERSION;
 use crate::store::cards::Zone;
+use crate::store::db::begin_write;
 use crate::store::models::{CardRow, DeckVersionRow};
-use crate::web::error::{AppResult, OrNotFound};
+use crate::web::error::{AppError, AppResult, OrNotFound};
+use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
 use common::web::tiles::CardTile;
 
@@ -131,4 +136,28 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         zones,
         played,
     })
+}
+
+/// Show the version on the public site (`is_public=1`) or hide it (`0`); one
+/// played in a tournament is shown anyway.
+pub async fn set_public(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(pairs): Form<Pairs>,
+) -> AppResult<Redirect> {
+    let is_public = FormData::new(pairs).get("is_public") == Some("1");
+    let mut tx = begin_write(&state.pool).await?;
+    let updated = sqlx::query("UPDATE deck_version SET is_public = ? WHERE id = ?")
+        .bind(is_public)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+    if updated == 0 {
+        return Err(AppError::NotFound);
+    }
+    tx.commit().await?;
+    tracing::info!(version_id = id, is_public, "deck version shown or hidden");
+
+    Ok(Redirect::to(&format!("/deck-versions/{id}")))
 }

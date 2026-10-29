@@ -25,10 +25,6 @@
       <input type="text" name="labels" id="labels" value="{{ labels }}" list="label-names" autocomplete="off" placeholder="Mitsurugi, K9">
       <small>Its archetypes and engines, for the tournament stats ("with K9"). Comma-separated; the same labels as your opponents' decks.</small>
     </p>
-    <p>
-      <label class="checkbox"><input type="checkbox" name="is_public" value="1" {% if is_public %}checked{% endif %}> Show on the public site, every version</label>
-      <small>A deck played in a tournament is shown anyway, by the versions played.</small>
-    </p>
   </fieldset>
 
   <input type="submit" value="Save">

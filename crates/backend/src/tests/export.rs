@@ -17,11 +17,12 @@ async fn the_public_copy_holds_nothing_private() {
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
          INSERT INTO deck (id, name) VALUES (1, 'Secret deck');
          INSERT INTO tournament (id, name, date) VALUES (1, 'Secret tournament', '2025-07-01');
-         -- public: a deck played in a tournament (that version only), a deck ticked
-         INSERT INTO deck (id, name, is_public) VALUES (2, 'Played deck', 0), (3, 'Ticked deck', 1);
-         INSERT INTO deck_version (id, deck_id, version_name, tournament_id) VALUES
-             (10, 2, 'Played version', 1), (11, 2, 'Draft version', NULL),
-             (12, 3, 'Any version', NULL), (13, 1, 'Secret version', NULL);
+         -- public: a version played in a tournament, a version shown by hand
+         INSERT INTO deck (id, name) VALUES (2, 'Played deck'), (3, 'Ticked deck');
+         INSERT INTO deck_version (id, deck_id, version_name, tournament_id, is_public) VALUES
+             (10, 2, 'Played version', 1, 0), (11, 2, 'Draft version', NULL, 0),
+             (12, 3, 'Any version', NULL, 1), (14, 3, 'Hidden version', NULL, 0),
+             (13, 1, 'Secret version', NULL, 0);
          INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
@@ -123,6 +124,7 @@ async fn the_public_copy_holds_nothing_private() {
         "Secret deck",
         "Secret version",
         "Draft version",
+        "Hidden version",
         "deck-builder",
         "Secret tournament",
         "secret note",

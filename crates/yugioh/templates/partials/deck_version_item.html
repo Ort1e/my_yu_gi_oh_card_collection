@@ -1,6 +1,6 @@
 <a href="/deck-versions/{{ version.id }}" class="card-link">
   <div class="card">
-    <div class="card-title">{{ version.full_name() }}{% if version.is_built %} <span class="built-badge" title="Built: its cards are locked, out of the collection for the other decks">Built</span>{% endif %}</div>
+    <div class="card-title">{{ version.full_name() }}{% if version.is_built %} <span class="built-badge" title="Built: its cards are locked, out of the collection for the other decks">Built</span>{% endif %}{% if version.on_public_site() && !common::export::public_copy() %} <span class="built-badge" title="Shown on the public site">Public</span>{% endif %}</div>
     <div class="card-meta-line">
       <div>Version name: {{ version.version_name }}</div>
       {% match version.deck_box %}{% when Some with (deck_box) %}<div>Deck box: {{ deck_box }}</div>{% when None %}{% endmatch %}

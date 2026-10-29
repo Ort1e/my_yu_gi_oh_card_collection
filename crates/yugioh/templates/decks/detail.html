@@ -15,7 +15,6 @@
       {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
       {% if !common::export::public_copy() %}
       {% if has_tournaments %}<div><a href="/tournaments?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
-      <div>Public site: {% if deck.is_public %}shown, every version{% else if has_tournaments %}shown, the versions played in a tournament{% else %}not shown{% endif %}</div>
       {% endif %}
     </div>
     {% if !common::export::public_copy() %}

@@ -145,13 +145,22 @@ pub struct DeckVersionRow {
     pub is_built: bool,
     pub deck_box: Option<String>,
     pub sleeves: Option<String>,
+    /// Shown on the public site by hand (`deck_version.is_public`).
+    pub is_public: bool,
+    /// Played in a tournament: on the public site anyway.
+    pub played: bool,
 }
 
 impl DeckVersionRow {
     pub const SELECT: &'static str = "SELECT deck_version.id, deck_version.version_name,
             deck_version.deck_id, deck.name AS deck_name, deck_version.is_built, deck_version.deck_box,
-            deck_version.sleeves
+            deck_version.sleeves, deck_version.is_public,
+            deck_version.tournament_id IS NOT NULL AS played
         FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id";
+
+    pub fn on_public_site(&self) -> bool {
+        self.is_public || self.played
+    }
 
     /// "Deck - version", as Django's `DeckVersion.name`.
     pub fn full_name(&self) -> String {

@@ -30,7 +30,8 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 One line each; the details are in `docs/tour.md` and the git history.
 
 - 2026-10-29: a deck version's cards on a read-only page
-  (`/deck-versions/:id`), public decks (played in a tournament, or ticked);
+  (`/deck-versions/:id`), public deck versions (played in a tournament, or
+  shown by hand); the logos alike;
   the statistics by language fixed; the wishlist's cards seen large.
 
 - 2026-10-28: testers' feedback: back to the list page you came from, a

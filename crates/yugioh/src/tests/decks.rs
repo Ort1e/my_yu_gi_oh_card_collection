@@ -84,25 +84,16 @@ async fn deck_edit_versions_and_delete() {
     let (status, _) = t
         .post(
             &format!("/decks/{deck}/edit"),
-            &[
-                ("name", "Renamed"),
-                ("description", "desc"),
-                ("is_public", "1"),
-            ],
+            &[("name", "Renamed"), ("description", "desc")],
         )
         .await;
     assert_eq!(status, StatusCode::SEE_OTHER);
     assert_eq!(
-        t.text("SELECT name || ' ' || description || ' ' || is_public FROM deck")
+        t.text("SELECT name || ' ' || description FROM deck")
             .await
             .as_deref(),
-        Some("Renamed desc 1")
+        Some("Renamed desc")
     );
-    let (_, page) = t.get(&format!("/decks/{deck}")).await;
-    assert!(page.contains("Public site: shown, every version"), "{page}");
-    t.post(&format!("/decks/{deck}/edit"), &[("name", "Renamed")])
-        .await;
-    assert_eq!(t.scalar("SELECT is_public FROM deck").await, 0);
     let (status, page) = t
         .post(&format!("/decks/{deck}/edit"), &[("name", " ")])
         .await;
@@ -193,4 +184,49 @@ async fn a_version_shows_its_cards_by_zone() {
     assert!(side.contains("Kuriboh") && side.contains("Proxy"), "{side}");
 
     assert_eq!(t.get("/deck-versions/999").await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let is_public = || t.scalar("SELECT is_public FROM deck_version");
+
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("Show on the public site"), "{page}");
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(!page.contains(r#"title="Shown on the public site""#));
+
+    let path = format!("/deck-versions/{version}/public");
+    let (status, location) = t.post(&path, &[("is_public", "1")]).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(location, format!("/deck-versions/{version}"));
+    assert_eq!(is_public().await, 1);
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("Hide from the public site"), "{page}");
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(
+        page.contains(r#"title="Shown on the public site""#),
+        "{page}"
+    );
+
+    t.post(&path, &[("is_public", "0")]).await;
+    assert_eq!(is_public().await, 0);
+    assert_eq!(
+        t.post("/deck-versions/999/public", &[("is_public", "1")])
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+
+    // played in a tournament: shown anyway, no button
+    t.exec(
+        "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
+         UPDATE deck_version SET tournament_id = 1;",
+    )
+    .await;
+    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
+    assert!(page.contains("On the public site: played in a tournament."));
+    assert!(!page.contains("Show on the public site"));
 }

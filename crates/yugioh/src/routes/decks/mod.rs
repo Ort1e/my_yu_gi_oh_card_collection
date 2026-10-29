@@ -2,11 +2,11 @@
 //! (`version.rs`), the built decks, the forms; the deck builder's shell
 //! page and its JSON API.
 //!
-//! In the public copy (`common::export::public_copy`), only the decks played
-//! in a tournament, by the versions played, and the decks ticked "public"
-//! (`deck.is_public`), with all their versions: [`PUBLIC_DECK`],
-//! [`PUBLIC_VERSION`]. The others answer 404 there, so the copy leaves them
-//! out.
+//! In the public copy (`common::export::public_copy`), only the versions
+//! played in a tournament or shown by hand (`deck_version.is_public`, the
+//! button on the version's page), and the decks that have one:
+//! [`PUBLIC_VERSION`], [`PUBLIC_DECK`]. The others answer 404 there, so the
+//! copy leaves them out.
 
 pub mod api;
 pub mod built;
@@ -24,19 +24,20 @@ use crate::web::error::{AppResult, OrNotFound};
 use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
 use crate::AppState;
 
-/// SQL: whether `deck` is on the public site.
-pub const PUBLIC_DECK: &str = "(deck.is_public = 1 OR EXISTS (SELECT 1 FROM deck_version pv
-     WHERE pv.deck_id = deck.id AND pv.tournament_id IS NOT NULL))";
+/// SQL: whether `deck_version` is on the public site.
+pub const PUBLIC_VERSION: &str =
+    "(deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL)";
 
-/// SQL: whether `deck_version` (with its `deck`) is on the public site.
-pub const PUBLIC_VERSION: &str = "(deck.is_public = 1 OR deck_version.tournament_id IS NOT NULL)";
+/// SQL: whether `deck` is on the public site: one of its versions is.
+pub const PUBLIC_DECK: &str =
+    "EXISTS (SELECT 1 FROM deck_version WHERE deck_version.deck_id = deck.id
+     AND (deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL))";
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct DeckRow {
     id: i64,
     name: String,
     description: Option<String>,
-    is_public: bool,
 }
 
 /// One deck of the list, with its versions count and last tournament.
@@ -151,7 +152,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
 pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult<DeckDetail> {
     let public = common::export::public_copy();
     let deck = sqlx::query_as(&format!(
-        "SELECT id, name, description, is_public FROM deck WHERE id = ?{}",
+        "SELECT id, name, description FROM deck WHERE id = ?{}",
         if public {
             format!(" AND {PUBLIC_DECK}")
         } else {

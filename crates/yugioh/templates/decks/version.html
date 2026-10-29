@@ -22,6 +22,14 @@
   {% if !common::export::public_copy() %}
   <div class="button-row">
     <a href="/deck-builder/{{ version.id }}" class="btn">Open in the deck builder</a>
+    {% if version.played %}
+    <span>On the public site: played in a tournament.</span>
+    {% else %}
+    <form method="post" action="/deck-versions/{{ version.id }}/public" class="inline">
+      <input type="hidden" name="is_public" value="{% if version.is_public %}0{% else %}1{% endif %}">
+      <button type="submit" class="btn-secondary">{% if version.is_public %}Hide from the public site{% else %}Show on the public site{% endif %}</button>
+    </form>
+    {% endif %}
   </div>
   {% endif %}
 </div>
