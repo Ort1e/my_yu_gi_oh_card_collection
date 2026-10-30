@@ -1,0 +1,33 @@
+{# A tournament's rounds and games (TournamentView): set `rounds` before including. Its page and the deck version's page. #}
+{% if rounds.is_empty() %}
+<p>No round noted yet.</p>
+{% else %}
+<ol class="rounds">
+  {% for round in rounds %}
+  <li class="round-card">
+    <div class="round-title">
+      <span class="round-number">Round {{ round.number }}</span>
+      <span class="result {{ round.result_class }}">{{ round.result }}</span>
+      {% if !round.opponent.is_empty() %}<span>against {{ round.opponent }}</span>{% endif %}
+      {% if !round.labels.is_empty() %}<span class="labels">{{ round.labels }}</span>{% endif %}
+      {% if !round.die.is_empty() %}<span class="die">{{ round.die }}</span>{% endif %}
+      {% if !round.team_result.is_empty() %}<span class="team">Team: {{ round.team_result }}</span>{% endif %}
+    </div>
+    {% if !round.games.is_empty() %}
+    <ul class="games">
+      {% for game in round.games %}
+      <li>
+        <span class="game-number">Game {{ game.number }}</span>
+        <span class="result {{ game.result_class }}">{{ game.result }}</span>
+        {% if !game.turn.is_empty() %}<span class="turn">going {{ game.turn }}</span>{% endif %}
+        {% if !game.comment.is_empty() %}<span class="comment">{{ game.comment }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if !round.comment.is_empty() %}<p class="comment">{{ round.comment }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+

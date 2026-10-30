@@ -1,6 +1,6 @@
 //! `export-public`: the public copy of the collections (`common::export`),
 //! written into a folder to put on the web hosting: the app's own pages of
-//! the Yu-Gi-Oh! cards, their statistics and decks, the Pokémon cards and
+//! the Yu-Gi-Oh! cards, their statistics, decks and tournaments, the Pokémon cards and
 //! wishlist, the books, the rarity guides. Nothing else of the app: only
 //! the addresses of [`public`] are asked for, and the templates leave out
 //! what is private (`common::export::public_copy`). The decks: only those
@@ -13,10 +13,11 @@ use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
 
 /// The pages the copy starts from; the first one is its home page.
-const START: [&str; 10] = [
+const START: [&str; 11] = [
     "/cards",
     "/collection/stats",
     "/decks",
+    "/tournaments",
     "/rarities",
     "/pokemon",
     "/pokemon/wishlist",
@@ -27,13 +28,14 @@ const START: [&str; 10] = [
 ];
 
 /// The addresses the copy may hold: the start pages, a card's, a deck's, a
-/// deck version's, a copy's, a book's, an author's, a series' page, and the
-/// card pictures.
+/// deck version's, a tournament's, a copy's, a book's, an author's, a
+/// series' page, and the card pictures (ygoprodeck's, the printings' own).
 fn public(path: &str) -> bool {
-    const NUMBERED: [&str; 7] = [
+    const NUMBERED: [&str; 8] = [
         "/cards/",
         "/decks/",
         "/deck-versions/",
+        "/tournaments/",
         "/pokemon/",
         "/books/",
         "/books/authors/",
@@ -45,6 +47,7 @@ fn public(path: &str) -> bool {
                 .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
         })
         || path.starts_with("/card-image/")
+        || path.starts_with("/card-picture/")
         || path.starts_with("/pokemon/card-image/")
 }
 
@@ -86,7 +89,10 @@ mod tests {
             "/pokemon/7",
             "/decks/1",
             "/deck-versions/4",
+            "/tournaments",
+            "/tournaments/2",
             "/card-image/1",
+            "/card-picture/1",
         ] {
             assert!(public(path), "{path}");
         }
@@ -102,9 +108,12 @@ mod tests {
             "/decks/1/edit",
             "/decks/built",
             "/deck-builder/4",
-            "/tournaments/1",
+            "/tournaments/1/edit",
+            "/tournaments/add",
+            "/tournaments/labels",
             "/books/advent-calendar",
             "/media/shipment_files/x.pdf",
+            "/cards/1/pictures/0",
         ] {
             assert!(!public(path), "{path}");
         }

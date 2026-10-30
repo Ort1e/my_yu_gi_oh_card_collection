@@ -22,6 +22,17 @@ pub async fn fetch_once(
     path: &Path,
     url: impl FnOnce() -> AppResult<String>,
 ) -> AppResult<Vec<u8>> {
+    fetch_once_as(state, path, url, Ok).await
+}
+
+/// [`fetch_once`], the downloaded file saved as `convert` makes it (a big
+/// PNG as a JPEG: `photos::web_copy`).
+pub async fn fetch_once_as(
+    state: &AppState,
+    path: &Path,
+    url: impl FnOnce() -> AppResult<String>,
+    convert: impl FnOnce(Vec<u8>) -> AppResult<Vec<u8>>,
+) -> AppResult<Vec<u8>> {
     if let Ok(bytes) = tokio::fs::read(path).await {
         return Ok(bytes);
     }
@@ -40,6 +51,7 @@ pub async fn fetch_once(
         .await
         .map_err(fail)?
         .to_vec();
+    let bytes = convert(bytes)?;
 
     // a temporary file then a rename: a concurrent request never reads a
     // half-written picture

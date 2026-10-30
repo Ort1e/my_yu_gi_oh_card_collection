@@ -30,11 +30,13 @@ use sqlx::{QueryBuilder, SqliteConnection};
 use crate::store::db::push_ids;
 
 use crate::store::db::Money;
+use crate::store::models::picture_url;
 use crate::web::error::AppResult;
 
 pub use categories::{add_category, assign_category, card_categories, categories, delete_category};
 pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
+pub(crate) use simulation::inputs as simulation_inputs;
 pub use simulation::monte_carlo;
 pub use version::{clone_version, delete_version, get_version, update_version};
 pub use ydke_import::import_ydke;
@@ -53,6 +55,8 @@ pub struct ApiCard {
     /// Cheapest price paid for this card (Django's deck price used the min).
     price: Option<Money>,
     card_data_id: Option<i64>,
+    /// Its picture's address (`store::models::picture_url`).
+    image: Option<String>,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
     /// ban list id -> "Banned" | "Limited" | "Semi-Limited"
@@ -70,6 +74,7 @@ struct CardRecord {
     rarity: Option<String>,
     is_proxy: bool,
     card_data_id: Option<i64>,
+    has_picture: bool,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
 }
@@ -90,7 +95,8 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
         "SELECT card.id, card.name, card.en_name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.last_known_status, card.rarity,
-                card.is_proxy, card.card_data_id, card_data.card_type, card_data.ygopro_id
+                card.is_proxy, card.card_data_id, card.picture IS NOT NULL AS has_picture,
+                card_data.card_type, card_data.ygopro_id
          FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN ",
     );
     push_ids(&mut qb, unique.iter().copied());
@@ -143,6 +149,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                 status: r.last_known_status,
                 rarity: r.rarity,
                 is_proxy: r.is_proxy,
+                image: picture_url(r.id, r.has_picture, r.card_data_id),
                 card_data_id: r.card_data_id,
                 card_type: r.card_type,
                 ygopro_id: r.ygopro_id,

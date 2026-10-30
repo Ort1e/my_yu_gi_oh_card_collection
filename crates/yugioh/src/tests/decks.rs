@@ -190,6 +190,72 @@ async fn a_version_shows_its_cards_by_zone() {
 }
 
 #[tokio::test]
+async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    t.exec(&format!(
+        "INSERT INTO advanced_ban_list (id, date) VALUES (1, '2026-01-01'), (2, '2026-04-01');
+         INSERT INTO ban_list_entry (ban_list_id, card_data_id, status) VALUES (2, 1, 'Limited');
+         INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
+         INSERT INTO card_category (id, name, deck_version_id) VALUES (1, 'Starter', {version});
+         INSERT INTO card_category_assignment (category_id, card_id) VALUES (1, {});
+         INSERT INTO tournament (id, name, date, conclusion) VALUES (1, 'Locals', '2026-02-08', 'Fun deck');
+         INSERT INTO tournament_round (id, tournament_id, number, result, opponent_deck, comment)
+             VALUES (1, 1, 1, 'win', 'Yummy', 'quick round');
+         INSERT INTO tournament_game (round_id, number, result, comment) VALUES (1, 1, 'won', 'god hand');
+         UPDATE deck_version SET tournament_id = 1;",
+        cards[0], cards[1], cards[0]
+    ))
+    .await;
+    let page = || async { t.get(&format!("/deck-versions/{version}")).await.1 };
+
+    // no list chosen: the latest one, its badges on the tiles
+    let shown = page().await;
+    assert!(
+        shown.contains("The list of 2026-04-01 (the latest"),
+        "{shown}"
+    );
+    assert_eq!(
+        shown
+            .matches(r#"class="card-tile-ban" data-ban="Limited""#)
+            .count(),
+        2
+    );
+    assert!(shown.contains(r#"<td class="text">Magicien Sombre</td><td class="text"><span class="ban-status" data-ban="Limited">Limited</span></td><td>2</td>"#), "{shown}");
+
+    // the version's own list
+    t.exec(&format!(
+        "UPDATE deck_version SET ban_list_id = 1 WHERE id = {version}"
+    ))
+    .await;
+    let shown = page().await;
+    assert!(shown.contains("The list of 2026-01-01."), "{shown}");
+    assert!(shown.contains("No card of this version is restricted on it."));
+    assert!(!shown.contains("card-tile-ban"));
+
+    // 1 Starter of 2 cards: always in a 2-card hand (the whole deck), once on average
+    assert!(shown.contains("Opening hands"));
+    assert!(
+        shown.contains(
+            r#"<td class="text">Starter</td><td>1</td><td>100%</td><td>100%</td><td>1.0</td>"#
+        ),
+        "{shown}"
+    );
+
+    // the tournament, round by round
+    assert!(shown.contains(r##"href="#tournament""##));
+    for text in [
+        "Played at <a href=\"/tournaments/1\">Locals</a>",
+        "Yummy",
+        "quick round",
+        "god hand",
+        "Fun deck",
+    ] {
+        assert!(shown.contains(text), "{text}: {shown}");
+    }
+}
+
+#[tokio::test]
 async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
     let t = TestApp::new().await;
     let (version, _) = t.deck_fixture().await;

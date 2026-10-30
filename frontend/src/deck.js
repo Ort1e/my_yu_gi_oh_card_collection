@@ -65,7 +65,7 @@ export function englishName(card) {
 }
 
 export function imageUrl(card) {
-    return card.card_data_id ? `/card-image/${card.card_data_id}` : null;
+    return card.image ?? null;
 }
 
 /** Random sample of `n` cards, without replacement. */

@@ -12,6 +12,7 @@ pub mod cardmarket;
 pub mod cardmarket_catalog;
 pub mod lot;
 pub mod monte_carlo;
+pub mod printing_picture;
 pub mod rarity;
 pub mod stats;
 pub mod tournament;

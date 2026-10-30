@@ -1,6 +1,6 @@
 <a class="advent-card" href="/cards/{{ card_id }}">
-  {% match card_data_id %}{% when Some with (data_id) %}
-  <img src="/card-image/{{ data_id }}" alt="{{ name }}" loading="lazy">
+  {% match self.image() %}{% when Some with (src) %}
+  <img src="{{ src }}" alt="{{ name }}" loading="lazy">
   {% when None %}{% endmatch %}
   <span class="advent-card-text">
     <strong>{{ name }}</strong>

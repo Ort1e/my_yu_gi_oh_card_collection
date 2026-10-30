@@ -83,6 +83,95 @@ async fn edit_card() {
 }
 
 #[tokio::test]
+async fn a_card_takes_a_picture_of_its_printing_from_yugipedia() {
+    let t = TestApp::new().await;
+    let (_, cards) = t.deck_fixture().await;
+    let (id, other) = (cards[0], cards[1]);
+    let uri = format!("/cards/{id}/edit");
+    t.exec(&format!(
+        "UPDATE card SET rarity = 'Ultra Rare' WHERE id IN ({id}, {other})"
+    ))
+    .await;
+
+    // no gallery cached: nothing asked, a link to ask
+    let (_, page) = t.get(&uri).await;
+    assert!(page.contains("haven&#x27;t been looked up yet"), "{page}");
+    assert!(page.contains(&format!("/cards/{id}/edit?pictures=1")));
+
+    t.exec(
+        r#"INSERT INTO yugipedia_gallery (card_data_id, files, checked_at) VALUES (1,
+             '["DarkMagician-LOB-FR-UR-1E.png", "DarkMagician-LOB-FR-UR-1E-AA.png",
+               "DarkMagician-LOB-EN-UR-1E.png"]', date('now'))"#,
+    )
+    .await;
+    let (_, page) = t.get(&uri).await;
+    assert!(page.contains("FR · UR · 1st edition · AA"), "{page}");
+    assert!(page.contains(&format!(r#"src="/cards/{id}/pictures/1""#)));
+    assert!(!page.contains("LOB-EN-UR"), "not its language");
+    assert_eq!(
+        t.get(&format!("/cards/{id}/pictures/2")).await.0,
+        StatusCode::NOT_FOUND
+    );
+
+    let form = |picture: &'static str, everywhere: bool| {
+        let mut form = vec![
+            ("name", "Magicien Sombre"),
+            ("en_name", "dark magician"),
+            ("code", "LOB-FR005"),
+            ("rarity", "Ultra Rare"),
+            ("picture", picture),
+        ];
+        if everywhere {
+            form.push(("picture_everywhere", "on"));
+        }
+        form
+    };
+    let picture = |card: i64| {
+        let sql = format!(
+            "SELECT coalesce(picture, '-') || '/' || picture_manual FROM card WHERE id = {card}"
+        );
+        let t = &t;
+        async move { t.text(&sql).await.unwrap() }
+    };
+
+    let (_, page) = t.post(&uri, &form("Other.png", false)).await;
+    assert!(page.contains("Unknown picture."), "{page}");
+
+    // the alternate art, for both copies
+    let (status, _) = t
+        .post(&uri, &form("DarkMagician-LOB-FR-UR-1E-AA.png", true))
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(picture(id).await, "DarkMagician-LOB-FR-UR-1E-AA.png/1");
+    assert_eq!(picture(other).await, "DarkMagician-LOB-FR-UR-1E-AA.png/1");
+    let (_, page) = t.get("/cards").await;
+    assert!(
+        page.contains(&format!(r#"src="/card-picture/{id}""#)),
+        "{page}"
+    );
+    let (_, page) = t.get(&uri).await;
+    assert!(page.contains(r#"value="DarkMagician-LOB-FR-UR-1E-AA.png" checked"#));
+
+    // ygoprodeck's, kept by the automatic pass
+    t.post(&uri, &form("ygoprodeck", false)).await;
+    assert_eq!(picture(id).await, "-/1");
+    let (_, page) = t.get("/cards").await;
+    assert!(page.contains(r#"src="/card-image/1""#));
+
+    // automatic again; a new code puts an automatic picture back to ygoprodeck's
+    t.post(&uri, &form("", false)).await;
+    assert_eq!(picture(id).await, "-/0");
+    t.exec(&format!(
+        "UPDATE card SET picture = 'DarkMagician-LOB-FR-UR-1E.png' WHERE id = {id}"
+    ))
+    .await;
+    let mut moved = form("", false);
+    moved[2] = ("code", "LOB-FR006");
+    t.post(&uri, &moved).await;
+    assert_eq!(picture(id).await, "-/0");
+}
+
+#[tokio::test]
 async fn edit_seller() {
     let t = TestApp::new().await;
     t.post("/lots/add", LOT).await;

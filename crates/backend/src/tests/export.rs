@@ -16,7 +16,10 @@ async fn the_public_copy_holds_nothing_private() {
                     (2, 'Kuriboh Proxy', 'kuriboh', 'MRD-FR071', NULL, 'NM', 2, 1);
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
          INSERT INTO deck (id, name) VALUES (1, 'Secret deck');
-         INSERT INTO tournament (id, name, date) VALUES (1, 'Secret tournament', '2025-07-01');
+         INSERT INTO tournament (id, name, date, conclusion, notes)
+             VALUES (1, 'Rennes local', '2025-07-01', 'Fun deck', 'old tournament note');
+         INSERT INTO tournament_round (tournament_id, number, result, comment)
+             VALUES (1, 1, 'win', 'quick round');
          -- public: a version played in a tournament, a version shown by hand
          INSERT INTO deck (id, name) VALUES (2, 'Played deck'), (3, 'Ticked deck');
          INSERT INTO deck_version (id, deck_id, version_name, tournament_id, is_public) VALUES
@@ -71,6 +74,8 @@ async fn the_public_copy_holds_nothing_private() {
         "decks-2.html",
         "deck-versions-10.html",
         "deck-versions-12.html",
+        "tournaments.html",
+        "tournaments-1.html",
         "img/card-image-1.webp",
         "static/css/style.css",
         "static/js/card_preview.js",
@@ -97,6 +102,9 @@ async fn the_public_copy_holds_nothing_private() {
         "Played version",
         "Ticked deck",
         "Any version",
+        "Rennes local",
+        "Fun deck",
+        "quick round",
         r#"href="collection-stats.html""#,
         r#"src="img/card-image-1.webp""#,
     ] {
@@ -112,7 +120,7 @@ async fn the_public_copy_holds_nothing_private() {
         assert!(inside, "{link}: not in the copy");
     }
     // never: sellers, prices paid, lots, private decks and versions,
-    // tournaments, budget, notes, wishes' maximum price, ISBNs, proxies (but
+    // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, proxies (but
     // in a public deck), the deck builder, links to the app
     for private in [
         "Privatename",
@@ -126,7 +134,8 @@ async fn the_public_copy_holds_nothing_private() {
         "Draft version",
         "Hidden version",
         "deck-builder",
-        "Secret tournament",
+        "old tournament note",
+        "Deck labels",
         "secret note",
         "wish note",
         "book note",

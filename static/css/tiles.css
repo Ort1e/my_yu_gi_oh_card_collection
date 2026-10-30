@@ -48,6 +48,42 @@
     box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
 }
 
+/* A card's status on the deck's ban list, top right, as in the deck builder. */
+.card-tile-ban {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+.card-tile-ban[data-ban="Banned"],
+.ban-status[data-ban="Banned"] {
+    background: #dc3545;
+}
+
+.card-tile-ban[data-ban="Limited"],
+.ban-status[data-ban="Limited"] {
+    background: #b38600;
+}
+
+.card-tile-ban[data-ban="Semi-Limited"],
+.ban-status[data-ban="Semi-Limited"] {
+    background: #127a8a;
+}
+
+/* The same colours in a deck's ban list table (decks/version.html). */
+.ban-status {
+    padding: 1px 8px;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 700;
+}
+
 .card-tile-proxy {
     position: absolute;
     bottom: 0.4rem;

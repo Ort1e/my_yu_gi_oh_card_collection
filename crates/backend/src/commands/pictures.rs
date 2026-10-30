@@ -1,5 +1,6 @@
 //! `clean-pictures`: delete the cached card pictures no card uses any more
-//! (`media/card_images/`, `media/pokemon_card_images/`; `common::media`).
+//! (`media/card_images/`, `media/card_pictures/` (the printings' own),
+//! `media/pokemon_card_images/`; `common::media`).
 //! They are downloaded again if a card needs one later. The server also
 //! does it once a day ([`spawn_daily`]).
 
@@ -14,6 +15,10 @@ async fn clean_all(state: &AppState, dry_run: bool) -> anyhow::Result<Vec<(&'sta
         (
             "card_images",
             yugioh::routes::used_card_pictures(&state.pool).await?,
+        ),
+        (
+            "card_pictures",
+            yugioh::routes::used_printing_pictures(&state.pool).await?,
         ),
         (
             "pokemon_card_images",

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ name }}{% endblock %}
+{% block title %}{{ tournament.name }}{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/tournaments.css">
@@ -9,61 +9,34 @@
 {% block content %}
 <div class="inside-container">
   <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
-  <h1>{{ name }}{% if is_team %} <span class="badge">Team</span>{% endif %}</h1>
+  <h1>{{ tournament.name }}{% if tournament.is_team %} <span class="badge">Team</span>{% endif %}</h1>
   <div class="tournament-head">
-    <div>{{ date }}{% if !location.is_empty() %}, {{ location }}{% endif %}</div>
-    <div>Deck played: {% match version_id %}{% when Some with (v) %}<a href="/deck-versions/{{ v }}">{{ version_name }}</a>{% when None %}not noted{% endmatch %}</div>
-    {% if !record.is_empty() %}<div>Rounds: {{ record }}</div>{% endif %}
-    {% if !placement.is_empty() %}<div>Placement: {{ placement }}</div>{% endif %}
+    <div>{{ tournament.date }}{% if !tournament.location.is_empty() %}, {{ tournament.location }}{% endif %}</div>
+    <div>Deck played: {% match tournament.version_id %}{% when Some with (v) %}<a href="/deck-versions/{{ v }}">{{ tournament.version_name }}</a>{% when None %}not noted{% endmatch %}</div>
+    {% if !tournament.record.is_empty() %}<div>Rounds: {{ tournament.record }}</div>{% endif %}
+    {% if !tournament.placement.is_empty() %}<div>Placement: {{ tournament.placement }}</div>{% endif %}
   </div>
+  {% if !common::export::public_copy() %}
   <div class="button-row">
-    <a href="/tournaments/{{ id }}/edit" class="btn">Edit</a>
-    <form method="post" action="/tournaments/{{ id }}/delete" class="inline">
+    <a href="/tournaments/{{ tournament.id }}/edit" class="btn">Edit</a>
+    <form method="post" action="/tournaments/{{ tournament.id }}/delete" class="inline">
       <button type="submit" class="btn-danger" onclick="return confirm('Delete this tournament, its rounds and games?')">Delete</button>
     </form>
   </div>
-
-  {% if rounds.is_empty() %}
-  <p>No round noted yet.</p>
-  {% else %}
-  <ol class="rounds">
-    {% for round in rounds %}
-    <li class="round-card">
-      <div class="round-title">
-        <span class="round-number">Round {{ round.number }}</span>
-        <span class="result {{ round.result_class }}">{{ round.result }}</span>
-        {% if !round.opponent.is_empty() %}<span>against {{ round.opponent }}</span>{% endif %}
-        {% if !round.labels.is_empty() %}<span class="labels">{{ round.labels }}</span>{% endif %}
-        {% if !round.die.is_empty() %}<span class="die">{{ round.die }}</span>{% endif %}
-        {% if !round.team_result.is_empty() %}<span class="team">Team: {{ round.team_result }}</span>{% endif %}
-      </div>
-      {% if !round.games.is_empty() %}
-      <ul class="games">
-        {% for game in round.games %}
-        <li>
-          <span class="game-number">Game {{ game.number }}</span>
-          <span class="result {{ game.result_class }}">{{ game.result }}</span>
-          {% if !game.turn.is_empty() %}<span class="turn">going {{ game.turn }}</span>{% endif %}
-          {% if !game.comment.is_empty() %}<span class="comment">{{ game.comment }}</span>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      {% if !round.comment.is_empty() %}<p class="comment">{{ round.comment }}</p>{% endif %}
-    </li>
-    {% endfor %}
-  </ol>
   {% endif %}
 
-  {% if !conclusion.is_empty() %}
+  {% let rounds = tournament.rounds.as_slice() %}
+  {% include "tournaments/rounds.html" %}
+
+  {% if !tournament.conclusion.is_empty() %}
   <h2>Conclusion</h2>
-  <p class="multiline">{{ conclusion }}</p>
+  <p class="multiline">{{ tournament.conclusion }}</p>
   {% endif %}
 
-  {% if !notes.is_empty() %}
+  {% if !tournament.notes.is_empty() && !common::export::public_copy() %}
   <details class="old-notes">
     <summary>Old notes (before the rounds were noted)</summary>
-    <p class="multiline">{{ notes }}</p>
+    <p class="multiline">{{ tournament.notes }}</p>
   </details>
   {% endif %}
 </div>

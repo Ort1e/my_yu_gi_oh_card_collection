@@ -9,6 +9,7 @@
 {% block content %}
 <div class="inside-container">
   <h1>Tournaments</h1>
+  {% if !common::export::public_copy() %}
   <div class="button-row">
     <a href="/tournaments/add" class="btn">Add a tournament</a>
     <a href="/tournaments/labels" class="btn btn-secondary">Deck labels</a>
@@ -36,6 +37,7 @@
     </div>
     <small>The list and the stats below both follow the filter (the meta moves: stats since a date are the useful ones).</small>
   </form>
+  {% endif %}
 
   {% if rows.is_empty() %}
   <p>No tournament {% if filtered %}for this filter{% else %}yet{% endif %}.</p>

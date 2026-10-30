@@ -1,11 +1,13 @@
 //! New cards (a lot saved, a card renamed) linked to their card data in the
 //! background, then named in the language of their code, then swapped for
-//! the deck proxies waiting for them.
+//! the deck proxies waiting for them, then given their printing's picture
+//! (Yugipedia, when there is no doubt).
 
 use std::collections::BTreeMap;
 
 use crate::store::cards::{delete_orphan_proxies, replace_proxies};
 use crate::store::db::{begin_write, Pool};
+use crate::store::yugipedia::find_pictures;
 use crate::web::error::AppResult;
 use crate::AppState;
 
@@ -13,8 +15,9 @@ use super::{get_or_fetch, plan_translations};
 
 /// In the background, so form submissions don't wait on the API: link the
 /// given cards to their `card_data` (fetching it if needed), put their names
-/// in the language of their code, then replace deck proxies by the new owned
-/// copies and delete the proxies left unused.
+/// in the language of their code, replace deck proxies by the new owned
+/// copies and delete the proxies left unused, then look up their printing's
+/// picture.
 pub fn spawn_link_cards(state: AppState, card_ids: Vec<i64>) {
     if card_ids.is_empty() {
         return;
@@ -28,6 +31,10 @@ pub fn spawn_link_cards(state: AppState, card_ids: Vec<i64>) {
         }
         if let Err(e) = tidy_proxies(&state.pool).await {
             tracing::warn!("replacing proxies: {e:?}");
+        }
+        // last: Yugipedia is slow (a request a second)
+        if let Err(e) = find_pictures(&state, Some(&card_ids), false, usize::MAX).await {
+            tracing::warn!("finding pictures: {e:?}");
         }
     });
 }

@@ -36,6 +36,10 @@ pub struct CardTile {
     /// A Yu-Gi-Oh! proxy (a stand-in, not owned): red border and "Proxy"
     /// badge on the picture, as in the deck builder.
     pub proxy: bool,
+    /// A Yu-Gi-Oh! card's status on a deck's ban list (`Banned`, `Limited`,
+    /// `Semi-Limited`): a corner badge on the picture, as in the deck
+    /// builder; `None` when unlimited or not asked.
+    pub ban: Option<&'static str>,
 }
 
 /// The proportions of a collection's cards (their pictures are shown
@@ -47,6 +51,18 @@ pub enum CardShape {
     YuGiOh,
     /// 63 × 88 mm.
     Pokemon,
+}
+
+impl CardTile {
+    /// The ban badge's text: `X`, `1` or `2` copies allowed.
+    pub fn ban_mark(&self) -> &'static str {
+        match self.ban {
+            Some("Banned") => "X",
+            Some("Limited") => "1",
+            Some("Semi-Limited") => "2",
+            _ => "",
+        }
+    }
 }
 
 impl CardShape {
