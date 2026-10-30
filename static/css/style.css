@@ -305,7 +305,10 @@ form tbody tr:nth-child(even) {
 
 .table-tools input[type="search"] {
     flex: 1 1 16rem;
+    min-width: 0;
     max-width: 28rem;
+    margin-bottom: 0;
+    box-sizing: border-box;     /* its padding inside: no wider than a phone */
 }
 
 .table-tools .table-count {

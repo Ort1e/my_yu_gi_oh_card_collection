@@ -150,6 +150,10 @@ static VOLUME_AFTER: LazyLock<Regex> = LazyLock::new(|| {
     )
     .unwrap()
 });
+/// A bare number after a comma or a spaced dash: `Red Rising, 3`,
+/// `Robert Langdon -- 5` (not `Catch-22`: no space before its dash).
+static VOLUME_TRAILING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(.+?)(?:\s*[,;]|\s+[-–—#]+)\s*(\d{1,3})$").unwrap());
 static VOLUME_BEFORE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^(?:book|volume|part)\s+(\d+|[a-z]+)\s+(?:of|in)\s+(?:the\s+)?(.+)$").unwrap()
 });
@@ -183,8 +187,9 @@ fn volume_number(text: &str) -> Option<i64> {
 
 /// A catalogue's series text, split into the series name and the volume:
 /// `The Farseer ; bk. 1`, `Discworld #3`, `Book One of A Song of Ice and
-/// Fire`, `Stormlight Archive (Book 2)`. Without a recognisable volume, the
-/// whole text is the name.
+/// Fire`, `Stormlight Archive (Book 2)`, `Red Rising, 3`, `Robert Langdon
+/// -- 5`. Without a recognisable volume, the whole text is the name; the
+/// separators left at its end (`--`, `,`) are dropped.
 pub fn parse_series(text: &str) -> (String, Option<i64>) {
     let text = clean_name(text);
 
@@ -194,14 +199,23 @@ pub fn parse_series(text: &str) -> (String, Option<i64>) {
         }
     }
 
-    if let Some(c) = VOLUME_AFTER.captures(&text) {
-        let name = c[1].trim_end_matches([',', ';', ':', ' ']).trim();
-        if let (false, Some(volume)) = (name.is_empty(), volume_number(&c[2])) {
-            return (name.to_string(), Some(volume));
+    for pattern in [&VOLUME_AFTER, &VOLUME_TRAILING] {
+        if let Some(c) = pattern.captures(&text) {
+            let name = trim_separators(&c[1]);
+            if let (false, Some(volume)) = (name.is_empty(), volume_number(&c[2])) {
+                return (name.to_string(), Some(volume));
+            }
         }
     }
 
-    (text, None)
+    (trim_separators(&text).to_string(), None)
+}
+
+/// A series name without the separators a catalogue left at its end:
+/// `Robert Langdon --` → `Robert Langdon`.
+fn trim_separators(name: &str) -> &str {
+    name.trim_end_matches([',', ';', ':', ' ', '-', '–', '—', '#', '/', '|'])
+        .trim()
 }
 
 /// The volumes missing from a series: the gaps between 1 and the highest
@@ -213,6 +227,26 @@ pub fn missing_volumes(owned: &[i64]) -> Vec<i64> {
     };
 
     (1..last).filter(|v| !owned.contains(v)).collect()
+}
+
+/// A language code as stored (`en`, from the lookups) in words, for the
+/// pages: `English`; `None` for one not listed (shown as it is).
+pub fn language_name(code: &str) -> Option<&'static str> {
+    Some(match code.trim().to_ascii_lowercase().as_str() {
+        "en" => "English",
+        "fr" => "French",
+        "de" => "German",
+        "es" => "Spanish",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "nl" => "Dutch",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        "zh" => "Chinese",
+        "ru" => "Russian",
+        "la" => "Latin",
+        _ => return None,
+    })
 }
 
 // ---------- lookup answers ----------
@@ -365,6 +399,14 @@ mod tests {
             ("The Farseer", "The Farseer", None),
             // "Book" is part of the name, no number after it
             ("The Book of the New Sun", "The Book of the New Sun", None),
+            // Open Library's (seen 2026-10-30)
+            ("Robert Langdon -- bk. 5", "Robert Langdon", Some(5)),
+            ("Robert Langdon -- 5", "Robert Langdon", Some(5)),
+            ("Red Rising, 3", "Red Rising", Some(3)),
+            ("Robert Langdon --", "Robert Langdon", None),
+            // a number that is part of the name
+            ("Catch-22", "Catch-22", None),
+            ("Fahrenheit 451", "Fahrenheit 451", None),
         ];
         for (text, name, volume) in cases {
             assert_eq!(parse_series(text), (name.to_string(), volume), "{text}");
@@ -473,5 +515,12 @@ mod tests {
         assert_eq!(info.authors, ["Madeline Miller"]);
         assert_eq!(info.pages, Some(393));
         assert!(!info.is_empty() && BookInfo::default().is_empty());
+    }
+
+    #[test]
+    fn language_names() {
+        assert_eq!(language_name("en"), Some("English"));
+        assert_eq!(language_name(" FR "), Some("French"));
+        assert_eq!(language_name("xyz"), None);
     }
 }

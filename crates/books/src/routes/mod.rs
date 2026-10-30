@@ -22,7 +22,6 @@ use sqlx::{QueryBuilder, Sqlite};
 
 use common::sql::like_pattern;
 use common::web::error::{AppResult, OrNotFound};
-use common::web::pagination::{self, Page, PAGE_SIZE};
 use common::AppState;
 
 /// A book in a list: its authors joined, its series.
@@ -36,6 +35,8 @@ pub struct BookRow {
     pub volume: Option<i64>,
     pub published_year: Option<i64>,
     pub format: Option<String>,
+    /// The first author's `sort_name` (`hobb robin`), to sort by surname.
+    pub author_sort: Option<String>,
 }
 
 impl BookRow {
@@ -46,7 +47,9 @@ impl BookRow {
                 (SELECT a.name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
                  WHERE ba.book_id = book.id ORDER BY ba.position)) AS authors,
             book_series.name AS series, book.volume, book.published_year,
-            book.format
+            book.format,
+            (SELECT a.sort_name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
+             WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) AS author_sort
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id";
 
     /// `Discworld #3`, `Discworld`, or nothing.
@@ -56,6 +59,22 @@ impl BookRow {
 
     pub fn authors_text(&self) -> &str {
         self.authors.as_deref().unwrap_or("")
+    }
+
+    /// To sort by surname, then series and volume, in the list's table.
+    pub fn author_sort_value(&self) -> String {
+        match &self.author_sort {
+            Some(name) => format!("{name} {}", self.series_sort_value()),
+            None => String::new(),
+        }
+    }
+
+    /// To sort by series then volume (`Farseer 00002`), empty without one.
+    pub fn series_sort_value(&self) -> String {
+        match &self.series {
+            Some(name) => format!("{name} {:05}", self.volume.unwrap_or(0)),
+            None => String::new(),
+        }
     }
 }
 
@@ -119,82 +138,41 @@ impl BookFilter {
             _ => " ORDER BY book.title COLLATE NOCASE, book.id",
         }
     }
-
-    fn querystring(&self) -> String {
-        pagination::querystring([
-            ("title", self.title.as_deref()),
-            ("author", self.author.as_deref()),
-            ("series", self.series.as_deref()),
-            ("sort", self.sort.as_deref()),
-        ])
-    }
-
-    fn value(value: &Option<String>) -> &str {
-        value.as_deref().unwrap_or("")
-    }
 }
 
+/// Every book in one table (no pages): the search field and the column
+/// headings filter and sort it in the page (`static/js/tables.js`). The
+/// filters of the address (`?author=hobb`, `?sort=author`) still apply.
 #[derive(Template)]
 #[template(path = "books/list.html")]
 pub struct BooksList {
-    page_title: &'static str,
-    page: Page,
     total: i64,
     books: Vec<BookRow>,
-    filter: BookFilter,
 }
 
 impl BooksList {
-    fn sort_is(&self, option: &str) -> bool {
-        self.filter.sort.as_deref().unwrap_or("title") == option
-    }
-
-    fn title_value(&self) -> &str {
-        BookFilter::value(&self.filter.title)
-    }
-
-    fn author_value(&self) -> &str {
-        BookFilter::value(&self.filter.author)
-    }
-
-    fn series_value(&self) -> &str {
-        BookFilter::value(&self.filter.series)
+    /// Fewer books than in the collection (filters in the address).
+    fn filtered(&self) -> bool {
+        self.books.len() as i64 != self.total
     }
 }
 
 /// `/books`.
 pub async fn list(
     State(state): State<AppState>,
-    Query(page): Query<pagination::PageParam>,
     Query(filter): Query<BookFilter>,
 ) -> AppResult<BooksList> {
     let pool = &state.pool;
-
-    let mut count = QueryBuilder::new(
-        "SELECT count(*) FROM book LEFT JOIN book_series ON book_series.id = book.series_id",
-    );
-    filter.push_where(&mut count);
-    let count: i64 = count.build_query_scalar().fetch_one(pool).await?;
-    let page = Page::new(page.page, count, filter.querystring());
-
     let mut select = QueryBuilder::new(BookRow::SELECT);
     filter.push_where(&mut select);
-    select
-        .push(filter.order_by())
-        .push(" LIMIT ")
-        .push_bind(PAGE_SIZE)
-        .push(" OFFSET ")
-        .push_bind(page.offset());
+    select.push(filter.order_by());
     let books = select.build_query_as().fetch_all(pool).await?;
 
     Ok(BooksList {
-        page_title: "Books",
-        page,
         total: sqlx::query_scalar("SELECT count(*) FROM book")
             .fetch_one(pool)
             .await?,
         books,
-        filter,
     })
 }
 
@@ -224,11 +202,50 @@ pub struct BookDetail {
     authors: Vec<(i64, String)>,
     /// The advent calendar days it was behind: `(year, day)`.
     calendar_days: Vec<(i64, i64)>,
+    /// The volumes of its series, this one included, by volume.
+    series_books: Vec<BookRow>,
+    /// Its series' missing volumes (`books_domain::book::missing_volumes`).
+    missing: Vec<i64>,
+    /// The other books of its authors, not of its series, latest first.
+    other_books: Vec<BookRow>,
 }
 
 impl BookDetail {
-    fn series_text(&self) -> String {
-        series_text(self.book.series.as_deref(), self.book.volume)
+    /// The language in words (`English`), or as stored.
+    fn language_text(&self) -> String {
+        let code = self.book.language.as_deref().unwrap_or("");
+        books_domain::book::language_name(code)
+            .map(str::to_string)
+            .unwrap_or_else(|| code.to_string())
+    }
+
+    /// Its cover at Open Library (by ISBN, shown from there: never stored);
+    /// none in the public copy, where ISBNs aren't shown.
+    fn cover_url(&self) -> Option<String> {
+        if common::export::public_copy() {
+            return None;
+        }
+        let isbn = self.book.isbn.as_deref()?;
+        Some(format!(
+            "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false"
+        ))
+    }
+
+    /// "Origin", "Dan Brown": the authors on one line.
+    fn authors_text(&self) -> String {
+        self.authors
+            .iter()
+            .map(|(_, name)| name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    fn missing_text(&self) -> String {
+        self.missing
+            .iter()
+            .map(|v| format!("#{v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 
@@ -246,7 +263,7 @@ pub async fn book_authors(pool: &common::db::Pool, id: i64) -> sqlx::Result<Vec<
 /// `/books/:id`.
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<BookDetail> {
     let pool = &state.pool;
-    let book = sqlx::query_as(
+    let book: BookDetailRow = sqlx::query_as(
         "SELECT book.id, book.isbn, book.title, book.publisher, book.published_year,
                 book.language, book.page_count, book.series_id, book_series.name AS series,
                 book.volume, book.format, book.notes, book.added_on
@@ -258,10 +275,40 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     .await?
     .or_404()?;
 
+    let series_books: Vec<BookRow> = match book.series_id {
+        Some(series_id) => {
+            sqlx::query_as(&format!(
+                "{} WHERE book.series_id = ?
+                 ORDER BY book.volume IS NULL, book.volume, book.published_year, book.title",
+                BookRow::SELECT
+            ))
+            .bind(series_id)
+            .fetch_all(pool)
+            .await?
+        }
+        None => Vec::new(),
+    };
+    let volumes: Vec<i64> = series_books.iter().filter_map(|b| b.volume).collect();
+    let other_books = sqlx::query_as(&format!(
+        "{} WHERE book.id <> ?1
+             AND book.id IN (SELECT ba.book_id FROM book_book_author ba WHERE ba.author_id IN
+                 (SELECT author_id FROM book_book_author WHERE book_id = ?1))
+             AND ((SELECT series_id FROM book WHERE id = ?1) IS NULL
+                  OR book.series_id IS NOT (SELECT series_id FROM book WHERE id = ?1))
+         ORDER BY book.published_year IS NULL, book.published_year DESC, book.title",
+        BookRow::SELECT
+    ))
+    .bind(id)
+    .fetch_all(pool)
+    .await?;
+
     let mut conn = pool.acquire().await?;
     Ok(BookDetail {
         book,
         authors: book_authors(pool, id).await?,
         calendar_days: crate::store::books::calendar_days(&mut conn, id).await?,
+        missing: books_domain::book::missing_volumes(&volumes),
+        series_books,
+        other_books,
     })
 }

@@ -3,7 +3,8 @@
 //! The Content-Security-Policy lets the pages load only the app's own files,
 //! plus what they use from outside: scripts from jsDelivr (Chart.js on the
 //! dashboard and value pages) and the
-//! Pokémon finder's thumbnails from TCGdex. Styles allow `'unsafe-inline'`:
+//! Pokémon finder's thumbnails from TCGdex, the book covers from Open
+//! Library (redirected to archive.org). Styles allow `'unsafe-inline'`:
 //! the deck builder sets one `style` attribute (a chart's height). No
 //! inline script anywhere (CLAUDE.md), so none is allowed.
 
@@ -13,7 +14,7 @@ use axum::response::Response;
 const CSP: &str = "default-src 'self'; \
     script-src 'self' https://cdn.jsdelivr.net; \
     style-src 'self' 'unsafe-inline'; \
-    img-src 'self' data: blob: https://assets.tcgdex.net; \
+    img-src 'self' data: blob: https://assets.tcgdex.net https://covers.openlibrary.org https://archive.org https://*.archive.org; \
     connect-src 'self'; \
     object-src 'none'; \
     base-uri 'self'; \

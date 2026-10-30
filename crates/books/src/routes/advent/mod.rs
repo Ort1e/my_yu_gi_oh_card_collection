@@ -9,7 +9,7 @@ use books_domain::isbn::Isbn;
 use sqlx::SqliteConnection;
 
 use super::series_text;
-use crate::store::book_data;
+use crate::store::book_data::{self, Found};
 use crate::store::books::{self, BookFields};
 use common::db::Pool;
 use common::web::error::AppResult;
@@ -122,10 +122,14 @@ impl Calendar for Books {
             format!("no catalogue knows the ISBN {isbn}: add the book on the Add page first, then use its #id.")
         };
         match book_data::lookup(&state.pool, &state.http, &isbn).await {
-            Ok(Some(info)) => Ok(BookFields::from_info(isbn.clone(), info)
+            Ok(Found::Book(info)) => Ok(BookFields::from_info(isbn.clone(), info)
                 .map(|book| Pick::New(Box::new(book)))
                 .ok_or_else(not_found)),
-            Ok(None) => Ok(Err(not_found())),
+            Ok(Found::Unknown) => Ok(Err(not_found())),
+            Ok(Found::Unavailable) => Ok(Err(format!(
+                "Google Books is refusing requests for now and Open Library doesn't know {isbn}: \
+                 try again later, or add the book on the Add page first."
+            ))),
             Err(e) => {
                 tracing::warn!(isbn = %isbn, "book lookup failed: {e}");
                 Ok(Err(format!(

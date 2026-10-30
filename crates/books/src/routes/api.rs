@@ -7,7 +7,8 @@
 //! "pages", "series", "volume", "format", "owned_book_id"}` (each may be
 //! null; `owned_book_id`: the book already in the list with this ISBN);
 //! 400 `{"error"}` for an invalid ISBN; 404 `{"error", "isbn",
-//! "owned_book_id"}` when no catalogue knows it.
+//! "owned_book_id"}` when no catalogue knows it, 503 (same body) when Google
+//! Books couldn't answer (asked again next time).
 //!
 //! `POST /books/api/isbn-scan` (multipart, `photo`): the ISBN on a photo of
 //! the barcode (`crate::barcode`), for the "Scan" buttons: 200 `{"isbn"}`,
@@ -19,11 +20,12 @@ use axum::extract::{Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use books_domain::book::BookFormat;
+use books_domain::book::{BookFormat, BookInfo};
 use books_domain::isbn::Isbn;
 use serde_json::json;
 
-use crate::store::{book_data, books};
+use crate::store::book_data::{self, Found};
+use crate::store::books;
 use common::web::error::{bad_request, AppError, AppResult};
 use common::AppState;
 
@@ -37,16 +39,27 @@ pub async fn isbn(State(state): State<AppState>, Path(text): Path<String>) -> Ap
     let owned = books::with_isbn(&mut conn, &isbn).await?;
     drop(conn);
 
-    let Some(info) = book_data::lookup(&state.pool, &state.http, &isbn).await? else {
-        let body = json!({
-            "error": format!("No catalogue knows the ISBN {isbn}: fill the fields by hand."),
-            "isbn": isbn.as_str(),
-            "owned_book_id": owned,
-        });
-        return Ok((StatusCode::NOT_FOUND, Json(body)).into_response());
+    let (status, error) = match book_data::lookup(&state.pool, &state.http, &isbn).await? {
+        Found::Book(info) => return Ok(Json(found(&isbn, info, owned)).into_response()),
+        Found::Unknown => (
+            StatusCode::NOT_FOUND,
+            format!("No catalogue knows the ISBN {isbn}: fill the fields by hand."),
+        ),
+        Found::Unavailable => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!(
+                "Open Library doesn't know the ISBN {isbn}, and Google Books is refusing \
+                 requests for now (too many): try again later, or fill the fields by hand."
+            ),
+        ),
     };
+    let body = json!({ "error": error, "isbn": isbn.as_str(), "owned_book_id": owned });
+    Ok((status, Json(body)).into_response())
+}
 
-    Ok(Json(json!({
+/// The lookup's answer for a book found.
+fn found(isbn: &Isbn, info: BookInfo, owned: Option<i64>) -> serde_json::Value {
+    json!({
         "isbn": isbn.as_str(),
         "title": info.title,
         "authors": info.authors,
@@ -58,8 +71,7 @@ pub async fn isbn(State(state): State<AppState>, Path(text): Path<String>) -> Ap
         "volume": info.volume,
         "format": info.format.map(BookFormat::label),
         "owned_book_id": owned,
-    }))
-    .into_response())
+    })
 }
 
 /// `POST /books/api/isbn-scan`: read the ISBN on the photo sent.

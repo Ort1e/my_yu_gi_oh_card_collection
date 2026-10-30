@@ -7,8 +7,13 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 - **The book scan on the friend's phone** said "out of memory" in Chrome
   (2026-10-30): the barcode is now read on the NAS, and "From a photo"
   avoids the camera app over the browser. To check once deployed.
-- **Book lookups:** inconsistencies seen by the friend (the volume number
-  in a series…): waiting for an ISBN that shows it.
+- **Book data to fix by hand** (seen 2026-10-30): Harry Potter and the
+  Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
+  "Red Rising, 3" were badly read from Open Library (fixed for new
+  lookups): rename them in their books' forms.
+- Maybe: a Google Books API key (free, 1000 lookups a day): without one its
+  shared quota is often used up (429), and Open Library lacks some books
+  (9781464266430).
 - **Testers of the public copy:** after the 2026-10-28 changes (back link,
   full screen card, bigger tile text), is the text still too small on
   phones? If so: bigger text on phones everywhere, not only the tiles.

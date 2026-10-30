@@ -4,38 +4,81 @@
 {% block body_class %}books{% endblock %}
 {% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
 
-{% block extra_css %}
-  <link rel="stylesheet" href="/static/css/card.css">
-{% endblock %}
-
 {% block content %}
-<div class="card-list">
-  <div class="card">
-    <div class="card-title">{{ book.title }}</div>
-    {% if !authors.is_empty() %}
-    <div class="book-by">
-      by {% for (author_id, name) in authors %}{% if !loop.first %}, {% endif %}<a href="/books/authors/{{ author_id }}">{{ name }}</a>{% endfor %}
+<div class="inside-container">
+<p class="back-link"><a href="/books">← All the books</a></p>
+
+<article class="book-page">
+  {# The cover from Open Library (never stored), over a plain "book" shown when there is none. #}
+  <div class="book-cover">
+    <div class="book-cover-placeholder" aria-hidden="true">
+      <span class="book-cover-title">{{ book.title }}</span>
+      <span class="book-cover-author">{{ self.authors_text() }}</span>
     </div>
+    {% match self.cover_url() %}{% when Some with (src) %}
+    <img src="{{ src }}" alt="Cover of {{ book.title }}" class="book-cover-image" loading="lazy" referrerpolicy="no-referrer">
+    {% when None %}{% endmatch %}
+  </div>
+
+  <div class="book-info">
+    <h1>{{ book.title }}</h1>
+    {% if !authors.is_empty() %}
+    <p class="book-page-by">by {% for (author_id, name) in authors %}{% if !loop.first %}, {% endif %}<a href="/books/authors/{{ author_id }}">{{ name }}</a>{% endfor %}</p>
     {% endif %}
     {% match book.series_id %}{% when Some with (series_id) %}
-    <div class="card-subtitle">Series: <a href="/books/series/{{ series_id }}" class="on-card">{{ self.series_text() }}</a></div>
+    <p class="book-page-series">{% match book.volume %}{% when Some with (volume) %}Volume {{ volume }} of {% when None %}In {% endmatch %}<a href="/books/series/{{ series_id }}">{{ book.series.as_deref().unwrap_or("") }}</a></p>
     {% when None %}{% endmatch %}
-    {% match book.publisher %}{% when Some with (publisher) %}<div class="card-subtitle">Publisher: {{ publisher }}</div>{% when None %}{% endmatch %}
-    {% match book.published_year %}{% when Some with (year) %}<div class="card-subtitle">Year: {{ year }}</div>{% when None %}{% endmatch %}
-    {% match book.format %}{% when Some with (format) %}<div class="card-subtitle">Format: {{ format }}</div>{% when None %}{% endmatch %}
-    {% match book.page_count %}{% when Some with (pages) %}<div class="card-subtitle">Pages: {{ pages }}</div>{% when None %}{% endmatch %}
-    {% match book.language %}{% when Some with (language) %}<div class="card-subtitle">Language: {{ language }}</div>{% when None %}{% endmatch %}
+
+    <dl class="book-facts">
+      {% match book.published_year %}{% when Some with (year) %}<dt>Year</dt><dd>{{ year }}</dd>{% when None %}{% endmatch %}
+      {% match book.publisher %}{% when Some with (publisher) %}<dt>Publisher</dt><dd>{{ publisher }}</dd>{% when None %}{% endmatch %}
+      {% match book.page_count %}{% when Some with (pages) %}<dt>Pages</dt><dd>{{ pages }}</dd>{% when None %}{% endmatch %}
+      {% match book.format %}{% when Some with (format) %}<dt>Format</dt><dd>{{ format }}</dd>{% when None %}{% endmatch %}
+      {% if book.language.is_some() %}<dt>Language</dt><dd>{{ self.language_text() }}</dd>{% endif %}
+      {% if !common::export::public_copy() %}
+      {% match book.isbn %}{% when Some with (isbn) %}<dt>ISBN</dt><dd>{{ isbn }}</dd>{% when None %}{% endmatch %}
+      {% endif %}
+      <dt>Added</dt><dd>{{ book.added_on }}</dd>
+    </dl>
+
     {% if !common::export::public_copy() %}
-    {% match book.isbn %}{% when Some with (isbn) %}<div class="card-subtitle">ISBN: {{ isbn }}</div>{% when None %}{% endmatch %}
-    {% endif %}
-    <div class="card-subtitle">Added on {{ book.added_on }} · book #{{ book.id }}</div>
-    {% if !common::export::public_copy() %}
-    {% match book.notes %}{% when Some with (notes) %}<p class="book-notes">{{ notes }}</p>{% when None %}{% endmatch %}
+    {% match book.notes %}{% when Some with (notes) %}<blockquote class="book-notes">{{ notes }}</blockquote>{% when None %}{% endmatch %}
     {% for (year, day) in calendar_days %}
-    <div class="card-subtitle">🎄 Day {{ day }} of the <a href="/books/advent-calendar/{{ year }}" class="on-card">{{ year }} advent calendar</a></div>
+    <p>🎄 Day {{ day }} of the <a href="/books/advent-calendar/{{ year }}">{{ year }} advent calendar</a></p>
     {% endfor %}
     <div class="button-row"><a href="/books/{{ book.id }}/edit" class="btn">Edit</a></div>
     {% endif %}
   </div>
+</article>
+
+{% if series_books.len() > 1 || !missing.is_empty() %}
+<section class="book-related">
+  <h2>{{ book.series.as_deref().unwrap_or("") }}</h2>
+  <ol class="book-volumes">
+    {% for other in series_books %}
+    <li{% if other.id == book.id %} class="current"{% endif %}>
+      <span class="book-volume-number">{% match other.volume %}{% when Some with (volume) %}#{{ volume }}{% when None %}–{% endmatch %}</span>
+      {% if other.id == book.id %}<strong>{{ other.title }}</strong> <small>(this one)</small>{% else %}<a href="/books/{{ other.id }}">{{ other.title }}</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if !missing.is_empty() %}<p class="book-missing">Missing: {{ self.missing_text() }}</p>{% endif %}
+</section>
+{% endif %}
+
+{% if !other_books.is_empty() %}
+<section class="book-related">
+  <h2>More by {{ self.authors_text() }}</h2>
+  <ul class="book-others">
+    {% for other in other_books %}
+    <li><a href="/books/{{ other.id }}">{{ other.title }}</a>{% if !other.series_text().is_empty() %} <small>· {{ other.series_text() }}</small>{% endif %}{% match other.published_year %}{% when Some with (year) %} <small>· {{ year }}</small>{% when None %}{% endmatch %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/book_cover.js"></script>
 {% endblock %}

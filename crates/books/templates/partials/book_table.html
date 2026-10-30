@@ -1,0 +1,27 @@
+{# Books as a table (BookRow): set `books` before including; the page loads static/js/tables.js. The search field filters it, the headings sort it. #}
+<div class="table-tools">
+  <input type="search" data-filter-table="books-table" placeholder="Search a title, an author, a series…" aria-label="Search the books">
+  <span class="table-count" data-count-for="books-table" data-count-noun="books">{{ books.len() }} book{% if books.len() != 1 %}s{% endif %}</span>
+</div>
+<div class="table-scroll">
+<table class="numbers sortable book-table" id="books-table">
+  <thead><tr>
+    <th data-sort="text">Title</th>
+    <th class="text phone-hide" data-sort="text">Author</th>
+    <th class="text" data-sort="text">Series</th>
+    <th class="phone-hide" data-sort="number">Year</th>
+    <th class="text phone-hide" data-sort="text">Format</th>
+  </tr></thead>
+  <tbody>
+    {% for book in books %}
+    <tr>
+      <td><a href="/books/{{ book.id }}">{{ book.title }}</a>{% if !book.authors_text().is_empty() %}<div class="phone-only book-row-author">{{ book.authors_text() }}</div>{% endif %}</td>
+      <td class="text phone-hide" data-sort-value="{{ book.author_sort_value() }}">{{ book.authors_text() }}</td>
+      <td class="text" data-sort-value="{{ book.series_sort_value() }}">{{ book.series_text() }}</td>
+      <td class="phone-hide">{% match book.published_year %}{% when Some with (year) %}{{ year }}{% when None %}{% endmatch %}</td>
+      <td class="text phone-hide">{% match book.format %}{% when Some with (format) %}{{ format }}{% when None %}{% endmatch %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>

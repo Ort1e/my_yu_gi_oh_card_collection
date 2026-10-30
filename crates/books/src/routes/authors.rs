@@ -1,56 +1,41 @@
-//! `/books/authors`: the authors (surname order) and the books of each.
+//! `/books/authors`: the authors (surname order) in one table, sorted and
+//! searched in the page like the books (`static/js/tables.js`), and the
+//! books of each.
 //! Authors are created and deleted with their books (`store::books`).
 
 use askama::Template;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 
 use super::BookRow;
 use common::web::error::{AppResult, OrNotFound};
-use common::web::pagination::{Page, PageParam, PAGE_SIZE};
 use common::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct AuthorRow {
     id: i64,
     name: String,
+    /// `hobb robin`, to sort by surname.
+    sort_name: String,
     books: i64,
 }
 
 #[derive(Template)]
 #[template(path = "books/authors.html")]
 pub struct AuthorsList {
-    page_title: &'static str,
-    page: Page,
-    total: i64,
     authors: Vec<AuthorRow>,
 }
 
 /// `/books/authors`.
-pub async fn list(
-    State(state): State<AppState>,
-    Query(param): Query<PageParam>,
-) -> AppResult<AuthorsList> {
-    let pool = &state.pool;
-    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM book_author")
-        .fetch_one(pool)
-        .await?;
-    let page = Page::new(param.page, total, String::new());
+pub async fn list(State(state): State<AppState>) -> AppResult<AuthorsList> {
     let authors = sqlx::query_as(
-        "SELECT a.id, a.name,
+        "SELECT a.id, a.name, a.sort_name,
                 (SELECT count(*) FROM book_book_author ba WHERE ba.author_id = a.id) AS books
-         FROM book_author a ORDER BY a.sort_name LIMIT ? OFFSET ?",
+         FROM book_author a ORDER BY a.sort_name COLLATE NOCASE",
     )
-    .bind(PAGE_SIZE)
-    .bind(page.offset())
-    .fetch_all(pool)
+    .fetch_all(&state.pool)
     .await?;
 
-    Ok(AuthorsList {
-        page_title: "Authors",
-        page,
-        total,
-        authors,
-    })
+    Ok(AuthorsList { authors })
 }
 
 #[derive(Template)]
