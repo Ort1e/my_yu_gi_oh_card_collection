@@ -346,6 +346,25 @@ legend {
     background-color: #e53935;
 }
 
+/* A deletion on an edit page: well below the form's "Save", folded (the
+   book and wish forms), so a thumb aiming at Save never hits it. */
+.danger-zone {
+    margin-top: 3rem;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+}
+
+.danger-zone summary {
+    color: var(--danger);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.danger-zone form {
+    margin-top: 0.75rem;
+}
+
 .btn-small {
     padding: 0.15rem 0.5rem;
     font-size: 0.85rem;

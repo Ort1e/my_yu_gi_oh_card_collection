@@ -20,9 +20,6 @@
     {% if !common::export::public_copy() %}
     <div class="button-row">
       <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
-      <form method="post" action="/decks/{{ deck.id }}/delete" class="inline">
-        <button type="submit" class="btn-danger" onclick="return confirm('Delete this deck and all its versions?')">Delete</button>
-      </form>
     </div>
     {% endif %}
   </div>

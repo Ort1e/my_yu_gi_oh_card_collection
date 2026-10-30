@@ -84,6 +84,17 @@
 
   <input type="submit" value="Save">
 </form>
+
+{% match id %}{% when Some with (id) %}
+{# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
+<details class="danger-zone">
+  <summary>Delete this tournament…</summary>
+  <p>Its rounds and games go with it; the deck version played stays.</p>
+  <form method="post" action="/tournaments/{{ id }}/delete" data-confirm="Delete this tournament, its rounds and games?">
+    <button type="submit" class="btn-danger">Delete this tournament</button>
+  </form>
+</details>
+{% when None %}{% endmatch %}
 </div>
 </div>
 

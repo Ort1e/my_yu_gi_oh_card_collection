@@ -19,9 +19,6 @@
   {% if !common::export::public_copy() %}
   <div class="button-row">
     <a href="/tournaments/{{ tournament.id }}/edit" class="btn">Edit</a>
-    <form method="post" action="/tournaments/{{ tournament.id }}/delete" class="inline">
-      <button type="submit" class="btn-danger" onclick="return confirm('Delete this tournament, its rounds and games?')">Delete</button>
-    </form>
   </div>
   {% endif %}
 
