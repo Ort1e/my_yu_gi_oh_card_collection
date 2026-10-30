@@ -1,0 +1,29 @@
+/*
+ * A deck version's read-only page (templates/decks/version.html): the
+ * opening hands and ban list panels above the cards, the tournament below.
+ */
+
+.deck-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.deck-panel h2 {
+    margin-top: 0;
+}
+
+.deck-panel table {
+    width: 100%;
+}
+
+.deck-tournament {
+    margin-top: 2rem;
+}
+
+@media (max-width: 760px) {
+    .deck-panels {
+        grid-template-columns: 1fr;
+    }
+}

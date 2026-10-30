@@ -50,7 +50,11 @@ async fn main() {
         .expect("cannot load the session key");
     let state = AppState {
         pool,
-        http: reqwest::Client::new(),
+        // the outside services (Yugipedia above all) want to know who asks
+        http: reqwest::Client::builder()
+            .user_agent("my-collection/0.1 (a personal card and book collection app)")
+            .build()
+            .expect("an HTTP client"),
         media_dir: PathBuf::from(env("MEDIA_DIR", "data/media")),
         uploads_dir: PathBuf::from(env("UPLOADS_DIR", "uploads")),
         cardmarket_account: env("CARDMARKET_ACCOUNT", "0rtie"),

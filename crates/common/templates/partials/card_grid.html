@@ -9,6 +9,7 @@
       <div class="card-tile-no-image">{{ tile.name }}<br><small>{{ tile.print }}</small></div>
       {% endmatch %}
       {% if tile.proxy %}<span class="card-tile-proxy">Proxy</span>{% endif %}
+      {% match tile.ban %}{% when Some with (ban) %}<span class="card-tile-ban" data-ban="{{ ban }}" title="{{ ban }}">{{ tile.ban_mark() }}</span>{% when None %}{% endmatch %}
     </div>
     <div class="card-tile-text">
       <div class="card-tile-name" title="{{ tile.name }}">{{ tile.name }}</div>

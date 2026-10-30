@@ -16,6 +16,7 @@ use yugioh_domain::tournament::{ordinal, stats, Record, RoundResult, Stats};
 
 pub use self::data::{deck_labels, label_names};
 use self::data::{RoundView, TournamentRow, Which};
+use crate::store::db::Pool;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::AppState;
 
@@ -284,25 +285,24 @@ pub async fn list(
 // ---------- detail ----------
 
 pub struct GameLine {
-    number: i64,
-    result: &'static str,
-    result_class: &'static str,
-    turn: &'static str,
-    comment: String,
+    pub(crate) number: i64,
+    pub(crate) result: &'static str,
+    pub(crate) result_class: &'static str,
+    pub(crate) turn: &'static str,
+    pub(crate) comment: String,
 }
 
 pub struct RoundLine {
-    number: i64,
-    opponent: String,
-    labels: String,
-    die: &'static str,
-    result: &'static str,
-    result_class: &'static str,
-    team_result: &'static str,
-    comment: String,
-    games: Vec<GameLine>,
+    pub(crate) number: i64,
+    pub(crate) opponent: String,
+    pub(crate) labels: String,
+    pub(crate) die: &'static str,
+    pub(crate) result: &'static str,
+    pub(crate) result_class: &'static str,
+    pub(crate) team_result: &'static str,
+    pub(crate) comment: String,
+    pub(crate) games: Vec<GameLine>,
 }
-
 impl RoundLine {
     fn new(round: &RoundView) -> RoundLine {
         use yugioh_domain::tournament::GameResult;
@@ -339,44 +339,60 @@ impl RoundLine {
     }
 }
 
+/// One tournament, round by round: its page, and the page of the deck
+/// version played (`routes::decks::version`, `tournaments/rounds.html`).
+pub struct TournamentView {
+    pub(crate) id: i64,
+    pub(crate) name: String,
+    pub(crate) date: String,
+    pub(crate) location: String,
+    pub(crate) version_id: Option<i64>,
+    pub(crate) version_name: String,
+    pub(crate) is_team: bool,
+    pub(crate) record: String,
+    pub(crate) placement: String,
+    pub(crate) conclusion: String,
+    pub(crate) notes: String,
+    pub(crate) rounds: Vec<RoundLine>,
+}
+
+impl TournamentView {
+    /// Tournament `id`, `None` when there is none.
+    pub(crate) async fn load(pool: &Pool, id: i64) -> AppResult<Option<TournamentView>> {
+        let which = Which {
+            id: Some(id),
+            ..Which::default()
+        };
+        let loaded = data::load(pool, &which).await?;
+        let Some(t) = loaded.tournaments.first() else {
+            return Ok(None);
+        };
+
+        Ok(Some(TournamentView {
+            id,
+            name: t.name.clone(),
+            date: t.date.clone(),
+            location: t.location.clone().unwrap_or_default(),
+            version_id: t.version_id,
+            version_name: t.version_full_name().unwrap_or_default(),
+            is_team: t.is_team,
+            record: tournament_record(&stats(&loaded.records_of(t))),
+            placement: placement_text(t),
+            conclusion: t.conclusion.clone().unwrap_or_default(),
+            notes: t.notes.clone().unwrap_or_default(),
+            rounds: loaded.rounds_of(id).iter().map(RoundLine::new).collect(),
+        }))
+    }
+}
+
 #[derive(Template)]
 #[template(path = "tournaments/detail.html")]
 pub struct DetailPage {
-    id: i64,
-    name: String,
-    date: String,
-    location: String,
-    version_id: Option<i64>,
-    version_name: String,
-    is_team: bool,
-    record: String,
-    placement: String,
-    conclusion: String,
-    notes: String,
-    rounds: Vec<RoundLine>,
+    tournament: TournamentView,
 }
 
 /// `GET /tournaments/:id`.
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<DetailPage> {
-    let which = Which {
-        id: Some(id),
-        ..Which::default()
-    };
-    let loaded = data::load(&state.pool, &which).await?;
-    let t = loaded.tournaments.first().or_404()?;
-
-    Ok(DetailPage {
-        id,
-        name: t.name.clone(),
-        date: t.date.clone(),
-        location: t.location.clone().unwrap_or_default(),
-        version_id: t.version_id,
-        version_name: t.version_full_name().unwrap_or_default(),
-        is_team: t.is_team,
-        record: tournament_record(&stats(&loaded.records_of(t))),
-        placement: placement_text(t),
-        conclusion: t.conclusion.clone().unwrap_or_default(),
-        notes: t.notes.clone().unwrap_or_default(),
-        rounds: loaded.rounds_of(id).iter().map(RoundLine::new).collect(),
-    })
+    let tournament = TournamentView::load(&state.pool, id).await?.or_404()?;
+    Ok(DetailPage { tournament })
 }

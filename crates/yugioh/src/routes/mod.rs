@@ -22,6 +22,7 @@ use axum::Router;
 use crate::AppState;
 
 pub use cards::images::used_files as used_card_pictures;
+pub use cards::images::used_picture_files as used_printing_pictures;
 
 /// Every route, by who may use them (assembled by `common::app`).
 pub fn all() -> common::Routes {
@@ -77,7 +78,9 @@ pub fn router() -> Router<AppState> {
 /// Routes that serve files rather than pages (kept out of the request log:
 /// a deck builder page loads dozens of card images).
 pub fn files_router() -> Router<AppState> {
-    Router::new().route("/card-image/:card_data_id", get(cards::images::card_image))
+    Router::new()
+        .route("/card-image/:card_data_id", get(cards::images::card_image))
+        .route("/card-picture/:card_id", get(cards::images::card_picture))
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
@@ -115,6 +118,10 @@ pub fn write_router() -> Router<AppState> {
         .route(
             "/cards/:id/edit",
             get(cards::form::page).post(cards::form::update),
+        )
+        .route(
+            "/cards/:id/pictures/:n",
+            get(cards::images::offered_picture),
         )
         .route(
             "/sellers/:id/edit",

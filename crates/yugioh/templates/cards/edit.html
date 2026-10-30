@@ -66,6 +66,34 @@
     {% endif %}
   </fieldset>
 
+  <fieldset id="picture">
+    <legend>Picture</legend>
+    <div class="picture-choices">
+      <label class="picture-choice">
+        <input type="radio" name="picture" value="" {% if pictures.chosen.is_empty() %}checked{% endif %}>
+        {% match pictures.automatic %}{% when Some with (_) %}<img src="/card-picture/{{ id }}" alt="" loading="lazy">{% when None %}{% match pictures.card_data_id %}{% when Some with (data_id) %}<img src="/card-image/{{ data_id }}" alt="" loading="lazy">{% when None %}{% endmatch %}{% endmatch %}
+        <small>{{ pictures.automatic_label() }}</small>
+      </label>
+      {% match pictures.card_data_id %}{% when Some with (data_id) %}
+      <label class="picture-choice">
+        <input type="radio" name="picture" value="ygoprodeck" {% if pictures.chosen == "ygoprodeck" %}checked{% endif %}>
+        <img src="/card-image/{{ data_id }}" alt="" loading="lazy">
+        <small>ygoprodeck's</small>
+      </label>
+      {% when None %}{% endmatch %}
+      {% for file in pictures.offered %}
+      <label class="picture-choice">
+        <input type="radio" name="picture" value="{{ file }}" {% if pictures.chosen == file.as_str() %}checked{% endif %}>
+        <img src="/cards/{{ id }}/pictures/{{ loop.index0 }}" alt="{{ file }}" loading="lazy">
+        <small>{{ pictures.label(file) }}</small>
+      </label>
+      {% endfor %}
+    </div>
+    {% if !pictures.missing.is_empty() %}<p><small>{{ pictures.missing }}{% if pictures.can_ask %} <a href="/cards/{{ id }}/edit?pictures=1#picture">Look on Yugipedia</a>{% endif %}</small></p>{% endif %}
+    <label class="switch"><input type="checkbox" name="picture_everywhere"> The same for every copy of this card, code and rarity</label>
+    <small>Yugipedia has a picture of each printing (its language, Extended or alternate art). Automatic: its printing's when there is only one, else ygoprodeck's.</small>
+  </fieldset>
+
   <input type="submit" value="Save">
 </form>
 </div>

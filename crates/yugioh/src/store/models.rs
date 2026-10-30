@@ -8,6 +8,16 @@ use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::valuation::{estimate, MARKET_PRICE};
 
+/// A copy's picture: its printing's own (`card.picture`, from Yugipedia),
+/// else ygoprodeck's picture of its card data; `None` without either.
+pub fn picture_url(card_id: i64, has_picture: bool, card_data_id: Option<i64>) -> Option<String> {
+    if has_picture {
+        Some(format!("/card-picture/{card_id}"))
+    } else {
+        card_data_id.map(|id| format!("/card-image/{id}"))
+    }
+}
+
 /// A card as shown in lists.
 #[derive(Debug, sqlx::FromRow)]
 pub struct CardRow {
@@ -18,6 +28,8 @@ pub struct CardRow {
     pub rarity: Option<String>,
     pub is_proxy: bool,
     pub card_data_id: Option<i64>,
+    /// Has its printing's own picture (`card.picture`).
+    pub has_picture: bool,
     /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
     pub name_en: Option<String>,
     /// Its latest market price (`valuation::MARKET_PRICE`).
@@ -31,11 +43,16 @@ impl CardRow {
     pub fn columns() -> String {
         format!(
             "card.id, card.name, card.code, card.last_known_status, card.rarity, card.is_proxy, \
-             card.card_data_id, \
+             card.card_data_id, card.picture IS NOT NULL AS has_picture, \
              (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
               WHERE card_data.id = card.card_data_id) AS name_en, \
              {MARKET_PRICE} AS market_price, {SOLD_EXISTS} AS is_sold"
         )
+    }
+
+    /// Its picture's address ([`picture_url`]).
+    pub fn picture(&self) -> Option<String> {
+        picture_url(self.id, self.has_picture, self.card_data_id)
     }
 
     /// The card in a picture grid.
@@ -47,7 +64,7 @@ impl CardRow {
         CardTile {
             href: format!("/cards/{}", self.id),
             shape: CardShape::YuGiOh,
-            image: self.card_data_id.map(|id| format!("/card-image/{id}")),
+            image: self.picture(),
             name: self.name.clone(),
             other_name: self.english_name().unwrap_or_default().to_string(),
             print: self.code.clone().unwrap_or_default(),
@@ -57,6 +74,7 @@ impl CardRow {
             value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
             faded: self.is_sold,
             proxy: self.is_proxy,
+            ban: None,
         }
     }
 

@@ -5,6 +5,8 @@
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
   <link rel="stylesheet" href="/static/css/tiles.css">
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+  <link rel="stylesheet" href="/static/css/decks.css">
 {% endblock %}
 
 {% block content %}
@@ -17,7 +19,7 @@
     {% for zone in zones %}<div>{{ zone.name }}: {{ zone.tiles.len() }}</div>{% endfor %}
     {% match version.deck_box %}{% when Some with (deck_box) %}<div>Deck box: {{ deck_box }}</div>{% when None %}{% endmatch %}
     {% match version.sleeves %}{% when Some with (sleeves) %}<div>Sleeves: {{ sleeves }}</div>{% when None %}{% endmatch %}
-    {% match played %}{% when Some with (played) %}<div>Played at <a href="/tournaments/{{ played.id }}" class="on-card">{{ played.name }}</a> ({{ played.date }})</div>{% when None %}{% endmatch %}
+    {% match played %}{% when Some with (played) %}<div>Played at <a href="#tournament" class="on-card">{{ played.name }}</a> ({{ played.date }}{% if !played.record.is_empty() %}, {{ played.record }}{% endif %})</div>{% when None %}{% endmatch %}
   </div>
   {% if !common::export::public_copy() %}
   <div class="button-row">
@@ -34,6 +36,47 @@
   {% endif %}
 </div>
 
+{% if !hands.is_empty() || ban_list.is_some() %}
+<div class="deck-panels">
+  {% if !hands.is_empty() %}
+  <section class="deck-panel">
+    <h2>Opening hands</h2>
+    <p class="hint">Hands with at least one card of each category, going first (5 cards) and second (6), over 10,000 hands drawn at random.</p>
+    <div class="table-scroll">
+    <table class="numbers">
+      <thead><tr><th class="text">Category</th><th>Cards</th><th>First</th><th>Second</th><th title="Cards of it in a 5-card hand, on average">Average</th></tr></thead>
+      <tbody>
+        {% for line in hands %}
+        <tr><td class="text">{{ line.name }}</td><td>{{ line.cards }}</td><td>{{ line.first }}</td><td>{{ line.second }}</td><td>{{ line.average }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+  {% endif %}
+  {% match ban_list %}{% when Some with (ban_list) %}
+  <section class="deck-panel">
+    <h2>Ban list</h2>
+    <p class="hint">The list of {{ ban_list.date }}{% if !ban_list.chosen %} (the latest: none chosen for this version){% endif %}.</p>
+    {% if ban_list.cards.is_empty() %}
+    <p>No card of this version is restricted on it.</p>
+    {% else %}
+    <div class="table-scroll">
+    <table class="numbers">
+      <thead><tr><th class="text">Card</th><th class="text">Status</th><th>Copies</th></tr></thead>
+      <tbody>
+        {% for (status, name, copies) in ban_list.cards %}
+        <tr><td class="text">{{ name }}</td><td class="text"><span class="ban-status" data-ban="{{ status }}">{{ status }}</span></td><td>{{ copies }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  </section>
+  {% when None %}{% endmatch %}
+</div>
+{% endif %}
+
 {% for zone in zones %}
 {% if !zone.tiles.is_empty() %}
 <h2>{{ zone.name }} ({{ zone.tiles.len() }})</h2>
@@ -44,6 +87,23 @@
 {% if self.no_card() %}
 <p>No card in this version yet.</p>
 {% endif %}
+
+{% match played %}{% when Some with (played) %}
+<section id="tournament" class="deck-tournament">
+  <h2>Played at <a href="/tournaments/{{ played.id }}">{{ played.name }}</a>{% if played.is_team %} <span class="badge">Team</span>{% endif %}</h2>
+  <div class="tournament-head">
+    <div>{{ played.date }}{% if !played.location.is_empty() %}, {{ played.location }}{% endif %}</div>
+    {% if !played.record.is_empty() %}<div>Rounds: {{ played.record }}</div>{% endif %}
+    {% if !played.placement.is_empty() %}<div>Placement: {{ played.placement }}</div>{% endif %}
+  </div>
+  {% let rounds = played.rounds.as_slice() %}
+  {% include "tournaments/rounds.html" %}
+  {% if !played.conclusion.is_empty() %}
+  <h3>Conclusion</h3>
+  <p class="multiline">{{ played.conclusion }}</p>
+  {% endif %}
+</section>
+{% when None %}{% endmatch %}
 </div>
 {% endblock %}
 

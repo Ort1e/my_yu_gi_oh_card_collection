@@ -14,7 +14,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use sqlx::SqliteConnection;
 
 use crate::store::db::{begin_write, Pool};
-use crate::store::models::other_name;
+use crate::store::models::{other_name, picture_url};
 use crate::web::error::AppResult;
 use crate::AppState;
 
@@ -31,9 +31,14 @@ pub struct DoorCard {
     code: Option<String>,
     rarity: Option<String>,
     card_data_id: Option<i64>,
+    has_picture: bool,
 }
 
 impl DoorCard {
+    fn image(&self) -> Option<String> {
+        picture_url(self.card_id, self.has_picture, self.card_data_id)
+    }
+
     fn english_name(&self) -> Option<&str> {
         other_name(&self.name, self.name_en.as_deref())
     }
@@ -71,7 +76,8 @@ impl Calendar for Cards {
 
     const ENTRIES: &'static str = "SELECT e.day, e.photo, card.id AS card_id, card.name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
-                card.code, card.rarity, card.card_data_id
+                card.code, card.rarity, card.card_data_id,
+                card.picture IS NOT NULL AS has_picture
          FROM advent_calendar_entry e
          JOIN card ON card.id = e.card_id
          LEFT JOIN card_data ON card_data.id = card.card_data_id

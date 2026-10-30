@@ -350,6 +350,27 @@ missing.
 - `/decks/built` (`routes/decks/built.rs`): each built version, what it still
   misses (its proxies), and the shopping list of all of them.
 
+## A deck version's page
+
+`/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
+`static/css/decks.css`) shows a version read-only, for the app and the
+public copy: its zones as the card grid (by kind, then English name), and
+around them:
+
+- **the ban list**: the version's own (chosen in the deck builder), else the
+  latest one; the restricted cards in a table, and a corner badge on their
+  tiles (`CardTile::ban`, `X`/`1`/`2` as in the builder). It doesn't judge
+  the deck (no "too many copies" check);
+- **the opening hands**: the deck builder's Monte Carlo on the version's
+  categories (`decks/api/simulation.rs::inputs`, `yugioh_domain::monte_carlo`),
+  10,000 hands of 5 cards (going first) and of 6 (second), seeded by the
+  version's id so the public copy doesn't change from one night to the
+  next; the share of hands with at least one card of each category, and
+  their average number;
+- **the tournament** it was played in, round by round
+  (`tournaments::TournamentView`, the same `tournaments/rounds.html` as the
+  tournament's page).
+
 ## Tournaments
 
 `/tournaments` (`routes/tournaments/`, `templates/tournaments/`,
@@ -379,6 +400,9 @@ a version (`clone`) doesn't take it.
   `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
 - **Deck builder**: the tournament panel is a summary with links to these
   pages (`decks/api/tournament.rs`).
+- **Public**: the list, the stats and each tournament are in the public copy,
+  without the buttons, the filter (it needs the server), the labels page
+  and the old `notes`. The version played shows the tournament too.
 
 ## The advent calendar
 
@@ -645,7 +669,9 @@ keeps no trace of a run that found no price).
 
 `clean-pictures` (`backend/src/commands/pictures.rs`) deletes the cached
 card pictures no card uses any more: in `media/card_images/` those of card
-data no card links to (and old Django duplicates), in
+data no card links to (and old Django duplicates), in `media/card_pictures/`
+the printings' pictures no copy has (those offered on an edit page and not
+chosen), in
 `media/pokemon_card_images/` those of Pokémon cards no longer owned or
 wished. Each collection lists its files in use (`yugioh::routes::used_card_pictures`,
 `pokemon::routes::images::used_files`); a picture deleted by mistake is just
@@ -659,12 +685,13 @@ runs. They are **the app's own pages**, saved as files:
    it for its pages like a browser, inside `common::export::public_copy()`
    (a tokio task-local, true only there);
 2. it starts from `START` (`/cards`, `/collection/stats`, `/decks`,
-   `/rarities`, `/pokemon`, the wishlist and guide, `/books`, authors,
-   series) and follows the links, **only** to the addresses `public()`
-   accepts: those, a card's, a deck's, a deck version's, a copy's, a
-   book's, an author's or a series' page (by id), and the picture routes.
-   `/lots`, `/sellers`, `/tournaments`, the deck builder… are never asked
-   for, whatever links to them. A page can also refuse: a deck not on the
+   `/tournaments`, `/rarities`, `/pokemon`, the wishlist and guide,
+   `/books`, authors, series) and follows the links, **only** to the
+   addresses `public()` accepts: those, a card's, a deck's, a deck
+   version's, a tournament's, a copy's, a book's, an author's or a series'
+   page (by id), and the picture routes. `/lots`, `/sellers`, the
+   tournaments' forms and labels, the deck builder… are never asked for,
+   whatever links to them. A page can also refuse: a deck not on the
    public site answers 404 in that mode (only the versions played in a
    tournament or shown by hand, the button on a version's page, and their
    decks), so it isn't in the copy;
@@ -682,16 +709,16 @@ In that mode the templates leave out what is private:
 (`partials/*_nav.html`), the add buttons and filters (`list_base.html`), a
 card's lot, price paid and decks, the Pokémon copies' price paid, notes,
 certificate and opening, the wishlist's maximum prices, verdicts and
-notes, a book's ISBN and notes, a deck's buttons, tournaments and deck
-builder. The card list shows the cards owned only
+notes, a book's ISBN and notes, a deck's buttons and deck builder, the
+tournaments' buttons, filter and old notes. The card list shows the cards owned only
 (no proxy, not sold). A page added to the copy is a path in `START` or
 `public()`, and a look at its template for anything private.
 
 The folder is emptied at each export, and refused if it isn't an earlier
 export. `backend/src/tests/export.rs` runs it on a database full of
 private things and checks that every page is there, every link stays in
-the copy, and no seller, price paid, note, ISBN, deck, tournament or budget
-gets in. The NAS writes it and uploads it every morning ([Where it
+the copy, and no seller, price paid, note, ISBN, private deck, tournament's
+old notes or budget gets in. The NAS writes it and uploads it every morning ([Where it
 runs](#where-it-runs)).
 
 `backup --to DIR [--keep DAYS]` (`backend/src/commands/backup.rs`) copies
@@ -731,6 +758,29 @@ it: `TestApp` pre-inserts the card data they need (and translations, in
 `card_translation`). The shapes ygoprodeck answers are reshaped in pure
 functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
 rarity names), which are unit-tested on small synthetic JSON.
+
+## A printing's picture: Yugipedia
+
+ygoprodeck has one picture per artwork, in English: a French copy, an
+Extended Art or an alternate art shows the wrong one. Yugipedia has a
+picture of each printing, named after it
+(`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
+Extended Art). A copy can take one: `card.picture` (migration 0019), served
+by `/card-picture/:card_id` (downloaded once, kept as a JPEG in
+`media/card_pictures/`); without it, the copy shows ygoprodeck's picture
+(`store::models::picture_url`, used by the grid, the card page, the advent
+doors and the deck builder's `ApiCard.image`).
+
+| Piece | Where |
+|---|---|
+| reading a file name, the files of a copy's printing, the one to take without asking | `yugioh_domain::printing_picture` (`parse`, `candidates`, `automatic`) |
+| the card galleries (MediaWiki API, `Card Gallery:<name>`, 500 files a page), one request a second (`YUGIPEDIA` throttle), cached in `yugipedia_gallery` for 30 days | `yugioh/src/store/yugipedia.rs` |
+| the automatic pictures: copies with an automatic picture get their printing's when there is one artwork for it (`find_pictures`) | new cards at the end of their linking (`card_data/linking.rs`), a new code or rarity (`spawn_find_pictures`), the whole collection by hand (`find-pictures`, `commands/find_pictures.rs`: once for the cards added before, then now and then for the scans Yugipedia adds later) |
+| the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
+
+A new code, rarity or name puts an automatic picture back to ygoprodeck's
+and looks for the new printing's. Tests insert `yugipedia_gallery` rows: Yugipedia is
+never called by them.
 
 ## The collection value
 

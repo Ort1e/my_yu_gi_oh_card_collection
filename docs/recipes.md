@@ -429,6 +429,16 @@ collections need):
 5. Test the endpoint in `crates/yugioh/src/tests/deck_api.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
 
+## Fix a card's picture
+
+A card showing the wrong art (an Extended Art, a French card shown in
+English): open its edit page, "Picture". The pictures of its printing come
+from Yugipedia (looked up when the card was added; otherwise "Look on
+Yugipedia"); click the right one, tick "The same for every copy…" if they
+all are, and save. `cargo run -p backend -- find-pictures` looks for the whole collection
+(the cards added before, the scans Yugipedia adds later) and lists the
+copies with several artworks to choose from (tour.md, "A printing's picture: Yugipedia").
+
 ## Show cards as pictures
 
 A page listing cards (Yu-Gi-Oh! or Pokémon) shows them with the shared grid

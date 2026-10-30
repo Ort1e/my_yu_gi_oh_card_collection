@@ -3,6 +3,7 @@
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
+use sqlx::SqliteConnection;
 use yugioh_domain::monte_carlo::{self, Category, SimulationResult};
 
 use super::categories::load_categories;
@@ -15,6 +16,25 @@ use crate::AppState;
 pub struct SimulationInput {
     hand_size: usize,
     simulations: u32,
+}
+
+/// What a simulation of version `id` needs: its Main Deck, its categories
+/// and which cards are in them (also the read-only page, `decks::version`).
+pub(crate) async fn inputs(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> AppResult<(Vec<i64>, Vec<Category>, Vec<(i64, i64)>)> {
+    let main = Zone::Main.card_ids(&mut *conn, id).await?;
+    let categories = load_categories(&mut *conn, id).await?;
+    let assignments: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT card_id, category_id FROM card_category_assignment
+         WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let categories = categories.into_iter().map(Category::from).collect();
+    Ok((main, categories, assignments))
 }
 
 pub async fn monte_carlo(
@@ -30,19 +50,8 @@ pub async fn monte_carlo(
     }
     let mut conn = state.pool.acquire().await?;
     exists(&mut conn, "deck_version", id).await?;
-    let main = Zone::Main.card_ids(&mut conn, id).await?;
-
-    let categories = load_categories(&mut conn, id).await?;
-    let assignments: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT card_id, category_id FROM card_category_assignment
-         WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let (main, categories, assignments) = inputs(&mut conn, id).await?;
     drop(conn);
-
-    let categories: Vec<Category> = categories.into_iter().map(Category::from).collect();
 
     let result = tokio::task::spawn_blocking(move || {
         monte_carlo::simulate(

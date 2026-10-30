@@ -292,6 +292,7 @@ impl CopyRow {
             value: self.value_text(),
             faded: self.is_sold(),
             proxy: false,
+            ban: None,
         }
     }
 

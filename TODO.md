@@ -29,6 +29,12 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-30: a deck version's page shows its ban list, opening hands and
+  tournament; the tournaments in the public copy; a card's picture of its
+  own printing from Yugipedia (automatic when there's no doubt, when the
+  card is added; else chosen on its edit page). Once on the NAS after the
+  update: `backend find-pictures` for the cards added before (~10 min).
+
 - 2026-10-29: a deck version's cards on a read-only page
   (`/deck-versions/:id`), public deck versions (played in a tournament, or
   shown by hand); the logos alike;

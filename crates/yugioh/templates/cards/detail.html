@@ -12,9 +12,9 @@
 <p class="back-link"><a href="/cards">← Back to the cards</a></p>
 
 <div class="card-detail">
-  {% match card.card_data_id %}{% when Some with (data_id) %}
+  {% match card.picture() %}{% when Some with (src) %}
   <figure class="card-detail-picture">
-    <img src="/card-image/{{ data_id }}" alt="{{ card.name }}" class="card-detail-image yugioh" width="300" height="437" data-zoom>
+    <img src="{{ src }}" alt="{{ card.name }}" class="card-detail-image yugioh" width="300" height="437" data-zoom>
   </figure>
   {% when None %}{% endmatch %}
 

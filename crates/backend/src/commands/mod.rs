@@ -2,6 +2,7 @@
 //!
 //!   cargo run -p backend -- scrap-ban-list [--all] [--dry-run] [--date YYYY-MM-DD]…
 //!   cargo run -p backend -- clean-cards [--dry-run]
+//!   cargo run -p backend -- find-pictures [--dry-run]
 //!   cargo run -p backend -- refresh-prices [--dry-run]
 //!   cargo run -p backend -- clean-pictures [--dry-run]
 //!   cargo run -p backend -- export-public [--out DIR]
@@ -21,7 +22,7 @@ mod release;
 pub use pictures::spawn_daily as spawn_daily_picture_cleanup;
 pub use prices::spawn_weekly as spawn_weekly_price_refresh;
 pub use yugioh::commands::clean_cards::spawn_daily as spawn_daily_cleanup;
-use yugioh::commands::{ban_list, clean_cards, tournament_notes};
+use yugioh::commands::{ban_list, clean_cards, find_pictures, tournament_notes};
 
 use std::path::PathBuf;
 
@@ -39,6 +40,10 @@ pub const USAGE: &str = "usage:
   backend clean-cards [--dry-run]
       normalise card names, link cards to the right card data, replace
       proxies in decks by owned copies and delete unused proxies
+  backend find-pictures [--dry-run]
+      give the cards their printing's picture from Yugipedia (language,
+      Extended Art…) when there is no doubt (new cards get theirs when
+      added); --dry-run asks Yugipedia nothing
   backend refresh-prices [--dry-run]
       fetch today's market prices: every Yu-Gi-Oh! card from ygoprodeck and
       Cardmarket's price guide, the Pokémon cards owned or wished from TCGdex
@@ -70,6 +75,9 @@ pub enum Command {
         dates: Vec<NaiveDate>,
     },
     CleanCards {
+        dry_run: bool,
+    },
+    FindPictures {
         dry_run: bool,
     },
     RefreshPrices {
@@ -136,9 +144,11 @@ impl Command {
         let allowed: &[&str] = match name.as_str() {
             "serve" | "export-public" | "backup" | "fetch-release" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
-            "clean-cards" | "refresh-prices" | "clean-pictures" | "import-tournament-notes" => {
-                &["--dry-run"]
-            }
+            "clean-cards"
+            | "find-pictures"
+            | "refresh-prices"
+            | "clean-pictures"
+            | "import-tournament-notes" => &["--dry-run"],
             other => return Err(format!("unknown command {other:?}")),
         };
         if let Some(bad) = flags.iter().find(|f| !allowed.contains(f)) {
@@ -152,6 +162,9 @@ impl Command {
                 dates,
             },
             "clean-cards" => Command::CleanCards {
+                dry_run: has("--dry-run"),
+            },
+            "find-pictures" => Command::FindPictures {
                 dry_run: has("--dry-run"),
             },
             "refresh-prices" => Command::RefreshPrices {
@@ -224,6 +237,7 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
             dates,
         } => ban_list::scrap(state, all, dry_run, &dates).await,
         Command::CleanCards { dry_run } => clean_cards::clean(state, dry_run).await,
+        Command::FindPictures { dry_run } => find_pictures::find(state, dry_run).await,
         Command::RefreshPrices { dry_run } => prices::refresh(state, dry_run).await,
         Command::CleanPictures { dry_run } => pictures::clean(state, dry_run).await,
         Command::Backup { to, keep_days } => backup::run(state, &to, keep_days).await,
