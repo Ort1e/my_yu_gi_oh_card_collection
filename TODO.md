@@ -11,6 +11,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
   "Red Rising, 3" were badly read from Open Library (fixed for new
   lookups): rename them in their books' forms.
+- **Stand-alone books:** a list of the books in no series, the
+  complement of `/books/series` (a tab in the book menu, the same table
+  as the other lists: `partials/book_table.html`).
 - Maybe: a Google Books API key (free, 1000 lookups a day): without one its
   shared quota is often used up (429), and Open Library lacks some books
   (9781464266430).
