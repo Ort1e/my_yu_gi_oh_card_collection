@@ -117,10 +117,8 @@ for an app-like icon; the session lasts, restarts included.
 
 **Limits:** it's plain HTTP. Fine at home, but the password crosses the
 Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
-book barcode scan takes a photo instead, read by the ZXing library: the
-phone's own barcode reader is HTTPS-only too). The photo is decoded already
-reduced to 1600 px: decoded whole, a phone photo is 50 to 200 MB, and some
-phones ran out of memory. Never forward port 3000 on the
+book barcode scan takes a photo instead, sent to the NAS, which reads the
+barcode: the phone does nothing heavy). Never forward port 3000 on the
 box: the NAS must stay unreachable from the internet.
 
 ### The development server from a phone

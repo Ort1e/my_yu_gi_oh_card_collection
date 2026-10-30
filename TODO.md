@@ -4,10 +4,11 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
-- **The book scan on the friend's phone** said "out of memory" (2026-10-30):
-  the photo is now decoded already reduced (`static/js/book_form.js`). To
-  check once deployed; if it still fails: which browser, and the exact
-  message (under the ISBN field, or a crashed tab).
+- **The book scan on the friend's phone** said "out of memory" in Chrome
+  (2026-10-30): the barcode is now read on the NAS, and "From a photo"
+  avoids the camera app over the browser. To check once deployed.
+- **Book lookups:** inconsistencies seen by the friend (the volume number
+  in a series…): waiting for an ISBN that shows it.
 - **Testers of the public copy:** after the 2026-10-28 changes (back link,
   full screen card, bigger tile text), is the text still too small on
   phones? If so: bigger text on phones everywhere, not only the tiles.

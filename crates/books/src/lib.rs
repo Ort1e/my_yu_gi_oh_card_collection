@@ -7,13 +7,16 @@
 //!   advent calendars);
 //! - `store/`: book writes (`books.rs`) and the ISBN lookup with its cache
 //!   (`book_data.rs`);
+//! - `barcode.rs`: the ISBN read on a photo of a barcode (the scan);
 //! - the pure rules: the `books-domain` crate.
 
+pub mod barcode;
 pub mod routes;
 pub mod store;
 #[cfg(test)]
 mod tests;
 
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::Router;
 use common::{AppState, Routes};
@@ -40,7 +43,11 @@ pub fn routes() -> Routes {
                 get(routes::form::edit_page).post(routes::form::update),
             )
             .route("/books/:id/delete", post(routes::form::delete))
-            .route("/books/api/isbn/:isbn", get(routes::api::isbn)),
+            .route("/books/api/isbn/:isbn", get(routes::api::isbn))
+            .route(
+                "/books/api/isbn-scan",
+                post(routes::api::scan).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),
+            ),
         files: Router::new(),
         private_media: Vec::new(),
     }

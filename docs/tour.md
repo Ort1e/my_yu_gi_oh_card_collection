@@ -460,17 +460,21 @@ pictures.
 | the routes | `src/lib.rs` (`routes()`) |
 | list (filters, sort by title / surname / added), detail | `src/routes/mod.rs` |
 | add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
-| `GET /books/api/isbn/:isbn`, the lookup as JSON | `src/routes/api.rs` |
+| `GET /books/api/isbn/:isbn`, the lookup as JSON; `POST /books/api/isbn-scan`, the ISBN on a barcode photo | `src/routes/api.rs`, `src/barcode.rs` |
 | authors, series (with the missing volumes) | `src/routes/authors.rs`, `series.rs` |
 | the book advent calendars (the `advent` crate, own tables and photo folder) | `src/routes/advent/mod.rs` |
 
 The add form (`static/js/book_form.js`): "Look up" (or Enter, which USB
 barcode scanners send) calls the API and fills the fields; "Scan" opens the
-phone's camera through a file input and reads the barcode **in the
-browser**: `BarcodeDetector` where the browser has it (HTTPS only), else the
-ZXing library loaded from jsDelivr, trying the photo as taken and turned a
-quarter turn. Plain HTTP on the home network can't use the live camera
-(browsers keep it to HTTPS), hence the photo.
+phone's camera through a file input ("From a photo": one taken before) and
+sends the photo **to the NAS**, which reads the barcode (`books::barcode`:
+`common::photos::grey` decodes a JPEG straight at 1/2, 1/4 or 1/8 of its
+size, then `rxing`, a Rust ZXing, tries 1600 and 800 px, as taken and
+turned a quarter turn). Plain HTTP on the home network can't use the live
+camera (browsers keep it to HTTPS), hence the photo. It used to be read in
+the browser: a whole camera photo took more memory than a phone had. On the
+NAS it takes 2 to 3 s and 60 MB (measured 2026-10-30; decoded whole, a
+50 MP photo took 8 s and 300 MB).
 
 Like ygoprodeck: the lookup happens **before** any write transaction, and
 tests never call it (they insert `book_data` rows).

@@ -2,7 +2,8 @@
 //! the pages is made upright from the EXIF orientation, resized and
 //! re-encoded as JPEG **without metadata** (phone photos may carry the GPS
 //! position); the original is kept as uploaded, next to it. Also the public
-//! copy's card pictures ([`thumbnail`], WebP).
+//! copy's card pictures ([`thumbnail`], WebP), and the book scan's grey copy
+//! of a barcode photo ([`grey`]).
 //!
 //! CPU work: call these in `tokio::task::spawn_blocking`.
 
@@ -85,6 +86,74 @@ pub fn web_copy(bytes: &[u8]) -> Result<Vec<u8>, PhotoError> {
         img = img.resize(MAX_SIDE, MAX_SIDE, FilterType::Lanczos3);
     }
     encode(&img)
+}
+
+/// A grey copy of a photo, its long side at most `max_side` px, for a
+/// barcode reader (the book scan). A JPEG (any phone photo) is decoded
+/// straight at 1/2, 1/4 or 1/8 of its size, the smallest still at least
+/// `max_side` (on the NAS a 50 MP photo takes 3 s and 60 MB so, 8 s and
+/// 300 MB decoded whole); its EXIF orientation is left out (the reader
+/// tries it turned). Other formats are decoded whole, within [`limits`].
+pub fn grey(bytes: &[u8], max_side: u32) -> Result<image::GrayImage, PhotoError> {
+    let img = match reduced_jpeg(bytes, max_side) {
+        Some(img) => img?,
+        None => reader(bytes)?.decode().map_err(refused)?,
+    };
+    let img = if img.width() > max_side || img.height() > max_side {
+        img.resize(max_side, max_side, FilterType::Triangle)
+    } else {
+        img
+    };
+    Ok(img.to_luma8())
+}
+
+/// [`grey`]'s reduced decoding of a JPEG: `None` for another format (or a
+/// JPEG `jpeg-decoder` can't reduce: CMYK, 12 bits), left to `image`.
+fn reduced_jpeg(bytes: &[u8], max_side: u32) -> Option<Result<DynamicImage, PhotoError>> {
+    use jpeg_decoder::{Decoder, PixelFormat};
+
+    if !bytes.starts_with(&[0xFF, 0xD8]) {
+        return None;
+    }
+    let unreadable =
+        |e: jpeg_decoder::Error| PhotoError(format!("the photo couldn't be read ({e})"));
+    let mut decoder = Decoder::new(Cursor::new(bytes));
+    if let Err(e) = decoder.read_info() {
+        return Some(Err(unreadable(e)));
+    }
+    let info = decoder.info()?;
+    if !matches!(info.pixel_format, PixelFormat::L8 | PixelFormat::RGB24) {
+        return None;
+    }
+    let (width, height) = (u32::from(info.width), u32::from(info.height));
+    if width > 10_000 || height > 10_000 {
+        return Some(Err(PhotoError(
+            "the photo is too big (at most 10,000 pixels a side)".to_string(),
+        )));
+    }
+
+    let long = width.max(height);
+    let factor = [8, 4, 2, 1]
+        .into_iter()
+        .find(|f| long / f >= max_side)
+        .unwrap_or(1);
+    let (w, h) = match decoder.scale((width / factor) as u16, (height / factor) as u16) {
+        Ok(size) => (u32::from(size.0), u32::from(size.1)),
+        Err(e) => return Some(Err(unreadable(e))),
+    };
+    let pixels = match decoder.decode() {
+        Ok(pixels) => pixels,
+        Err(e) => return Some(Err(unreadable(e))),
+    };
+    let wrong = || PhotoError("the photo couldn't be read".to_string());
+    Some(match info.pixel_format {
+        PixelFormat::L8 => image::GrayImage::from_raw(w, h, pixels)
+            .map(DynamicImage::ImageLuma8)
+            .ok_or_else(wrong),
+        _ => image::RgbImage::from_raw(w, h, pixels)
+            .map(DynamicImage::ImageRgb8)
+            .ok_or_else(wrong),
+    })
 }
 
 /// A copy at most `width` px wide, never enlarged, as lossy WebP with its
@@ -236,5 +305,26 @@ mod tests {
         let error = web_copy(&bomb).unwrap_err();
         assert!(error.0.contains("too big"), "{error}");
         assert!(rotate(&bomb, true).is_err());
+    }
+
+    #[test]
+    fn grey_copies_reduced() {
+        // a JPEG of 6400 × 4800: decoded at 1/4 (1600 × 1200), not whole
+        let img = DynamicImage::new_rgb8(6400, 4800);
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 80)
+            .encode_image(&img.to_rgb8())
+            .unwrap();
+        let grey_copy = grey(&jpeg, 1600).unwrap();
+        assert_eq!((grey_copy.width(), grey_copy.height()), (1600, 1200));
+
+        // another format, decoded whole; never enlarged
+        let grey_copy = grey(&png(300, 200), 1600).unwrap();
+        assert_eq!((grey_copy.width(), grey_copy.height()), (300, 200));
+        let grey_copy = grey(&png(3000, 2000), 1600).unwrap();
+        assert_eq!((grey_copy.width(), grey_copy.height()), (1600, 1067));
+
+        assert!(grey(b"\xFF\xD8 not a jpeg", 1600).is_err());
+        assert!(grey(b"not a photo", 1600).is_err());
     }
 }

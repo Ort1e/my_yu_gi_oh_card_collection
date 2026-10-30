@@ -44,7 +44,8 @@ body.books {
     letter-spacing: 0.05em;
 }
 
-/* The "Scan" label looks like a button and opens the hidden file input. */
+/* The "Scan" and "From a photo" labels look like buttons and open their
+   hidden file input. */
 .scan-button {
     margin: 0;
     font-weight: bold;
