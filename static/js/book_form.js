@@ -2,23 +2,25 @@
 // fields.html):
 // - "Look up" (or Enter in the ISBN field, which barcode scanners type
 //   after the digits) asks /books/api/isbn/:isbn and fills the fields;
-// - "Scan" takes a photo of the barcode and reads the ISBN from it;
+// - "Scan" takes a photo of the barcode, "From a photo" picks one already
+//   taken, and the NAS reads the ISBN on it (POST /books/api/isbn-scan);
 // - the delete button asks first.
 //
-// The scan reads the photo in the browser: the phone's BarcodeDetector when
-// it has one (only on HTTPS sites), else the ZXing library, loaded from the
-// CDN the first time. The photo is never sent anywhere.
+// The photo is sent as it is: read in the phone's browser, a whole camera
+// photo took more memory than some phones have ("out of memory"). The NAS
+// keeps nothing of it. "From a photo" also spares the phone the camera app
+// opened over the browser (on a phone short of memory, Android may close
+// the browser meanwhile).
 
 const form = document.getElementById('book-form');
 const isbnField = document.getElementById('isbn');
 const lookupButton = document.getElementById('isbn-lookup');
-const photoInput = document.getElementById('isbn-photo');
+// "Scan" (the camera) and "From a photo" (one already taken)
+const photoInputs = document.querySelectorAll('#isbn-photo, #isbn-photo-file');
 const status = document.getElementById('isbn-status');
 
 // On the edit page, a lookup only fills the empty fields.
 const keepFilled = form?.hasAttribute('data-keep-filled');
-
-const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
 
 // ---------- status line ----------
 
@@ -147,131 +149,57 @@ if (form) {
 
 // ---------- barcode scan ----------
 
-/** The photo, drawn on a canvas at most `maxSide` px wide or high. */
-async function photoCanvas(file, maxSide) {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    return canvas;
-}
+/** The ISBN on the photo, read on the NAS: { isbn } or { error }. */
+async function scanOnServer(file) {
+    const body = new FormData();
+    body.append('photo', file);
 
-/** A book's ISBN (978/979…) among the barcodes read, or null. */
-function bookIsbn(values) {
-    return values.find((v) => /^97[89]\d{10}$/.test(v)) ?? null;
-}
-
-async function readWithBarcodeDetector(canvas) {
-    if (!('BarcodeDetector' in window)) return undefined;
-
-    const formats = await BarcodeDetector.getSupportedFormats();
-
-    if (!formats.includes('ean_13')) return undefined;
-
-    const found = await new BarcodeDetector({ formats: ['ean_13'] }).detect(canvas);
-    return bookIsbn(found.map((b) => b.rawValue));
-}
-
-let zxingLoading = null;
-
-function loadZxing() {
-    zxingLoading ??= new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = ZXING_URL;
-        script.onload = () => resolve(window.ZXing);
-        script.onerror = () => {
-            zxingLoading = null;
-            reject(new Error('the barcode reader could not be loaded'));
-        };
-        document.head.append(script);
+    const response = await fetch('/books/api/isbn-scan', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body,
     });
 
-    return zxingLoading;
+    if (response.status === 401) return { login: true };
+
+    return response.json();
 }
 
-async function readWithZxing(canvas) {
-    const ZXing = await loadZxing();
-    const hints = new Map([
-        [ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]],
-        [ZXing.DecodeHintType.TRY_HARDER, true],
-    ]);
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
+async function scan(input) {
+    const file = input.files[0];
 
-    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+    if (!file) return;
+
+    say('Reading the barcode (a few seconds)…');
+
+    let answer;
 
     try {
-        const result = reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source)));
-        return bookIsbn([result.getText()]);
+        answer = await scanOnServer(file);
     } catch {
-        return null; // no barcode found
-    }
-}
-
-/** The canvas turned a quarter turn (a barcode photographed sideways). */
-function turned(canvas) {
-    const out = document.createElement('canvas');
-    out.width = canvas.height;
-    out.height = canvas.width;
-
-    const g = out.getContext('2d');
-    g.translate(out.width, 0);
-    g.rotate(Math.PI / 2);
-    g.drawImage(canvas, 0, 0);
-    return out;
-}
-
-/** The ISBN in a photo of a barcode, or null. Tries a big then a small copy
-    (a far barcode needs pixels, a blurry one is sharper smaller), each as
-    taken and turned. */
-async function readIsbn(file) {
-    for (const size of [1600, 800]) {
-        const canvas = await photoCanvas(file, size);
-
-        for (const picture of [canvas, turned(canvas)]) {
-            const detected = await readWithBarcodeDetector(picture).catch(() => undefined);
-
-            if (detected) return detected;
-
-            const read = await readWithZxing(picture);
-
-            if (read) return read;
-        }
+        say('The photo could not be sent (no connection?). Try again, or type the 13 digits.', { error: true });
+        return;
+    } finally {
+        input.value = ''; // the same photo can be chosen again
     }
 
-    return null;
+    if (answer.login) {
+        const next = encodeURIComponent(location.pathname + location.search);
+        say('Log in first.', { error: true, link: { href: `/login?next=${next}`, text: 'Log in' } });
+        return;
+    }
+
+    if (!answer.isbn) {
+        say(answer.error ?? 'The scan failed: type the 13 digits instead.', { error: true });
+        return;
+    }
+
+    isbnField.value = answer.isbn;
+    lookup();
 }
 
-if (photoInput) {
-    photoInput.addEventListener('change', async () => {
-        const file = photoInput.files[0];
-
-        if (!file) return;
-
-        say('Reading the barcode…');
-
-        let isbn;
-
-        try {
-            isbn = await readIsbn(file);
-        } catch (e) {
-            say(`The scan failed (${e.message}). Type the 13 digits instead.`, { error: true });
-            return;
-        } finally {
-            photoInput.value = ''; // the same photo can be chosen again
-        }
-
-        if (!isbn) {
-            say('No ISBN barcode found in the photo: try closer, flat and well lit, or type the 13 digits.', { error: true });
-            return;
-        }
-
-        isbnField.value = isbn;
-        lookup();
-    });
+for (const input of photoInputs) {
+    input.addEventListener('change', () => scan(input));
 }
 
 // ---------- delete ----------

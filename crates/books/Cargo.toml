@@ -20,7 +20,10 @@ chrono = { workspace = true }
 reqwest = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
+image = { workspace = true }
+rxing = { workspace = true }
 
 [dev-dependencies]
 common = { path = "../common", features = ["test-support"] }
-image = { workspace = true }
+# barcodes drawn for the scan's tests
+rxing = { workspace = true, features = ["encoders"] }

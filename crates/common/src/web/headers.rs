@@ -2,7 +2,7 @@
 //!
 //! The Content-Security-Policy lets the pages load only the app's own files,
 //! plus what they use from outside: scripts from jsDelivr (Chart.js on the
-//! dashboard and value pages, ZXing for the book barcode scan) and the
+//! dashboard and value pages) and the
 //! Pokémon finder's thumbnails from TCGdex. Styles allow `'unsafe-inline'`:
 //! the deck builder sets one `style` attribute (a chart's height). No
 //! inline script anywhere (CLAUDE.md), so none is allowed.

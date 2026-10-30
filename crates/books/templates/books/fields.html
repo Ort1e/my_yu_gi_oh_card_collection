@@ -7,9 +7,12 @@
     <button type="button" id="isbn-lookup">Look up</button>
     <label class="btn btn-secondary scan-button" for="isbn-photo">📷 Scan</label>
     <input type="file" id="isbn-photo" accept="image/*" capture="environment" class="visually-hidden">
+    <label class="btn btn-secondary scan-button" for="isbn-photo-file">🖼 From a photo</label>
+    <input type="file" id="isbn-photo-file" accept="image/*" class="visually-hidden">
   </div>
   <p id="isbn-status" class="isbn-status" role="status" aria-live="polite"></p>
-  <small>"Look up" fills the fields below from Open Library. "Scan": take a photo of the barcode.
+  <small>"Look up" fills the fields below from Open Library. "Scan": take a photo of the barcode
+    ("From a photo": one taken with the camera app before, lighter for the phone).
     A book without an ISBN: leave it empty and fill the fields by hand.</small>
 </fieldset>
 

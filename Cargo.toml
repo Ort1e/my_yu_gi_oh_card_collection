@@ -42,6 +42,13 @@ html-escape = "0.2"
 # session cookie signature (login)
 hmac = "0.12"
 sha2 = "0.10"
+# Yugipedia's file paths (MediaWiki: md5 of the name)
+md-5 = "0.10"
+# the book scan, on the NAS: a phone photo decoded straight at 1/2, 1/4 or
+# 1/8 of its size (`image` decodes it whole: 8 s and 300 MB for 50 MP on the
+# NAS, 3 s and 60 MB this way), then its EAN-13 barcode read
+jpeg-decoder = { version = "0.3", default-features = false }
+rxing = { version = "0.9", default-features = false, features = ["oned", "decoders", "no_character_set_support"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 # advent calendar photos: EXIF orientation, resize, re-encode without metadata
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }

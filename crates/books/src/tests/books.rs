@@ -423,5 +423,54 @@ async fn reading_is_public_writing_needs_the_login() {
         "the API answers 401, not a redirect"
     );
     assert!(answer["error"].is_string());
+    assert_eq!(
+        t.multipart("/books/api/isbn-scan", &[], Some(b"x")).await.0,
+        StatusCode::UNAUTHORIZED
+    );
     assert_eq!(t.scalar("SELECT count(*) FROM book").await, 1);
+}
+
+#[tokio::test]
+async fn the_scan_reads_the_isbn_on_the_nas() {
+    use crate::barcode::tests::barcode_photo;
+    use image::ImageFormat;
+
+    let t = TestApp::new().await;
+    let scan = |photo: Option<Vec<u8>>| {
+        let t = &t;
+        async move {
+            let (status, body) = t
+                .multipart("/books/api/isbn-scan", &[], photo.as_deref())
+                .await;
+            (
+                status,
+                serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+            )
+        }
+    };
+
+    let photo = barcode_photo("9780553573398", 2000, 1500, ImageFormat::Jpeg);
+    let (status, answer) = scan(Some(photo)).await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["isbn"], "9780553573398");
+
+    // a barcode, but not a book's
+    let photo = barcode_photo("3017620422003", 1200, 900, ImageFormat::Png);
+    let (status, answer) = scan(Some(photo)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(answer["error"]
+        .as_str()
+        .unwrap()
+        .contains("No ISBN barcode"));
+
+    let (status, answer) = scan(Some(b"not a photo".to_vec())).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        answer["error"]
+            .as_str()
+            .unwrap()
+            .contains("isn't supported"),
+        "{answer}"
+    );
+    assert_eq!(scan(None).await.0, StatusCode::BAD_REQUEST);
 }

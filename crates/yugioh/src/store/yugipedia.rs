@@ -3,15 +3,19 @@
 //! Extended Art, a French card). Its card galleries are read through the
 //! MediaWiki API and cached in `yugipedia_gallery`; which file fits a copy
 //! is `yugioh_domain::printing_picture`. The chosen file is `card.picture`,
-//! downloaded once into `media/card_pictures/` as a JPEG
-//! (`routes::cards::images`).
+//! downloaded once into `media/card_pictures/` as a JPEG ([`download`]):
+//! the automatic pass downloads a picture before giving it to a copy, so a
+//! page (or the public copy) never waits on Yugipedia, and a picture that
+//! can't be had shows ygoprodeck's (`routes::cards::images`).
 //!
 //! A new copy gets its printing's picture by itself, after its linking
 //! ([`spawn_find_pictures`], when there is no doubt); `find-pictures` does it
 //! for the whole collection, and the edit page lets a person choose.
 //!
 //! Every call goes through [`YUGIPEDIA`] (a wiki run by volunteers: one
-//! request a second, a User-Agent saying who asks).
+//! request a second, a User-Agent saying who asks), every picture through
+//! [`PICTURES`] (one every 2 seconds, straight from its media server; it
+//! answers 429 Too Many Requests above that: then we wait and try again).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -19,6 +23,7 @@ use std::time::Duration;
 
 use common::db::{is_fresh, today};
 use common::http::Throttle;
+use common::{media, photos};
 use serde_json::Value;
 use yugioh_domain::printing_picture::{automatic, candidates};
 use yugioh_domain::rarity::Rarity;
@@ -28,7 +33,7 @@ use crate::web::error::{AppError, AppResult};
 use crate::AppState;
 
 const API_URL: &str = "https://yugipedia.com/api.php";
-const WIKI_URL: &str = "https://yugipedia.com/wiki/";
+const FILES_URL: &str = "https://ms.yugipedia.com/";
 const USER_AGENT: &str = "my-yugioh-cards/0.1 (a personal card collection app)";
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -36,6 +41,12 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 pub const GALLERY_DAYS: i64 = 30;
 
 pub(crate) static YUGIPEDIA: Throttle = Throttle::new(Duration::from_secs(1));
+pub(crate) static PICTURES: Throttle = Throttle::new(Duration::from_secs(2));
+
+/// Tries of a picture Yugipedia answers 429 for, a wait between them.
+const TRIES: u32 = 3;
+/// The longest wait asked by a 429 (`Retry-After`) that we accept.
+const MAX_WAIT: Duration = Duration::from_secs(60);
 
 /// The file names of the gallery of card data `card_data_id`, from the
 /// cache when fresh, else from Yugipedia (and cached). `None` when Yugipedia
@@ -164,15 +175,72 @@ async fn fetch_gallery(http: &reqwest::Client, name: &str) -> AppResult<Option<V
 /// against a continuation that never ends.
 const MAX_REQUESTS: usize = 20;
 
-/// Where a gallery file is downloaded from.
+/// Where a gallery file is downloaded from: MediaWiki's place for it,
+/// `<h>/<hh>/<name>` where `hh` begins the md5 of the name (spaces as `_`),
+/// one request (`Special:FilePath` would redirect twice).
 pub fn file_url(file: &str) -> String {
-    let mut url = url::Url::parse(WIKI_URL).expect("a valid URL");
+    use md5::{Digest, Md5};
+
+    let name = file.replace(' ', "_");
+    let hash = format!("{:x}", Md5::digest(name.as_bytes()));
+    let mut url = url::Url::parse(FILES_URL).expect("a valid URL");
     url.path_segments_mut()
         .expect("an http URL")
         .pop_if_empty()
-        .push("Special:FilePath")
-        .push(file);
+        .push(&hash[..1])
+        .push(&hash[..2])
+        .push(&name);
     url.to_string()
+}
+
+/// The picture `file`, as a JPEG: from `media/card_pictures/`, else
+/// downloaded (and kept). A 429 from Yugipedia is waited for (its
+/// `Retry-After`, at most a minute) and tried again, [`TRIES`] times.
+pub async fn download(state: &AppState, file: &str) -> AppResult<Vec<u8>> {
+    let path = file_path(state, file);
+    if let Ok(bytes) = tokio::fs::read(&path).await {
+        return Ok(bytes);
+    }
+
+    let url = file_url(file);
+    let fail = |e: reqwest::Error| AppError::Internal(format!("downloading {url}: {e}"));
+    for attempt in 1..=TRIES {
+        PICTURES.wait().await;
+        let response = state
+            .http
+            .get(&url)
+            .header(reqwest::header::USER_AGENT, USER_AGENT)
+            .timeout(TIMEOUT)
+            .send()
+            .await
+            .map_err(fail)?;
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && attempt < TRIES {
+            let wait = response
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|v| v.to_str().ok()?.parse().ok())
+                .map_or(Duration::from_secs(30), Duration::from_secs)
+                .min(MAX_WAIT);
+            tracing::info!(file, ?wait, "Yugipedia asks to slow down");
+            tokio::time::sleep(wait).await;
+            continue;
+        }
+
+        let bytes = response
+            .error_for_status()
+            .map_err(fail)?
+            .bytes()
+            .await
+            .map_err(fail)?;
+        let jpeg =
+            photos::web_copy(&bytes).map_err(|e| AppError::Internal(format!("{file}: {}", e.0)))?;
+        media::save(&path, &jpeg).await?;
+        tracing::info!("downloaded {}", path.display());
+        return Ok(jpeg);
+    }
+    Err(AppError::Internal(format!(
+        "{url}: still too many requests"
+    )))
 }
 
 /// Where a gallery file is kept, as a JPEG: `media/card_pictures/<name>.jpg`.
@@ -286,6 +354,27 @@ pub async fn find_pictures(
         }
     }
 
+    // the pictures downloaded first: a copy never points at a picture that
+    // isn't here (the pages, the public copy never wait on Yugipedia)
+    if !dry_run {
+        let mut downloaded = Vec::new();
+        for (id, file) in found {
+            if !reachable {
+                report.waiting += 1;
+                continue;
+            }
+            match download(state, &file).await {
+                Ok(_) => downloaded.push((id, file)),
+                Err(e) => {
+                    tracing::warn!("Yugipedia picture: {e}");
+                    reachable = false;
+                    report.waiting += 1;
+                }
+            }
+        }
+        found = downloaded;
+    }
+
     let mut tx = begin_write(pool).await?;
     for (id, file) in &found {
         sqlx::query(
@@ -342,6 +431,13 @@ mod tests {
                  (5, 'no code', 'dark magician', NULL, NULL, 1, 0, NULL, 0);"#,
         )
         .await;
+        // its picture already downloaded: nothing asked to Yugipedia
+        media::save(
+            &file_path(&t.state, "DarkMagician-LOB-FR-UR-1E.png"),
+            &photos::test_png(59, 86),
+        )
+        .await
+        .unwrap();
         let pictures =
             || t.text("SELECT group_concat(id || ':' || coalesce(picture, '-'), ' ') FROM card");
 
@@ -385,9 +481,11 @@ mod tests {
             "WitnessoftheAncient-CORI-FR-UR-1E-EA.jpg"
         );
         assert_eq!(file_name("a/../b c.png"), "a____b_c.jpg");
+        // MediaWiki's place for it, as Yugipedia gives it
         assert_eq!(
-            file_url("Ash & Co-X.png"),
-            "https://yugipedia.com/wiki/Special:FilePath/Ash%20&%20Co-X.png"
+            file_url("GrandmasteroftheSixSamurai-SPWA-EN-SR-1E.png"),
+            "https://ms.yugipedia.com/b/ba/GrandmasteroftheSixSamurai-SPWA-EN-SR-1E.png"
         );
+        assert!(file_url("Ash & Co.png").ends_with("/Ash_&_Co.png"));
     }
 }
