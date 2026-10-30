@@ -102,6 +102,13 @@ On the home Wi-Fi (not mobile data), open **`http://192.168.1.202:3000`**
 and log in with your own password. Bookmark it, or "Add to home screen"
 for an app-like icon; the session lasts, restarts included.
 
+**To scan books with the live camera** (Chrome, once per phone): open
+`chrome://flags`, search "Insecure origins treated as secure", enable it,
+type `http://192.168.1.202:3000` in its box, then "Relaunch". "📷 Scan"
+then shows the camera in the page and reads the barcode as soon as it's
+in view. Without it, "Scan" opens the camera app, and a phone short of
+memory may close Chrome meanwhile ("not enough memory", photo lost).
+
 **If the page doesn't load** on one phone while it works elsewhere:
 
 - the phone is on the home Wi-Fi, not a guest network (guests can't see
@@ -117,8 +124,8 @@ for an app-like icon; the session lasts, restarts included.
 
 **Limits:** it's plain HTTP. Fine at home, but the password crosses the
 Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
-book barcode scan takes a photo instead, sent to the NAS, which reads the
-barcode: the phone does nothing heavy). Never forward port 3000 on the
+book barcode scan opens the camera app instead, unless Chrome's setting
+above trusts the address: then the camera is live in the page). Never forward port 3000 on the
 box: the NAS must stay unreachable from the internet.
 
 ### The development server from a phone

@@ -52,6 +52,51 @@ body.books {
     cursor: pointer;
 }
 
+/* The live scanner (book_form.js): the camera in a window over the page,
+   a frame to aim the barcode at. */
+.scan-dialog {
+    width: min(92vw, 34rem);
+    padding: 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    background: #111;
+    color: #fff;
+    text-align: center;
+}
+
+.scan-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.scan-dialog video {
+    display: block;
+    width: 100%;
+    border-radius: 6px;
+    background: #000;
+}
+
+/* A wide box in the middle of the picture: where the barcode goes. */
+.scan-view {
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.scan-frame {
+    position: absolute;
+    top: 32%;
+    left: 12%;
+    right: 12%;
+    height: 36%;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    border-radius: 6px;
+    pointer-events: none;
+}
+
+.scan-help {
+    margin: 0.75rem 0;
+}
+
 .isbn-status {
     min-height: 1.4em;
     margin: 0.4rem 0;
