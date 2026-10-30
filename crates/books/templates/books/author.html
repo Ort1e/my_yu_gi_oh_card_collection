@@ -4,18 +4,14 @@
 {% block body_class %}books{% endblock %}
 {% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
 
-{% block extra_css %}
-  <link rel="stylesheet" href="/static/css/card.css">
-{% endblock %}
-
 {% block content %}
 <div class="inside-container">
-  <h1 class="card-title">{{ name }} ({{ books.len() }} book{% if books.len() != 1 %}s{% endif %})</h1>
+  <h1>{{ name }}</h1>
   <p class="back-link"><a href="/books/authors">← All authors</a></p>
-  <div class="card-list">
-    {% for book in books %}
-      {% include "partials/book_item.html" %}
-    {% endfor %}
-  </div>
+  {% include "partials/book_table.html" %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% endblock %}

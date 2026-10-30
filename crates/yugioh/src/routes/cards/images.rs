@@ -4,7 +4,9 @@
 //! hotlink their images).
 //!
 //! A copy can have its printing's own picture instead (`card.picture`, from
-//! Yugipedia: `store::yugipedia`), served by `/card-picture/:card_id` and
+//! Yugipedia: `store::yugipedia`), served by `/card-picture/:name` (one
+//! address per picture, shared by the copies of a printing: the public copy
+//! keeps it once) and
 //! kept in `<media>/card_pictures/` as a JPEG; the edit page shows the
 //! pictures it can choose from with `/cards/:id/pictures/:n`.
 
@@ -62,24 +64,25 @@ pub fn offered(files: &[String], code: &str, rarity: Option<&str>) -> Vec<String
         .collect()
 }
 
-/// `GET /card-picture/:card_id`: the copy's own picture; ygoprodeck's
-/// picture of its card data when it can't be had (Yugipedia down, or
-/// refusing for a while).
+/// `GET /card-picture/:name`: a printing's picture some copy has
+/// (`name`: `yugipedia::file_name` of its file); ygoprodeck's picture of the
+/// card data when it can't be had (Yugipedia down, or refusing for a while).
 pub async fn card_picture(
     State(state): State<AppState>,
-    Path(card_id): Path<i64>,
+    Path(name): Path<String>,
 ) -> AppResult<Response> {
-    let (file, card_data_id): (String, Option<i64>) = sqlx::query_as(
-        "SELECT picture, card_data_id FROM card WHERE id = ? AND picture IS NOT NULL",
-    )
-    .bind(card_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .or_404()?;
+    let used: Vec<(String, Option<i64>)> =
+        sqlx::query_as("SELECT DISTINCT picture, card_data_id FROM card WHERE picture IS NOT NULL")
+            .fetch_all(&state.pool)
+            .await?;
+    let (file, card_data_id) = used
+        .into_iter()
+        .find(|(file, _)| yugipedia::file_name(file) == name)
+        .or_404()?;
     match yugipedia::download(&state, &file).await {
         Ok(bytes) => Ok(media::picture(bytes).into_response()),
         Err(e) => {
-            tracing::warn!(card_id, "its printing's picture: {e}");
+            tracing::warn!(file, "a printing's picture: {e}");
             let card_data_id = card_data_id.ok_or(e)?;
             Ok(card_image(State(state), Path(card_data_id))
                 .await?

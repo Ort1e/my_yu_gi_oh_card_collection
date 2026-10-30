@@ -10,11 +10,14 @@ use crate::store::valuation::{estimate, MARKET_PRICE};
 
 /// A copy's picture: its printing's own (`card.picture`, from Yugipedia),
 /// else ygoprodeck's picture of its card data; `None` without either.
-pub fn picture_url(card_id: i64, has_picture: bool, card_data_id: Option<i64>) -> Option<String> {
-    if has_picture {
-        Some(format!("/card-picture/{card_id}"))
-    } else {
-        card_data_id.map(|id| format!("/card-image/{id}"))
+/// One address per picture: the copies of a printing share it.
+pub fn picture_url(picture: Option<&str>, card_data_id: Option<i64>) -> Option<String> {
+    match picture {
+        Some(file) => Some(format!(
+            "/card-picture/{}",
+            crate::store::yugipedia::file_name(file)
+        )),
+        None => card_data_id.map(|id| format!("/card-image/{id}")),
     }
 }
 
@@ -28,8 +31,8 @@ pub struct CardRow {
     pub rarity: Option<String>,
     pub is_proxy: bool,
     pub card_data_id: Option<i64>,
-    /// Has its printing's own picture (`card.picture`).
-    pub has_picture: bool,
+    /// Its printing's own picture (`card.picture`, a Yugipedia file).
+    pub picture_file: Option<String>,
     /// The English name as ygoprodeck writes it ("Rainbow Bridge Bifrost").
     pub name_en: Option<String>,
     /// Its latest market price (`valuation::MARKET_PRICE`).
@@ -43,7 +46,7 @@ impl CardRow {
     pub fn columns() -> String {
         format!(
             "card.id, card.name, card.code, card.last_known_status, card.rarity, card.is_proxy, \
-             card.card_data_id, card.picture IS NOT NULL AS has_picture, \
+             card.card_data_id, card.picture AS picture_file, \
              (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
               WHERE card_data.id = card.card_data_id) AS name_en, \
              {MARKET_PRICE} AS market_price, {SOLD_EXISTS} AS is_sold"
@@ -52,7 +55,7 @@ impl CardRow {
 
     /// Its picture's address ([`picture_url`]).
     pub fn picture(&self) -> Option<String> {
-        picture_url(self.id, self.has_picture, self.card_data_id)
+        picture_url(self.picture_file.as_deref(), self.card_data_id)
     }
 
     /// The card in a picture grid.

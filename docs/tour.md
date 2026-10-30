@@ -447,8 +447,11 @@ A second collection in the same app and database, with nothing in common
 with the cards: the novels at home, in `crates/books/`. Every route starts
 with `/books` (`src/routes/`, `templates/books/`); the book templates swap the
 navigation bar (`{% block nav %}` → `partials/books_nav.html`) and the page
-background (`body.books`, `static/css/books.css`). No prices, lots or
-pictures.
+background (`body.books`, `static/css/books.css`). No prices or lots, and
+no picture stored: a book's page shows its cover straight from Open Library
+by ISBN (`covers.openlibrary.org`, allowed in the CSP; a plain "book" when
+there is none, `static/js/book_cover.js`; none in the public copy, where
+ISBNs aren't shown).
 
 | Piece | Where |
 |---|---|
@@ -456,9 +459,9 @@ pictures.
 | ISBN parsing, check digits, ISBN-10 → 13 | `crates/books-domain/src/isbn.rs` |
 | lookup answers → `BookInfo`, series text → name + volume, author sort names, missing volumes | `crates/books-domain/src/book.rs` |
 | writes: a book with its authors (in order) and series, created on the way; orphans deleted | `src/store/books.rs` |
-| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data` | `src/store/book_data.rs` |
+| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data`, except when Google Books refused (429: `Found::Unavailable`, asked again next time) | `src/store/book_data.rs` |
 | the routes | `src/lib.rs` (`routes()`) |
-| list (filters, sort by title / surname / added), detail | `src/routes/mod.rs` |
+| list: every book in one table (`partials/book_table.html`, also on an author's and a series' page), searched and sorted in the page (`static/js/tables.js`); `?title=`, `?author=`, `?series=`, `?sort=` still filter; detail: cover, details, the series' other volumes and the authors' other books | `src/routes/mod.rs` |
 | add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
 | `GET /books/api/isbn/:isbn`, the lookup as JSON; `POST /books/api/isbn-scan`, the ISBN on a barcode photo | `src/routes/api.rs`, `src/barcode.rs` |
 | authors, series (with the missing volumes) | `src/routes/authors.rs`, `series.rs` |
@@ -770,7 +773,8 @@ Extended Art or an alternate art shows the wrong one. Yugipedia has a
 picture of each printing, named after it
 (`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
 Extended Art). A copy can take one: `card.picture` (migration 0019), served
-by `/card-picture/:card_id` (downloaded once, kept as a JPEG in
+by `/card-picture/:name` (one address per picture, so the public copy keeps
+it once for all the copies of a printing; downloaded once, kept as a JPEG in
 `media/card_pictures/`); without it, the copy shows ygoprodeck's picture
 (`store::models::picture_url`, used by the grid, the card page, the advent
 doors and the deck builder's `ApiCard.image`).
@@ -791,7 +795,7 @@ request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
 Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
 and tried again. The automatic pass downloads a picture **before** giving
 it to a copy, so a page or the public copy never asks Yugipedia; and
-`/card-picture/:card_id` answers ygoprodeck's picture when its own can't be
+`/card-picture/:name` answers ygoprodeck's picture when its own can't be
 had. (The first deployment let the public copy download them, ~600 at
 once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.

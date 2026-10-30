@@ -87,6 +87,150 @@ body.books {
     to   { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0); }
 }
 
+/* ---------- a book's page ---------- */
+
+/* The cover (or a plain "book") beside the details; stacked on phones. */
+.book-page {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    margin-bottom: 1.5rem;
+}
+
+.book-cover {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    border-radius: 4px 8px 8px 4px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* No cover: a cloth binding with its title, like a book on the shelf. */
+.book-cover-placeholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.6rem;
+    height: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+    border-left: 10px solid rgba(0, 0, 0, 0.18);
+    background: linear-gradient(135deg, #2f5d50, #1d3b33);
+    color: #f6eddc;
+    text-align: center;
+}
+
+.book-cover-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.book-cover-author {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+/* The cover itself, over the placeholder. */
+.book-cover-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--bg-color);
+}
+
+.book-info h1 {
+    margin: 0 0 0.3rem;
+}
+
+.book-page-by {
+    margin: 0 0 0.3rem;
+    font-size: 1.15rem;
+}
+
+.book-page-series {
+    margin: 0 0 1rem;
+    font-style: italic;
+}
+
+/* The details as two columns: what, then the value. */
+.book-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0 0 1rem;
+}
+
+.book-facts dt {
+    color: #6b5d45;
+}
+
+.book-facts dd {
+    margin: 0;
+}
+
+.book-page .book-notes {
+    margin: 0 0 1rem;
+    padding: 0.5rem 0.9rem;
+    border-left: 4px solid #c9b58f;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* The other volumes of the series, the other books of the authors. */
+.book-related {
+    margin-top: 1.5rem;
+}
+
+.book-related h2 {
+    margin-bottom: 0.5rem;
+}
+
+.book-volumes,
+.book-others {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.book-volumes li,
+.book-others li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.book-volume-number {
+    display: inline-block;
+    min-width: 2.5rem;
+    color: #6b5d45;
+}
+
+.book-volumes li.current {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.book-missing {
+    margin-top: 0.5rem;
+    color: #a34700;
+    font-weight: 600;
+}
+
+/* ---------- the lists: books, authors, series (one table each) ---------- */
+
+/* On a phone, the author under the title (its column is hidden there). */
+.book-row-author {
+    font-size: 0.85em;
+    color: #555;
+}
+
+/* The missing volumes, on the page's paper colour (not a green card). */
+.book-table .missing {
+    color: #a34700;
+}
+
 /* ---------- series ---------- */
 
 .missing {
@@ -109,4 +253,16 @@ body.books {
 /* The advent calendar's book: no picture, so a bit more room for the text. */
 .advent-book {
     min-height: 3.5rem;
+}
+
+@media (max-width: 760px) {
+    /* A book's page: the cover smaller, above the details. */
+    .book-page {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .book-cover {
+        width: 140px;
+    }
 }

@@ -5,8 +5,10 @@
 //!
 //! Open Library: free, no key; `jscmd=data` has the authors, `jscmd=details`
 //! the language, series and format. Google Books (no key) fills what Open
-//! Library lacks or finds nothing for; its anonymous quota is often used up,
-//! so its failures are only logged. Parsing the answers is
+//! Library lacks or finds nothing for; its anonymous quota is often used up
+//! (429 Too Many Requests). When Open Library knows nothing and Google Books
+//! couldn't answer, nothing is remembered: the answer is
+//! [`Found::Unavailable`], asked again next time. Parsing the answers is
 //! `books_domain::book`'s.
 
 use std::time::Duration;
@@ -30,14 +32,21 @@ const RECHECK_MISSING_DAYS: i64 = 7;
 
 /// Books are added one at a time; this only keeps a burst polite.
 static CATALOGUES: Throttle = Throttle::new(Duration::from_millis(250));
-/// What the catalogues know about an ISBN, `None` when nothing (or no
-/// title). Asks the network only when `book_data` has no fresh answer: call
-/// it **before** opening a write transaction.
-pub async fn lookup(
-    pool: &Pool,
-    http: &reqwest::Client,
-    isbn: &Isbn,
-) -> AppResult<Option<BookInfo>> {
+/// What a lookup found.
+#[derive(Debug)]
+pub enum Found {
+    Book(BookInfo),
+    /// No catalogue knows it (or gives no title).
+    Unknown,
+    /// Open Library doesn't know it and Google Books couldn't answer (its
+    /// quota): nothing remembered, to ask again later.
+    Unavailable,
+}
+
+/// What the catalogues know about an ISBN. Asks the network only when
+/// `book_data` has no fresh answer: call it **before** opening a write
+/// transaction.
+pub async fn lookup(pool: &Pool, http: &reqwest::Client, isbn: &Isbn) -> AppResult<Found> {
     let known: Option<(Option<String>, String)> =
         sqlx::query_as("SELECT json_data, checked_at FROM book_data WHERE isbn = ?")
             .bind(isbn.as_str())
@@ -45,17 +54,20 @@ pub async fn lookup(
             .await?;
     if let Some((json, checked_at)) = known {
         if let Some(info) = json.and_then(|j| serde_json::from_str::<BookInfo>(&j).ok()) {
-            return Ok(Some(info));
+            return Ok(Found::Book(info));
         }
 
         if is_fresh(&checked_at, RECHECK_MISSING_DAYS, today()) {
-            return Ok(None);
+            return Ok(Found::Unknown);
         }
     }
 
-    let found = fetch(http, isbn).await?;
+    let (found, google_failed) = fetch(http, isbn).await?;
+    if found.is_none() && google_failed {
+        return Ok(Found::Unavailable);
+    }
     remember(pool, isbn, found.as_ref()).await?;
-    Ok(found.map(|(info, _)| info))
+    Ok(found.map_or(Found::Unknown, |(info, _)| Found::Book(info)))
 }
 
 async fn remember(pool: &Pool, isbn: &Isbn, found: Option<&(BookInfo, &str)>) -> AppResult<()> {
@@ -84,10 +96,15 @@ async fn remember(pool: &Pool, isbn: &Isbn, found: Option<&(BookInfo, &str)>) ->
     Ok(())
 }
 
-/// Ask the catalogues; the answer and where it came from.
-async fn fetch(http: &reqwest::Client, isbn: &Isbn) -> AppResult<Option<(BookInfo, &'static str)>> {
+/// Ask the catalogues: the answer and where it came from, and whether
+/// Google Books failed.
+async fn fetch(
+    http: &reqwest::Client,
+    isbn: &Isbn,
+) -> AppResult<(Option<(BookInfo, &'static str)>, bool)> {
     let mut info = open_library(http, isbn).await?;
     let mut source = "openlibrary";
+    let mut google_failed = false;
 
     let complete = info
         .as_ref()
@@ -105,11 +122,17 @@ async fn fetch(http: &reqwest::Client, isbn: &Isbn) -> AppResult<Option<(BookInf
                 }
             },
             Ok(None) => {}
-            Err(why) => tracing::warn!(isbn = %isbn, "Google Books: {why}"),
+            Err(why) => {
+                tracing::warn!(isbn = %isbn, "Google Books: {why}");
+                google_failed = true;
+            }
         }
     }
 
-    Ok(info.filter(|i| !i.is_empty()).map(|i| (i, source)))
+    Ok((
+        info.filter(|i| !i.is_empty()).map(|i| (i, source)),
+        google_failed,
+    ))
 }
 
 async fn get_json(

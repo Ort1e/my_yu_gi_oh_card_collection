@@ -1,21 +1,37 @@
-{% extends "list_base.html" %}
+{% extends "base.html" %}
 
+{% block title %}Authors{% endblock %}
 {% block body_class %}books{% endblock %}
 {% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
 
-{% block items %}
+{% block content %}
+<div class="inside-container">
+  <h1>Authors</h1>
+
   {% if authors.is_empty() %}
-    <p class="card-title">No author yet: they come with the books.</p>
+  <p>No author yet: they come with the books.</p>
   {% else %}
-    <div class="card-list">
+  <div class="table-tools">
+    <input type="search" data-filter-table="authors-table" placeholder="Search an author…" aria-label="Search the authors">
+    <span class="table-count" data-count-for="authors-table" data-count-noun="authors">{{ authors.len() }} author{% if authors.len() != 1 %}s{% endif %}</span>
+  </div>
+  <div class="table-scroll">
+  <table class="numbers sortable book-table" id="authors-table">
+    <thead><tr><th data-sort="text">Author</th><th data-sort="number">Books</th></tr></thead>
+    <tbody>
       {% for author in authors %}
-      <a href="/books/authors/{{ author.id }}" class="card-link">
-        <div class="card">
-          <div class="card-title">{{ author.name }}</div>
-          <div class="card-meta-line"><div>{{ author.books }} book{% if author.books != 1 %}s{% endif %}</div></div>
-        </div>
-      </a>
+      <tr>
+        <td data-sort-value="{{ author.sort_name }}"><a href="/books/authors/{{ author.id }}">{{ author.name }}</a></td>
+        <td>{{ author.books }}</td>
+      </tr>
       {% endfor %}
-    </div>
+    </tbody>
+  </table>
+  </div>
   {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% endblock %}

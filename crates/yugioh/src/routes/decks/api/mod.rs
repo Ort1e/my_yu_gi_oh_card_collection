@@ -74,7 +74,7 @@ struct CardRecord {
     rarity: Option<String>,
     is_proxy: bool,
     card_data_id: Option<i64>,
-    has_picture: bool,
+    picture_file: Option<String>,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
 }
@@ -95,7 +95,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
         "SELECT card.id, card.name, card.en_name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.last_known_status, card.rarity,
-                card.is_proxy, card.card_data_id, card.picture IS NOT NULL AS has_picture,
+                card.is_proxy, card.card_data_id, card.picture AS picture_file,
                 card_data.card_type, card_data.ygopro_id
          FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN ",
     );
@@ -149,7 +149,7 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                 status: r.last_known_status,
                 rarity: r.rarity,
                 is_proxy: r.is_proxy,
-                image: picture_url(r.id, r.has_picture, r.card_data_id),
+                image: picture_url(r.picture_file.as_deref(), r.card_data_id),
                 card_data_id: r.card_data_id,
                 card_type: r.card_type,
                 ygopro_id: r.ygopro_id,

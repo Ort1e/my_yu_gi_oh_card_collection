@@ -1,14 +1,14 @@
-//! `/books/series`: the series, and the volumes of each with the missing
+//! `/books/series`: the series in one table (sorted and searched in the
+//! page, `static/js/tables.js`), and the volumes of each with the missing
 //! ones (the gaps up to the last volume owned, `books_domain::book::missing_volumes`).
 //! Series are created and deleted with their books (`store::books`).
 
 use askama::Template;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use books_domain::book::missing_volumes;
 
 use super::BookRow;
 use common::web::error::{AppResult, OrNotFound};
-use common::web::pagination::{Page, PageParam, PAGE_SIZE};
 use common::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -50,22 +50,12 @@ fn join(volumes: &[i64]) -> String {
 #[derive(Template)]
 #[template(path = "books/series_list.html")]
 pub struct SeriesList {
-    page_title: &'static str,
-    page: Page,
-    total: i64,
     series: Vec<SeriesRow>,
 }
 
 /// `/books/series`.
-pub async fn list(
-    State(state): State<AppState>,
-    Query(param): Query<PageParam>,
-) -> AppResult<SeriesList> {
+pub async fn list(State(state): State<AppState>) -> AppResult<SeriesList> {
     let pool = &state.pool;
-    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM book_series")
-        .fetch_one(pool)
-        .await?;
-    let page = Page::new(param.page, total, String::new());
     let series = sqlx::query_as(
         "SELECT s.id, s.name,
                 (SELECT count(*) FROM book WHERE book.series_id = s.id) AS books,
@@ -75,19 +65,12 @@ pub async fn list(
                  JOIN book_book_author ba ON ba.book_id = book.id AND ba.position = 0
                  JOIN book_author a ON a.id = ba.author_id
                  WHERE book.series_id = s.id ORDER BY book.volume LIMIT 1) AS author
-         FROM book_series s ORDER BY s.name COLLATE NOCASE LIMIT ? OFFSET ?",
+         FROM book_series s ORDER BY s.name COLLATE NOCASE",
     )
-    .bind(PAGE_SIZE)
-    .bind(page.offset())
     .fetch_all(pool)
     .await?;
 
-    Ok(SeriesList {
-        page_title: "Series",
-        page,
-        total,
-        series,
-    })
+    Ok(SeriesList { series })
 }
 
 #[derive(Template)]

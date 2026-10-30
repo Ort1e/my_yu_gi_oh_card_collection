@@ -31,12 +31,12 @@ pub struct DoorCard {
     code: Option<String>,
     rarity: Option<String>,
     card_data_id: Option<i64>,
-    has_picture: bool,
+    picture_file: Option<String>,
 }
 
 impl DoorCard {
     fn image(&self) -> Option<String> {
-        picture_url(self.card_id, self.has_picture, self.card_data_id)
+        picture_url(self.picture_file.as_deref(), self.card_data_id)
     }
 
     fn english_name(&self) -> Option<&str> {
@@ -77,7 +77,7 @@ impl Calendar for Cards {
     const ENTRIES: &'static str = "SELECT e.day, e.photo, card.id AS card_id, card.name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.rarity, card.card_data_id,
-                card.picture IS NOT NULL AS has_picture
+                card.picture AS picture_file
          FROM advent_calendar_entry e
          JOIN card ON card.id = e.card_id
          LEFT JOIN card_data ON card_data.id = card.card_data_id

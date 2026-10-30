@@ -1,8 +1,9 @@
 #!/bin/bash
 # Upload the public copy (EXPORT_DIR, written by `backend export-public`) to
-# the OVH hosting: the files new or changed since the last upload, then
-# delete there the files gone from the copy (old pictures would otherwise
-# fill the 100 MB). What is on the hosting is remembered in
+# the OVH hosting: first delete there the files gone from the copy, then
+# send the files new or changed since the last upload. Deleting first: the
+# hosting has 100 MB, and a copy whose pictures all changed would not fit
+# next to the old ones (2026-10-30: the upload failed half-way). What is on the hosting is remembered in
 # EXPORT_DIR.uploaded (checksum and path of each file); delete it to upload
 # everything again.
 #
@@ -36,8 +37,8 @@ touch "$uploaded"
 (cd "$EXPORT_DIR" && find . -type f ! -name .public-export | sed 's|^\./||' | sort |
     while IFS= read -r file; do sha256sum "$file"; done) > "$work/now"
 
-# the files new or changed, then the files no longer in the copy (in what
-# was uploaded, not now)
+# the files no longer in the copy (in what was uploaded, not now), then the
+# files new or changed
 comm -13 <(sort "$uploaded") <(sort "$work/now") | cut -c67- > "$work/send"
 cut -c67- "$uploaded" | sort > "$work/before.paths"
 cut -c67- "$work/now" | sort > "$work/now.paths"
@@ -46,8 +47,8 @@ sent=$(wc -l < "$work/send")
 removed=$(wc -l < "$work/remove")
 
 if [ "$protocol" = sftp ]; then
-    # one session for everything: the folders (an existing one is no
-    # error: `-`), the files, then the removals. `-o BatchMode=no` before
+    # one session for everything: the removals, the folders (an existing
+    # one is no error: `-`), then the files. `-o BatchMode=no` before
     # `-b` (which turns it on; ssh keeps the first value), or the password
     # is never tried. The password goes through
     # SSH_ASKPASS (no sshpass on the NAS); the server's key must be in
@@ -55,6 +56,9 @@ if [ "$protocol" = sftp ]; then
     known_hosts="${OVH_KNOWN_HOSTS:-$APP_DIR/ovh_known_hosts}"
     [ -s "$known_hosts" ] || { log "no server key in $known_hosts (deploy/README.md)"; exit 1; }
     {
+        while IFS= read -r file; do
+            echo "-rm \"$OVH_DIR/$file\""
+        done < "$work/remove"
         path=""
         for part in ${OVH_DIR//\// }; do
             path="$path${path:+/}$part"
@@ -79,9 +83,6 @@ if [ "$protocol" = sftp ]; then
             echo "put \"$EXPORT_DIR/$file\" \"$OVH_DIR/$file\""
             echo "chmod 644 \"$OVH_DIR/$file\""
         done < "$work/send"
-        while IFS= read -r file; do
-            echo "-rm \"$OVH_DIR/$file\""
-        done < "$work/remove"
     } > "$work/batch"
     printf '#!/bin/sh\nprintf "%%s\\n" "$OVH_PASSWORD"\n' > "$work/askpass"
     chmod 700 "$work/askpass"
@@ -98,14 +99,14 @@ if [ "$protocol" = sftp ]; then
 else
     # plain FTP, one curl per file
     while IFS= read -r file; do
-        curl -sS --fail --retry 3 --netrc-file "$work/netrc" --ftp-create-dirs \
-            -T "$EXPORT_DIR/$file" "ftp://$OVH_HOST/$OVH_DIR/$file"
-    done < "$work/send"
-    while IFS= read -r file; do
         curl -sS --fail --netrc-file "$work/netrc" -Q "DELE $OVH_DIR/$file" \
             "ftp://$OVH_HOST/" -o /dev/null ||
             log "could not delete $file on the hosting"
     done < "$work/remove"
+    while IFS= read -r file; do
+        curl -sS --fail --retry 3 --netrc-file "$work/netrc" --ftp-create-dirs \
+            -T "$EXPORT_DIR/$file" "ftp://$OVH_HOST/$OVH_DIR/$file"
+    done < "$work/send"
 fi
 
 cp "$work/now" "$uploaded"

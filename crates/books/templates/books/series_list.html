@@ -1,25 +1,44 @@
-{% extends "list_base.html" %}
+{% extends "base.html" %}
 
+{% block title %}Series{% endblock %}
 {% block body_class %}books{% endblock %}
 {% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
 
-{% block items %}
+{% block content %}
+<div class="inside-container">
+  <h1>Series</h1>
+
   {% if series.is_empty() %}
-    <p class="card-title">No series yet: give a book its series in its form.</p>
+  <p>No series yet: give a book its series in its form.</p>
   {% else %}
-    <div class="card-list">
+  <div class="table-tools">
+    <input type="search" data-filter-table="series-table" placeholder="Search a series, an author…" aria-label="Search the series">
+    <span class="table-count" data-count-for="series-table" data-count-noun="series">{{ series.len() }} series</span>
+  </div>
+  <div class="table-scroll">
+  <table class="numbers sortable book-table" id="series-table">
+    <thead><tr>
+      <th data-sort="text">Series</th>
+      <th class="text phone-hide" data-sort="text">Author</th>
+      <th data-sort="number">Books</th>
+      <th class="text" data-sort="text">Missing</th>
+    </tr></thead>
+    <tbody>
       {% for s in series %}
-      <a href="/books/series/{{ s.id }}" class="card-link">
-        <div class="card">
-          <div class="card-title">{{ s.name }}</div>
-          <div class="card-meta-line">
-            {% match s.author %}{% when Some with (author) %}<div>{{ author }}</div>{% when None %}{% endmatch %}
-            <div>{{ s.books }} book{% if s.books != 1 %}s{% endif %}</div>
-            {% if !s.missing().is_empty() %}<div class="missing">Missing: {{ s.missing_text() }}</div>{% endif %}
-          </div>
-        </div>
-      </a>
+      <tr>
+        <td><a href="/books/series/{{ s.id }}">{{ s.name }}</a>{% match s.author %}{% when Some with (author) %}<div class="phone-only book-row-author">{{ author }}</div>{% when None %}{% endmatch %}</td>
+        <td class="text phone-hide">{% match s.author %}{% when Some with (author) %}{{ author }}{% when None %}{% endmatch %}</td>
+        <td>{{ s.books }}</td>
+        <td class="text{% if !s.missing().is_empty() %} missing{% endif %}">{{ s.missing_text() }}</td>
+      </tr>
       {% endfor %}
-    </div>
+    </tbody>
+  </table>
+  </div>
   {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
 {% endblock %}

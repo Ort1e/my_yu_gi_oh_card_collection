@@ -48,7 +48,13 @@ async fn a_book_is_added_and_shown() {
 
     let (_, page) = t.get(&format!("/books/{id}")).await;
     assert!(page.contains("A Game of Thrones") && page.contains("George R. R. Martin"));
-    assert!(page.contains("A Song of Ice and Fire #1") && page.contains("Signed!"));
+    assert!(page.contains("Volume 1 of") && page.contains("A Song of Ice and Fire"));
+    assert!(
+        page.contains("Signed!") && page.contains("<dd>English</dd>"),
+        "{page}"
+    );
+    // its cover from Open Library, by ISBN (not stored)
+    assert!(page.contains("https://covers.openlibrary.org/b/isbn/9780007448036-M.jpg"));
     assert!(page.contains("/books/authors/1") && page.contains("/books/series/1"));
 
     let (_, list) = t.get("/books").await;
@@ -219,10 +225,19 @@ async fn the_list_filters_and_sorts() {
     .await;
     add(&t, &[("title", "Anonymous Tales")]).await;
 
+    // the titles of the table's rows, in order
     let titles = |page: &str| -> Vec<String> {
-        page.split(r#"<div class="card-title">"#)
+        page.split(r#"<td><a href="/books/"#)
             .skip(1)
-            .map(|s| s.split('<').next().unwrap().to_string())
+            .map(|s| {
+                s.split('>')
+                    .nth(1)
+                    .unwrap()
+                    .split('<')
+                    .next()
+                    .unwrap()
+                    .to_string()
+            })
             .collect()
     };
 
@@ -252,7 +267,7 @@ async fn the_list_filters_and_sorts() {
 
     let (_, page) = t.get("/books?author=hobb&title=royal").await;
     assert_eq!(titles(&page), ["Royal Assassin"]);
-    assert!(page.contains("Books (1/4)"));
+    assert!(page.contains("1 of 4 books, by the filters of the address"));
     let (_, page) = t.get("/books?series=far").await;
     assert_eq!(titles(&page).len(), 2);
 }
@@ -288,12 +303,29 @@ async fn authors_and_series_pages() {
 
     let (status, page) = t.get("/books/authors").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(page.contains("Robin Hobb") && page.contains("2 books"));
+    assert!(
+        page.contains("Robin Hobb") && page.contains("<td>2</td>"),
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"data-sort-value="hobb robin""#),
+        "by surname"
+    );
     let (_, page) = t.get("/books/authors/1").await;
     assert!(page.contains("Assassin&#x27;s Apprentice") && page.contains("Farseer #4"));
+    // a book's page: the other volumes of its series, and the gaps
+    let (_, page) = t.get("/books/1").await;
+    assert!(
+        page.contains(r#"<a href="/books/2">Assassin&#x27;s Quest</a>"#),
+        "{page}"
+    );
+    assert!(page.contains("Missing: #2, #3"));
 
     let (_, page) = t.get("/books/series").await;
-    assert!(page.contains("Farseer") && page.contains("Missing: 2, 3"));
+    assert!(
+        page.contains("Farseer") && page.contains(r#"<td class="text missing">2, 3</td>"#),
+        "{page}"
+    );
     let (_, page) = t.get("/books/series/1").await;
     assert!(page.contains("Missing volumes: 2, 3."));
     assert!(

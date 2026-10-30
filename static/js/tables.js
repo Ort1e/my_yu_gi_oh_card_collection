@@ -7,7 +7,8 @@
 //   Empty values ("", "—") always go last.
 // - <input type="search" data-filter-table="<table id>">: shows only the rows
 //   whose text contains every word typed (case and accents ignored); an
-//   element with `data-count-for="<table id>"` says how many are shown.
+//   element with `data-count-for="<table id>"` says how many are shown
+//   ("12 of 40 rows"; its `data-count-noun` replaces "rows": "books").
 //   Buttons with `data-filter-for="<table id>"` and `data-filter-tag` keep
 //   only the rows with that exact `data-tag` (a rarity: "Rare" is not "Super
 //   Rare"); a second click clears it.
@@ -77,7 +78,8 @@ function filter(table, query, tag) {
 
     if (count) {
         const total = table.tBodies[0].rows.length;
-        count.textContent = shown < total ? `${shown} of ${total} rows` : `${total} rows`;
+        const noun = count.dataset.countNoun ?? 'rows';
+        count.textContent = shown < total ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
     }
 }
 
