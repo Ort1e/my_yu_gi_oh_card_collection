@@ -31,6 +31,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-30: the book lists as tables (+ the stand-alone books), a book's
+  page with its cover (Open Library, not stored); deletions far from Save,
+  their confirmations working again (the CSP blocked them).
 - 2026-10-30: the friend's phone reaches the app (`http://` typed in full).
 - 2026-10-30: a deck version's page shows its ban list, opening hands and
   tournament; the tournaments in the public copy; a card's picture of its

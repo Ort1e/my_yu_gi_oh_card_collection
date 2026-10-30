@@ -57,9 +57,13 @@
 </form>
 
 {% match id %}{% when Some with (id) %}
-<form method="post" action="/pokemon/wishlist/{{ id }}/delete" class="inline" data-confirm="Delete this wish?">
-  <button type="submit" class="btn-danger">Delete this wish</button>
-</form>
+{# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
+<details class="danger-zone">
+  <summary>Delete this wish…</summary>
+  <form method="post" action="/pokemon/wishlist/{{ id }}/delete" data-confirm="Delete this wish?">
+    <button type="submit" class="btn-danger">Delete this wish</button>
+  </form>
+</details>
 {% when None %}{% endmatch %}
 </div>
 {% endblock %}

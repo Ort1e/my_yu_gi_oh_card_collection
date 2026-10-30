@@ -336,6 +336,17 @@ async fn authors_and_series_pages() {
     let (_, page) = t.get("/books/add?series=Farseer&volume=2").await;
     assert!(page.contains(r#"value="Farseer""#) && page.contains(r#"value="2""#));
 
+    // the books in no series: none here, then one
+    let (status, page) = t.get("/books/standalone").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Every book is in a series."));
+    add(&t, &[("title", "Circe"), ("authors", "Madeline Miller")]).await;
+    let (_, page) = t.get("/books/standalone").await;
+    assert!(
+        page.contains("Circe") && !page.contains("Assassin&#x27;s Quest"),
+        "{page}"
+    );
+
     assert_eq!(t.get("/books/authors/9").await.0, StatusCode::NOT_FOUND);
     assert_eq!(t.get("/books/series/9").await.0, StatusCode::NOT_FOUND);
 }

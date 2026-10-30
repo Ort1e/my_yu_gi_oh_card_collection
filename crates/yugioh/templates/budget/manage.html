@@ -71,8 +71,8 @@
           {% for apport in self.apports_of(budget.id) %}
           <div>
             {{ apport.date }}: {{ apport.amount }} € {{ apport.description }}
-            <form method="post" action="/budget/manage/apports/{{ apport.id }}/delete" class="inline">
-              <button type="submit" class="btn-small btn-danger" title="Delete this apport" onclick="return confirm('Delete this apport?')">✕</button>
+            <form method="post" action="/budget/manage/apports/{{ apport.id }}/delete" class="inline" data-confirm="Delete this apport?">
+              <button type="submit" class="btn-small btn-danger" title="Delete this apport">✕</button>
             </form>
           </div>
           {% endfor %}

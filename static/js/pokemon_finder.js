@@ -352,8 +352,3 @@ if (queryField) {
     if (cardField.value.trim()) showCard();
 }
 
-document.addEventListener('submit', (event) => {
-    const message = event.target.dataset.confirm;
-
-    if (message && !confirm(message)) event.preventDefault();
-});

@@ -4,7 +4,6 @@
 //   after the digits) asks /books/api/isbn/:isbn and fills the fields;
 // - "Scan" takes a photo of the barcode, "From a photo" picks one already
 //   taken, and the NAS reads the ISBN on it (POST /books/api/isbn-scan);
-// - the delete button asks first.
 //
 // The photo is sent as it is: read in the phone's browser, a whole camera
 // photo took more memory than some phones have ("out of memory"). The NAS
@@ -201,11 +200,3 @@ async function scan(input) {
 for (const input of photoInputs) {
     input.addEventListener('change', () => scan(input));
 }
-
-// ---------- delete ----------
-
-document.addEventListener('submit', (e) => {
-    const message = e.target.dataset.confirm;
-
-    if (message && !confirm(message)) e.preventDefault();
-});

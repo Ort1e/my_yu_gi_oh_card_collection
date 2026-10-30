@@ -29,6 +29,15 @@
 
   <input type="submit" value="Save">
 </form>
+
+{# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
+<details class="danger-zone">
+  <summary>Delete this deck…</summary>
+  <p>Its versions go with it; its cards stay in the collection (its proxies are deleted).</p>
+  <form method="post" action="/decks/{{ id }}/delete" data-confirm="Delete this deck and all its versions?">
+    <button type="submit" class="btn-danger">Delete this deck</button>
+  </form>
+</details>
 <datalist id="label-names">
   {% for name in label_names %}<option value="{{ name }}"></option>{% endfor %}
 </datalist>

@@ -13,7 +13,7 @@ use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
 
 /// The pages the copy starts from; the first one is its home page.
-const START: [&str; 11] = [
+const START: [&str; 12] = [
     "/cards",
     "/collection/stats",
     "/decks",
@@ -25,6 +25,7 @@ const START: [&str; 11] = [
     "/books",
     "/books/authors",
     "/books/series",
+    "/books/standalone",
 ];
 
 /// The addresses the copy may hold: the start pages, a card's, a deck's, a
@@ -86,6 +87,7 @@ mod tests {
             "/cards",
             "/cards/12",
             "/books/series/3",
+            "/books/standalone",
             "/pokemon/7",
             "/decks/1",
             "/deck-versions/4",

@@ -16,9 +16,14 @@
   <input type="submit" value="Save">
 </form>
 
-<form method="post" action="/books/{{ id }}/delete" class="inline" data-confirm="Delete this book from the list?">
-  <button type="submit" class="btn-danger">Delete this book</button>
-</form>
+{# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
+<details class="danger-zone">
+  <summary>Delete this book…</summary>
+  <p>It leaves the list for good (its authors and series too, if they have no other book).</p>
+  <form method="post" action="/books/{{ id }}/delete" data-confirm="Delete this book from the list?">
+    <button type="submit" class="btn-danger">Delete this book</button>
+  </form>
+</details>
 </div>
 {% endblock %}
 

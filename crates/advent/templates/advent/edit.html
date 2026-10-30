@@ -55,6 +55,13 @@
         <p class="advent-help">Empty.</p>
       {% endmatch %}
 
+      {# emptying: above the day's form, away from its Save button #}
+      {% if door.entry.is_some() %}
+      <form method="post" action="{{ spec.base }}/{{ year }}/days/{{ door.day }}/delete" class="inline advent-empty" data-confirm="Empty day {{ door.day }}? Its photo is deleted ({{ spec.stays }}).">
+        <button type="submit" class="btn-small btn-danger">Empty this day</button>
+      </form>
+      {% endif %}
+
       <form method="post" action="{{ spec.base }}/{{ year }}/days/{{ door.day }}" enctype="multipart/form-data" class="plain advent-edit-form">
         <label for="{{ spec.item }}-{{ door.day }}">{{ spec.field_label }}</label>
         <input type="text" id="{{ spec.item }}-{{ door.day }}" name="{{ spec.item }}" list="day-suggestions" placeholder="{% if door.entry.is_some() %}keep the current {{ spec.item }}{% else %}{{ spec.example }}{% endif %}" autocomplete="off">
@@ -63,11 +70,6 @@
         <button type="submit">Save day {{ door.day }}</button>
       </form>
 
-      {% if door.entry.is_some() %}
-      <form method="post" action="{{ spec.base }}/{{ year }}/days/{{ door.day }}/delete" class="inline" data-confirm="Empty day {{ door.day }}? Its photo is deleted ({{ spec.stays }}).">
-        <button type="submit" class="btn-small btn-danger">Empty this day</button>
-      </form>
-      {% endif %}
     </section>
     {% endfor %}
   </div>
@@ -75,6 +77,4 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script src="/static/js/advent_edit.js"></script>
-{% endblock %}
+
