@@ -31,7 +31,8 @@ pub fn routes() -> Routes {
             .route("/books/authors", get(routes::authors::list))
             .route("/books/authors/:id", get(routes::authors::detail))
             .route("/books/series", get(routes::series::list))
-            .route("/books/series/:id", get(routes::series::detail)),
+            .route("/books/series/:id", get(routes::series::detail))
+            .route("/books/standalone", get(routes::series::standalone)),
         private: Router::new(),
         write: Router::new()
             .route(

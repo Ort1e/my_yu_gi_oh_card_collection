@@ -464,7 +464,7 @@ ISBNs aren't shown).
 | list: every book in one table (`partials/book_table.html`, also on an author's and a series' page), searched and sorted in the page (`static/js/tables.js`); `?title=`, `?author=`, `?series=`, `?sort=` still filter; detail: cover, details, the series' other volumes and the authors' other books | `src/routes/mod.rs` |
 | add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
 | `GET /books/api/isbn/:isbn`, the lookup as JSON; `POST /books/api/isbn-scan`, the ISBN on a barcode photo | `src/routes/api.rs`, `src/barcode.rs` |
-| authors, series (with the missing volumes) | `src/routes/authors.rs`, `series.rs` |
+| authors, series (with the missing volumes), the stand-alone books (in no series) | `src/routes/authors.rs`, `series.rs` |
 | the book advent calendars (the `advent` crate, own tables and photo folder) | `src/routes/advent/mod.rs` |
 
 The add form (`static/js/book_form.js`): "Look up" (or Enter, which USB

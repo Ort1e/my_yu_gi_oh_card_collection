@@ -2,6 +2,7 @@
 //! page, `static/js/tables.js`), and the volumes of each with the missing
 //! ones (the gaps up to the last volume owned, `books_domain::book::missing_volumes`).
 //! Series are created and deleted with their books (`store::books`).
+//! `/books/standalone`: the complement, the books in no series.
 
 use askama::Template;
 use axum::extract::{Path, State};
@@ -120,4 +121,30 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         missing: missing_volumes(&volumes),
         books,
     })
+}
+
+#[derive(Template)]
+#[template(path = "books/standalone.html")]
+pub struct StandaloneList {
+    books: Vec<BookRow>,
+}
+
+/// `/books/standalone`: the books in no series, by author (surname) then
+/// title; sorted otherwise and searched in the page like the other lists.
+pub async fn standalone(State(state): State<AppState>) -> AppResult<StandaloneList> {
+    let books = sqlx::query_as(&format!(
+        "{} WHERE book.series_id IS NULL
+         ORDER BY (SELECT a.sort_name FROM book_book_author ba
+                   JOIN book_author a ON a.id = ba.author_id
+                   WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) IS NULL,
+                  (SELECT a.sort_name FROM book_book_author ba
+                   JOIN book_author a ON a.id = ba.author_id
+                   WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1),
+                  book.title COLLATE NOCASE",
+        BookRow::SELECT
+    ))
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(StandaloneList { books })
 }

@@ -11,9 +11,6 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
   "Red Rising, 3" were badly read from Open Library (fixed for new
   lookups): rename them in their books' forms.
-- **Stand-alone books:** a list of the books in no series, the
-  complement of `/books/series` (a tab in the book menu, the same table
-  as the other lists: `partials/book_table.html`).
 - Maybe: a Google Books API key (free, 1000 lookups a day): without one its
   shared quota is often used up (429), and Open Library lacks some books
   (9781464266430).
@@ -34,6 +31,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-30: the book lists as tables (+ the stand-alone books), a book's
+  page with its cover (Open Library, not stored); deletions far from Save,
+  their confirmations working again (the CSP blocked them).
 - 2026-10-30: the friend's phone reaches the app (`http://` typed in full).
 - 2026-10-30: a deck version's page shows its ban list, opening hands and
   tournament; the tournaments in the public copy; a card's picture of its

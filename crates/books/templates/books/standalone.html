@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Stand-alone books{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Stand-alone books</h1>
+  <p class="hint">The books in no series (those in one: <a href="/books/series">Series</a>).</p>
+
+  {% if books.is_empty() %}
+  <p>Every book is in a series.</p>
+  {% else %}
+  {% include "partials/book_table.html" %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+{% endblock %}
