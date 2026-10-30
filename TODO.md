@@ -4,14 +4,10 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
-- **The app doesn't load on the friend's phone** (works everywhere else).
-  To try, in order: `http://` typed in full (Chrome's "Always use secure
-  connections", Firefox/Brave HTTPS-only, Samsung Internet send it to
-  `https://`, which the NAS doesn't serve); the phone on the main Wi-Fi,
-  not a guest network or mobile data; a VPN, ad blocker or "private DNS"
-  app on the phone (it may send every page through the internet); another
-  browser. If it still fails: does `http://192.168.1.202:3000/login` show
-  anything, and what error does the browser give.
+- **The book scan on the friend's phone** said "out of memory" (2026-10-30):
+  the photo is now decoded already reduced (`static/js/book_form.js`). To
+  check once deployed; if it still fails: which browser, and the exact
+  message (under the ISBN field, or a crashed tab).
 - **Testers of the public copy:** after the 2026-10-28 changes (back link,
   full screen card, bigger tile text), is the text still too small on
   phones? If so: bigger text on phones everywhere, not only the tiles.
@@ -29,6 +25,7 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-10-30: the friend's phone reaches the app (`http://` typed in full).
 - 2026-10-30: a deck version's page shows its ban list, opening hands and
   tournament; the tournaments in the public copy; a card's picture of its
   own printing from Yugipedia (automatic when there's no doubt, when the

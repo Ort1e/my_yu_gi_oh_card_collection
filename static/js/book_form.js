@@ -7,7 +7,8 @@
 //
 // The scan reads the photo in the browser: the phone's BarcodeDetector when
 // it has one (only on HTTPS sites), else the ZXing library, loaded from the
-// CDN the first time. The photo is never sent anywhere.
+// CDN the first time. The photo is decoded once, already reduced (phones
+// run out of memory on a whole one), and never sent anywhere.
 
 const form = document.getElementById('book-form');
 const isbnField = document.getElementById('isbn');
@@ -147,16 +148,52 @@ if (form) {
 
 // ---------- barcode scan ----------
 
-/** The photo, drawn on a canvas at most `maxSide` px wide or high. */
+/** The photo's size, read by the browser without decoding its pixels. */
+function photoSize(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error('the photo could not be read'));
+        img.src = url;
+    });
+}
+
+/** The photo on a canvas at most `maxSide` px wide or high, decoded at that
+    size: a phone photo decoded whole takes 50 to 200 MB, too much for some
+    phones ("out of memory"). */
 async function photoCanvas(file, maxSide) {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    return canvas;
+    const url = URL.createObjectURL(file);
+
+    try {
+        const { width, height } = await photoSize(url);
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+
+        const bitmap = await createImageBitmap(file, {
+            resizeWidth: canvas.width,
+            resizeHeight: canvas.height,
+            resizeQuality: 'medium',
+        });
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+
+        return canvas;
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+/** A smaller copy of a canvas, at most `maxSide` px wide or high. */
+function shrunk(canvas, maxSide) {
+    const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height));
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(canvas.width * scale));
+    out.height = Math.max(1, Math.round(canvas.height * scale));
+    out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
+
+    return out;
 }
 
 /** A book's ISBN (978/979…) among the barcodes read, or null. */
@@ -226,11 +263,11 @@ function turned(canvas) {
 
 /** The ISBN in a photo of a barcode, or null. Tries a big then a small copy
     (a far barcode needs pixels, a blurry one is sharper smaller), each as
-    taken and turned. */
+    taken and turned. The photo is decoded once, already reduced. */
 async function readIsbn(file) {
-    for (const size of [1600, 800]) {
-        const canvas = await photoCanvas(file, size);
+    const big = await photoCanvas(file, 1600);
 
+    for (const canvas of [big, shrunk(big, 800)]) {
         for (const picture of [canvas, turned(canvas)]) {
             const detected = await readWithBarcodeDetector(picture).catch(() => undefined);
 
