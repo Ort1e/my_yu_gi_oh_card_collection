@@ -2,14 +2,18 @@
 // fields.html):
 // - "Look up" (or Enter in the ISBN field, which barcode scanners type
 //   after the digits) asks /books/api/isbn/:isbn and fills the fields;
-// - "Scan" takes a photo of the barcode, "From a photo" picks one already
-//   taken, and the NAS reads the ISBN on it (POST /books/api/isbn-scan);
+// - "Scan": the camera live in the page, the barcode read as soon as it is
+//   in view (the browser's BarcodeDetector, else a frame now and then sent
+//   to the NAS). Browsers give a page the camera on HTTPS only: on the home
+//   network's http://, Chrome needs its setting "Insecure origins treated
+//   as secure" (docs/recipes.md, "Use the app from a phone"). Without it,
+//   "Scan" opens the camera app instead, and the NAS reads the photo;
+// - "From a photo" picks one already taken, read by the NAS too
+//   (POST /books/api/isbn-scan).
 //
-// The photo is sent as it is: read in the phone's browser, a whole camera
-// photo took more memory than some phones have ("out of memory"). The NAS
-// keeps nothing of it. "From a photo" also spares the phone the camera app
-// opened over the browser (on a phone short of memory, Android may close
-// the browser meanwhile).
+// The camera app over the browser was the trouble: on a phone short of
+// memory, Android closed Chrome meanwhile ("not enough memory", the photo
+// lost). The live scanner never leaves the page, and keeps no photo.
 
 const form = document.getElementById('book-form');
 const isbnField = document.getElementById('isbn');
@@ -199,4 +203,121 @@ async function scan(input) {
 
 for (const input of photoInputs) {
     input.addEventListener('change', () => scan(input));
+}
+
+// ---------- live scanner ----------
+
+const liveButton = document.getElementById('isbn-live');
+const photoLabel = document.getElementById('isbn-photo-label');
+const dialog = document.getElementById('scan-dialog');
+const video = document.getElementById('scan-video');
+const scanHelp = document.getElementById('scan-help');
+
+/** The page may use the camera (HTTPS, or Chrome's setting for this address). */
+const canStream = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
+
+let stream = null;
+let stopped = true;
+
+const isBookIsbn = (text) => /^97[89]\d{10}$/.test(text);
+
+/** The browser's own barcode reader, when it reads EAN-13 (Chrome on Android). */
+async function nativeDetector() {
+    if (!('BarcodeDetector' in window)) return null;
+
+    try {
+        const formats = await BarcodeDetector.getSupportedFormats();
+        return formats.includes('ean_13') ? new BarcodeDetector({ formats: ['ean_13'] }) : null;
+    } catch {
+        return null;
+    }
+}
+
+function stopScanner() {
+    stopped = true;
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+    video.srcObject = null;
+
+    if (dialog.open) dialog.close();
+}
+
+function found(isbn) {
+    stopScanner();
+    isbnField.value = isbn;
+    lookup();
+}
+
+/** The current frame as a JPEG, at most 1280 px: for the NAS to read. */
+function frameBlob() {
+    const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+}
+
+/** Read frames until a book's ISBN is found or the scanner is closed. */
+async function readFrames(detector) {
+    // the browser's reader is fast: often; the NAS takes a second or two
+    const pause = detector ? 250 : 1500;
+
+    while (!stopped) {
+        if (video.readyState >= 2) {
+            try {
+                if (detector) {
+                    const codes = await detector.detect(video);
+                    const isbn = codes.map((c) => c.rawValue).find(isBookIsbn);
+
+                    if (isbn) return found(isbn);
+                } else {
+                    const blob = await frameBlob();
+                    const answer = blob && !stopped ? await scanOnServer(blob) : {};
+
+                    if (answer.isbn) return found(answer.isbn);
+                }
+            } catch {
+                // a frame that couldn't be read: the next one
+            }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, pause));
+    }
+}
+
+async function startScanner() {
+    say('');
+    scanHelp.textContent = 'Point the camera at the barcode on the back…';
+    dialog.showModal();
+    stopped = false;
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+        });
+    } catch (e) {
+        stopScanner();
+        say(`The camera could not be opened (${e.message}): use "From a photo", or type the 13 digits.`, { error: true });
+        return;
+    }
+
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+
+    const detector = await nativeDetector();
+
+    if (!detector) scanHelp.textContent = 'Point the camera at the barcode on the back (read by the NAS: hold it a second or two)…';
+
+    readFrames(detector);
+}
+
+if (liveButton && canStream) {
+    liveButton.hidden = false;
+    photoLabel.hidden = true;
+    liveButton.addEventListener('click', startScanner);
+    document.getElementById('scan-cancel').addEventListener('click', stopScanner);
+    dialog.addEventListener('cancel', stopScanner); // the phone's back button
 }

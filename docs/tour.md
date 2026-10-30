@@ -468,8 +468,12 @@ ISBNs aren't shown).
 | the book advent calendars (the `advent` crate, own tables and photo folder) | `src/routes/advent/mod.rs` |
 
 The add form (`static/js/book_form.js`): "Look up" (or Enter, which USB
-barcode scanners send) calls the API and fills the fields; "Scan" opens the
-phone's camera through a file input ("From a photo": one taken before) and
+barcode scanners send) calls the API and fills the fields. "Scan" shows the
+camera **live in the page** when the browser allows it (HTTPS, or Chrome's
+"Insecure origins treated as secure" for the NAS's address: docs/recipes.md):
+the browser's `BarcodeDetector` reads the frames, else one every 1.5 s goes
+to `POST /books/api/isbn-scan`; no photo is kept. Otherwise "Scan" opens the
+camera app through a file input ("From a photo": one taken before) and
 sends the photo **to the NAS**, which reads the barcode (`books::barcode`:
 `common::photos::grey` decodes a JPEG straight at 1/2, 1/4 or 1/8 of its
 size, then `rxing`, a Rust ZXing, tries 1600 and 800 px, as taken and
