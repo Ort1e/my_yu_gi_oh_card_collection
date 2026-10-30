@@ -11,8 +11,8 @@
 use std::collections::HashSet;
 
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
-use common::{media, photos};
+use axum::response::{IntoResponse, Response};
+use common::media;
 use yugioh_domain::card::clean_card_name;
 use yugioh_domain::printing_picture;
 use yugioh_domain::rarity::Rarity;
@@ -62,37 +62,30 @@ pub fn offered(files: &[String], code: &str, rarity: Option<&str>) -> Vec<String
         .collect()
 }
 
-/// A Yugipedia file, downloaded once and kept as a JPEG.
-async fn serve_file(state: &AppState, file: &str) -> AppResult<impl IntoResponse> {
-    let path = yugipedia::file_path(state, file);
-    if !path.exists() {
-        // a page of new pictures (the public copy) asks for many at once
-        yugipedia::YUGIPEDIA.wait().await;
-    }
-    let bytes = media::fetch_once_as(
-        state,
-        &path,
-        || Ok(yugipedia::file_url(file)),
-        |bytes| {
-            photos::web_copy(&bytes).map_err(|e| AppError::Internal(format!("{file}: {}", e.0)))
-        },
-    )
-    .await?;
-    Ok(media::picture(bytes))
-}
-
-/// `GET /card-picture/:card_id`: the copy's own picture.
+/// `GET /card-picture/:card_id`: the copy's own picture; ygoprodeck's
+/// picture of its card data when it can't be had (Yugipedia down, or
+/// refusing for a while).
 pub async fn card_picture(
     State(state): State<AppState>,
     Path(card_id): Path<i64>,
-) -> AppResult<impl IntoResponse> {
-    let file: String =
-        sqlx::query_scalar("SELECT picture FROM card WHERE id = ? AND picture IS NOT NULL")
-            .bind(card_id)
-            .fetch_optional(&state.pool)
-            .await?
-            .or_404()?;
-    serve_file(&state, &file).await
+) -> AppResult<Response> {
+    let (file, card_data_id): (String, Option<i64>) = sqlx::query_as(
+        "SELECT picture, card_data_id FROM card WHERE id = ? AND picture IS NOT NULL",
+    )
+    .bind(card_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .or_404()?;
+    match yugipedia::download(&state, &file).await {
+        Ok(bytes) => Ok(media::picture(bytes).into_response()),
+        Err(e) => {
+            tracing::warn!(card_id, "its printing's picture: {e}");
+            let card_data_id = card_data_id.ok_or(e)?;
+            Ok(card_image(State(state), Path(card_data_id))
+                .await?
+                .into_response())
+        }
+    }
 }
 
 /// `GET /cards/:id/pictures/:n` (login): the `n`-th picture its edit page
@@ -116,7 +109,7 @@ pub async fn offered_picture(
     };
     let offered = offered(&files, code.as_deref().unwrap_or(""), rarity.as_deref());
     let file = offered.get(n).or_404()?;
-    serve_file(&state, file).await
+    Ok(media::picture(yugipedia::download(&state, file).await?))
 }
 
 pub async fn card_image(

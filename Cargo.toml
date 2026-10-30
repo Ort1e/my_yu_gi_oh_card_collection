@@ -42,6 +42,8 @@ html-escape = "0.2"
 # session cookie signature (login)
 hmac = "0.12"
 sha2 = "0.10"
+# Yugipedia's file paths (MediaWiki: md5 of the name)
+md-5 = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 # advent calendar photos: EXIF orientation, resize, re-encode without metadata
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }

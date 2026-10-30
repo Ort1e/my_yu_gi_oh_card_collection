@@ -22,17 +22,6 @@ pub async fn fetch_once(
     path: &Path,
     url: impl FnOnce() -> AppResult<String>,
 ) -> AppResult<Vec<u8>> {
-    fetch_once_as(state, path, url, Ok).await
-}
-
-/// [`fetch_once`], the downloaded file saved as `convert` makes it (a big
-/// PNG as a JPEG: `photos::web_copy`).
-pub async fn fetch_once_as(
-    state: &AppState,
-    path: &Path,
-    url: impl FnOnce() -> AppResult<String>,
-    convert: impl FnOnce(Vec<u8>) -> AppResult<Vec<u8>>,
-) -> AppResult<Vec<u8>> {
     if let Ok(bytes) = tokio::fs::read(path).await {
         return Ok(bytes);
     }
@@ -51,19 +40,23 @@ pub async fn fetch_once_as(
         .await
         .map_err(fail)?
         .to_vec();
-    let bytes = convert(bytes)?;
+    save(path, &bytes).await?;
+    tracing::info!("downloaded {}", path.display());
+    Ok(bytes)
+}
 
-    // a temporary file then a rename: a concurrent request never reads a
-    // half-written picture
+/// Write a downloaded picture at `path` (its folder created): a temporary
+/// file then a rename, so a concurrent request never reads a half-written
+/// picture.
+pub async fn save(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let io = |e: std::io::Error| AppError::Internal(format!("saving {}: {e}", path.display()));
     if let Some(dir) = path.parent() {
         tokio::fs::create_dir_all(dir).await.map_err(io)?;
     }
     let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
-    tokio::fs::write(&tmp, &bytes).await.map_err(io)?;
+    tokio::fs::write(&tmp, bytes).await.map_err(io)?;
     tokio::fs::rename(&tmp, path).await.map_err(io)?;
-    tracing::info!("downloaded {}", path.display());
-    Ok(bytes)
+    Ok(())
 }
 
 /// What [`remove_unused`] found.

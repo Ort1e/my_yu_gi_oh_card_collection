@@ -779,7 +779,17 @@ doors and the deck builder's `ApiCard.image`).
 | the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
 
 A new code, rarity or name puts an automatic picture back to ygoprodeck's
-and looks for the new printing's. Tests insert `yugipedia_gallery` rows: Yugipedia is
+and looks for the new printing's.
+
+The pictures come straight from Yugipedia's media server
+(`ms.yugipedia.com/<h>/<hh>/<name>`, `hh` from the md5 of the name: one
+request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
+Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
+and tried again. The automatic pass downloads a picture **before** giving
+it to a copy, so a page or the public copy never asks Yugipedia; and
+`/card-picture/:card_id` answers ygoprodeck's picture when its own can't be
+had. (The first deployment let the public copy download them, ~600 at
+once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.
 
 ## The collection value
