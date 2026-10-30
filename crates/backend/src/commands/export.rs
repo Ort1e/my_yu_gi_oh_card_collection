@@ -92,7 +92,7 @@ mod tests {
             "/tournaments",
             "/tournaments/2",
             "/card-image/1",
-            "/card-picture/1",
+            "/card-picture/Ash-RA04-EN-UR-1E.jpg",
         ] {
             assert!(public(path), "{path}");
         }

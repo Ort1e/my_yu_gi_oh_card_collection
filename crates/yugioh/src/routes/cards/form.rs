@@ -174,6 +174,11 @@ impl Pictures {
         common::web::tiles::dotted(parts)
     }
 
+    /// The automatic picture's address (its printing's, else ygoprodeck's).
+    fn automatic_src(&self) -> Option<String> {
+        crate::store::models::picture_url(self.automatic.as_deref(), self.card_data_id)
+    }
+
     fn automatic_label(&self) -> &'static str {
         if self.automatic.is_some() {
             "Automatic (now its printing's, from Yugipedia)"

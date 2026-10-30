@@ -71,7 +71,7 @@
     <div class="picture-choices">
       <label class="picture-choice">
         <input type="radio" name="picture" value="" {% if pictures.chosen.is_empty() %}checked{% endif %}>
-        {% match pictures.automatic %}{% when Some with (_) %}<img src="/card-picture/{{ id }}" alt="" loading="lazy">{% when None %}{% match pictures.card_data_id %}{% when Some with (data_id) %}<img src="/card-image/{{ data_id }}" alt="" loading="lazy">{% when None %}{% endmatch %}{% endmatch %}
+        {% match pictures.automatic_src() %}{% when Some with (src) %}<img src="{{ src }}" alt="" loading="lazy">{% when None %}{% endmatch %}
         <small>{{ pictures.automatic_label() }}</small>
       </label>
       {% match pictures.card_data_id %}{% when Some with (data_id) %}

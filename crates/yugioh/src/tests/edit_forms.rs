@@ -146,11 +146,25 @@ async fn a_card_takes_a_picture_of_its_printing_from_yugipedia() {
     assert_eq!(picture(other).await, "DarkMagician-LOB-FR-UR-1E-AA.png/1");
     let (_, page) = t.get("/cards").await;
     assert!(
-        page.contains(&format!(r#"src="/card-picture/{id}""#)),
+        page.contains(r#"src="/card-picture/DarkMagician-LOB-FR-UR-1E-AA.jpg""#),
         "{page}"
     );
     let (_, page) = t.get(&uri).await;
     assert!(page.contains(r#"value="DarkMagician-LOB-FR-UR-1E-AA.png" checked"#));
+    // one address for both copies, served from the folder (already there:
+    // nothing asked to Yugipedia); an unknown one is 404
+    let file = crate::store::yugipedia::file_path(&t.state, "DarkMagician-LOB-FR-UR-1E-AA.png");
+    common::media::save(&file, &common::photos::test_png(59, 86))
+        .await
+        .unwrap();
+    let (status, _) = t
+        .get("/card-picture/DarkMagician-LOB-FR-UR-1E-AA.jpg")
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        t.get("/card-picture/Other.jpg").await.0,
+        StatusCode::NOT_FOUND
+    );
 
     // ygoprodeck's, kept by the automatic pass
     t.post(&uri, &form("ygoprodeck", false)).await;

@@ -773,7 +773,8 @@ Extended Art or an alternate art shows the wrong one. Yugipedia has a
 picture of each printing, named after it
 (`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
 Extended Art). A copy can take one: `card.picture` (migration 0019), served
-by `/card-picture/:card_id` (downloaded once, kept as a JPEG in
+by `/card-picture/:name` (one address per picture, so the public copy keeps
+it once for all the copies of a printing; downloaded once, kept as a JPEG in
 `media/card_pictures/`); without it, the copy shows ygoprodeck's picture
 (`store::models::picture_url`, used by the grid, the card page, the advent
 doors and the deck builder's `ApiCard.image`).
@@ -794,7 +795,7 @@ request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
 Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
 and tried again. The automatic pass downloads a picture **before** giving
 it to a copy, so a page or the public copy never asks Yugipedia; and
-`/card-picture/:card_id` answers ygoprodeck's picture when its own can't be
+`/card-picture/:name` answers ygoprodeck's picture when its own can't be
 had. (The first deployment let the public copy download them, ~600 at
 once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.

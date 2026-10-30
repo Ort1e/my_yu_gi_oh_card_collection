@@ -80,7 +80,7 @@ pub fn router() -> Router<AppState> {
 pub fn files_router() -> Router<AppState> {
     Router::new()
         .route("/card-image/:card_data_id", get(cards::images::card_image))
-        .route("/card-picture/:card_id", get(cards::images::card_picture))
+        .route("/card-picture/:name", get(cards::images::card_picture))
 }
 
 /// Every route that changes data. Kept apart so a login layer can be added
