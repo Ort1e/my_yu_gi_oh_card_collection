@@ -22,7 +22,7 @@ use super::ValueData;
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::models::CardRow;
 use crate::web::error::AppResult;
-use crate::web::filters;
+use crate::web::filters::{self, french_date};
 use crate::AppState;
 use common::web::tiles::CardTile;
 
@@ -218,7 +218,7 @@ fn share(part: Decimal, whole: Decimal) -> String {
 fn value_chart(data: &ValueData) -> String {
     let points = history(&data.copies, &data.lots, &data.by_date);
     let chart = json!({
-        "labels": points.iter().map(|t| t.date.to_string()).collect::<Vec<_>>(),
+        "labels": points.iter().map(|t| french_date(&t.date.to_string())).collect::<Vec<_>>(),
         "value": points.iter().map(|t| t.value.to_f64().unwrap_or_default()).collect::<Vec<_>>(),
     });
     crate::web::filters::json_for_script(&chart)

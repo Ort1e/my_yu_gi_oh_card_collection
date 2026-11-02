@@ -8,7 +8,7 @@
     export let api;
     export let main;
     export let categories;
-    export let banListId = null;
+    export let rules = null;
     /** the deck has unsaved changes (the simulation runs on the saved deck) */
     export let dirty = false;
 
@@ -85,7 +85,7 @@
 
 <div class="dropzone">
     {#each hand as card, i (i)}
-        <CardTile {card} {banListId} on:select />
+        <CardTile {card} {rules} on:select />
     {:else}
         <span class="hint">Draw to see a test hand.</span>
     {/each}

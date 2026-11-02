@@ -11,9 +11,11 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
   "Red Rising, 3" were badly read from Open Library (fixed for new
   lookups): rename them in their books' forms.
-- Maybe: a Google Books API key (free, 1000 lookups a day): without one its
-  shared quota is often used up (429), and Open Library lacks some books
-  (9781464266430).
+- **The Google Books key** (2026-11-02): it answered 503 "backendFailed"
+  the hour it was made. Check that lookups say `googlebooks` in
+  `book_data.source` once it's on the NAS (`GOOGLE_BOOKS_API_KEY` in
+  `/apps/collection/collection.env`). 9781464266430 is still unknown to
+  every catalogue.
 - **Testers of the public copy:** after the 2026-10-28 changes (back link,
   full screen card, bigger tile text), is the text still too small on
   phones? If so: bigger text on phones everywhere, not only the tiles.
@@ -21,15 +23,33 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   rarity, language; by author, series, format), like `/collection/stats`.
 - Maybe: hide the add/edit buttons a user can't use (they get a "Not
   allowed" page today).
-- **Formats** in the deck builder (Edison…): `docs/specs/formats.md`
-  (`format::first_release` and `check` are the owner's).
+- **Edison's exact cutoff**: the format made on 2026-11-02 should be
+  checked against the community's definition (ygoprodeck's set dates are
+  used: The Shining Darkness = 07/05/2010 there). Goat or others: from
+  `/formats/add`.
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
   the app from the home network (ZAP).
 - Maybe: Dependabot for the Cargo and npm updates (weekly, onto `dev`).
+- **TypeScript** for the deck builder (`frontend/`: Svelte 4 + Vite handle
+  `<script lang="ts">`, with `svelte-check` in the CI); maybe the page
+  scripts of `static/js/` too (they are loaded as they are today: they
+  would need a build step, or JSDoc types checked by `tsc --checkJs`
+  instead).
 
 ## Done
 
 One line each; the details are in `docs/tour.md` and the git history.
+
+- 2026-11-02: formats (Edison…: `/formats`, own card pool and list,
+  versions; in the deck builder: "Ban list or format", problems, tiles
+  out of the pool, legal-only reserve); a card's page shows what the card
+  is and says (type, attribute, level, ATK/DEF…, its text); the books'
+  menu grouped (it no longer fits on medium screens otherwise); a note on
+  the add page when the phone can't scan live.
+- 2026-11-02: dates the French way on every page (dd/mm/yyyy); books read
+  or not (switches, a ✓ in the public copy) and "What to read?"
+  (`/books/random`, public too); ISBN lookups with a Google Books key
+  (≤ 800 a day) and the BnF (first for French editions).
 
 - 2026-10-30: the book lists as tables (+ the stand-alone books), a book's
   page with its cover (Open Library, not stored); deletions far from Save,

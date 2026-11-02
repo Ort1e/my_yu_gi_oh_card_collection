@@ -7,13 +7,17 @@
 //! "pages", "series", "volume", "format", "owned_book_id"}` (each may be
 //! null; `owned_book_id`: the book already in the list with this ISBN);
 //! 400 `{"error"}` for an invalid ISBN; 404 `{"error", "isbn",
-//! "owned_book_id"}` when no catalogue knows it, 503 (same body) when Google
-//! Books couldn't answer (asked again next time).
+//! "owned_book_id"}` when no catalogue knows it, 503 (same body) when one
+//! couldn't answer (asked again next time).
 //!
 //! `POST /books/api/isbn-scan` (multipart, `photo`): the ISBN on a photo of
 //! the barcode (`crate::barcode`), for the "Scan" buttons: 200 `{"isbn"}`,
 //! 422 `{"error"}` when no book barcode is found, 400 `{"error"}` when it
 //! isn't a photo.
+//!
+//! `POST /books/api/books/:id/read` (JSON `{"read": bool}`): the "Read"
+//! switches of the book tables and pages (`static/js/book_read.js`): 200
+//! `{"is_read"}`, 404 for no such book.
 
 use axum::extract::multipart::MultipartError;
 use axum::extract::{Multipart, Path, State};
@@ -22,10 +26,12 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use books_domain::book::{BookFormat, BookInfo};
 use books_domain::isbn::Isbn;
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::store::book_data::{self, Found};
 use crate::store::books;
+use common::db::begin_write;
 use common::web::error::{bad_request, AppError, AppResult};
 use common::AppState;
 
@@ -39,7 +45,7 @@ pub async fn isbn(State(state): State<AppState>, Path(text): Path<String>) -> Ap
     let owned = books::with_isbn(&mut conn, &isbn).await?;
     drop(conn);
 
-    let (status, error) = match book_data::lookup(&state.pool, &state.http, &isbn).await? {
+    let (status, error) = match book_data::lookup(&state, &isbn).await? {
         Found::Book(info) => return Ok(Json(found(&isbn, info, owned)).into_response()),
         Found::Unknown => (
             StatusCode::NOT_FOUND,
@@ -48,8 +54,9 @@ pub async fn isbn(State(state): State<AppState>, Path(text): Path<String>) -> Ap
         Found::Unavailable => (
             StatusCode::SERVICE_UNAVAILABLE,
             format!(
-                "Open Library doesn't know the ISBN {isbn}, and Google Books is refusing \
-                 requests for now (too many): try again later, or fill the fields by hand."
+                "No catalogue found the ISBN {isbn}, and one of them couldn't answer \
+                 (Google Books' daily quota, or the network): try again later, or fill \
+                 the fields by hand."
             ),
         ),
     };
@@ -101,4 +108,25 @@ pub async fn scan(mut multipart: Multipart) -> AppResult<Response> {
         }
         Err(why) => bad_request(format!("{why}.")),
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReadStatus {
+    read: bool,
+}
+
+/// `POST /books/api/books/:id/read`: mark a book read or not.
+pub async fn set_read(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(status): Json<ReadStatus>,
+) -> AppResult<Response> {
+    let mut tx = begin_write(&state.pool).await?;
+    if !books::set_read(&mut tx, id, status.read).await? {
+        return Err(AppError::NotFound);
+    }
+    tx.commit().await?;
+    tracing::info!(book_id = id, read = status.read, "book read status");
+
+    Ok(Json(json!({ "is_read": status.read })).into_response())
 }

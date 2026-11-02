@@ -10,6 +10,7 @@ pub(crate) mod cards;
 mod collection;
 mod dashboard;
 mod decks;
+mod formats;
 mod lots;
 mod reference;
 mod sellers;
@@ -55,12 +56,18 @@ pub fn router() -> Router<AppState> {
         .route("/deck-versions/:id", get(decks::version::page))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))
+        .route("/formats", get(formats::list))
+        .route("/formats/:id", get(formats::detail))
         .route("/tournaments", get(tournaments::list))
         .route("/tournaments/labels", get(tournaments::labels::list))
         .route("/tournaments/:id", get(tournaments::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))
         .route("/api/deck-versions/:id", get(decks::api::get_version))
         .route("/api/deck-versions/:id/reserve", post(decks::api::reserve))
+        .route(
+            "/api/deck-versions/:id/check",
+            get(decks::api::check_version),
+        )
         .route(
             "/api/deck-versions/:id/categories",
             get(decks::api::categories),
@@ -97,6 +104,18 @@ pub fn write_router() -> Router<AppState> {
             get(tournaments::form::edit_page).post(tournaments::form::update),
         )
         .route("/tournaments/:id/delete", post(tournaments::form::delete))
+        .route(
+            "/formats/add",
+            get(formats::form::add_form).post(formats::form::create),
+        )
+        .route("/formats/:id/edit", post(formats::form::update))
+        .route("/formats/:id/cards", post(formats::form::add_card))
+        .route(
+            "/formats/:id/cards/:card_data_id",
+            post(formats::form::set_status),
+        )
+        .route("/formats/:id/new-version", post(formats::form::new_version))
+        .route("/formats/:id/delete", post(formats::form::delete))
         .route(
             "/tournaments/labels/:id/rename",
             post(tournaments::labels::rename),

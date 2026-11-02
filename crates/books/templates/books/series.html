@@ -26,4 +26,5 @@
 
 {% block extra_js %}
 <script src="/static/js/tables.js"></script>
+{% if !common::export::public_copy() %}<script src="/static/js/book_read.js"></script>{% endif %}
 {% endblock %}

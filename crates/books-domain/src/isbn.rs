@@ -86,6 +86,12 @@ impl Isbn {
         &self.0
     }
 
+    /// Published in French (the French-speaking registration groups:
+    /// `978-2…` and `979-10…`): the BnF knows these best.
+    pub fn is_french(&self) -> bool {
+        self.0.starts_with("9782") || self.0.starts_with("97910")
+    }
+
     /// The ISBN-10 of a `978…` ISBN (what old catalogues know), `None` for
     /// `979…` (they have none).
     pub fn isbn10(&self) -> Option<String> {
@@ -190,5 +196,14 @@ mod tests {
         assert_eq!(Isbn::parse("Circe"), Err(IsbnError::Character));
         // a grocery barcode: valid EAN-13, not a book
         assert_eq!(Isbn::parse("3017620422003"), Err(IsbnError::NotABook));
+    }
+
+    #[test]
+    fn french_isbns() {
+        assert!(Isbn::parse("9782070584628").unwrap().is_french());
+        assert!(!Isbn::parse("9780553573398").unwrap().is_french());
+        // 979-10 is French, 979-1 alone isn't a group (979-11 is Korean)
+        assert!(Isbn::parse("9791035800369").unwrap().is_french());
+        assert!(!Isbn::parse("9791158391140").unwrap().is_french());
     }
 }

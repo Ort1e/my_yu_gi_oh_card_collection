@@ -82,7 +82,9 @@ impl ValuePage {
     }
 
     fn last_refresh_str(&self) -> String {
-        self.last_refresh.map(|d| d.to_string()).unwrap_or_default()
+        self.last_refresh
+            .map(|d| filters::french_date(&d.to_string()))
+            .unwrap_or_default()
     }
 }
 

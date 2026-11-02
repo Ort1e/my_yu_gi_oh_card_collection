@@ -1,16 +1,22 @@
 <script>
     // The control panel: switch, rename, copy or delete the version, see its
-    // read-only page (/deck-versions/:id), choose the ban list, build it, note
+    // read-only page (/deck-versions/:id), choose the ban list or format (and
+    // see the problems there), build it, note
     // its deck box and sleeves, save. Saving needs the
     // zones, so it is left to App.svelte ("save" event); building changes the
     // zones, so the new version goes back to App.svelte too ("reload" event).
     import { createEventDispatcher } from 'svelte';
 
+    import { frenchDate } from '../deck.js';
+
     export let api;
     export let deckVersionId;
     /** the loaded version (shared with App.svelte: a rename updates the title) */
     export let deck;
-    export let banListId;
+    /** the ban list or format chosen: "12", "f3", null */
+    export let key;
+    /** `{format, problems}` of the saved version (App.svelte) */
+    export let check;
     export let dirty;
 
     const dispatch = createEventDispatcher();
@@ -137,14 +143,36 @@
 </div>
 
 <div class="control">
-    <label for="ban-list-select">Ban list</label>
-    <select id="ban-list-select" bind:value={banListId} on:change={() => (dirty = true)}>
-        {#each deck.ban_lists as banList, i (banList.id)}
-            <option value={banList.id}>{banList.date}{i === 0 ? ' (latest)' : ''}</option>
-        {/each}
+    <label for="ban-list-select">Ban list or format</label>
+    <select id="ban-list-select" bind:value={key} on:change={() => (dirty = true)}>
+        {#if deck.formats.length > 0}
+            <optgroup label="Formats">
+                {#each deck.formats as format (format.id)}
+                    <option value="f{format.id}">{format.label} (cards up to {frenchDate(format.cutoff)})</option>
+                {/each}
+            </optgroup>
+        {/if}
+        <optgroup label="Konami's lists">
+            {#each deck.ban_lists as banList, i (banList.id)}
+                <option value={String(banList.id)}>{frenchDate(banList.date)}{i === 0 ? ' (latest)' : ''}</option>
+            {/each}
+        </optgroup>
         <option value={null}>No ban list</option>
     </select>
-    <span class="hint">Limits shown on the cards. Saved with the deck.</span>
+    <span class="hint">Limits shown on the cards. Saved with the deck. <a href="/formats" target="_blank" rel="noopener">The formats</a></span>
+
+    {#if check.format}
+        {#if check.problems.length === 0}
+            <p class="format-ok">✓ Fits {check.format} (as saved).</p>
+        {:else}
+            <p class="format-title">In {check.format} (as saved):</p>
+            <ul class="format-problems">
+                {#each check.problems as problem}<li>{problem}</li>{/each}
+            </ul>
+        {/if}
+    {:else if check.problems.length > 0}
+        <p class="format-problems">{check.problems[0]}</p>
+    {/if}
 </div>
 
 <div class="control">
@@ -184,6 +212,23 @@
 
     .switch {
         margin: 0 0 0.5rem;
+    }
+
+    .format-ok {
+        margin: 0.5rem 0 0;
+        color: #8be28b;
+        font-weight: bold;
+    }
+
+    .format-title {
+        margin: 0.5rem 0 0.2rem;
+        font-weight: bold;
+    }
+
+    .format-problems {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: #ffb3b3;
     }
 
     .notes {

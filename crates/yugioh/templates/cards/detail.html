@@ -46,13 +46,28 @@
       {% else %}
       <span title="ygoprodeck's price of the card name, the cheapest printing's: an estimate. Pick the card's Cardmarket product on its edit page for a precise price.">Market (estimate):</span>
       {% endif %}
-      {{ market.price }} € on {{ market.date }} (this copy ≈ {{ market.copy_value }} €)
+      {{ market.price }} € on {{ market.date|date }} (this copy ≈ {{ market.copy_value }} €)
       {% match market.sparkline %}{% when Some with (points) %}
       <svg class="price-history" width="160" height="32" viewBox="-2 -2 164 36" role="img" aria-label="Price history">
         <polyline points="{{ points }}" fill="none" stroke="currentColor" stroke-width="2"/>
       </svg>
       {% when None %}{% endmatch %}
     </div>
+    {% when None %}{% endmatch %}
+    {% match text %}{% when Some with (text) %}
+    <section class="card-text frame-{{ text.frame }}">
+      <div class="card-text-band">{{ text.kind }}</div>
+      <dl class="card-facts">
+        {% for fact in text.facts %}
+        <dt>{{ fact.label }}</dt>
+        <dd>{% match fact.badge %}{% when Some with (badge) %}<span class="attribute-badge {{ badge }}">{{ fact.value }}</span>{% when None %}{% if !fact.stars.is_empty() %}<span class="level-stars" aria-hidden="true">{{ fact.stars }}</span> {% endif %}{{ fact.value }}{% endmatch %}</dd>
+        {% endfor %}
+      </dl>
+      {% for (label, part) in text.parts %}
+      {% match label %}{% when Some with (label) %}<div class="card-text-label">{{ label }}</div>{% when None %}{% endmatch %}
+      <p class="card-text-body">{{ part }}</p>
+      {% endfor %}
+    </section>
     {% when None %}{% endmatch %}
     {% if !common::export::public_copy() %}<div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a></div>{% endif %}
   </div>

@@ -10,6 +10,7 @@ pub mod card;
 pub mod card_set;
 pub mod cardmarket;
 pub mod cardmarket_catalog;
+pub mod format;
 pub mod lot;
 pub mod monte_carlo;
 pub mod printing_picture;

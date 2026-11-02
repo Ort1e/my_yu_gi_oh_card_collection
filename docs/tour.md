@@ -164,7 +164,10 @@ Things to notice:
   (blocks `items`, `filter`, `add_button`, and `summary`, `more_css`,
   `more_js`) → `sellers/list.html`. Partials live in `partials/` and are
   pulled in with `{% include %}`. Filters such as `|money` or `|yes_no` are
-  plain functions in `common::web::filters`. The shared templates are in
+  plain functions in `common::web::filters`. **Dates** are shown the French
+  way with `|date` (`02/11/2026`; `french_date` from Rust, `frenchDate` in
+  the deck builder) and stay ISO everywhere else: the DB, the addresses,
+  the forms' date fields, a sortable cell's `data-sort-value`. The shared templates are in
   `crates/common/templates/`.
 - **Inside the yugioh crate**, `crate::web::…` and `crate::store::db` are
   re-exports of `common`'s modules (`yugioh/src/web/mod.rs`): the code reads
@@ -282,6 +285,7 @@ factors, which `yugioh-domain` re-exports as `card::CardStatus` and
 | `ban_list` | Konami's ban-list JSON and US pages → entries |
 | `cardmarket_catalog` | Cardmarket's price guide files, set code → expansion, copy → product |
 | `valuation` | market value of the copies (condition/language factors), ownership by date, gain from lot prices, price moves |
+| `format` | formats: a card's first TCG release, a deck's problems in a format (`check`: out of the pool, too many copies), ygoprodeck's sets |
 
 Each module's doc comment (`//!` at the top) says what it ports and lists
 the **deliberate differences from Django** (bugs fixed, crashes turned into
@@ -301,7 +305,7 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/main.js`: mounts `App` with the version id | |
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.js`: one function per endpoint | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
-| `src/deck.js`: pure helpers (sorting, prices, YDKE URL) | |
+| `src/deck.js`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
 | `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
 Moving cards between zones only changes the app's local state until
@@ -357,10 +361,12 @@ missing.
 public copy: its zones as the card grid (by kind, then English name), and
 around them:
 
-- **the ban list**: the version's own (chosen in the deck builder), else the
-  latest one; the restricted cards in a table, and a corner badge on their
-  tiles (`CardTile::ban`, `X`/`1`/`2` as in the builder). It doesn't judge
-  the deck (no "too many copies" check);
+- **the format** it plays (its problems there: `store::formats::version_problems`,
+  and the format's list for the badges), else **the ban list**: the
+  version's own (chosen in the deck builder), else the latest one; the
+  restricted cards in a table, and a corner badge on their tiles
+  (`CardTile::ban`, `X`/`1`/`2` as in the builder). A ban list doesn't
+  judge the deck (no "too many copies" check), a format does;
 - **the opening hands**: the deck builder's Monte Carlo on the version's
   categories (`decks/api/simulation.rs::inputs`, `yugioh_domain::monte_carlo`),
   10,000 hands of 5 cards (going first) and of 6 (second), seeded by the
@@ -370,6 +376,25 @@ around them:
 - **the tournament** it was played in, round by round
   (`tournaments::TournamentView`, the same `tournaments/rounds.html` as the
   tournament's page).
+
+## Formats
+
+A **format** (Edison, Goat…: `deck_format`, migration 0022) is a way to
+play with its own card pool (the cards released in the TCG up to its
+**cutoff**) and its own list of forbidden and limited cards
+(`deck_format_entry`). A deck version plays a Konami ban list **or** a
+format (`deck_version.format_id`; the save refuses both).
+
+| Piece | Where |
+|---|---|
+| the rules: a card's first release (the earliest TCG date of its sets), a deck's problems (`check`: released after the cutoff or never in the TCG, more copies than allowed, counted by English name across main, extra and side) | `yugioh-domain/src/format.rs` |
+| the sets' TCG dates (`ygo_set`, ygoprodeck's `cardsets.php`; with the weekly prices, and once when there are none); first releases, a format's rules, a version's problems; create from a Konami list (copied), new version (a copy) | `yugioh/src/store/formats.rs` |
+| `/formats` (list), `/formats/:id` (its list: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
+| deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.js` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
+
+**A change of the list on a format already played**: make a new version
+(button on its page). The decks keep the version they play; v1 stays as it
+was. A version can still be edited (a mistake to fix).
 
 ## Tournaments
 
@@ -459,10 +484,12 @@ ISBNs aren't shown).
 | ISBN parsing, check digits, ISBN-10 → 13 | `crates/books-domain/src/isbn.rs` |
 | lookup answers → `BookInfo`, series text → name + volume, author sort names, missing volumes | `crates/books-domain/src/book.rs` |
 | writes: a book with its authors (in order) and series, created on the way; orphans deleted | `src/store/books.rs` |
-| the lookup: Open Library (`jscmd=data` + `details`), Google Books when it lacks something; cached in `book_data`, except when Google Books refused (429: `Found::Unavailable`, asked again next time) | `src/store/book_data.rs` |
+| the lookup: Open Library (`jscmd=data` + `details`), then Google Books (with `GOOGLE_BOOKS_API_KEY`, at most 800 a day counted in memory) and the BnF's catalogue (SRU, Dublin Core; asked first for a French ISBN) while something is missing; cached in `book_data`, except when nothing was found and a catalogue couldn't answer (`Found::Unavailable`, asked again next time) | `src/store/book_data.rs` |
 | the routes | `src/lib.rs` (`routes()`) |
 | list: every book in one table (`partials/book_table.html`, also on an author's and a series' page), searched and sorted in the page (`static/js/tables.js`); `?title=`, `?author=`, `?series=`, `?sort=` still filter; detail: cover, details, the series' other volumes and the authors' other books | `src/routes/mod.rs` |
 | add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
+| read or not (`book.is_read`, 0020): a switch in the book tables and on a book's page (`static/js/book_read.js` → `POST /books/api/books/:id/read`), in the edit form; a ✓ in the public copy | `src/routes/api.rs`, `partials/book_table.html` |
+| "What to read?" (`/books/random`): every book as JSON in the page, `static/js/book_random.js` filters (unread, can start it now, language, format) and picks in the browser, so the public copy has it too | `src/routes/random.rs` |
 | `GET /books/api/isbn/:isbn`, the lookup as JSON; `POST /books/api/isbn-scan`, the ISBN on a barcode photo | `src/routes/api.rs`, `src/barcode.rs` |
 | authors, series (with the missing volumes), the stand-alone books (in no series) | `src/routes/authors.rs`, `series.rs` |
 | the book advent calendars (the `advent` crate, own tables and photo folder) | `src/routes/advent/mod.rs` |

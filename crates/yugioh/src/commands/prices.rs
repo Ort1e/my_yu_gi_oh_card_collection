@@ -1,11 +1,13 @@
 //! The Yu-Gi-Oh! part of `refresh-prices`: today's market prices from
 //! ygoprodeck into `card_price` (`store::prices::ygoprodeck`), then
-//! Cardmarket's price guide (`store::prices::cardmarket`). The backend runs
-//! it with the Pokémon prices, by hand and every week ([`due`]).
+//! Cardmarket's price guide (`store::prices::cardmarket`), then the sets'
+//! TCG dates for the formats (`store::formats`). The backend runs it with
+//! the Pokémon prices, by hand and every week ([`due`]).
 
 use common::schedule::is_due;
 
 use crate::store::db::today;
+use crate::store::formats::refresh_set_dates;
 use crate::store::prices::cardmarket;
 use crate::store::prices::history::latest_refresh;
 use crate::store::prices::ygoprodeck::refresh_prices;
@@ -20,11 +22,15 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     );
     let report = cardmarket::refresh(&state.pool, &state.http, today(), dry_run).await?;
     println!("{}", report.summary());
+    if !dry_run {
+        let sets = refresh_set_dates(&state.pool, &state.http).await?;
+        println!("{sets} sets' release dates");
+    }
     Ok(())
 }
 
-/// The two refreshes in the background (logged), each even when the one
-/// before failed (they are independent).
+/// The refreshes in the background (logged), each even when the one before
+/// failed (they are independent).
 pub async fn refresh_in_background(state: &AppState) {
     match refresh_prices(&state.pool, &state.http, today(), false).await {
         Ok(report) => report.log(),
@@ -33,6 +39,9 @@ pub async fn refresh_in_background(state: &AppState) {
     match cardmarket::refresh(&state.pool, &state.http, today(), false).await {
         Ok(report) => tracing::info!("{}", report.summary()),
         Err(e) => tracing::warn!("background Cardmarket refresh: {e}"),
+    }
+    if let Err(e) = refresh_set_dates(&state.pool, &state.http).await {
+        tracing::warn!("background set dates refresh: {e}");
     }
 }
 

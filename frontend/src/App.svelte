@@ -1,7 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { deckApi } from './api.js';
-    import { ZONES, euros, sortCards, zonePrice } from './deck.js';
+    import { ZONES, euros, rulesFields, rulesKey, rulesOf, sortCards, zonePrice } from './deck.js';
     import CardOverview from './lib/CardOverview.svelte';
     import DeckZone from './lib/DeckZone.svelte';
     import ReserveSearch from './lib/ReserveSearch.svelte';
@@ -18,7 +18,10 @@
     let loadError = null;
     /** zone name -> cards; "reserve" holds the search results */
     let zones = { main: [], extra: [], side: [], reserve: [] };
-    let banListId = null;
+    /** the selector's ban list or format ("12", "f3"), saved with the deck */
+    let key = null;
+    /** the version's problems in its format (`GET …/check`), for the panel */
+    let check = { format: null, problems: [] };
     let dirty = false;
     let selected = null;
     let categories = [];
@@ -26,7 +29,7 @@
 
     function setDeck(data) {
         deck = data;
-        banListId = data.ban_list_id;
+        key = rulesKey(data);
         zones = {
             main: sortCards(data.main),
             extra: sortCards(data.extra),
@@ -35,7 +38,18 @@
         };
 
         dirty = false;
+        refreshCheck();
     }
+
+    async function refreshCheck() {
+        try {
+            check = await api.check();
+        } catch (e) {
+            check = { format: null, problems: [`Could not check the format: ${e.message}`] };
+        }
+    }
+
+    $: rules = deck ? rulesOf(deck, key) : null;
 
     // an empty version (like the "v1" made with a new deck) is replaced by a
     // YDKE import instead of staying behind
@@ -158,7 +172,7 @@
                 main: zones.main.map((c) => c.id),
                 extra: zones.extra.map((c) => c.id),
                 side: zones.side.map((c) => c.id),
-                ban_list_id: banListId,
+                ...rulesFields(key),
             });
 
             setDeck(saved);
@@ -208,7 +222,7 @@
                     <DeckZone
                         {zone}
                         cards={zones[zone]}
-                        {banListId}
+                        {rules}
                         selectedId={selected?.id}
                         on:move={({ detail }) => move(detail)}
                         on:proxy={addProxy}
@@ -223,7 +237,7 @@
         <div id="card-overview">
             <CardOverview
                 card={selected}
-                {banListId}
+                {rules}
                 {api}
                 {categoriesVersion}
                 canReplace={selectedZone !== null}
@@ -236,7 +250,8 @@
                 {api}
                 {deckVersionId}
                 bind:deck
-                bind:banListId
+                bind:key
+                {check}
                 bind:dirty
                 on:save={save}
                 on:reload={({ detail }) => setDeck(detail)}
@@ -250,7 +265,7 @@
                 cardTypes={deck.card_types}
                 bind:cards={zones.reserve}
                 {deckCardIds}
-                {banListId}
+                {rules}
                 selectedId={selected?.id}
                 on:move={({ detail }) => move(detail)}
                 on:select={select}
@@ -268,7 +283,7 @@
                 {api}
                 main={zones.main}
                 {categories}
-                {banListId}
+                {rules}
                 {dirty}
                 on:select={select}
                 on:categories={({ detail }) => {

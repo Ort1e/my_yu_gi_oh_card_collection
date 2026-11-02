@@ -8,7 +8,7 @@
 //!   deck (Django needed the `clean_card_categories` command);
 //! - YDKE import never reuses sold cards, and one owned copy is used once
 //!   across all zones;
-//! - clone keeps the ban list but not the tournament (the copy wasn't
+//! - clone keeps the ban list (or format) but not the tournament (the copy wasn't
 //!   played there: it would count twice in the tournament stats);
 //! - conditional categories are created here (Django: in the admin only).
 //!
@@ -28,6 +28,7 @@ use serde::Serialize;
 use sqlx::{QueryBuilder, SqliteConnection};
 
 use crate::store::db::push_ids;
+use crate::store::formats;
 
 use crate::store::db::Money;
 use crate::store::models::picture_url;
@@ -38,7 +39,7 @@ pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
 pub(crate) use simulation::inputs as simulation_inputs;
 pub use simulation::monte_carlo;
-pub use version::{clone_version, delete_version, get_version, update_version};
+pub use version::{check_version, clone_version, delete_version, get_version, update_version};
 pub use ydke_import::import_ydke;
 
 #[derive(Debug, Serialize)]
@@ -59,8 +60,12 @@ pub struct ApiCard {
     image: Option<String>,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
-    /// ban list id -> "Banned" | "Limited" | "Semi-Limited"
-    ban: BTreeMap<i64, String>,
+    /// ban list id (`"12"`) or format (`"f3"`) -> "Banned" | "Limited" |
+    /// "Semi-Limited"
+    ban: BTreeMap<String, String>,
+    /// Its first TCG release (`YYYY-MM-DD`), for the formats' card pools;
+    /// `None`: unknown (an OCG card, or not linked yet).
+    first_release: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -117,20 +122,24 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
     }
 
     let data_ids: HashSet<i64> = records.iter().filter_map(|r| r.card_data_id).collect();
-    let mut bans: HashMap<i64, BTreeMap<i64, String>> = HashMap::new();
+    // the formats' statuses, then the Konami lists'
+    let mut bans = formats::statuses(&mut *conn, data_ids.iter().copied()).await?;
     if !data_ids.is_empty() {
         let mut qb = QueryBuilder::new(
             "SELECT card_data_id, ban_list_id, status FROM ban_list_entry WHERE card_data_id IN ",
         );
-        push_ids(&mut qb, data_ids);
+        push_ids(&mut qb, data_ids.iter().copied());
         for (data_id, ban_list_id, status) in qb
             .build_query_as::<(i64, i64, String)>()
             .fetch_all(&mut *conn)
             .await?
         {
-            bans.entry(data_id).or_default().insert(ban_list_id, status);
+            bans.entry(data_id)
+                .or_default()
+                .insert(ban_list_id.to_string(), status);
         }
     }
+    let releases = formats::first_releases(&mut *conn, data_ids.iter().copied()).await?;
 
     let mut by_id: HashMap<i64, ApiCard> = records
         .into_iter()
@@ -142,6 +151,10 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                     .card_data_id
                     .and_then(|d| bans.get(&d).cloned())
                     .unwrap_or_default(),
+                first_release: r
+                    .card_data_id
+                    .and_then(|d| releases.get(&d).copied().flatten())
+                    .map(|d| d.to_string()),
                 name: r.name,
                 en_name: r.en_name,
                 name_en: r.name_en,

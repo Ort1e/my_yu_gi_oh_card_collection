@@ -24,6 +24,7 @@ pub struct BookFields {
     pub volume: Option<i64>,
     pub format: Option<BookFormat>,
     pub notes: Option<String>,
+    pub is_read: bool,
 }
 
 impl BookFields {
@@ -42,6 +43,7 @@ impl BookFields {
             volume: info.volume,
             format: info.format,
             notes: None,
+            is_read: false,
         })
     }
 }
@@ -59,8 +61,8 @@ pub async fn insert(conn: &mut SqliteConnection, book: &BookFields) -> sqlx::Res
     let series = series_id(conn, book.series.as_deref()).await?;
     let id = sqlx::query(
         "INSERT INTO book (isbn, title, publisher, published_year, language, page_count,
-                           series_id, volume, format, notes, added_on)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           series_id, volume, format, notes, is_read, added_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(book.isbn.as_ref().map(Isbn::as_str))
     .bind(&book.title)
@@ -72,6 +74,7 @@ pub async fn insert(conn: &mut SqliteConnection, book: &BookFields) -> sqlx::Res
     .bind(series.and(book.volume))
     .bind(book.format.map(BookFormat::label))
     .bind(&book.notes)
+    .bind(book.is_read)
     .bind(today().to_string())
     .execute(&mut *conn)
     .await?
@@ -86,7 +89,8 @@ pub async fn update(conn: &mut SqliteConnection, id: i64, book: &BookFields) -> 
     let series = series_id(conn, book.series.as_deref()).await?;
     let updated = sqlx::query(
         "UPDATE book SET isbn = ?, title = ?, publisher = ?, published_year = ?, language = ?,
-                         page_count = ?, series_id = ?, volume = ?, format = ?, notes = ?
+                         page_count = ?, series_id = ?, volume = ?, format = ?, notes = ?,
+                         is_read = ?
          WHERE id = ?",
     )
     .bind(book.isbn.as_ref().map(Isbn::as_str))
@@ -99,6 +103,7 @@ pub async fn update(conn: &mut SqliteConnection, id: i64, book: &BookFields) -> 
     .bind(series.and(book.volume))
     .bind(book.format.map(BookFormat::label))
     .bind(&book.notes)
+    .bind(book.is_read)
     .bind(id)
     .execute(&mut *conn)
     .await?
@@ -110,6 +115,18 @@ pub async fn update(conn: &mut SqliteConnection, id: i64, book: &BookFields) -> 
     set_authors(conn, id, &book.authors).await?;
     delete_orphans(conn).await?;
     Ok(true)
+}
+
+/// Mark a book read or not (its page's button); `false` when there is
+/// none with this id.
+pub async fn set_read(conn: &mut SqliteConnection, id: i64, read: bool) -> sqlx::Result<bool> {
+    let updated = sqlx::query("UPDATE book SET is_read = ? WHERE id = ?")
+        .bind(read)
+        .bind(id)
+        .execute(conn)
+        .await?
+        .rows_affected();
+    Ok(updated > 0)
 }
 
 /// Delete a book. `false` when there is none with this id. Fails on the

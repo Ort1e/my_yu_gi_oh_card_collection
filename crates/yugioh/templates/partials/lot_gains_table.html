@@ -9,9 +9,9 @@
       <tr>
         <td data-sort-value="{{ lot.id }}">
           <a href="/lots/{{ lot.id }}">#{{ lot.id }}</a>
-          <div class="cell-note">{{ lot.seller }}<span class="phone-only"> · {{ lot.date }}</span></div>
+          <div class="cell-note">{{ lot.seller }}<span class="phone-only"> · {{ lot.date|date }}</span></div>
         </td>
-        <td class="text phone-hide">{{ lot.date }}</td>
+        <td class="text phone-hide" data-sort-value="{{ lot.date }}">{{ lot.date|date }}</td>
         <td>{{ lot.price|money }}</td>
         <td class="phone-hide" data-sort-value="{{ lot.owned }}" title="{{ lot.owned }} owned, {{ lot.sold }} sold{% if lot.without_price > 0 %}, {{ lot.without_price }} without a market price{% endif %}">{{ lot.owned }}{% if lot.sold > 0 %} + {{ lot.sold }} sold{% endif %}{% if lot.without_price > 0 %} ({{ lot.without_price }} unpriced){% endif %}</td>
         <td>{{ lot.value|money }}</td>

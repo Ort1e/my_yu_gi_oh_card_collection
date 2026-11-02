@@ -25,6 +25,7 @@ deploy/
     install-on-nas.sh       put a build on the NAS and install it
     move-data-to-nas.sh     move the live data to the NAS (once)
     pull-backup.sh          the NAS's latest copy → the data submodule (git)
+    set-nas-setting.sh      set one setting on the NAS (a key, a password) and restart
 ```
 
 On the NAS:
@@ -110,7 +111,9 @@ nano /apps/collection/nightly.env      # OVH_USER, OVH_PASSWORD
 ```
 
 `install.sh` can be run again: it never overwrites the settings or the
-data.
+data. A new build that brings a new setting: `update.sh` adds it, empty,
+with its comment, at the end of the settings file (the log says which);
+fill it in with `deploy/pc/set-nas-setting.sh` (below) or by hand.
 
 ## 4. Moving the data (once)
 
@@ -202,6 +205,7 @@ copying `data/app.db` there, never the NAS's live database.
 | a backup now | `ssh nas systemctl start collection-nightly` (the whole night's job) |
 | back to the previous version | stop the app, move `/apps/collection/previous/*` back, start it (and the database of `/Data500/collection-backups` if a migration ran) |
 | change a password | edit `collection.env`, `systemctl restart collection` (that user is logged out) |
+| set a setting from the computer (`GOOGLE_BOOKS_API_KEY`…) | `deploy/pc/set-nas-setting.sh NAME`: the value of the local `.env`, else asked (hidden); sent through SSH's input, written in `collection.env`, the app restarted |
 
 ## Security
 

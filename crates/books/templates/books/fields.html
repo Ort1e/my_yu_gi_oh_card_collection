@@ -13,6 +13,11 @@
     <input type="file" id="isbn-photo-file" accept="image/*" class="visually-hidden">
   </div>
   <p id="isbn-status" class="isbn-status" role="status" aria-live="polite"></p>
+  {# shown by book_form.js on a phone whose browser won't give this page the camera #}
+  <p id="scan-note" class="hint" hidden>No live scan at this address: "📷 Scan" opens the camera app, and a phone
+    short of memory may close the browser meanwhile (the page starts again). Prefer "🖼 From a photo", or, in
+    Chrome, turn on <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> with
+    <code data-origin></code>, then "Relaunch".</p>
   <dialog id="scan-dialog" class="scan-dialog">
     <div class="scan-view">
       <video id="scan-video" playsinline muted></video>
@@ -21,7 +26,7 @@
     <p id="scan-help" class="scan-help">Point the camera at the barcode on the back…</p>
     <button type="button" id="scan-cancel" class="btn-secondary">Cancel</button>
   </dialog>
-  <small>"Look up" fills the fields below from Open Library. "Scan": take a photo of the barcode
+  <small>"Look up" fills the fields below from the catalogues (Open Library, Google Books, the BnF). "Scan": take a photo of the barcode
     ("From a photo": one taken with the camera app before, lighter for the phone).
     A book without an ISBN: leave it empty and fill the fields by hand.</small>
 </fieldset>
@@ -47,6 +52,7 @@
       <input type="number" name="volume" id="volume" value="{{ values.volume }}" min="1" max="999" inputmode="numeric">
     </div>
   </div>
+  <label class="switch"><input type="checkbox" name="is_read" id="is_read" value="1" {% if values.is_read %}checked{% endif %}> Read</label>
 </fieldset>
 
 <details class="more-fields" {% if !values.publisher.is_empty() || !values.year.is_empty() || !values.pages.is_empty() || !values.format.is_empty() || !values.language.is_empty() || !values.notes.is_empty() %}open{% endif %}>

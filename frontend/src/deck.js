@@ -52,9 +52,47 @@ export function zonePrice(cards) {
 
 export const euros = (n) => `${n.toFixed(2)}€`;
 
-/** "Banned" | "Limited" | "Semi-Limited" | undefined for the chosen ban list. */
-export function banStatus(card, banListId) {
-    return banListId == null ? undefined : card.ban?.[String(banListId)];
+/**
+ * What a version plays: `{ key, cutoff }`, `key` its ban list's id ("12")
+ * or its format's ("f3"), `cutoff` the format's ("2010-03-01", null for a
+ * ban list); null for neither. From the saved `ban_list_id` / `format_id`
+ * and the version's `formats`.
+ */
+export function rulesOf(deck, key) {
+    if (key == null) return null;
+
+    const format = deck.formats.find((f) => `f${f.id}` === key);
+
+    return { key, cutoff: format?.cutoff ?? null };
+}
+
+/** The selector's key of a version's saved ban list or format. */
+export function rulesKey(deck) {
+    if (deck.format_id != null) return `f${deck.format_id}`;
+
+    return deck.ban_list_id != null ? String(deck.ban_list_id) : null;
+}
+
+/** The `PATCH` fields for a key: `{ ban_list_id, format_id }`. */
+export function rulesFields(key) {
+    const format = key?.startsWith('f') ?? false;
+
+    return {
+        ban_list_id: key != null && !format ? Number(key) : null,
+        format_id: format ? Number(key.slice(1)) : null,
+    };
+}
+
+/** "Banned" | "Limited" | "Semi-Limited" | undefined in the rules played. */
+export function banStatus(card, rules) {
+    return rules == null ? undefined : card.ban?.[rules.key];
+}
+
+/** Out of the format's card pool: released after its cutoff, or never in the TCG. */
+export function outOfFormat(card, rules) {
+    if (!rules?.cutoff) return false;
+
+    return !card.first_release || card.first_release > rules.cutoff;
 }
 
 /** The English name, when it isn't the name already shown (a French card). */
@@ -103,4 +141,11 @@ export function ordinal(n) {
     const suffix = [11, 12, 13].includes(n % 100) ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
 
     return `${n}${suffix}`;
+}
+
+/** "2026-11-02" → "02/11/2026", anything else as it is (common::web::filters::french_date). */
+export function frenchDate(iso) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : iso;
 }

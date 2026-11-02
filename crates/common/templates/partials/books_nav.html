@@ -2,18 +2,34 @@
 <div class="logo">
   <a href="/books">My Books</a>
 </div>
+{% if common::export::public_copy() %}
 <ul class="nav-links" id="nav-links">
   <li><a href="/books">Books</a></li>
-  {% if !common::export::public_copy() %}<li><a href="/books/add">Add</a></li>{% endif %}
   <li><a href="/books/authors">Authors</a></li>
   <li><a href="/books/series">Series</a></li>
   <li><a href="/books/standalone">Stand-alone</a></li>
-  {% if common::export::public_copy() %}
+  <li><a href="/books/random" title="What to read next">🎲 Random</a></li>
   <li><a href="/cards" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
-  {% else %}
+  <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
+</ul>
+{% else %}
+<ul class="nav-links" id="nav-links">
+  <li class="nav-group">
+    <details>
+      <summary>Books</summary>
+      <ul class="nav-submenu">
+        <li><a href="/books">All the books</a></li>
+        <li><a href="/books/authors">Authors</a></li>
+        <li><a href="/books/series">Series</a></li>
+        <li><a href="/books/standalone">Stand-alone</a></li>
+      </ul>
+    </details>
+  </li>
+  <li><a href="/books/add">Add</a></li>
+  <li><a href="/books/random" title="What to read next">🎲 Random</a></li>
   <li><a href="/books/advent-calendar">Advent</a></li>
   <li><a href="/" class="section-switch" title="The Yu-Gi-Oh! card collection">Yu-Gi-Oh!</a></li>
-  {% endif %}
   <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
-  {% if !common::export::public_copy() %}<li><a href="/login">Account</a></li>{% endif %}
+  <li><a href="/login">Account</a></li>
 </ul>
+{% endif %}

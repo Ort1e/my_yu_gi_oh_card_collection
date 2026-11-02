@@ -57,6 +57,7 @@ impl TestApp {
                 media_dir: dir.join("media"),
                 uploads_dir: dir.join("uploads"),
                 cardmarket_account: "me".into(),
+                google_books_key: None,
                 auth,
             },
             dir,

@@ -70,6 +70,7 @@ async fn the_public_copy_holds_nothing_private() {
         "pokemon-wishlist.html",
         "books.html",
         "books-1.html",
+        "books-random.html",
         "decks.html",
         "decks-2.html",
         "deck-versions-10.html",
@@ -107,6 +108,9 @@ async fn the_public_copy_holds_nothing_private() {
         "quick round",
         r#"href="collection-stats.html""#,
         r#"src="img/card-image-1.webp""#,
+        // the random pick's links to the books, made by its script
+        r#""href":"books-1.html""#,
+        "static/js/book_random.js",
     ] {
         assert!(pages.contains(shown), "{shown} is missing");
     }

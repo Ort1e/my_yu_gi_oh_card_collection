@@ -149,7 +149,11 @@ impl LotRow {
     }
 
     pub fn title(&self) -> String {
-        format!("Lot {} - {}", self.buy_date, self.seller_name())
+        format!(
+            "Lot {} - {}",
+            crate::web::filters::french_date(&self.buy_date.to_string()),
+            self.seller_name()
+        )
     }
 }
 

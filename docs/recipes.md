@@ -181,6 +181,17 @@ In the app: **Books** in the menu (or `/books`) → **Add**.
 3. Fix what needs it, **Add the book**: the empty form comes back for the
    next one.
 
+The lookup asks Open Library, Google Books and the BnF (French national
+library: asked first for a French edition, `978-2…`). Google needs the
+`GOOGLE_BOOKS_API_KEY` setting (see the README's settings); the app stops at
+800 Google lookups a day, under its free quota.
+
+**Read or not:** the switch in the **Read** column of the book lists, or on
+the book's page. **🎲 Random** (in the menu, also on the public site) picks
+a book to read: unread ones you can start now (no unread earlier volume of
+the series) by default, a language or format if you like; **Another one**
+picks again.
+
 A book without an ISBN: fill the fields by hand. A series page lists the
 missing volumes, each with a link to add it. A book given away: its edit
 page → **Delete this book** (refused while it is behind an advent calendar
@@ -436,6 +447,22 @@ collections need):
    Style: 4-space indent, blank lines between logical blocks.
 5. Test the endpoint in `crates/yugioh/src/tests/deck_api.rs` (`t.json(…)`, see
    `categories_and_monte_carlo`), then `npm run build`.
+
+## Play a format (Edison…)
+
+1. **Decks → Formats → Add a format**: its name, its cutoff (a date, or
+   the set it ends with: the date comes from ygoprodeck's list of sets),
+   the Konami list it starts from (its cards are copied).
+2. On the format's page: add the cards of its own list (English name, as
+   on ygoprodeck), change a status, take one off. Check the cutoff: the
+   sets' dates are ygoprodeck's.
+3. In the deck builder, **Ban list or format** → the format, **Save**: the
+   problems show under it (too many copies, cards released after the
+   cutoff: greyed with "Out" on their tiles), and the reserve can keep only
+   the legal cards. The read-only page of the version shows them too.
+4. The format's list changes after decks were built with it (a community
+   update): **New version** on its page, then edit the copy. The decks
+   keep the version they play until you switch them.
 
 ## Fix a card's picture
 

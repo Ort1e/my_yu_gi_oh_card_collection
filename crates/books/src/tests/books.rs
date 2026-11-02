@@ -517,3 +517,101 @@ async fn the_scan_reads_the_isbn_on_the_nas() {
     );
     assert_eq!(scan(None).await.0, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn a_book_is_marked_read() {
+    let t = TestApp::new().await;
+    let mut form = GAME_OF_THRONES.to_vec();
+    form.push(("is_read", "1"));
+    let id = add(&t, &form).await;
+    assert_eq!(t.scalar("SELECT is_read FROM book").await, 1);
+    let (_, edit) = t.get(&format!("/books/{id}/edit")).await;
+    assert!(
+        edit.contains(r#"name="is_read" id="is_read" value="1" checked"#),
+        "{edit}"
+    );
+
+    // the switches of the tables and the book's page
+    let (_, list) = t.get("/books").await;
+    assert!(
+        list.contains(&format!(
+            r#"data-book-read="{id}" aria-label="A Game of Thrones: read" checked"#
+        )),
+        "{list}"
+    );
+    assert!(list.contains("/static/js/book_read.js"));
+    let (status, answer) = t
+        .json(
+            "POST",
+            &format!("/books/api/books/{id}/read"),
+            serde_json::json!({ "read": false }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(answer, serde_json::json!({ "is_read": false }));
+    assert_eq!(t.scalar("SELECT is_read FROM book").await, 0);
+    let (_, page) = t.get(&format!("/books/{id}")).await;
+    assert!(
+        page.contains(&format!(r#"data-book-read="{id}" >"#)),
+        "{page}"
+    );
+    let (status, _) = t
+        .json(
+            "POST",
+            "/books/api/books/99/read",
+            serde_json::json!({ "read": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // a save of the form keeps what it says
+    let mut form = GAME_OF_THRONES.to_vec();
+    form.retain(|(name, _)| *name != "isbn");
+    t.post(&format!("/books/{id}/edit"), &form).await;
+    assert_eq!(t.scalar("SELECT is_read FROM book").await, 0);
+}
+
+#[tokio::test]
+async fn the_random_pick_carries_every_book() {
+    let t = TestApp::new().await;
+    t.exec(
+        "INSERT INTO book_series (id, name) VALUES (1, 'Farseer');
+         INSERT INTO book (id, isbn, title, series_id, volume, language, format, page_count, is_read, added_on)
+             VALUES (1, '9780553573398', 'Assassin''s Apprentice', 1, 1, 'en', 'Paperback', 435, 1, '2026-10-18'),
+                    (2, NULL, 'Royal Assassin', 1, 2, 'en', NULL, NULL, 0, '2026-10-18'),
+                    (3, NULL, 'Circe', NULL, NULL, 'fr', 'Hardcover', NULL, 0, '2026-10-18');",
+    )
+    .await;
+
+    let (status, page) = t.get("/books/random").await;
+    assert_eq!(status, StatusCode::OK);
+    for text in [
+        r#""href":"/books/1""#,
+        r#""series":"Farseer #2","series_id":1"#,
+        r#""read":true"#,
+        "https://covers.openlibrary.org/b/isbn/9780553573398-M.jpg",
+        r#"<option value="fr">French</option>"#,
+        "/static/js/book_random.js",
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
+    assert_eq!(page.matches(r#""title":"#).count(), 3);
+}
+
+#[tokio::test]
+async fn the_read_switch_needs_the_login() {
+    let t = TestApp::with_password(Some("secret")).await;
+    t.exec("INSERT INTO book (id, title, added_on) VALUES (1, 'Circe', '2026-10-18')")
+        .await;
+
+    assert_eq!(t.get("/books/random").await.0, StatusCode::OK);
+    let (status, _) = t
+        .json(
+            "POST",
+            "/books/api/books/1/read",
+            serde_json::json!({ "read": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(t.scalar("SELECT is_read FROM book").await, 0);
+}

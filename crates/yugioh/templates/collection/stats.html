@@ -21,7 +21,7 @@
     <div class="value-tile">
       <div class="value-label">Market value</div>
       <div class="value-amount">{{ value|money }} €</div>
-      <div class="value-detail">{% match last_refresh %}{% when Some with (date) %}prices of {{ date }}{% when None %}no price yet{% endmatch %}{% if without_price > 0 %}, {{ without_price }} without a price{% endif %}</div>
+      <div class="value-detail">{% match last_refresh %}{% when Some with (date) %}prices of {{ date|date }}{% when None %}no price yet{% endmatch %}{% if without_price > 0 %}, {{ without_price }} without a price{% endif %}</div>
     </div>
   </div>
   <p class="value-note">Market value: Cardmarket's trend price of each card's printing, else ygoprodeck's estimate,

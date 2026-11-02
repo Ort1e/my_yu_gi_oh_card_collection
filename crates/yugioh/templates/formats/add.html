@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Add a format{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow">
+  <p class="back-link"><a href="/formats">← All the formats</a></p>
+  <h1>Add a format</h1>
+
+  {% include "partials/form_errors.html" %}
+
+  <form method="post" action="/formats/add">
+    <p>
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" value="{{ values.name }}" placeholder="Edison" required>
+    </p>
+    <fieldset>
+      <legend>Cutoff</legend>
+      <p><small>The cards released in the TCG up to this day (included) are in the format.</small></p>
+      <div class="field-row">
+        <div>
+          <label for="cutoff">A date:</label>
+          <input type="date" name="cutoff" id="cutoff" value="{{ values.cutoff }}">
+        </div>
+        <div class="wide">
+          <label for="cutoff_set">or the set it ends with:</label>
+          <input type="text" name="cutoff_set" id="cutoff_set" value="{{ values.cutoff_set }}" list="set-names" autocomplete="off" placeholder="The Shining Darkness">
+        </div>
+      </div>
+      {% if sets.is_empty() %}<p class="hint">The sets' dates couldn't be had from ygoprodeck: type a date.</p>{% endif %}
+    </fieldset>
+    <p>
+      <label for="based_on">Its list starts from the Konami list of:</label>
+      <select name="based_on" id="based_on">
+        <option value="">— none (an empty list)</option>
+        {% for (id, date) in ban_lists %}
+        <option value="{{ id }}" {% if values.based_on_is(id) %}selected{% endif %}>{{ date|date }}</option>
+        {% endfor %}
+      </select>
+      <small>Copied: change it afterwards on the format's page.</small>
+    </p>
+    <p>
+      <label for="notes">Notes:</label>
+      <textarea name="notes" id="notes" rows="3" placeholder="Where its rules come from…">{{ values.notes }}</textarea>
+    </p>
+    <button type="submit">Add the format</button>
+  </form>
+
+  <datalist id="set-names">
+    {% for (name, date) in sets %}<option value="{{ name }}">{{ date|date }}</option>{% endfor %}
+  </datalist>
+</div>
+{% endblock %}

@@ -38,10 +38,12 @@
       {% if !common::export::public_copy() %}
       {% match book.isbn %}{% when Some with (isbn) %}<dt>ISBN</dt><dd>{{ isbn }}</dd>{% when None %}{% endmatch %}
       {% endif %}
-      <dt>Added</dt><dd>{{ book.added_on }}</dd>
+      <dt>Added</dt><dd>{{ book.added_on|date }}</dd>
+      {% if common::export::public_copy() %}<dt>Read</dt><dd>{{ book.is_read|yes_no }}</dd>{% endif %}
     </dl>
 
     {% if !common::export::public_copy() %}
+    <label class="switch"><input type="checkbox" data-book-read="{{ book.id }}" {% if book.is_read %}checked{% endif %}> Read</label>
     {% match book.notes %}{% when Some with (notes) %}<blockquote class="book-notes">{{ notes }}</blockquote>{% when None %}{% endmatch %}
     {% for (year, day) in calendar_days %}
     <p>🎄 Day {{ day }} of the <a href="/books/advent-calendar/{{ year }}">{{ year }} advent calendar</a></p>
@@ -81,4 +83,5 @@
 
 {% block extra_js %}
 <script src="/static/js/book_cover.js"></script>
+{% if !common::export::public_copy() %}<script src="/static/js/book_read.js"></script>{% endif %}
 {% endblock %}

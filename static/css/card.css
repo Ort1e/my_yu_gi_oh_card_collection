@@ -259,6 +259,107 @@ a.rarity-badge:hover {
 /* Phones                                                               */
 /* ------------------------------------------------------------------ */
 
+/* What the card is and says (cards/detail.html, routes/cards/text.rs): a
+   band of the card's frame colour with its type, the facts in two columns,
+   the text with its own line breaks (a Pendulum card's two effects). */
+.card-text {
+    overflow: hidden;
+    margin: 1rem 0;
+    border-radius: var(--radius);
+    background: #fbf8f1;
+    color: #222;
+    font-size: 0.95rem;
+}
+
+.card-text-band {
+    padding: 0.45rem 0.8rem;
+    background: var(--frame, #8a8a8a);
+    color: var(--frame-text, #fff);
+    font-weight: bold;
+    letter-spacing: 0.02em;
+}
+
+/* The frames' colours, as on the cards. */
+.frame-normal { --frame: #e1b96b; --frame-text: #2b1d00; }
+.frame-effect { --frame: #c9652e; }
+.frame-ritual { --frame: #4d74b8; }
+.frame-fusion { --frame: #7d4b9e; }
+.frame-synchro { --frame: #e8e8e8; --frame-text: #222; }
+.frame-xyz { --frame: #1f1f1f; }
+.frame-link { --frame: #1f5f9e; }
+.frame-token { --frame: #8a8a8a; }
+.frame-spell { --frame: #1d8a72; }
+.frame-trap { --frame: #a8457a; }
+.frame-effect_pendulum { --frame: linear-gradient(90deg, #c9652e 50%, #1d8a72 50%); }
+.frame-normal_pendulum { --frame: linear-gradient(90deg, #e1b96b 50%, #1d8a72 50%); --frame-text: #2b1d00; }
+.frame-xyz_pendulum { --frame: linear-gradient(90deg, #1f1f1f 50%, #1d8a72 50%); }
+.frame-synchro_pendulum { --frame: linear-gradient(90deg, #e8e8e8 50%, #1d8a72 50%); --frame-text: #222; }
+.frame-fusion_pendulum { --frame: linear-gradient(90deg, #7d4b9e 50%, #1d8a72 50%); }
+
+.card-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.3rem 1rem;
+    margin: 0;
+    padding: 0.7rem 0.8rem 0.2rem;
+}
+
+.card-facts dt {
+    color: #666;
+}
+
+.card-facts dd {
+    margin: 0;
+}
+
+.level-stars {
+    color: #d48a00;
+    letter-spacing: -0.05em;
+}
+
+/* The attributes' colours, as their round symbols. */
+.attribute-badge {
+    display: inline-block;
+    padding: 0 0.55rem;
+    border-radius: 1rem;
+    background: #777;
+    color: #fff;
+    font-size: 0.85em;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+}
+
+.attribute-dark { background: #4b2a6b; }
+.attribute-light { background: #c9a227; color: #222; }
+.attribute-earth { background: #6b4b2a; }
+.attribute-water { background: #2a6fb0; }
+.attribute-fire { background: #c0392b; }
+.attribute-wind { background: #2f8f4e; }
+.attribute-divine { background: #b08d2a; }
+
+.card-text-label {
+    padding: 0.5rem 0.8rem 0;
+    color: #666;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.card-text-body {
+    margin: 0;
+    padding: 0.4rem 0.8rem 0.7rem;
+    white-space: pre-line;
+    line-height: 1.5;
+}
+
+.card-facts + .card-text-body,
+.card-facts + .card-text-label {
+    margin-top: 0.4rem;
+    border-top: 1px solid #e3dccb;
+    padding-top: 0.6rem;
+}
+
 @media (max-width: 760px) {
     .card {
         padding: 0.75rem 1rem;

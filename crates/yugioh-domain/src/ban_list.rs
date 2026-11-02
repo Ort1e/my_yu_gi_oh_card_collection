@@ -35,6 +35,17 @@ pub enum BanStatus {
 }
 
 impl BanStatus {
+    pub const ALL: [BanStatus; 3] = [
+        BanStatus::Banned,
+        BanStatus::Limited,
+        BanStatus::SemiLimited,
+    ];
+
+    /// From a stored status (`Semi-Limited`).
+    pub fn from_code(code: &str) -> Option<BanStatus> {
+        BanStatus::ALL.into_iter().find(|s| s.code() == code)
+    }
+
     /// Value stored in `ban_list_entry.status`.
     pub fn code(self) -> &'static str {
         match self {

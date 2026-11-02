@@ -1,11 +1,11 @@
 <script>
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, englishName, imageUrl } from '../deck.js';
+    import { banStatus, englishName, imageUrl, outOfFormat } from '../deck.js';
 
     export let card;
     /** zone the card is in ("main", "reserve", …); null = not draggable */
     export let from = null;
-    export let banListId = null;
+    export let rules = null;
     export let selected = false;
 
     const dispatch = createEventDispatcher();
@@ -16,8 +16,10 @@
     }
 
     $: src = imageUrl(card);
-    $: ban = banStatus(card, banListId);
-    $: title = englishName(card) ? `${card.name} (${englishName(card)})` : card.name;
+    $: ban = banStatus(card, rules);
+    $: out = outOfFormat(card, rules);
+    $: name = englishName(card) ? `${card.name} (${englishName(card)})` : card.name;
+    $: title = out ? `${name}: not in this format's card pool` : name;
 </script>
 
 <button
@@ -27,6 +29,7 @@
     draggable={from !== null}
     data-is_proxy={card.is_proxy}
     data-ban_status={ban}
+    class:out-of-format={out}
     {title}
     on:dragstart={dragStart}
     on:click={() => dispatch('select', card)}
@@ -36,6 +39,7 @@
     {:else}
         <span class="no-image">{card.name}</span>
     {/if}
+    {#if out}<span class="out-badge" aria-hidden="true">Out</span>{/if}
 </button>
 
 <style>
@@ -96,6 +100,26 @@
         font-size: 0.7rem;
         padding: 2px 4px;
         border-radius: 4px;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    /* out of the format's card pool: greyed, "Out" badge (top-left: the
+       proxy badge is at the bottom, the limit at the top-right) */
+    .deck-card.out-of-format img {
+        filter: grayscale(1);
+        opacity: 0.55;
+    }
+
+    .deck-card.out-of-format .out-badge {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        background: #6c3483;
+        color: white;
+        font-size: 0.7rem;
         pointer-events: none;
         z-index: 10;
     }

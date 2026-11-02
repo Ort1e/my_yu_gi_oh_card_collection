@@ -43,7 +43,7 @@ async fn values_the_collection_from_lot_prices() {
 
     let (status, body) = t.get("/collection/value").await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(body.contains("Market prices of 2026-10-01"), "{body}");
+    assert!(body.contains("Market prices of 01/10/2026"), "{body}");
     // 2 French NM copies at 6.00 × 0.9; the proxy isn't owned
     assert!(body.contains("10.80 €"), "{body}");
     assert!(body.contains("2 copies"), "{body}");
@@ -84,7 +84,7 @@ async fn the_card_page_shows_its_market_price() {
     let (status, body) = t.get(&format!("/cards/{}", cards[0])).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert!(
-        body.contains("6.00 € on 2026-10-01 (this copy ≈ 5.40 €)"),
+        body.contains("6.00 € on 01/10/2026 (this copy ≈ 5.40 €)"),
         "{body}"
     );
     assert!(body.contains("Market (estimate):"), "{body}");
@@ -228,4 +228,31 @@ async fn the_statistics_show_the_cards_owned_without_what_they_cost() {
     assert!(body.contains(r#""value":["#), "{body}");
     assert!(!body.contains("net_spent"));
     assert!(!body.contains("8.00"), "{body}");
+}
+
+#[tokio::test]
+async fn the_card_page_shows_what_the_card_is_and_says() {
+    let t = TestApp::new().await;
+    let cards = priced_fixture(&t).await;
+    t.exec(
+        r#"UPDATE card_data SET json_data = '{"type": "Normal Monster",
+            "humanReadableCardType": "Normal Monster", "frameType": "normal",
+            "typeline": ["Spellcaster", "Normal"], "attribute": "DARK", "level": 7,
+            "atk": 2500, "def": 2100,
+            "desc": "The ultimate wizard.\r\nIn terms of attack & defense."}' WHERE id = 1"#,
+    )
+    .await;
+
+    let (_, body) = t.get(&format!("/cards/{}", cards[0])).await;
+    for text in [
+        r#"<section class="card-text frame-normal">"#,
+        r#"<div class="card-text-band">Normal Monster</div>"#,
+        "<dd>Spellcaster / Normal</dd>",
+        r#"<span class="attribute-badge attribute-dark">DARK</span>"#,
+        "★★★★★★★</span> 7",
+        "<dd>2500 / 2100</dd>",
+        "The ultimate wizard.\nIn terms of attack &amp; defense.",
+    ] {
+        assert!(body.contains(text), "{text}: {body}");
+    }
 }

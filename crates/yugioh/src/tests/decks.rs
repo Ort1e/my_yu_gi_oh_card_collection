@@ -31,7 +31,7 @@ async fn deck_list_sorts() {
         ["Never played", "Played lately", "Played long ago"]
     );
     assert!(page.contains("Versions: 2"));
-    assert!(page.contains("Last tournament: 2026-02-08"));
+    assert!(page.contains("Last tournament: 08/02/2026"));
     assert!(page.contains("Last tournament: never"));
 
     let (_, page) = t.get("/decks?sort=tournament").await;
@@ -212,7 +212,7 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     // no list chosen: the latest one, its badges on the tiles
     let shown = page().await;
     assert!(
-        shown.contains("The list of 2026-04-01 (the latest"),
+        shown.contains("The list of 01/04/2026 (the latest"),
         "{shown}"
     );
     assert_eq!(
@@ -229,7 +229,7 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     ))
     .await;
     let shown = page().await;
-    assert!(shown.contains("The list of 2026-01-01."), "{shown}");
+    assert!(shown.contains("The list of 01/01/2026."), "{shown}");
     assert!(shown.contains("No card of this version is restricted on it."));
     assert!(!shown.contains("card-tile-ban"));
 

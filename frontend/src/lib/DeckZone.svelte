@@ -5,7 +5,7 @@
     /** "main" | "extra" | "side" | "reserve" */
     export let zone;
     export let cards;
-    export let banListId = null;
+    export let rules = null;
     export let selectedId = null;
 
     const dispatch = createEventDispatcher();
@@ -42,7 +42,7 @@
         <CardTile
             {card}
             from={zone}
-            {banListId}
+            {rules}
             selected={card.id === selectedId}
             on:select
         />

@@ -42,6 +42,7 @@
 }
 
 .nav-links a {
+    white-space: nowrap;        /* "Yu-Gi-Oh!" never cut at its hyphens */
     font-weight: 500;
     color: var(--text-light);
     text-decoration: none;
@@ -125,6 +126,19 @@
     padding: 0.1rem 0.6rem;
     border: 1px solid var(--text-light);
     border-radius: 1rem;
+}
+
+/* Between the phones and wide screens: the links closer together, so the
+   longest menu (the books') still holds on one line. */
+@media (min-width: 761px) and (max-width: 1100px) {
+    .site-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .nav-links {
+        gap: 0.9rem;
+        font-size: 0.92rem;
+    }
 }
 
 /* Phones: the header is not fixed (it would hide half the screen). The logo

@@ -11,6 +11,7 @@ use crate::store::models::{other_name, LotRow};
 use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
 use crate::web::card_rows::CardRowValues;
 use crate::web::error::{AppResult, OrNotFound};
+use crate::web::filters;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
 use crate::AppState;
 

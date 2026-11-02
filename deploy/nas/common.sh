@@ -32,3 +32,30 @@ app() {
     printf -v command '%s%s' "$command" "$(printf ' %q' "$APP_DIR/backend" "$@")"
     su -s /bin/bash -c "$command" "$APP_USER"
 }
+
+# The settings of an example file (`collection.env.example`) that a settings
+# file lacks, each with the comment above it, ready to append: a new build's
+# new settings reach the NAS (update.sh). A setting is there when the file
+# has it, even commented out (`#APP_ACCESS_FRIEND=…`): never set twice.
+new_settings() {
+    local example=$1 settings=$2
+    awk -v settings="$settings" '
+        function name_of(line) {
+            sub(/^#/, "", line)
+            sub(/=.*/, "", line)
+            return line
+        }
+        BEGIN {
+            while ((getline line < settings) > 0) {
+                if (line ~ /^#?[A-Za-z_][A-Za-z0-9_]*=/) known[name_of(line)] = 1
+            }
+        }
+        /^[A-Za-z_][A-Za-z0-9_]*=/ {
+            if (!(name_of($0) in known)) printf "\n%s%s\n", comments, $0
+            comments = ""
+            next
+        }
+        /^#/ { comments = comments $0 "\n"; next }
+        { comments = "" }
+    ' "$example"
+}

@@ -3,7 +3,7 @@
     // The results are a drop zone; moves in and out of it are done by
     // App.svelte, which shares `cards` with this component.
     import DeckZone from './DeckZone.svelte';
-    import { sortCards } from '../deck.js';
+    import { banStatus, outOfFormat, sortCards } from '../deck.js';
 
     export let api;
     export let cardTypes;
@@ -11,10 +11,17 @@
     export let cards;
     /** ids of the cards in the deck zones (saved or not), left out of the results */
     export let deckCardIds;
-    export let banListId = null;
+    export let rules = null;
     export let selectedId = null;
 
     const NO_FILTER = 'Please enter at least one filter to search cards.';
+
+    /** with a format: only its legal cards (in its pool, not forbidden) */
+    let legalOnly = false;
+
+    $: shown = rules?.cutoff && legalOnly
+        ? cards.filter((c) => !outOfFormat(c, rules) && banStatus(c, rules) !== 'Banned')
+        : cards;
 
     let filters = { name: '', code: '', card_type: '' };
     let message = NO_FILTER;
@@ -61,9 +68,12 @@
         <option value={cardType}>{cardType}</option>
     {/each}
 </select>
+{#if rules?.cutoff}
+    <label class="switch legal-only"><input type="checkbox" bind:checked={legalOnly}> Legal in this format only</label>
+{/if}
 
 <div class="results">
-    <DeckZone zone="reserve" {cards} {banListId} {selectedId} on:move on:select>
+    <DeckZone zone="reserve" cards={shown} {rules} {selectedId} on:move on:select>
         <span slot="empty" class="hint">{message}</span>
     </DeckZone>
 </div>
@@ -75,6 +85,10 @@
     select {
         max-width: none;
         margin-bottom: 0;
+    }
+
+    .legal-only {
+        margin: 0.5rem 0 0;
     }
 
     .results {

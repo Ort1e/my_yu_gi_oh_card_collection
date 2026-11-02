@@ -46,6 +46,10 @@ pub struct AppState {
     pub uploads_dir: PathBuf,
     /// Our Cardmarket username, to tell purchases from sales in shipments.
     pub cardmarket_account: String,
+    /// Google Books' API key (`GOOGLE_BOOKS_API_KEY`), for the ISBN lookups:
+    /// without one, Google's shared keyless quota is nearly always used up.
+    /// Never logged.
+    pub google_books_key: Option<String>,
     pub auth: auth::Auth,
 }
 

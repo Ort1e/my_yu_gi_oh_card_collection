@@ -3,8 +3,8 @@
 //! behind the login; the book advent calendars private.
 //!
 //! - `routes/`: the pages (list, detail, add/edit/delete with the ISBN
-//!   lookup and barcode scan, authors, series, the ISBN lookup's JSON, the
-//!   advent calendars);
+//!   lookup and barcode scan, authors, series, the random pick of the next
+//!   book, the ISBN lookup's JSON, the advent calendars);
 //! - `store/`: book writes (`books.rs`) and the ISBN lookup with its cache
 //!   (`book_data.rs`);
 //! - `barcode.rs`: the ISBN read on a photo of a barcode (the scan);
@@ -32,7 +32,8 @@ pub fn routes() -> Routes {
             .route("/books/authors/:id", get(routes::authors::detail))
             .route("/books/series", get(routes::series::list))
             .route("/books/series/:id", get(routes::series::detail))
-            .route("/books/standalone", get(routes::series::standalone)),
+            .route("/books/standalone", get(routes::series::standalone))
+            .route("/books/random", get(routes::random::page)),
         private: Router::new(),
         write: Router::new()
             .route(
@@ -45,6 +46,7 @@ pub fn routes() -> Routes {
             )
             .route("/books/:id/delete", post(routes::form::delete))
             .route("/books/api/isbn/:isbn", get(routes::api::isbn))
+            .route("/books/api/books/:id/read", post(routes::api::set_read))
             .route(
                 "/books/api/isbn-scan",
                 post(routes::api::scan).layer(DefaultBodyLimit::max(40 * 1024 * 1024)),

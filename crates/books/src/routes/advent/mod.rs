@@ -121,14 +121,14 @@ impl Calendar for Books {
         let not_found = || {
             format!("no catalogue knows the ISBN {isbn}: add the book on the Add page first, then use its #id.")
         };
-        match book_data::lookup(&state.pool, &state.http, &isbn).await {
+        match book_data::lookup(state, &isbn).await {
             Ok(Found::Book(info)) => Ok(BookFields::from_info(isbn.clone(), info)
                 .map(|book| Pick::New(Box::new(book)))
                 .ok_or_else(not_found)),
             Ok(Found::Unknown) => Ok(Err(not_found())),
             Ok(Found::Unavailable) => Ok(Err(format!(
-                "Google Books is refusing requests for now and Open Library doesn't know {isbn}: \
-                 try again later, or add the book on the Add page first."
+                "no catalogue found {isbn} and one couldn't answer (Google Books' daily quota, \
+                 or the network): try again later, or add the book on the Add page first."
             ))),
             Err(e) => {
                 tracing::warn!(isbn = %isbn, "book lookup failed: {e}");

@@ -142,7 +142,7 @@ async fn copies_are_valued_at_their_printings_price() {
 
     let (_, card) = t.get(&format!("/cards/{}", cards[0])).await;
     assert!(card.contains("Market (Cardmarket):"), "{card}");
-    assert!(card.contains("12.50 € on 2026-10-19"), "{card}");
+    assert!(card.contains("12.50 € on 19/10/2026"), "{card}");
 }
 
 #[tokio::test]
@@ -165,7 +165,7 @@ async fn the_edit_form_picks_the_product() {
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("Automatic (now 500)"), "{page}");
     assert!(
-        page.contains("501 · expansion 200 · added 2001-01-01 · trend 3.00 €"),
+        page.contains("501 · expansion 200 · added 01/01/2001 · trend 3.00 €"),
         "{page}"
     );
     assert!(page.contains("500 · expansion 100 (LOB)"), "{page}");

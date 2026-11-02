@@ -1,6 +1,7 @@
 /*
  * A deck version's read-only page (templates/decks/version.html): the
- * opening hands and ban list panels above the cards, the tournament below.
+ * opening hands and ban list (or format) panels above the cards, the
+ * tournament below. Then the formats' pages (templates/formats/).
  */
 
 .deck-panels {
@@ -20,6 +21,60 @@
 
 .deck-tournament {
     margin-top: 2rem;
+}
+
+/* A version's problems in its format. */
+.format-ok {
+    color: #1b7a3d;
+    font-weight: bold;
+}
+
+.format-problems {
+    margin: 0 0 1rem;
+    padding-left: 1.2rem;
+    color: #a12a2a;
+}
+
+.format-problems li {
+    margin-bottom: 0.25rem;
+}
+
+/* ---------- formats (templates/formats/) ---------- */
+
+.format-facts {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.format-notes {
+    margin: 0.3rem 0 0;
+    padding: 0.5rem 0.9rem;
+    border-left: 4px solid var(--border-color);
+    white-space: pre-line;
+}
+
+.format-add-card {
+    margin-bottom: 1rem;
+}
+
+/* A card's status and its button on one line. */
+#format-list form.inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#format-list select {
+    width: auto;
+    height: 2rem;
+    margin: 0;
+    padding: 0.2rem 0.5rem;
+}
+
+/* A listed card out of the pool anyway (released after the cutoff). */
+tr.format-out td {
+    opacity: 0.55;
 }
 
 @media (max-width: 760px) {
