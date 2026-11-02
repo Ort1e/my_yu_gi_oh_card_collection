@@ -11,6 +11,12 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
   "Red Rising, 3" were badly read from Open Library (fixed for new
   lookups): rename them in their books' forms.
+- **Tailscale on the NAS** (ready 2026-11-02, to run at home): the
+  owner runs `deploy/pc/install-tailscale-on-nas.sh`, approves the NAS,
+  turns HTTPS on, disables its key expiry, installs the app on the
+  devices, invites the friend (deploy/README.md, "From outside home").
+  Then check: the app at its `ts.net` address from mobile data, the live
+  book scan on the friend's phone over HTTPS, `NAS=nas-ts` scripts.
 - **The Google Books key** (2026-11-02): it answered 503 "backendFailed"
   the hour it was made. Check that lookups say `googlebooks` in
   `book_data.source` once it's on the NAS (`GOOGLE_BOOKS_API_KEY` in

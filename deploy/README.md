@@ -1,7 +1,8 @@
 # Deploying: the app on the NAS, the public copy on OVH
 
-The app runs on the NAS (a Netgear ReadyNAS), reachable **from the home
-network only**. Every morning the NAS backs the data up, updates the app
+The app runs on the NAS (a Netgear ReadyNAS), reachable from the home
+network, and from **our own devices anywhere through Tailscale** (no port
+opened on the box: [From outside home](#from-outside-home-tailscale)). Every morning the NAS backs the data up, updates the app
 when `main` has a new build, then writes the **public copy** (the cards and the
 deck versions played in tournaments or chosen, the Pokémon wishlist and the books, with
 market values) and uploads it to the
@@ -19,6 +20,7 @@ deploy/
     common.sh               the settings and the app's commands, for the scripts
     collection.service      the app, started at boot
     collection-nightly.*    the nightly job and its timer (7:30)
+    tailscaled.service      Tailscale, started at boot (deploy/pc/install-tailscale-on-nas.sh)
     collection.env.example  the app's settings (passwords)
     nightly.env.example     the nightly job's settings (OVH, GitHub token)
   pc/                       on the computer
@@ -26,6 +28,7 @@ deploy/
     move-data-to-nas.sh     move the live data to the NAS (once)
     pull-backup.sh          the NAS's latest copy → the data submodule (git)
     set-nas-setting.sh      set one setting on the NAS (a key, a password) and restart
+    install-tailscale-on-nas.sh   Tailscale on the NAS (install, update)
 ```
 
 On the NAS:
@@ -37,6 +40,7 @@ On the NAS:
 | the live data | `/Data1To/collection/` (`app.db`, `media/`, `uploads/`) |
 | the public copy, before its upload | `/Data1To/collection/public-export/` |
 | the nightly copies (other disks) | `/Data500/collection-backups/` (14 days) |
+| Tailscale (its programs, its state: the NAS's identity in the account) | `/apps/tailscale/` (root's) |
 
 The app runs as the user `collection`, which can write the data but not
 the app itself; the scripts run as root.
@@ -195,6 +199,66 @@ To work on the real data on the computer (development, a script), use a
 copy: `DATABASE_URL=sqlite:/tmp/copy.db cargo run -p backend` after
 copying `data/app.db` there, never the NAS's live database.
 
+## From outside home: Tailscale
+
+[Tailscale](https://tailscale.com) links our own devices (the NAS, the
+computers, the phones) wherever they are: each one signs in to the same
+Tailscale account, and only they can reach each other. The NAS only makes
+outgoing connections: **no port is opened on the Bbox** (which has no VPN
+server of its own), the NAS stays invisible from the internet.
+
+**Once, at home** (the NAS on):
+
+1. On the computer, at the repository's root:
+   `deploy/pc/install-tailscale-on-nas.sh`. It installs Tailscale on the
+   NAS (`/apps/tailscale`, the service `tailscaled`) and starts it.
+2. It prints a link (`To authenticate, visit: …`): open it on the computer
+   and log in to the Tailscale account. The NAS appears in the account's
+   **Machines**.
+3. It then publishes the app over HTTPS (`tailscale serve`). The first
+   time it may print another link, to turn on **HTTPS** (and MagicDNS) for
+   the account: open it, accept, and the script goes on. At the end it
+   prints the app's address, `https://lahochenas3.<name>.ts.net`.
+4. In the Tailscale admin page (login.tailscale.com), **Machines** → the
+   NAS → **⋯** → **Disable key expiry**: otherwise the NAS has to be
+   approved again every 6 months.
+
+**On each device**: install the Tailscale app (Android, iPhone, Windows,
+Linux: `tailscale up`) and log in to the same account. Then, from
+anywhere (the NAS is on from 7:00 to 22:00):
+
+- the app: `https://lahochenas3.<name>.ts.net` (the address step 3
+  printed). HTTPS: the pages get the camera, so **the live book scan works
+  without Chrome's setting** for the NAS's address. At home,
+  `http://192.168.1.202:3000` still works too;
+- SSH: `ssh root@lahochenas3`, or this in `~/.ssh/config`, then
+  `NAS=nas-ts deploy/pc/…` for any script of `deploy/pc/` from anywhere:
+
+  ```
+  Host nas-ts
+  	HostName lahochenas3
+  	User root
+  	IdentityFile ~/.ssh/nas_maison
+  	IdentitiesOnly yes
+  ```
+
+**The friend**: in the admin page, **Users** → **Invite** (her own
+account in our network), or **Machines** → the NAS → **Share** (she sees
+only the NAS). She installs the app on her phone and logs in.
+
+**Updates**: Tailscale doesn't update itself here; run
+`deploy/pc/install-tailscale-on-nas.sh` again now and then (it keeps the
+NAS's identity). To remove it: `systemctl disable --now tailscaled`, delete
+`/apps/tailscale` and `/etc/systemd/system/tailscaled.service`, and the
+machine in the admin page.
+
+Why userspace networking (`--tun=userspace-networking` in
+`tailscaled.service`): the NAS's old kernel (4.4) and firewall need nothing
+then. The connections coming through Tailscale reach the NAS's services on
+127.0.0.1; through `tailscale serve`, the app sees each visitor's address
+in `X-Forwarded-For` (the wrong-password limit is per visitor,
+`common::web::auth::client`).
+
 ## By hand
 
 | What | Command |
@@ -205,13 +269,17 @@ copying `data/app.db` there, never the NAS's live database.
 | a backup now | `ssh nas systemctl start collection-nightly` (the whole night's job) |
 | back to the previous version | stop the app, move `/apps/collection/previous/*` back, start it (and the database of `/Data500/collection-backups` if a migration ran) |
 | change a password | edit `collection.env`, `systemctl restart collection` (that user is logged out) |
+| Tailscale's state, the app's address | `ssh nas /apps/tailscale/tailscale status`, `ssh nas /apps/tailscale/tailscale serve status` |
 | set a setting from the computer (`GOOGLE_BOOKS_API_KEY`…) | `deploy/pc/set-nas-setting.sh NAME`: the value of the local `.env`, else asked (hidden); sent through SSH's input, written in `collection.env`, the app restarted |
 
 ## Security
 
 - The box opens **no port** to the NAS: Netgear no longer updates the
   ReadyNAS, so it must stay unreachable from the internet. The app is for
-  the home network only, in plain HTTP (`SECURE_COOKIES=0`), every page
+  the home network and, through Tailscale, our own devices only (outgoing
+  connections only, the devices of our Tailscale account); in plain HTTP
+  at home (`SECURE_COOKIES=0`: the cookie works in both), HTTPS through
+  Tailscale, every page
   behind the login (`PUBLIC_READS=0`: a guest on the Wi-Fi sees nothing),
   5 wrong passwords → 15 minutes of refusal.
 - One password per person (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`): one can
@@ -235,9 +303,10 @@ copying `data/app.db` there, never the NAS's live database.
 
 ## Why this setup
 
-- **Who uses it**: the owner and a friend living together, from the home
-  network only (computers, phones on the Wi-Fi). No access from outside,
-  so no VPN.
+- **Who uses it**: the owner and a friend living together, at home
+  (computers, phones on the Wi-Fi) and from outside through Tailscale
+  (2026-11-02: being away without the NAS was impractical; the Bbox has no
+  VPN server, and Tailscale opens no port).
 - **What is public**: a read-only copy of the Yu-Gi-Oh! cards, the
   Pokémon cards and wishlist and the books, with market values. No lots,
   sellers, prices paid, budget, decks, tournaments, advent calendars or
