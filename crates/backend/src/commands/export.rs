@@ -1,7 +1,7 @@
 //! `export-public`: the public copy of the collections (`common::export`),
 //! written into a folder to put on the web hosting: the app's own pages of
 //! the Yu-Gi-Oh! cards, their statistics, decks and tournaments, the Pokémon cards and
-//! wishlist, the books, the rarity guides. Nothing else of the app: only
+//! wishlist, the books (and their random pick), the rarity guides. Nothing else of the app: only
 //! the addresses of [`public`] are asked for, and the templates leave out
 //! what is private (`common::export::public_copy`). The decks: only those
 //! played in a tournament or ticked "public" (`yugioh::routes::decks`).
@@ -13,7 +13,7 @@ use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
 
 /// The pages the copy starts from; the first one is its home page.
-const START: [&str; 12] = [
+const START: [&str; 13] = [
     "/cards",
     "/collection/stats",
     "/decks",
@@ -26,6 +26,7 @@ const START: [&str; 12] = [
     "/books/authors",
     "/books/series",
     "/books/standalone",
+    "/books/random",
 ];
 
 /// The addresses the copy may hold: the start pages, a card's, a deck's, a

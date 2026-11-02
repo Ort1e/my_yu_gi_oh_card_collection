@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}{{ format.label() }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/decks.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <p class="back-link"><a href="/formats">← All the formats</a></p>
+  <h1>{{ format.label() }}</h1>
+
+  {% include "partials/form_errors.html" %}
+
+  <div class="format-facts">
+    <div>Cards released in the TCG up to <strong>{{ format.cutoff|date }}</strong>.</div>
+    {% match based_on %}{% when Some with (date) %}<div>Its list started from Konami's list of {{ date|date }}.</div>{% when None %}{% endmatch %}
+    {% if versions.len() > 1 %}
+    <div>Versions: {% for (other, number, current) in versions %}{% if !loop.first %}, {% endif %}{% if current %}<strong>v{{ number }}</strong>{% else %}<a href="/formats/{{ other }}">v{{ number }}</a>{% endif %}{% endfor %}</div>
+    {% endif %}
+    {% if !used_by.is_empty() %}
+    <div>Played by: {% for (version, label) in used_by %}{% if !loop.first %}, {% endif %}<a href="/deck-versions/{{ version }}">{{ label }}</a>{% endfor %}</div>
+    {% endif %}
+    {% if !self.notes().is_empty() %}<blockquote class="format-notes">{{ self.notes() }}</blockquote>{% endif %}
+  </div>
+
+  {% if !common::export::public_copy() %}
+  <div class="button-row">
+    <form method="post" action="/formats/{{ format.id }}/new-version" class="inline"
+          data-confirm="Make {{ format.name }} v{{ versions.len() + 1 }}, a copy of this version? The decks playing this one keep it.">
+      <button type="submit" class="btn-secondary" title="For a change of the list: the decks playing this version keep it">New version</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <h2 id="list">Its list ({{ entries.len() }})</h2>
+  {% if !common::export::public_copy() %}
+  <form method="post" action="/formats/{{ format.id }}/cards" class="format-add-card">
+    <div class="field-row">
+      <div class="wide">
+        <label for="card-name">Card (English name):</label>
+        <input type="text" name="name" id="card-name" list="card-names" autocomplete="off" required placeholder="Monster Reborn">
+      </div>
+      <div>
+        <label for="card-status">Status:</label>
+        <select name="status" id="card-status">
+          {% for status in self.statuses() %}<option value="{{ status }}">{{ status }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filter-buttons"><button type="submit">Add to the list</button></div>
+    </div>
+  </form>
+  <datalist id="card-names">{% for name in card_names %}<option value="{{ name }}"></option>{% endfor %}</datalist>
+  {% endif %}
+
+  {% if entries.is_empty() %}
+  <p>No card on its list: every card of its pool is unlimited (3 copies).</p>
+  {% else %}
+  <div class="table-tools">
+    <input type="search" data-filter-table="format-list" placeholder="Search a card…" aria-label="Search the list">
+    <span class="table-count" data-count-for="format-list" data-count-noun="cards">{{ entries.len() }} cards</span>
+  </div>
+  <div class="table-scroll">
+  <table class="numbers sortable" id="format-list">
+    <thead><tr>
+      <th class="text" data-sort="text">Card</th>
+      <th class="text" data-sort="number">Status</th>
+      <th data-sort="text" class="phone-hide">First release</th>
+    </tr></thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr{% if entry.out_of_pool %} class="format-out" title="Released after the cutoff: not in this format's pool anyway"{% endif %}>
+        <td class="text">{{ entry.name }}</td>
+        <td class="text" data-sort-value="{{ entry.status_rank() }}">
+          {% if common::export::public_copy() %}{{ entry.status }}{% else %}
+          <form method="post" action="/formats/{{ format.id }}/cards/{{ entry.card_data_id }}" class="inline">
+            <select name="status" aria-label="Status of {{ entry.name }}">
+              {% for status in self.statuses() %}<option value="{{ status }}" {% if entry.status_is(status) %}selected{% endif %}>{{ status }}</option>{% endfor %}
+              <option value="">Unlimited (off the list)</option>
+            </select>
+            <button type="submit" class="btn-small btn-secondary">Change</button>
+          </form>
+          {% endif %}
+        </td>
+        <td class="phone-hide" data-sort-value="{{ entry.released.as_deref().unwrap_or("") }}">{{ entry.released.as_deref().unwrap_or("—")|date }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if !common::export::public_copy() %}
+  <h2>Name, cutoff, notes</h2>
+  <form method="post" action="/formats/{{ format.id }}/edit">
+    <div class="field-row">
+      <div class="wide">
+        <label for="name">Name:</label>
+        <input type="text" name="name" id="name" value="{{ format.name }}" required>
+      </div>
+      <div>
+        <label for="cutoff">Cutoff:</label>
+        <input type="date" name="cutoff" id="cutoff" value="{{ format.cutoff }}" required>
+      </div>
+    </div>
+    <p>
+      <label for="notes">Notes:</label>
+      <textarea name="notes" id="notes" rows="3">{{ self.notes() }}</textarea>
+    </p>
+    <button type="submit">Save</button>
+  </form>
+
+  <details class="danger-zone">
+    <summary>Delete this version…</summary>
+    <p>Refused while a deck version plays it.</p>
+    <form method="post" action="/formats/{{ format.id }}/delete" data-confirm="Delete {{ format.label() }} and its list?">
+      <button type="submit" class="btn-danger">Delete {{ format.label() }}</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+{% endblock %}

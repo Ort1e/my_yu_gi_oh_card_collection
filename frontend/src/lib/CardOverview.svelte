@@ -1,9 +1,9 @@
 <script>
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, englishName, imageUrl } from '../deck.js';
+    import { banStatus, englishName, frenchDate, imageUrl, outOfFormat } from '../deck.js';
 
     export let card;
-    export let banListId = null;
+    export let rules = null;
     export let api;
     /** bumped by the parent when categories are added/removed */
     export let categoriesVersion = 0;
@@ -52,7 +52,11 @@
         <p>Type: {card.card_type || '—'}</p>
         <p>Code: {card.code || '—'}</p>
         <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
-        <p>Ban Status: {banStatus(card, banListId) || 'Unlimited'}</p>
+        <p>Ban Status: {banStatus(card, rules) || 'Unlimited'}</p>
+        <p>
+            First TCG release: {card.first_release ? frenchDate(card.first_release) : 'unknown'}
+            {#if outOfFormat(card, rules)}<strong class="out-of-format">· not in this format</strong>{/if}
+        </p>
         <p>Rarity: {#if card.rarity}<a href="/rarities?rarity={encodeURIComponent(card.rarity)}" target="_blank" rel="noopener">{card.rarity}</a>{:else}—{/if}</p>
         <p>
             Proxy: {card.is_proxy ? 'Yes' : 'No'}
@@ -88,6 +92,10 @@
 {/if}
 
 <style>
+    .out-of-format {
+        color: #ffb3b3;
+    }
+
     img {
         width: 120px;
         height: auto;

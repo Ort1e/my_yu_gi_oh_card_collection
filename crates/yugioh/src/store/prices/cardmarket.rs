@@ -349,7 +349,7 @@ pub struct Candidate {
 }
 
 impl Candidate {
-    /// `806175 · expansion 5902 (SUDA) · added 2025-01-15 · trend 48.18 € · low 36.99 €`
+    /// `806175 · expansion 5902 (SUDA) · added 15/01/2025 · trend 48.18 € · low 36.99 €`
     pub fn label(&self) -> String {
         let euros = |price: Option<Money>| price.map_or("—".to_string(), |p| format!("{p} €"));
         let sets = self
@@ -360,7 +360,7 @@ impl Candidate {
             "{} · expansion {}{sets} · added {} · trend {} · low {}",
             self.id,
             self.id_expansion,
-            self.added,
+            crate::web::filters::french_date(&self.added.to_string()),
             euros(self.trend),
             euros(self.low)
         )

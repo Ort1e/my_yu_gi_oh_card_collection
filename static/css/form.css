@@ -257,13 +257,17 @@ legend {
     cursor: pointer;
 }
 
-/* The checkbox, redrawn as a track… */
+/* The checkbox, redrawn as a track… (the knob's travel is computed from
+   these sizes: it always goes to the end) */
 .switch input {
+    --track: 2.2rem;
+    --knob: 0.95rem;
+    --inset: 0.15rem;
     appearance: none;           /* hide the browser's checkbox */
     position: relative;
     flex-shrink: 0;
-    width: 2.5rem;
-    height: 1.4rem;
+    width: var(--track);
+    height: calc(var(--knob) + 2 * var(--inset));
     margin: 0;
     border-radius: 1rem;
     background-color: #9a9999;
@@ -275,10 +279,10 @@ legend {
 .switch input::before {
     content: "";
     position: absolute;
-    top: 0.2rem;
-    left: 0.2rem;
-    width: 1rem;
-    height: 1rem;
+    top: var(--inset);
+    left: var(--inset);
+    width: var(--knob);
+    height: var(--knob);
     border-radius: 50%;
     background-color: #fff;
     transition: transform 0.2s;
@@ -290,7 +294,7 @@ legend {
 }
 
 .switch input:checked::before {
-    transform: translateX(1.1rem);
+    transform: translateX(calc(var(--track) - var(--knob) - 2 * var(--inset)));
 }
 
 /* ------------------------------------------------------------------ */
@@ -460,8 +464,9 @@ legend {
 /* Phones                                                               */
 /* ------------------------------------------------------------------ */
 
-/* A field in a data table (the card prices of a lot's edit page): a price's width. */
-.numbers td input {
+/* A field in a data table (the card prices of a lot's edit page): a price's
+   width. Not a checkbox: a switch keeps its own size. */
+.numbers td input:not([type="checkbox"]) {
     width: 8rem;
     margin-left: auto;          /* fields are blocks: on the right like the numbers */
     text-align: right;

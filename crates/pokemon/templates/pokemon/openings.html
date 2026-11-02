@@ -33,7 +33,7 @@
   <tbody>
     {% for row in openings %}
     <tr>
-      <td><a href="/pokemon/openings/{{ row.opening.id }}">{% match row.opening.opened_on %}{% when Some with (date) %}{{ date }}{% when None %}No date{% endmatch %}</a></td>
+      <td{% match row.opening.opened_on %}{% when Some with (date) %} data-sort-value="{{ date }}"{% when None %}{% endmatch %}><a href="/pokemon/openings/{{ row.opening.id }}">{% match row.opening.opened_on %}{% when Some with (date) %}{{ date|date }}{% when None %}No date{% endmatch %}</a></td>
       <td class="text">{{ row.opening.set_code }}</td>
       <td class="text">{{ row.opening.set_name }}</td>
       <td class="text">{{ row.opening.language }}</td>

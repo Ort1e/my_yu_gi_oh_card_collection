@@ -1,5 +1,6 @@
 pub mod form;
 pub mod images;
+pub mod text;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
@@ -204,6 +205,8 @@ pub struct CardDetail {
     versions: Vec<DeckVersionRow>,
     /// `None` before the card's first price refresh.
     market: Option<MarketPrice>,
+    /// What the card says (`None` before its card data is linked).
+    text: Option<text::CardText>,
 }
 
 /// The card's market price (`card_price`) and what this copy is worth.
@@ -301,6 +304,14 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         Some(card_data_id) => market_price(&state, &card, card_data_id).await?,
         None => None,
     };
+    let card_data: Option<String> =
+        sqlx::query_scalar("SELECT json_data FROM card_data WHERE id = ?")
+            .bind(card.card_data_id)
+            .fetch_optional(pool)
+            .await?;
+    let text = card_data
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .and_then(|json| text::CardText::from_card_data(&json));
 
     Ok(CardDetail {
         card,
@@ -308,6 +319,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         price,
         versions,
         market,
+        text,
     })
 }
 

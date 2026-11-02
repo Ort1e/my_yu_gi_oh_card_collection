@@ -14,6 +14,7 @@ use yugioh_domain::valuation::{copy_value, history, lot_gain, Prices};
 use super::data::ValueData;
 use crate::store::db::Pool;
 use crate::store::valuation::PurchaseLot;
+use crate::web::filters::french_date;
 
 /// Copies in each copy list, lots in each lot list, moves in each period.
 pub const TOP_COPIES: usize = 20;
@@ -93,11 +94,14 @@ pub struct Moves {
 /// two refreshes to compare).
 pub fn moves(data: &ValueData) -> Vec<Moves> {
     let since_last = data.compared_dates(1).map(|(before, after)| {
-        let title = format!("Since the previous refresh ({before})");
+        let title = format!(
+            "Since the previous refresh ({})",
+            french_date(&before.to_string())
+        );
         period(data, before, after, title)
     });
     let quarter = data.compared_dates(QUARTER_DAYS).map(|(before, after)| {
-        let title = format!("Over 3 months (since {before})");
+        let title = format!("Over 3 months (since {})", french_date(&before.to_string()));
         period(data, before, after, title)
     });
     since_last.into_iter().chain(quarter).collect()
@@ -171,7 +175,7 @@ pub fn chart_json(data: &ValueData) -> String {
     let points = history(&data.copies, &data.lots, &data.by_date);
     let to_f64 = |d: Decimal| d.to_f64().unwrap_or_default();
     let chart = json!({
-        "labels": points.iter().map(|t| t.date.to_string()).collect::<Vec<_>>(),
+        "labels": points.iter().map(|t| french_date(&t.date.to_string())).collect::<Vec<_>>(),
         "value": points.iter().map(|t| to_f64(t.value)).collect::<Vec<_>>(),
         "net_spent": points.iter().map(|t| to_f64(t.spent - t.sold)).collect::<Vec<_>>(),
     });

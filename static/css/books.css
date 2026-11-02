@@ -276,6 +276,12 @@ body.books {
     color: #a34700;
 }
 
+/* The "Read" switch of a row (book_read.js), without the form's margins. */
+.switch.compact {
+    margin: 0;
+    vertical-align: middle;
+}
+
 /* ---------- series ---------- */
 
 .missing {
@@ -310,4 +316,19 @@ body.books {
     .book-cover {
         width: 140px;
     }
+}
+
+/* ---------- what to read? (random.html) ---------- */
+
+.book-pick h2 {
+    margin-top: 0;
+}
+
+.book-pick-filter {
+    max-width: 900px;
+    margin: 1.5rem auto 0;
+}
+
+.book-pick-filter .switch {
+    display: flex;
 }

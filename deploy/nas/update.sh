@@ -38,6 +38,16 @@ for item in backend static deploy VERSION; do
     cp -a "$new/$item" "$APP_DIR/$item"
 done
 chown -R root:root "$APP_DIR/backend" "$APP_DIR/static" "$APP_DIR/deploy" "$APP_DIR/VERSION"
+# the settings the new version brings (empty: to fill in), the ones set kept
+for settings in collection nightly; do
+    [ -f "$APP_DIR/$settings.env" ] || continue
+    added=$(new_settings "$APP_DIR/deploy/$settings.env.example" "$APP_DIR/$settings.env")
+    if [ -n "$added" ]; then
+        printf '%s\n' "$added" >> "$APP_DIR/$settings.env"
+        names=$(printf '%s\n' "$added" | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' | tr '\n' ' ')
+        log "new settings in $settings.env (to fill in): $names"
+    fi
+done
 # the services as the new version describes them
 cp "$APP_DIR"/deploy/collection.service "$APP_DIR"/deploy/collection-nightly.service \
     "$APP_DIR"/deploy/collection-nightly.timer /etc/systemd/system/

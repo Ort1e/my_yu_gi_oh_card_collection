@@ -9,6 +9,7 @@ mod collection;
 mod deck_api;
 mod decks;
 mod edit_forms;
+mod formats;
 mod lots;
 mod rarity;
 mod security;

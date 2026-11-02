@@ -45,7 +45,7 @@
           <td class="text">{{ copy.variant_label() }}</td>
           <td class="text">{{ copy.language_label() }}</td>
           <td class="text">{{ copy.condition_label() }}</td>
-          <td class="text">{{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %}, {{ date }}{% when None %}{% endmatch %}</td>
+          <td class="text">{{ copy.source_label() }}{% match copy.obtained_on %}{% when Some with (date) %}, {{ date|date }}{% when None %}{% endmatch %}</td>
           <td>{{ copy.value_text() }}</td>
         </tr>
         {% endfor %}

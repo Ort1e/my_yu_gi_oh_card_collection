@@ -61,6 +61,11 @@
     box-sizing: border-box;
 }
 
+/* A link to an anchor (`#list`) lands below the fixed header, not under it. */
+html {
+    scroll-padding-top: 5rem;
+}
+
 body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
@@ -407,6 +412,11 @@ form tbody tr:nth-child(even) {
 /* ------------------------------------------------------------------ */
 
 @media (max-width: 760px) {
+    /* the header is not fixed on phones */
+    html {
+        scroll-padding-top: 0;
+    }
+
     /* The header scrolls away with the page (header.css): no room to keep
        for it. Room at the bottom for the floating buttons. */
     .container {

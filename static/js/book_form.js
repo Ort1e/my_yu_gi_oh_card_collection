@@ -314,6 +314,14 @@ async function startScanner() {
     readFrames(detector);
 }
 
+// a phone without the live scanner: say why, and what to do instead
+const scanNote = document.getElementById('scan-note');
+
+if (scanNote && !canStream && navigator.maxTouchPoints > 0) {
+    scanNote.querySelector('[data-origin]').textContent = window.location.origin;
+    scanNote.hidden = false;
+}
+
 if (liveButton && canStream) {
     liveButton.hidden = false;
     photoLabel.hidden = true;

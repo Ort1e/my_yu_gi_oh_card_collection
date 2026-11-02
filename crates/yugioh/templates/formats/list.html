@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Formats{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/decks.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Formats</h1>
+  <p>A way to play with its own card pool (the cards released in the TCG up to a date) and its own list of
+    forbidden and limited cards, like Edison or Goat. A deck version plays a Konami ban list or a format
+    (chosen in the deck builder), which checks its cards.</p>
+
+  {% if !common::export::public_copy() %}
+  <div class="button-row"><a href="/formats/add" class="btn">Add a format</a></div>
+  {% endif %}
+
+  {% if formats.is_empty() %}
+  <p>No format yet.</p>
+  {% else %}
+  <div class="table-scroll">
+  <table class="numbers sortable">
+    <thead><tr>
+      <th class="text" data-sort="text">Format</th>
+      <th data-sort="text">Cutoff</th>
+      <th class="text phone-hide" data-sort="text">From the list of</th>
+      <th data-sort="number">Cards listed</th>
+      <th data-sort="number">Decks</th>
+    </tr></thead>
+    <tbody>
+      {% for format in formats %}
+      <tr>
+        <td class="text"><a href="/formats/{{ format.id }}">{{ format.name }} v{{ format.version }}</a></td>
+        <td data-sort-value="{{ format.cutoff }}">{{ format.cutoff|date }}</td>
+        <td class="text phone-hide">{% match format.based_on %}{% when Some with (date) %}{{ date|date }}{% when None %}—{% endmatch %}</td>
+        <td>{{ format.cards }}</td>
+        <td>{{ format.used_by }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+{% endblock %}

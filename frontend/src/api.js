@@ -40,6 +40,8 @@ export function deckApi(id) {
         /** `{card, proxied_in}`: the owned copy now in place of the proxy */
         replaceProxy: (cardId) => request('POST', `${base}/proxies/${cardId}/replace`),
         reserve: (filters) => request('POST', `${base}/reserve`, filters),
+        /** `{format, problems}`: the saved version's problems in its format */
+        check: () => request('GET', `${base}/check`),
         categories: () => request('GET', `${base}/categories`),
         // `condition`: null for a plain category, else { description, if_any_of, then, otherwise }
         addCategory: (name, condition = null) => request('POST', `${base}/categories`, { name, condition }),

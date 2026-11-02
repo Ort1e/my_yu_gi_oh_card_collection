@@ -25,6 +25,7 @@ use crate::store::cards::{
 };
 use crate::store::db::push_ids;
 use crate::store::db::{begin_write, exists, row_exists, Pool};
+use crate::store::formats;
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
 
@@ -42,6 +43,8 @@ pub struct DeckVersion {
     deck_name: Option<String>,
     version_name: String,
     ban_list_id: Option<i64>,
+    /// The format it plays instead of a ban list (never both).
+    format_id: Option<i64>,
     is_built: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
@@ -57,6 +60,7 @@ pub struct DeckVersion {
     /// Other versions of the same deck, for the version switcher.
     versions: Vec<VersionRef>,
     ban_lists: Vec<BanListRef>,
+    formats: Vec<FormatRef>,
     card_types: Vec<String>,
 }
 
@@ -74,6 +78,7 @@ struct VersionHead {
     deck_name: Option<String>,
     version_name: String,
     ban_list_id: Option<i64>,
+    format_id: Option<i64>,
     tournament_id: Option<i64>,
     is_built: bool,
     deck_box: Option<String>,
@@ -90,6 +95,15 @@ pub struct VersionRef {
 pub struct BanListRef {
     id: i64,
     date: String,
+}
+
+/// A format for the selector: `Edison v2`, and its cutoff (`YYYY-MM-DD`)
+/// for the tiles of the cards out of its pool.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct FormatRef {
+    id: i64,
+    label: String,
+    cutoff: String,
 }
 
 fn ydke(main: &[ApiCard], extra: &[ApiCard], side: &[ApiCard]) -> Ydke {
@@ -119,7 +133,8 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let mut conn = pool.acquire().await?;
     let head: VersionHead = sqlx::query_as(
         "SELECT deck_version.deck_id, deck.name AS deck_name, deck_version.version_name,
-                deck_version.ban_list_id, deck_version.tournament_id, deck_version.is_built,
+                deck_version.ban_list_id, deck_version.format_id, deck_version.tournament_id,
+                deck_version.is_built,
                 deck_version.deck_box, deck_version.sleeves
          FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
          WHERE deck_version.id = ?",
@@ -153,6 +168,12 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let ban_lists = sqlx::query_as("SELECT id, date FROM advanced_ban_list ORDER BY date DESC")
         .fetch_all(&mut *conn)
         .await?;
+    let formats = sqlx::query_as(
+        "SELECT id, name || ' v' || version AS label, cutoff FROM deck_format
+         ORDER BY name COLLATE NOCASE, version DESC",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     drop(conn);
 
     Ok(DeckVersion {
@@ -161,6 +182,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         deck_name: head.deck_name,
         version_name: head.version_name,
         ban_list_id: head.ban_list_id,
+        format_id: head.format_id,
         is_built: head.is_built,
         deck_box: head.deck_box,
         sleeves: head.sleeves,
@@ -172,6 +194,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         side,
         versions,
         ban_lists,
+        formats,
         card_types: card_types(pool).await?,
     })
 }
@@ -198,6 +221,8 @@ pub struct VersionUpdate {
     side: Option<Vec<i64>>,
     #[serde(default, deserialize_with = "present")]
     ban_list_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "present")]
+    format_id: Option<Option<i64>>,
     is_built: Option<bool>,
     /// Present and `null` or blank: cleared.
     #[serde(default, deserialize_with = "present")]
@@ -372,7 +397,7 @@ pub async fn update_version(
     Json(update): Json<VersionUpdate>,
 ) -> AppResult<Json<DeckVersion>> {
     let renamed = update.version_name.is_some();
-    let ban_list_changed = update.ban_list_id.is_some();
+    let ban_list_changed = update.ban_list_id.is_some() || update.format_id.is_some();
     let mut tx = begin_write(&state.pool).await?;
     exists(&mut tx, "deck_version", id).await?;
 
@@ -396,6 +421,29 @@ pub async fn update_version(
             .bind(id)
             .execute(&mut *tx)
             .await?;
+    }
+    if let Some(format_id) = update.format_id {
+        if let Some(f) = format_id {
+            if !row_exists(&mut tx, "deck_format", f).await? {
+                return bad_request("Unknown format.");
+            }
+        }
+        sqlx::query("UPDATE deck_version SET format_id = ? WHERE id = ?")
+            .bind(format_id)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    if ban_list_changed {
+        let both: bool = sqlx::query_scalar(
+            "SELECT ban_list_id IS NOT NULL AND format_id IS NOT NULL FROM deck_version WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if both {
+            return bad_request("A version plays a ban list or a format, not both.");
+        }
     }
 
     let zones = [
@@ -548,8 +596,8 @@ pub async fn clone_version(
     let mut tx = begin_write(&state.pool).await?;
     exists(&mut tx, "deck_version", id).await?;
     let new_id: i64 = sqlx::query(
-        "INSERT INTO deck_version (deck_id, version_name, ban_list_id)
-         SELECT deck_id, ?, ban_list_id FROM deck_version WHERE id = ?
+        "INSERT INTO deck_version (deck_id, version_name, ban_list_id, format_id)
+         SELECT deck_id, ?, ban_list_id, format_id FROM deck_version WHERE id = ?
         ",
     )
     .bind(name)
@@ -584,4 +632,23 @@ pub async fn clone_version(
         "deck version copied"
     );
     Ok((StatusCode::CREATED, Json(Created { id: new_id })))
+}
+
+/// `GET /api/deck-versions/:id/check`: its problems in the format it plays
+/// (`{"format": "Edison v2", "problems": ["Raigeki: 2 copies, 1 allowed"]}`;
+/// `format` null and no problem without a format).
+pub async fn check_version(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> AppResult<Json<serde_json::Value>> {
+    let mut conn = state.pool.acquire().await?;
+    exists(&mut conn, "deck_version", id).await?;
+    let answer = match formats::version_problems(&mut conn, id).await? {
+        Some((format, problems)) => serde_json::json!({
+            "format": format.label(),
+            "problems": problems.iter().map(|p| p.message()).collect::<Vec<_>>(),
+        }),
+        None => serde_json::json!({ "format": null, "problems": [] }),
+    };
+    Ok(Json(answer))
 }

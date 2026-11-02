@@ -1,7 +1,7 @@
 <script>
     // The tournament this version was played at: a summary, edited on the
     // tournament pages (/tournaments, backend/src/routes/tournaments/).
-    import { ordinal } from '../deck.js';
+    import { frenchDate, ordinal } from '../deck.js';
 
     export let deckVersionId;
     export let tournament = null;
@@ -16,7 +16,7 @@
 {#if tournament}
     <p class="tournament-summary">
         <a href="/tournaments/{tournament.id}" target="_blank" rel="noopener">{tournament.name}</a>,
-        {tournament.date}{#if tournament.location}, {tournament.location}{/if}
+        {frenchDate(tournament.date)}{#if tournament.location}, {tournament.location}{/if}
         {#if placement}<br />Placement: {placement}{/if}
     </p>
 

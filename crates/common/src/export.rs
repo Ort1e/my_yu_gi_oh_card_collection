@@ -264,6 +264,17 @@ fn path_of(address: &str) -> &str {
     address.split('?').next().unwrap_or(address)
 }
 
+/// A link to an app page for a page's script (`/books/12`), which the copy
+/// can't rewrite: the page's file in the copy (`books-12.html`). Only for a
+/// page the copy holds.
+pub fn href(address: &str) -> String {
+    if public_copy() {
+        format!("{}.html", flat_name(address))
+    } else {
+        address.to_string()
+    }
+}
+
 /// A file name for an address: `/cards?page=2` → `cards-page-2`.
 fn flat_name(address: &str) -> String {
     let mut name = String::new();

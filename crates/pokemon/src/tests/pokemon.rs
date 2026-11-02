@@ -95,7 +95,7 @@ async fn a_single_is_added_valued_and_shown() {
         "Horsea",
         "Fable Nébuleuse · No. 067",
         "/pokemon/rarities?rarity=Illustration+rare",
-        "Bought as a single on 2026-10-20 · paid 29.90 €",
+        "Bought as a single on 20/10/2026 · paid 29.90 €",
         // 34.43 × 0.8 (excellent)
         "Value: 27.54 €",
         "market 34.43 €",
@@ -105,7 +105,7 @@ async fn a_single_is_added_valued_and_shown() {
         assert!(page.contains(text), "{text}: {page}");
     }
     assert!(
-        page.contains("<td>2026-10-01</td><td>30.00</td>"),
+        page.contains("<td>01/10/2026</td><td>30.00</td>"),
         "price history"
     );
 
@@ -261,7 +261,7 @@ async fn copies_are_sold_not_deleted() {
 
     let (_, page) = t.get("/pokemon/1").await;
     assert!(
-        page.contains("<strong>Sold</strong> on 2026-10-23 for 40.00 €"),
+        page.contains("<strong>Sold</strong> on 23/10/2026 for 40.00 €"),
         "{page}"
     );
     let (_, list) = t.get("/pokemon").await;

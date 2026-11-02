@@ -36,7 +36,7 @@ Outside services: [YGOPRODeck](https://ygoprodeck.com/api-guide/) (card
 data, pictures, prices), Cardmarket's price guide files, Konami's
 Forbidden & Limited lists, [TCGdex](https://tcgdex.dev) and the
 [Pokémon TCG API](https://pokemontcg.io) (Pokémon cards and pictures), Open
-Library and Google Books (ISBN lookups).
+Library, Google Books and the BnF's catalogue (ISBN lookups).
 
 ## Documentation: where to read what
 
@@ -91,6 +91,7 @@ Settings come from the environment or `.env` (gitignored):
 | `SECURE_COOKIES` | `0` | `1` behind HTTPS |
 | `MEDIA_DIR`, `UPLOADS_DIR` | `data/media`, `uploads` | pictures and files, pending uploads |
 | `CARDMARKET_ACCOUNT` | `0rtie` | your Cardmarket name, for reading the shipment PDFs |
+| `GOOGLE_BOOKS_API_KEY` | none | Google Books' API key for the ISBN lookups (free, Google Cloud console → Books API → Credentials); without one Google nearly always refuses |
 
 ## Commands
 

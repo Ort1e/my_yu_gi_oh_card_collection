@@ -5,7 +5,8 @@
 //!
 //! `form.rs` adds, edits and deletes books (with the ISBN lookup and the
 //! barcode scan of `static/js/book_form.js`), `authors.rs` and `series.rs`
-//! list them, `api.rs` is the lookup's JSON. Book writes are in
+//! list them, `random.rs` picks the next book to read, `api.rs` is the
+//! lookup's (and the read switches') JSON. Book writes are in
 //! `store::books`, the lookup in `store::book_data`, the pure rules in
 //! `books_domain::book` / `books_domain::isbn`.
 
@@ -13,6 +14,7 @@ pub mod advent;
 pub mod api;
 pub mod authors;
 pub mod form;
+pub mod random;
 pub mod series;
 
 use askama::Template;
@@ -22,6 +24,7 @@ use sqlx::{QueryBuilder, Sqlite};
 
 use common::sql::like_pattern;
 use common::web::error::{AppResult, OrNotFound};
+use common::web::filters;
 use common::AppState;
 
 /// A book in a list: its authors joined, its series.
@@ -37,6 +40,7 @@ pub struct BookRow {
     pub format: Option<String>,
     /// The first author's `sort_name` (`hobb robin`), to sort by surname.
     pub author_sort: Option<String>,
+    pub is_read: bool,
 }
 
 impl BookRow {
@@ -49,7 +53,8 @@ impl BookRow {
             book_series.name AS series, book.volume, book.published_year,
             book.format,
             (SELECT a.sort_name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
-             WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) AS author_sort
+             WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) AS author_sort,
+            book.is_read
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id";
 
     /// `Discworld #3`, `Discworld`, or nothing.
@@ -192,6 +197,7 @@ pub struct BookDetailRow {
     format: Option<String>,
     notes: Option<String>,
     added_on: String,
+    is_read: bool,
 }
 
 #[derive(Template)]
@@ -219,16 +225,8 @@ impl BookDetail {
             .unwrap_or_else(|| code.to_string())
     }
 
-    /// Its cover at Open Library (by ISBN, shown from there: never stored);
-    /// none in the public copy, where ISBNs aren't shown.
     fn cover_url(&self) -> Option<String> {
-        if common::export::public_copy() {
-            return None;
-        }
-        let isbn = self.book.isbn.as_deref()?;
-        Some(format!(
-            "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false"
-        ))
+        cover_url(self.book.isbn.as_deref())
     }
 
     /// "Origin", "Dan Brown": the authors on one line.
@@ -249,6 +247,18 @@ impl BookDetail {
     }
 }
 
+/// A book's cover at Open Library (by ISBN, shown from there: never stored);
+/// none in the public copy, where ISBNs aren't shown.
+pub fn cover_url(isbn: Option<&str>) -> Option<String> {
+    if common::export::public_copy() {
+        return None;
+    }
+    let isbn = isbn?;
+    Some(format!(
+        "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false"
+    ))
+}
+
 /// The authors of a book, in order: `(id, name)`.
 pub async fn book_authors(pool: &common::db::Pool, id: i64) -> sqlx::Result<Vec<(i64, String)>> {
     sqlx::query_as(
@@ -266,7 +276,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     let book: BookDetailRow = sqlx::query_as(
         "SELECT book.id, book.isbn, book.title, book.publisher, book.published_year,
                 book.language, book.page_count, book.series_id, book_series.name AS series,
-                book.volume, book.format, book.notes, book.added_on
+                book.volume, book.format, book.notes, book.added_on, book.is_read
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id
          WHERE book.id = ?",
     )

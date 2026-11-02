@@ -3,9 +3,10 @@
 //! formats, missing volumes of a series).
 //!
 //! Lookups: Open Library (`jscmd=data` has the authors, `jscmd=details` the
-//! language, series and format), Google Books as a fallback. Their answers
-//! are free text of varying quality: everything here is a best guess that
-//! the form shows before saving.
+//! language, series and format), then Google Books, then the BnF (the French
+//! national library: its Dublin Core records) for what is still missing.
+//! Their answers are free text of varying quality: everything here is a
+//! best guess that the form shows before saving.
 
 use std::sync::LazyLock;
 
@@ -358,6 +359,110 @@ pub fn from_google_books(answer: &Value) -> Option<BookInfo> {
     })
 }
 
+/// One element of a BnF Dublin Core record: `<dc:title>…</dc:title>`
+/// (some with attributes: `<dc:type xml:lang="fre">`).
+static DC_ELEMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<dc:(\w+)(?:\s[^>]*)?>([^<]*)</dc:\w+>").unwrap());
+/// The life dates and the role after a BnF name: `Rowling, J. K.
+/// (1965-....). Auteur du texte`.
+static BNF_NAME_TAIL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*\([^)]*\)\s*\..*$|\.\s+[A-Z][^.]*$").unwrap());
+static BNF_PAGES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(\d+)\s*p\.").unwrap());
+
+/// The XML escapes a BnF record uses (`&amp;`, `&#233;`…).
+fn xml_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('&') {
+        out.push_str(&rest[..start]);
+        rest = &rest[start..];
+        let Some(end) = rest.find(';') else { break };
+        let entity = &rest[1..end];
+        let decoded = match entity {
+            "amp" => Some('&'),
+            "lt" => Some('<'),
+            "gt" => Some('>'),
+            "quot" => Some('"'),
+            "apos" => Some('\''),
+            _ => entity
+                .strip_prefix("#x")
+                .map(|hex| u32::from_str_radix(hex, 16))
+                .or_else(|| entity.strip_prefix('#').map(str::parse))
+                .and_then(Result::ok)
+                .and_then(char::from_u32),
+        };
+        match decoded {
+            Some(c) => {
+                out.push(c);
+                rest = &rest[end + 1..];
+            }
+            None => {
+                out.push('&');
+                rest = &rest[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// A BnF name as the form writes it: `Rowling, J. K. (1965-....). Auteur
+/// du texte` → `J. K. Rowling`.
+fn bnf_name(text: &str) -> Option<String> {
+    let name = BNF_NAME_TAIL.replace(text.trim(), "");
+    let name = match name.split_once(", ") {
+        Some((surname, first)) => format!("{first} {surname}"),
+        None => name.to_string(),
+    };
+    Some(clean_name(&name)).filter(|n| !n.is_empty())
+}
+
+/// The BnF catalogue's answer (SRU, `recordSchema=dublincore`): its first
+/// record, `None` without one. The title is the part before ` / ` (the
+/// authors follow), the authors are the `dc:creator`s (the translators and
+/// illustrators are `dc:contributor`s), the publisher without its town
+/// (`Gallimard-Jeunesse (Paris)`), the pages from `dc:format` (`1 vol. (311
+/// p.) ; 18 cm`). No series: its titles mix them with the publishers'
+/// collections (`Folio junior ; 899`).
+pub fn from_bnf(xml: &str) -> Option<BookInfo> {
+    // the first record only
+    let start = xml.find("<oai_dc:dc")?;
+    let record = &xml[start..];
+    let record = &record[..record.find("</oai_dc:dc>").unwrap_or(record.len())];
+
+    let mut info = BookInfo::default();
+    for element in DC_ELEMENT.captures_iter(record) {
+        let value = xml_text(&element[2]);
+        let value = value.trim();
+        if value.is_empty() {
+            continue;
+        }
+
+        match &element[1] {
+            "title" if info.title.is_none() => {
+                let title = value.split(" / ").next().unwrap_or(value);
+                let title = title.replace("[Texte imprimé]", "");
+                info.title = Some(clean_name(&title)).filter(|t| !t.is_empty());
+            }
+            "creator" => info.authors.extend(bnf_name(value)),
+            "publisher" if info.publisher.is_none() => {
+                let publisher = value.split(" (").next().unwrap_or(value);
+                info.publisher = Some(clean_name(publisher)).filter(|p| !p.is_empty());
+            }
+            "date" if info.year.is_none() => info.year = year_of(value),
+            "language" if info.language.is_none() => info.language = Some(language_code(value)),
+            "format" if info.pages.is_none() => {
+                info.pages = BNF_PAGES
+                    .captures(value)
+                    .and_then(|c| c[1].parse().ok())
+                    .filter(|n| *n > 0);
+            }
+            _ => {}
+        }
+    }
+    Some(info)
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -522,5 +627,46 @@ mod tests {
         assert_eq!(language_name("en"), Some("English"));
         assert_eq!(language_name(" FR "), Some("French"));
         assert_eq!(language_name("xyz"), None);
+    }
+
+    #[test]
+    fn bnf_record() {
+        let xml = r#"<srw:searchRetrieveResponse><srw:numberOfRecords>1</srw:numberOfRecords>
+            <srw:records><srw:record><srw:recordData>
+            <oai_dc:dc xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier>https://catalogue.bnf.fr/ark:/12148/cb0</dc:identifier>
+            <dc:title>Harry Potter &#224; l&apos;&#xE9;cole des sorciers / J. K. Rowling ; traduit de l'anglais</dc:title>
+            <dc:creator>Rowling, J. K. (1965-....). Auteur du texte</dc:creator>
+            <dc:contributor>Ménard, Jean-François (1948-....). Traducteur</dc:contributor>
+            <dc:publisher>Gallimard-Jeunesse (Paris)</dc:publisher>
+            <dc:date>2017</dc:date>
+            <dc:format>1 vol. (311 p.) : couv. ill. ; 18 cm</dc:format>
+            <dc:language>fre</dc:language>
+            <dc:type xml:lang="fre">texte imprimé</dc:type>
+            </oai_dc:dc></srw:recordData></srw:record></srw:records></srw:searchRetrieveResponse>"#;
+        assert_eq!(
+            from_bnf(xml),
+            Some(BookInfo {
+                title: Some("Harry Potter à l'école des sorciers".into()),
+                authors: vec!["J. K. Rowling".into()],
+                publisher: Some("Gallimard-Jeunesse".into()),
+                year: Some(2017),
+                language: Some("fr".into()),
+                pages: Some(311),
+                ..BookInfo::default()
+            })
+        );
+
+        let none = "<srw:searchRetrieveResponse><srw:numberOfRecords>0</srw:numberOfRecords></srw:searchRetrieveResponse>";
+        assert_eq!(from_bnf(none), None);
+        assert_eq!(
+            bnf_name("Hugo, Victor (1802-1885). Auteur du texte").as_deref(),
+            Some("Victor Hugo")
+        );
+        assert_eq!(
+            bnf_name("Homère. Auteur du texte").as_deref(),
+            Some("Homère")
+        );
+        assert_eq!(xml_text("R&amp;D &unknown; &#38;"), "R&D &unknown; &");
     }
 }

@@ -15,7 +15,7 @@
 <p class="back-link"><a href="/pokemon/openings">← The openings</a></p>
 <h1>{{ opening.set_name }}</h1>
 <p>
-  Opened on {% match opening.opened_on %}{% when Some with (date) %}{{ date }}{% when None %}a day not noted{% endmatch %}
+  Opened on {% match opening.opened_on %}{% when Some with (date) %}{{ date|date }}{% when None %}a day not noted{% endmatch %}
   · {{ opening.language }} · {{ opening.cards }} cards · value <strong>{{ self.value_text() }} €</strong>
 </p>
 {% match opening.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}

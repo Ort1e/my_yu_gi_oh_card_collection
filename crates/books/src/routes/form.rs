@@ -35,6 +35,7 @@ pub struct BookValues {
     pub volume: String,
     pub format: String,
     pub notes: String,
+    pub is_read: bool,
 }
 
 impl BookValues {
@@ -51,6 +52,7 @@ impl BookValues {
             volume: form.text("volume"),
             format: form.text("format"),
             notes: form.text("notes"),
+            is_read: form.checked("is_read"),
         }
     }
 
@@ -109,6 +111,7 @@ fn read_book(form: &mut FormData) -> Option<BookFields> {
         volume,
         format,
         notes: form.get("notes").map(str::to_string),
+        is_read: form.checked("is_read"),
     })
 }
 
@@ -277,12 +280,14 @@ struct StoredBook {
     volume: Option<i64>,
     format: Option<String>,
     notes: Option<String>,
+    is_read: bool,
 }
 
 async fn stored_values(pool: &Pool, id: i64) -> AppResult<BookValues> {
     let book: StoredBook = sqlx::query_as(
         "SELECT book.isbn, book.title, book.publisher, book.published_year, book.language,
-                book.page_count, book_series.name AS series, book.volume, book.format, book.notes
+                book.page_count, book_series.name AS series, book.volume, book.format, book.notes,
+                book.is_read
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id WHERE book.id = ?",
     )
     .bind(id)
@@ -308,6 +313,7 @@ async fn stored_values(pool: &Pool, id: i64) -> AppResult<BookValues> {
         volume: text(book.volume),
         format: book.format.unwrap_or_default(),
         notes: book.notes.unwrap_or_default(),
+        is_read: book.is_read,
     })
 }
 

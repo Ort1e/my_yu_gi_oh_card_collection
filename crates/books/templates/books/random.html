@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}What to read?{% endblock %}
+{% block body_class %}books{% endblock %}
+{% block nav %}{% include "partials/books_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>What to read?</h1>
+
+{# Filled by static/js/book_random.js from the books below. #}
+<article class="book-page book-pick" id="book-pick" hidden>
+  <div class="book-cover">
+    <div class="book-cover-placeholder" aria-hidden="true">
+      <span class="book-cover-title" data-pick="title"></span>
+      <span class="book-cover-author" data-pick="authors"></span>
+    </div>
+  </div>
+
+  <div class="book-info">
+    <h2><a data-pick="link"></a></h2>
+    <p class="book-page-by" data-pick="by"></p>
+    <p class="book-page-series" data-pick="series"></p>
+    <dl class="book-facts">
+      <dt data-pick="pages-label">Pages</dt><dd data-pick="pages"></dd>
+      <dt data-pick="format-label">Format</dt><dd data-pick="format"></dd>
+      {% if common::export::public_copy() %}<dt>Read</dt><dd data-pick="read"></dd>{% endif %}
+    </dl>
+    {% if !common::export::public_copy() %}
+    <label class="switch"><input type="checkbox" data-pick="switch"> Read</label>
+    {% endif %}
+    <p class="hint" data-pick="among"></p>
+  </div>
+</article>
+<p id="book-pick-none" hidden>No book matches these filters.</p>
+
+<div class="book-pick-filter">
+  <label class="switch"><input type="checkbox" id="pick-unread" checked> Unread only</label>
+  <label class="switch"><input type="checkbox" id="pick-next" checked> Can start it now (no unread earlier volume)</label>
+  <div class="field-row">
+    <div>
+      <label for="pick-language">Language:</label>
+      <select id="pick-language">
+        <option value="">Any</option>
+        {% for choice in languages %}
+        <option value="{{ choice.code }}">{{ choice.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="pick-format">Format:</label>
+      <select id="pick-format">
+        <option value="">Any</option>
+        {% for format in self.formats() %}
+        <option value="{{ format.label() }}">{{ format.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <button type="button" id="pick-again">🎲 Another one</button>
+</div>
+</div>
+
+<script type="application/json" id="books-data">{{ books_json|safe }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/book_random.js"></script>
+{% if !common::export::public_copy() %}<script src="/static/js/book_read.js"></script>{% endif %}
+{% endblock %}

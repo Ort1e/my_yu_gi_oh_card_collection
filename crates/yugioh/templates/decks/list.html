@@ -21,7 +21,7 @@
           <div class="card-meta-line">
             <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
             <div>Versions: {{ deck.versions }}</div>
-            <div>Last tournament: {{ deck.last_tournament.as_deref().unwrap_or("never") }}</div>
+            <div>Last tournament: {{ deck.last_tournament.as_deref().unwrap_or("never")|date }}</div>
           </div>
         </div>
       </a>

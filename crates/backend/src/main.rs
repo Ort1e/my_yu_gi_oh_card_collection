@@ -58,6 +58,10 @@ async fn main() {
         media_dir: PathBuf::from(env("MEDIA_DIR", "data/media")),
         uploads_dir: PathBuf::from(env("UPLOADS_DIR", "uploads")),
         cardmarket_account: env("CARDMARKET_ACCOUNT", "0rtie"),
+        google_books_key: std::env::var("GOOGLE_BOOKS_API_KEY")
+            .ok()
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty()),
         auth,
     };
 
