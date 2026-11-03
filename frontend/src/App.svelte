@@ -103,7 +103,7 @@
 
     /** The deck zone (not the reserve) of `zones` holding `card`, or null. */
     const zoneOf = (zones: Zones, card: ApiCard | null): Zone | null =>
-        card ? (ZONES.find((z) => zones[z].some((c) => c.id === card.id)) ?? null) : null;
+        card ? (['main', 'extra', 'side'] as Zone[]).find((z) => zones[z].some((c) => c.id === card.id)) ?? null : null;
 
     $: selectedZone = zoneOf(zones, selected);
 

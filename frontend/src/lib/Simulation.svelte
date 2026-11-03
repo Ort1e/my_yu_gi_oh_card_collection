@@ -77,7 +77,7 @@
     // stats of a category in the last result, if any
     $: stats = new Map<number, CategoryStats>((result?.categories ?? []).map((s) => [s.category_id, s]));
     $: maxInHand = result ? Math.max(0, ...result.categories.flatMap((s) => Object.keys(s.per_hand).map(Number))) : 0;
-    const percent = (n: number) => ((n / (result?.total_simulations || 1)) * 100).toFixed(2);
+    const percent = (n: number) => ((n / result!.total_simulations) * 100).toFixed(2);
 </script>
 
 <div class="controls">

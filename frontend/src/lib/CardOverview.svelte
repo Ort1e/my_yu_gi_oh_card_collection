@@ -36,13 +36,12 @@
 
     $: if (card) load(card.id, categoriesVersion);
 
+    // only shown with a card
     async function toggle(category: CardCategory) {
-        if (!card) return;
-
         const assigned = !category.assigned;
 
         try {
-            await api.assignCategory(card.id, category.id, assigned);
+            await api.assignCategory(card!.id, category.id, assigned);
             category.assigned = assigned;
             categories = categories;
         } catch (e) {

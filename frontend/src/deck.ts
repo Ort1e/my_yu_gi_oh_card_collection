@@ -88,13 +88,13 @@ export function rulesFields(key: string | null): Pick<VersionUpdate, 'ban_list_i
 
     return {
         ban_list_id: key != null && !format ? Number(key) : null,
-        format_id: key != null && format ? Number(key.slice(1)) : null,
+        format_id: format ? Number(key!.slice(1)) : null,
     };
 }
 
 /** The card's status in the rules played, undefined when it has none. */
 export function banStatus(card: ApiCard, rules: Rules | null): BanStatus | undefined {
-    return rules == null ? undefined : (card.ban[rules.key] as BanStatus | undefined);
+    return rules == null ? undefined : (card.ban?.[rules.key] as BanStatus | undefined);
 }
 
 /** Out of the format's card pool: released after its cutoff, or never in the TCG. */
@@ -147,8 +147,7 @@ export function ydkeUrl(zones: DeckZones, keep: (card: ApiCard) => boolean = () 
 
 /** "1st", "2nd", "3rd", "4th", "11th", "21st"… (domain::tournament::ordinal). */
 export function ordinal(n: number): string {
-    const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
-    const suffix = [11, 12, 13].includes(n % 100) ? 'th' : (suffixes[n % 10] ?? 'th');
+    const suffix = [11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
 
     return `${n}${suffix}`;
 }

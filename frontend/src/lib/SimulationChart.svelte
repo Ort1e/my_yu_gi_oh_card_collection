@@ -34,7 +34,7 @@
         let hands = 0;
 
         for (const [n, count] of Object.entries(stats.per_hand)) {
-            if (Number(n) >= min && Number(n) <= max) hands += count ?? 0;
+            if (Number(n) >= min && Number(n) <= max) hands += count;
         }
 
         return (hands / result.total_simulations) * 100;
@@ -46,7 +46,7 @@
 
         afterDatasetsDraw(chart) {
             const { ctx, chartArea } = chart;
-            const zero = chart.data.datasets[0].data as number[];
+            const zero = chart.data.datasets[0];
 
             ctx.save();
             ctx.fillStyle = INK;
@@ -54,7 +54,7 @@
             ctx.textBaseline = 'middle';
 
             chart.getDatasetMeta(0).data.forEach((bar, i) => {
-                ctx.fillText(`≥1: ${(100 - zero[i]).toFixed(0)}%`, chartArea.right + 8, bar.y);
+                ctx.fillText(`≥1: ${(100 - (zero.data[i] as number)).toFixed(0)}%`, chartArea.right + 8, bar.y);
             });
 
             ctx.restore();

@@ -24,10 +24,10 @@ import type { Zone } from './api-types/Zone';
 
 /** The answer's JSON as `T`; `null` for an empty answer (204). */
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-    const init: RequestInit = { method };
+    const init: RequestInit & { headers: Record<string, string> } = { method, headers: {} };
 
     if (body !== undefined) {
-        init.headers = { 'Content-Type': 'application/json' };
+        init.headers['Content-Type'] = 'application/json';
         init.body = JSON.stringify(body);
     }
 

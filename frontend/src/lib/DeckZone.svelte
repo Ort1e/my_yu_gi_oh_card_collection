@@ -18,7 +18,7 @@
         // handled here: the window-level "dropped outside" handler must not run
         e.stopPropagation();
         over = false;
-        const data = e.dataTransfer?.getData('application/json');
+        const data = e.dataTransfer!.getData('application/json');
 
         if (data) dispatch('move', { ...(JSON.parse(data) as DragData), to: zone });
     }

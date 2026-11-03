@@ -12,12 +12,10 @@
 
     const dispatch = createEventDispatcher<{ select: ApiCard }>();
 
+    // only when `from` is set (draggable)
     function dragStart(e: DragEvent) {
-        if (!e.dataTransfer || from === null) return;
-
-        const data: DragData = { cardId: card.id, from };
-        e.dataTransfer.setData('application/json', JSON.stringify(data));
-        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer!.setData('application/json', JSON.stringify({ cardId: card.id, from } as DragData));
+        e.dataTransfer!.effectAllowed = 'move';
     }
 
     $: src = imageUrl(card);
