@@ -36,16 +36,15 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
   the app from the home network (ZAP).
 - Maybe: Dependabot for the Cargo and npm updates (weekly, onto `dev`).
-- **TypeScript** for the deck builder (`frontend/`: Svelte 4 + Vite handle
-  `<script lang="ts">`, with `svelte-check` in the CI); maybe the page
-  scripts of `static/js/` too (they are loaded as they are today: they
-  would need a build step, or JSDoc types checked by `tsc --checkJs`
-  instead).
 
 ## Done
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-11-03: TypeScript: the deck builder in TypeScript, its API's types
+  generated from the Rust structs (ts-rs), the page scripts checked from
+  their JSDoc; `npm run check` in the CI; VS Code set up for it. Private
+  books (off the public copy), one Scan button on the book form.
 - 2026-11-02: formats (Edison…: `/formats`, own card pool and list,
   versions; in the deck builder: "Ban list or format", problems, tiles
   out of the pool, legal-only reserve); a card's page shows what the card

@@ -31,7 +31,7 @@ pub fn clean_card_name(name: &str) -> String {
 
 /// A name as sorted in a deck: trimmed, lowercase, without accents
 /// (`Élégant` sorts with `elegant`, not after `zombie`). The deck builder
-/// sorts the same way (`frontend/src/deck.js`, `sortName`).
+/// sorts the same way (`frontend/src/deck.ts`, `sortName`).
 pub fn sort_name(name: &str) -> String {
     let mut sorted = String::with_capacity(name.len());
     for c in name.trim().to_lowercase().chars() {

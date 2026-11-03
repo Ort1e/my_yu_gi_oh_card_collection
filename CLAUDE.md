@@ -45,7 +45,7 @@ The port is finished; the project now serves as Rust practice for the owner, who
 | HTTP | axum 0.7, tower-http (ServeDir, trace) |
 | DB | SQLite (WAL) via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
 | Pages | askama 0.12 + askama_axum templates, scripts in `static/js/` (no inline JS), Chart.js from a CDN on the dashboard |
-| Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), built to `static/deck-builder/` (gitignored), talks only to `/api/*` |
+| Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), **TypeScript** (svelte-check), built to `static/deck-builder/` (gitignored), talks only to `/api/*`; its API's types generated from Rust (`ts-rs`) |
 | Env | Nix flake (`flake.nix`, `.envrc` → `use flake`), Rust 1.88.0 pinned in `rust-toolchain.toml` |
 
 Cargo workspace (`Cargo.toml`: `members = ["crates/*", "importer"]`), shared deps under `[workspace.dependencies]`. One crate per collection, a pure domain crate each, shared crates below them; dependencies only go down (domain ← collection ← `backend`). The refactor into crates (2026-10-26) is described in `docs/tour.md`, "The big picture" and "What the collections share".
@@ -62,7 +62,7 @@ Cargo workspace (`Cargo.toml`: `members = ["crates/*", "importer"]`), shared dep
 - `importer/` — one-off loader from a Django `dumpdata` JSON into the sqlx schema (used once for the cutover; refuses a non-empty DB).
 - `migrations/` — sqlx migrations, one folder for every collection, embedded by both binaries (`sqlx::migrate!("../../migrations")` in `common::db`).
 - `deploy/` — the deployment (`deploy/README.md`): `nas/` (install, nightly job, update, OVH upload, systemd units, settings examples: the NAS = Netgear ReadyNAS x86_64, Debian 8, home network + our devices through Tailscale; app in `/apps/collection`, data in `/Data1To/collection`, copies in `/Data500/collection-backups`), `pc/` (install on the NAS, move the data, pull its copies into the data submodule, `set-nas-setting.sh`, `install-tailscale-on-nas.sh`: Tailscale in userspace mode, `nas/tailscaled.service`, the app at `https://<nas>.<tailnet>.ts.net` via `tailscale serve`; no port opened on the Bbox). The CI job `nas-build` makes the static (musl) build (pull requests into `main` and pushes to it only, in parallel, own cache), `nas-release` publishes it as the release `nas-latest` once all jobs are green.
-- `frontend/` — the deck builder Svelte app (`App.svelte`, `lib/*.svelte` with their own `<style>`, `api.js` = HTTP client, `deck.js` = pure helpers).
+- `frontend/` — the deck builder Svelte app in TypeScript (`App.svelte`, `lib/*.svelte` with their own `<style>` and `<script lang="ts">`, `api.ts` = HTTP client, `deck.ts` = pure helpers, `types.ts` = the builder's own types, `api-types/` = the API's JSON types **generated** by `cargo test` from the Rust structs (`#[derive(TS)] #[ts(export)]`, `.cargo/config.toml` `[env]`), committed, never edited by hand). Also the page scripts' check: `tsconfig.static.json` + `static-globals.d.ts` (what `static/js/` shares at runtime); `jsconfig.json` at the root points the editor to it.
 - `data/` — git **submodule** (`Ort1e/my_yu_gi_oh_card_data`, private): **`app.db` (the live database, tracked)**, `media/card_images/`, `media/shipment_files/`, and the Django leftovers `data.json` (dump `app.db` was imported from) and `db.sqlite3` (Django DB). Its `.gitignore` excludes `*.db-wal`/`-shm`/`-journal`.
 
 ## Commands
@@ -91,6 +91,7 @@ cargo run -p backend -- clean-pictures        # delete the cached card pictures 
 DATABASE_URL=sqlite:/tmp/test.db cargo run -p importer -- data/data.json   # import the Django dump into a scratch DB (never over data/app.db)
 
 cd frontend && npm install && npm run build   # → static/deck-builder/, needed by /deck-builder/:id
+cd frontend && npm run check                  # TypeScript: svelte-check (deck builder) + tsc on static/js/ (JSDoc); the CI runs it
 cd frontend && npm run dev                    # hot reload at http://localhost:5173/?id=<deck version id>, proxies to :3000
 ```
 
@@ -156,7 +157,9 @@ Cardmarket shipment PDFs (uploads, `data/media/shipment_files/`, and the test PD
 - Handlers return `AppResult<T>`; use `?` and `.or_404()`, never `.unwrap()` on DB results. API input errors: `bad_request(...)` (JSON `{"error": …}`).
 - New behaviour goes where it belongs: pure logic in the collection's `*-domain` crate, card-row writes in `crates/yugioh/src/store/cards.rs`, ygoprodeck in `yugioh/src/store/card_data/`, pages/handlers in `routes/<area>/` of the collection's crate; what two collections need, once, in `common` (or `common-domain`, `advent`).
 - Tests: pure logic as unit tests in the domain crates; handlers and commands through each crate's `crate::tests::TestApp` (a wrapper of `common::testing::TestApp`; pre-insert any card data so nothing hits the network).
-- Frontend (`frontend/`): **4-space indentation and airy code** (blank lines between logical blocks, after guards/early returns, around try/catch); `.editorconfig` sets it.
+- Frontend (`frontend/`): **4-space indentation and airy code** (blank lines between logical blocks, after guards/early returns, around try/catch); `.editorconfig` sets it. TypeScript, strict: props and events typed (`createEventDispatcher<{…}>()`), the API's types imported from `api-types/` (`import type`), a request body tied to its input type with `satisfies`.
+- **A deck builder API struct changed** (field added, renamed): `cargo test` rewrites `frontend/src/api-types/`; commit them with the change (the CI fails when they are stale), then `npm run check` shows what the builder must follow. A new struct the builder reads: `#[derive(TS)] #[ts(export)]` (`Money`: `#[ts(type = "string")]`; an input's optional fields: `#[ts(optional_fields)]`).
+- **Page scripts** (`static/js/`): plain JavaScript, never built; JSDoc for the checker (`/** @type {HTMLInputElement} */ (document.getElementById('…'))`, `| null` where the code checks; `@param`/`@returns` where it helps). What one script gives another (the rarity data…) is declared in `frontend/static-globals.d.ts`. `npm run check` must stay at 0 errors.
 - **The public copy** saves the pages listed in `backend/src/commands/export.rs` (`START`, `public()`): anything private in their templates (and the shared partials they use) goes inside `{% if !common::export::public_copy() %}`; sellers, lots, shipment PDFs, prices paid, notes, ISBNs, tournaments' old notes and forms, private decks and books never in the copy (`backend/src/tests/export.rs`).
 - **A deletion:** `data-confirm="…"` on its form (`static/js/confirm.js`, loaded on every page); never `onclick="return confirm(…)"`, which the CSP blocks (the delete then happens without asking). On an edit page it goes in a folded `<details class="danger-zone">` well below "Save" (`static/css/form.css`); a page's own Edit button never has Delete next to it.
 - **Dates on the pages**: always `|date` (dd/mm/yyyy, `common::web::filters`), `french_date` in Rust-built text, `frenchDate` in the deck builder; ISO everywhere else (DB, URLs, `<input type="date">`, a sortable cell's `data-sort-value="{{ iso }}"`). Month names (`October 2026`) stay words.

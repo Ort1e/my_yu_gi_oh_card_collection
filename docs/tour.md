@@ -295,24 +295,39 @@ file (`#[cfg(test)] mod tests`).
 
 ## The deck builder
 
-A Svelte 4 app in `frontend/`, built by Vite into `static/deck-builder/`
-(`bundle.js`, `bundle.css`). The page `/deck-builder/:id`
+A Svelte 4 app in TypeScript in `frontend/`, built by Vite into `static/deck-builder/`
+(`bundle.js`, `bundle.css`; the types are only checked, by `npm run check`, and
+stripped from the bundle). The page `/deck-builder/:id`
 (`templates/decks/builder.html`) is just a `<div id="app">` that loads the
 bundle. The app then only talks JSON to `/api/*`:
 
 | Frontend | Backend |
 |---|---|
-| `src/main.js`: mounts `App` with the version id | |
+| `src/main.ts`: mounts `App` with the version id | |
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
-| `src/api.js`: one function per endpoint | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
-| `src/deck.js`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
+| `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
+| `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
 | `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
 Moving cards between zones only changes the app's local state until
 **Save** (`PATCH /api/deck-versions/:id` with the three zones). Proxies,
 categories and the tournament are saved immediately. Errors come back as
-`{"error": "…"}` with a 4xx status, and `api.js` turns them into exceptions
+`{"error": "…"}` with a 4xx status, and `api.ts` turns them into exceptions
 the app shows to you.
+
+**The JSON's types come from Rust.** The API's structs (`ApiCard`,
+`DeckVersion`, the inputs like `VersionUpdate`…) derive `ts_rs::TS` with
+`#[ts(export)]`: `cargo test` writes one TypeScript file per struct into
+`frontend/src/api-types/` (settings in `.cargo/config.toml`: that folder,
+`i64` as `number`). They are committed, and the CI fails when they are
+stale, so a field renamed in Rust shows up as an error in `npm run check`
+rather than as `undefined` in the page. `src/types.ts` holds the builder's
+own types (the zones with the reserve, the rules played, the drag data).
+
+**The page scripts** (`static/js/`) stay plain JavaScript, served as they
+are; `npm run check` also checks them from their JSDoc comments
+(`frontend/tsconfig.static.json`, each script in its own scope, what they
+share at runtime declared in `frontend/static-globals.d.ts`).
 
 During frontend work, `npm run dev` serves the app with hot reload on
 `:5173` and forwards `/api` to the backend on `:3000`.
@@ -390,7 +405,7 @@ format (`deck_version.format_id`; the save refuses both).
 | the rules: a card's first release (the earliest TCG date of its sets), a deck's problems (`check`: released after the cutoff or never in the TCG, more copies than allowed, counted by English name across main, extra and side) | `yugioh-domain/src/format.rs` |
 | the sets' TCG dates (`ygo_set`, ygoprodeck's `cardsets.php`; with the weekly prices, and once when there are none); first releases, a format's rules, a version's problems; create from a Konami list (copied), new version (a copy) | `yugioh/src/store/formats.rs` |
 | `/formats` (list), `/formats/:id` (its list: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
-| deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.js` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
+| deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.ts` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
 
 **A change of the list on a format already played**: make a new version
 (button on its page). The decks keep the version they play; v1 stays as it
