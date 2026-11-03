@@ -1,0 +1,10 @@
+{
+    // VS Code offers to install these when the folder is opened.
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "svelte.svelte-vscode",
+        "mkhl.direnv",
+        "tamasfe.even-better-toml",
+        "editorconfig.editorconfig"
+    ]
+}

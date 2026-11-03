@@ -7,6 +7,18 @@
         ".direnv/**": true,
         ".venv/**": true,
     },
+    // Use rust-analyzer from PATH (the Nix shell's), not from the extension installation
     "rust-analyzer.server.path": "rust-analyzer",
-    "editor.formatOnSave": true // Use rust-analyzer from PATH not from extension installation
+    "editor.formatOnSave": true,
+
+    // TypeScript: the project's version (frontend/node_modules, `npm install`
+    // in frontend/), the same as `npm run check`; the Svelte extension's
+    // plugin so that .ts files understand the .svelte imports.
+    "typescript.tsdk": "frontend/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "svelte.enable-ts-plugin": true,
+    // the generated API types (cargo test writes them): read, never edited
+    "files.readonlyInclude": {
+        "frontend/src/api-types/**": true
+    }
 }
