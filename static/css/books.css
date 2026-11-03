@@ -276,6 +276,17 @@ body.books {
     color: #a34700;
 }
 
+/* The form's "Read" and "Private" switches, side by side. */
+.switch-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2rem;
+}
+
+.switch-row .switch {
+    margin-bottom: 0.25rem;
+}
+
 /* The "Read" switch of a row (book_read.js), without the form's margins. */
 .switch.compact {
     margin: 0;

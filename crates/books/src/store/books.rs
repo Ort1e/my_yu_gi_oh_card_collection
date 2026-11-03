@@ -25,6 +25,8 @@ pub struct BookFields {
     pub format: Option<BookFormat>,
     pub notes: Option<String>,
     pub is_read: bool,
+    /// Kept off the public copy (`routes::shown_books`).
+    pub is_private: bool,
 }
 
 impl BookFields {
@@ -44,6 +46,7 @@ impl BookFields {
             format: info.format,
             notes: None,
             is_read: false,
+            is_private: false,
         })
     }
 }
@@ -61,8 +64,8 @@ pub async fn insert(conn: &mut SqliteConnection, book: &BookFields) -> sqlx::Res
     let series = series_id(conn, book.series.as_deref()).await?;
     let id = sqlx::query(
         "INSERT INTO book (isbn, title, publisher, published_year, language, page_count,
-                           series_id, volume, format, notes, is_read, added_on)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           series_id, volume, format, notes, is_read, is_private, added_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(book.isbn.as_ref().map(Isbn::as_str))
     .bind(&book.title)
@@ -75,6 +78,7 @@ pub async fn insert(conn: &mut SqliteConnection, book: &BookFields) -> sqlx::Res
     .bind(book.format.map(BookFormat::label))
     .bind(&book.notes)
     .bind(book.is_read)
+    .bind(book.is_private)
     .bind(today().to_string())
     .execute(&mut *conn)
     .await?
@@ -90,7 +94,7 @@ pub async fn update(conn: &mut SqliteConnection, id: i64, book: &BookFields) -> 
     let updated = sqlx::query(
         "UPDATE book SET isbn = ?, title = ?, publisher = ?, published_year = ?, language = ?,
                          page_count = ?, series_id = ?, volume = ?, format = ?, notes = ?,
-                         is_read = ?
+                         is_read = ?, is_private = ?
          WHERE id = ?",
     )
     .bind(book.isbn.as_ref().map(Isbn::as_str))
@@ -104,6 +108,7 @@ pub async fn update(conn: &mut SqliteConnection, id: i64, book: &BookFields) -> 
     .bind(book.format.map(BookFormat::label))
     .bind(&book.notes)
     .bind(book.is_read)
+    .bind(book.is_private)
     .bind(id)
     .execute(&mut *conn)
     .await?

@@ -9,6 +9,11 @@
 //! lookup's (and the read switches') JSON. Book writes are in
 //! `store::books`, the lookup in `store::book_data`, the pure rules in
 //! `books_domain::book` / `books_domain::isbn`.
+//!
+//! A private book (`book.is_private`, the form's switch) is left out of
+//! the public copy: every query of the pages here keeps only
+//! [`shown_books`]. Its page answers 404 there, so the copy has no file for
+//! it; an author or a series with only private books is left out too.
 
 pub mod advent;
 pub mod api;
@@ -27,6 +32,16 @@ use common::web::error::{AppResult, OrNotFound};
 use common::web::filters;
 use common::AppState;
 
+/// SQL: the books the page shows, `book` being the table: all of them in
+/// the app, the ones not private in the public copy.
+pub fn shown_books() -> &'static str {
+    if common::export::public_copy() {
+        "book.is_private = 0"
+    } else {
+        "1"
+    }
+}
+
 /// A book in a list: its authors joined, its series.
 #[derive(Debug, sqlx::FromRow)]
 pub struct BookRow {
@@ -41,11 +56,12 @@ pub struct BookRow {
     /// The first author's `sort_name` (`hobb robin`), to sort by surname.
     pub author_sort: Option<String>,
     pub is_read: bool,
+    pub is_private: bool,
 }
 
 impl BookRow {
-    /// Selects every column, `FROM book` (join `book_series`): add `WHERE` /
-    /// `ORDER BY`.
+    /// Selects every column, `FROM book` (join `book_series`): add `WHERE`
+    /// (with [`shown_books`]) / `ORDER BY`.
     pub const SELECT: &'static str = "SELECT book.id, book.title,
             (SELECT group_concat(name, ', ') FROM
                 (SELECT a.name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
@@ -54,7 +70,7 @@ impl BookRow {
             book.format,
             (SELECT a.sort_name FROM book_book_author ba JOIN book_author a ON a.id = ba.author_id
              WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) AS author_sort,
-            book.is_read
+            book.is_read, book.is_private
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id";
 
     /// `Discworld #3`, `Discworld`, or nothing.
@@ -107,7 +123,7 @@ impl BookFilter {
     }
 
     fn push_where(&self, qb: &mut QueryBuilder<'_, Sqlite>) {
-        qb.push(" WHERE 1");
+        qb.push(" WHERE ").push(shown_books());
         if let Some(title) = Self::text(&self.title) {
             qb.push(" AND book.title LIKE ")
                 .push_bind(like_pattern(title))
@@ -174,9 +190,12 @@ pub async fn list(
     let books = select.build_query_as().fetch_all(pool).await?;
 
     Ok(BooksList {
-        total: sqlx::query_scalar("SELECT count(*) FROM book")
-            .fetch_one(pool)
-            .await?,
+        total: sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM book WHERE {}",
+            shown_books()
+        ))
+        .fetch_one(pool)
+        .await?,
         books,
     })
 }
@@ -198,6 +217,7 @@ pub struct BookDetailRow {
     notes: Option<String>,
     added_on: String,
     is_read: bool,
+    is_private: bool,
 }
 
 #[derive(Template)]
@@ -273,13 +293,15 @@ pub async fn book_authors(pool: &common::db::Pool, id: i64) -> sqlx::Result<Vec<
 /// `/books/:id`.
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<BookDetail> {
     let pool = &state.pool;
-    let book: BookDetailRow = sqlx::query_as(
+    let shown = shown_books();
+    let book: BookDetailRow = sqlx::query_as(&format!(
         "SELECT book.id, book.isbn, book.title, book.publisher, book.published_year,
                 book.language, book.page_count, book.series_id, book_series.name AS series,
-                book.volume, book.format, book.notes, book.added_on, book.is_read
+                book.volume, book.format, book.notes, book.added_on, book.is_read,
+                book.is_private
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id
-         WHERE book.id = ?",
-    )
+         WHERE book.id = ? AND {shown}"
+    ))
     .bind(id)
     .fetch_optional(pool)
     .await?
@@ -288,7 +310,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     let series_books: Vec<BookRow> = match book.series_id {
         Some(series_id) => {
             sqlx::query_as(&format!(
-                "{} WHERE book.series_id = ?
+                "{} WHERE book.series_id = ? AND {shown}
                  ORDER BY book.volume IS NULL, book.volume, book.published_year, book.title",
                 BookRow::SELECT
             ))
@@ -300,7 +322,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     };
     let volumes: Vec<i64> = series_books.iter().filter_map(|b| b.volume).collect();
     let other_books = sqlx::query_as(&format!(
-        "{} WHERE book.id <> ?1
+        "{} WHERE book.id <> ?1 AND {shown}
              AND book.id IN (SELECT ba.book_id FROM book_book_author ba WHERE ba.author_id IN
                  (SELECT author_id FROM book_book_author WHERE book_id = ?1))
              AND ((SELECT series_id FROM book WHERE id = ?1) IS NULL

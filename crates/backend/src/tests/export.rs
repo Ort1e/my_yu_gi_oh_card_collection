@@ -39,7 +39,13 @@ async fn the_public_copy_holds_nothing_private() {
          INSERT INTO pokemon_wish (card_id, max_price, priority, note, added_on)
              VALUES (2, '33.33', 1, 'wish note', '2025-06-01');
          INSERT INTO book (id, isbn, title, notes, added_on)
-             VALUES (1, '9780553573398', 'Assassin''s Apprentice', 'book note', '2025-06-01');",
+             VALUES (1, '9780553573398', 'Assassin''s Apprentice', 'book note', '2025-06-01');
+         -- a private book, its own author and series
+         INSERT INTO book_series (id, name) VALUES (1, 'Hidden Series');
+         INSERT INTO book (id, title, series_id, volume, is_private, added_on)
+             VALUES (2, 'Hidden Diary', 1, 1, 1, '2025-06-01');
+         INSERT INTO book_author (id, name, sort_name) VALUES (1, 'Hidden Author', 'author hidden');
+         INSERT INTO book_book_author (book_id, author_id, position) VALUES (2, 1, 0);",
     )
     .await;
 
@@ -84,6 +90,13 @@ async fn the_public_copy_holds_nothing_private() {
         "static/js/back_link.js",
     ] {
         assert!(out.join(page).exists(), "{page} is missing");
+    }
+    for page in [
+        "books-2.html",
+        "books-series-1.html",
+        "books-authors-1.html",
+    ] {
+        assert!(!out.join(page).exists(), "{page}: a private book's");
     }
     let mut pages = String::new();
     for entry in std::fs::read_dir(&out).unwrap() {
@@ -145,6 +158,10 @@ async fn the_public_copy_holds_nothing_private() {
         "book note",
         "9780553573398",
         "Kuriboh Proxy",
+        "Hidden Diary",
+        "Hidden Series",
+        "Hidden Author",
+        "🔒",
         "/lots",
         "/login",
         "lots-",

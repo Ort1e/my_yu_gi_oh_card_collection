@@ -571,6 +571,45 @@ async fn a_book_is_marked_read() {
     assert_eq!(t.scalar("SELECT is_read FROM book").await, 0);
 }
 
+/// A private book shows as usual in the app, marked 🔒; the public copy
+/// leaves it out (backend's `the_public_copy_holds_nothing_private`).
+#[tokio::test]
+async fn a_book_is_kept_private() {
+    let t = TestApp::new().await;
+    let mut form = GAME_OF_THRONES.to_vec();
+    form.push(("is_private", "1"));
+    let id = add(&t, &form).await;
+    assert_eq!(t.scalar("SELECT is_private FROM book").await, 1);
+    let (_, edit) = t.get(&format!("/books/{id}/edit")).await;
+    assert!(
+        edit.contains(r#"name="is_private" id="is_private" value="1" checked"#),
+        "{edit}"
+    );
+
+    let (_, page) = t.get(&format!("/books/{id}")).await;
+    assert!(page.contains("🔒 Private"), "{page}");
+    for address in ["/books", "/books/authors/1", "/books/series/1"] {
+        let (status, list) = t.get(address).await;
+        assert_eq!(status, StatusCode::OK, "{address}");
+        assert!(
+            list.contains("A Game of Thrones") && list.contains("🔒"),
+            "{address}: {list}"
+        );
+    }
+    let (_, authors) = t.get("/books/authors").await;
+    assert!(authors.contains("George R. R. Martin"));
+    let (_, series) = t.get("/books/series").await;
+    assert!(series.contains("A Song of Ice and Fire"));
+    let (_, random) = t.get("/books/random").await;
+    assert!(random.contains(r#""title":"A Game of Thrones""#));
+
+    // unticked: public again
+    t.post(&format!("/books/{id}/edit"), GAME_OF_THRONES).await;
+    assert_eq!(t.scalar("SELECT is_private FROM book").await, 0);
+    let (_, page) = t.get(&format!("/books/{id}")).await;
+    assert!(!page.contains("🔒"));
+}
+
 #[tokio::test]
 async fn the_random_pick_carries_every_book() {
     let t = TestApp::new().await;

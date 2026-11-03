@@ -3,13 +3,16 @@
 //! ones (the gaps up to the last volume owned, `books_domain::book::missing_volumes`).
 //! Series are created and deleted with their books (`store::books`).
 //! `/books/standalone`: the complement, the books in no series.
+//! In the public copy, only the books not private, and only the series that
+//! have one (`super::shown_books`); the missing volumes are counted from
+//! the books shown.
 
 use askama::Template;
 use axum::extract::{Path, State};
 use books_domain::book::missing_volumes;
 
-use super::BookRow;
-use common::web::error::{AppResult, OrNotFound};
+use super::{shown_books, BookRow};
+use common::web::error::{AppError, AppResult, OrNotFound};
 use common::AppState;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -57,17 +60,20 @@ pub struct SeriesList {
 /// `/books/series`.
 pub async fn list(State(state): State<AppState>) -> AppResult<SeriesList> {
     let pool = &state.pool;
-    let series = sqlx::query_as(
-        "SELECT s.id, s.name,
-                (SELECT count(*) FROM book WHERE book.series_id = s.id) AS books,
-                (SELECT group_concat(volume) FROM book
-                 WHERE book.series_id = s.id AND volume IS NOT NULL) AS volumes,
-                (SELECT a.name FROM book
-                 JOIN book_book_author ba ON ba.book_id = book.id AND ba.position = 0
-                 JOIN book_author a ON a.id = ba.author_id
-                 WHERE book.series_id = s.id ORDER BY book.volume LIMIT 1) AS author
-         FROM book_series s ORDER BY s.name COLLATE NOCASE",
-    )
+    let series = sqlx::query_as(&format!(
+        "SELECT * FROM
+             (SELECT s.id, s.name,
+                     (SELECT count(*) FROM book WHERE book.series_id = s.id AND {shown}) AS books,
+                     (SELECT group_concat(volume) FROM book
+                      WHERE book.series_id = s.id AND volume IS NOT NULL AND {shown}) AS volumes,
+                     (SELECT a.name FROM book
+                      JOIN book_book_author ba ON ba.book_id = book.id AND ba.position = 0
+                      JOIN book_author a ON a.id = ba.author_id
+                      WHERE book.series_id = s.id AND {shown} ORDER BY book.volume LIMIT 1) AS author
+              FROM book_series s)
+         WHERE books > 0 ORDER BY name COLLATE NOCASE",
+        shown = shown_books()
+    ))
     .fetch_all(pool)
     .await?;
 
@@ -107,13 +113,18 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         .await?
         .or_404()?;
     let books: Vec<BookRow> = sqlx::query_as(&format!(
-        "{} WHERE book.series_id = ?
+        "{} WHERE book.series_id = ? AND {}
          ORDER BY book.volume IS NULL, book.volume, book.published_year, book.title",
-        BookRow::SELECT
+        BookRow::SELECT,
+        shown_books()
     ))
     .bind(id)
     .fetch_all(pool)
     .await?;
+    // a series has books (deleted with the last one): none = all private
+    if books.is_empty() {
+        return Err(AppError::NotFound);
+    }
     let volumes: Vec<i64> = books.iter().filter_map(|b| b.volume).collect();
 
     Ok(SeriesPage {
@@ -133,7 +144,7 @@ pub struct StandaloneList {
 /// title; sorted otherwise and searched in the page like the other lists.
 pub async fn standalone(State(state): State<AppState>) -> AppResult<StandaloneList> {
     let books = sqlx::query_as(&format!(
-        "{} WHERE book.series_id IS NULL
+        "{} WHERE book.series_id IS NULL AND {}
          ORDER BY (SELECT a.sort_name FROM book_book_author ba
                    JOIN book_author a ON a.id = ba.author_id
                    WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1) IS NULL,
@@ -141,7 +152,8 @@ pub async fn standalone(State(state): State<AppState>) -> AppResult<StandaloneLi
                    JOIN book_author a ON a.id = ba.author_id
                    WHERE ba.book_id = book.id ORDER BY ba.position LIMIT 1),
                   book.title COLLATE NOCASE",
-        BookRow::SELECT
+        BookRow::SELECT,
+        shown_books()
     ))
     .fetch_all(&state.pool)
     .await?;

@@ -1,0 +1,26 @@
+# Tailscale on the NAS: the app and SSH reachable from our own devices,
+# from anywhere, with no port opened on the box (Tailscale only makes
+# outgoing connections). Installed in /etc/systemd/system by
+# deploy/pc/install-tailscale-on-nas.sh, with the static binaries in
+# /apps/tailscale (deploy/README.md, "From outside home").
+#
+# Tailscale's own unit needs a newer systemd (StateDirectory…) than
+# ReadyNAS OS 6's (215). Userspace networking: no kernel TUN device or
+# firewall rules needed on the NAS's old kernel (4.4); the connections
+# coming through Tailscale reach the NAS's services on 127.0.0.1.
+[Unit]
+Description=Tailscale (the NAS from our own devices, anywhere)
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/apps
+
+[Service]
+Type=simple
+ExecStart=/apps/tailscale/tailscaled --tun=userspace-networking --state=/apps/tailscale/state/tailscaled.state --statedir=/apps/tailscale/state --socket=/run/tailscale/tailscaled.sock --port=41641
+ExecStopPost=/apps/tailscale/tailscaled --cleanup
+RuntimeDirectory=tailscale
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

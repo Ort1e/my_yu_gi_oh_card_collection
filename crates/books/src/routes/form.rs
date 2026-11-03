@@ -36,6 +36,7 @@ pub struct BookValues {
     pub format: String,
     pub notes: String,
     pub is_read: bool,
+    pub is_private: bool,
 }
 
 impl BookValues {
@@ -53,6 +54,7 @@ impl BookValues {
             format: form.text("format"),
             notes: form.text("notes"),
             is_read: form.checked("is_read"),
+            is_private: form.checked("is_private"),
         }
     }
 
@@ -112,6 +114,7 @@ fn read_book(form: &mut FormData) -> Option<BookFields> {
         format,
         notes: form.get("notes").map(str::to_string),
         is_read: form.checked("is_read"),
+        is_private: form.checked("is_private"),
     })
 }
 
@@ -281,13 +284,14 @@ struct StoredBook {
     format: Option<String>,
     notes: Option<String>,
     is_read: bool,
+    is_private: bool,
 }
 
 async fn stored_values(pool: &Pool, id: i64) -> AppResult<BookValues> {
     let book: StoredBook = sqlx::query_as(
         "SELECT book.isbn, book.title, book.publisher, book.published_year, book.language,
                 book.page_count, book_series.name AS series, book.volume, book.format, book.notes,
-                book.is_read
+                book.is_read, book.is_private
          FROM book LEFT JOIN book_series ON book_series.id = book.series_id WHERE book.id = ?",
     )
     .bind(id)
@@ -314,6 +318,7 @@ async fn stored_values(pool: &Pool, id: i64) -> AppResult<BookValues> {
         format: book.format.unwrap_or_default(),
         notes: book.notes.unwrap_or_default(),
         is_read: book.is_read,
+        is_private: book.is_private,
     })
 }
 

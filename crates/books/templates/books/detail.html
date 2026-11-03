@@ -21,7 +21,7 @@
   </div>
 
   <div class="book-info">
-    <h1>{{ book.title }}</h1>
+    <h1>{{ book.title }}{% if book.is_private %} <span class="tag" title="Kept off the public site">🔒 Private</span>{% endif %}</h1>
     {% if !authors.is_empty() %}
     <p class="book-page-by">by {% for (author_id, name) in authors %}{% if !loop.first %}, {% endif %}<a href="/books/authors/{{ author_id }}">{{ name }}</a>{% endfor %}</p>
     {% endif %}
