@@ -15,19 +15,23 @@
 // memory, Android closed Chrome meanwhile ("not enough memory", the photo
 // lost). The live scanner never leaves the page, and keeps no photo.
 
-const form = document.getElementById('book-form');
-const isbnField = document.getElementById('isbn');
-const lookupButton = document.getElementById('isbn-lookup');
+const form = /** @type {HTMLFormElement | null} */ (document.getElementById('book-form'));
+const isbnField = /** @type {HTMLInputElement} */ (document.getElementById('isbn'));
+const lookupButton = /** @type {HTMLButtonElement} */ (document.getElementById('isbn-lookup'));
 // "Scan" (the camera) and "From a photo" (one already taken)
 const photoInputs = document.querySelectorAll('#isbn-photo, #isbn-photo-file');
-const status = document.getElementById('isbn-status');
+const status = /** @type {HTMLElement} */ (document.getElementById('isbn-status'));
 
 // On the edit page, a lookup only fills the empty fields.
 const keepFilled = form?.hasAttribute('data-keep-filled');
 
 // ---------- status line ----------
 
-/** Show a message under the ISBN field; `link` adds a link after it. */
+/**
+ * Show a message under the ISBN field; `link` adds a link after it.
+ * @param {string} message
+ * @param {{ error?: boolean, link?: { href: string, text: string } | null }} [options]
+ */
 function say(message, { error = false, link = null } = {}) {
     status.textContent = message;
     status.classList.toggle('is-error', error);
@@ -62,7 +66,7 @@ function fill(book) {
     let filledMore = false;
 
     for (const [id, value] of Object.entries(fieldValues(book))) {
-        const field = document.getElementById(id);
+        const field = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
 
         if (!field || value === null || value === undefined || value === '') continue;
 
@@ -207,11 +211,11 @@ for (const input of photoInputs) {
 
 // ---------- live scanner ----------
 
-const liveButton = document.getElementById('isbn-live');
-const photoLabel = document.getElementById('isbn-photo-label');
-const dialog = document.getElementById('scan-dialog');
-const video = document.getElementById('scan-video');
-const scanHelp = document.getElementById('scan-help');
+const liveButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('isbn-live'));
+const photoLabel = /** @type {HTMLElement} */ (document.getElementById('isbn-photo-label'));
+const dialog = /** @type {HTMLDialogElement} */ (document.getElementById('scan-dialog'));
+const video = /** @type {HTMLVideoElement} */ (document.getElementById('scan-video'));
+const scanHelp = /** @type {HTMLElement} */ (document.getElementById('scan-help'));
 
 /** The page may use the camera (HTTPS, or Chrome's setting for this address). */
 const canStream = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
@@ -254,7 +258,7 @@ function frameBlob() {
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d')).drawImage(video, 0, 0, canvas.width, canvas.height);
 
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
 }
@@ -318,7 +322,7 @@ async function startScanner() {
 const scanNote = document.getElementById('scan-note');
 
 if (scanNote && !canStream && navigator.maxTouchPoints > 0) {
-    scanNote.querySelector('[data-origin]').textContent = window.location.origin;
+    /** @type {HTMLElement} */ (scanNote.querySelector('[data-origin]')).textContent = window.location.origin;
     scanNote.hidden = false;
 }
 
@@ -326,6 +330,6 @@ if (liveButton && canStream) {
     liveButton.hidden = false;
     photoLabel.hidden = true;
     liveButton.addEventListener('click', startScanner);
-    document.getElementById('scan-cancel').addEventListener('click', stopScanner);
+    /** @type {HTMLElement} */ (document.getElementById('scan-cancel')).addEventListener('click', stopScanner);
     dialog.addEventListener('cancel', stopScanner); // the phone's back button
 }

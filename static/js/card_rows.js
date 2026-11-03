@@ -3,9 +3,9 @@
 // rows from card numbers of a default set, or full codes of any set, using
 // GET /api/sets/:code (backend/src/routes/reference/sets.rs).
 
-const rows = document.getElementById('card-rows');
-const addButton = document.getElementById('add-row');
-const rowTemplate = document.getElementById('card-row-template');
+const rows = /** @type {HTMLElement} */ (document.getElementById('card-rows'));
+const addButton = /** @type {HTMLButtonElement} */ (document.getElementById('add-row'));
+const rowTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById('card-row-template'));
 
 let nextIndex = rows.querySelectorAll('.card-row').length;
 
@@ -13,42 +13,51 @@ let nextIndex = rows.querySelectorAll('.card-row').length;
 
 /** Append an empty card row (before the "+ Add a card" button) and return it. */
 function addRow() {
-    const html = rowTemplate.innerHTML.replaceAll('__i__', nextIndex++);
+    const html = rowTemplate.innerHTML.replaceAll('__i__', /** @type {any} */ (nextIndex++));
     addButton.insertAdjacentHTML('beforebegin', html);
 
-    return addButton.previousElementSibling;
+    return /** @type {Element} */ (addButton.previousElementSibling);
 }
 
-/** A field of a row, by the end of its name: `cards-3-code` → field(row, 'code'). */
+/**
+ * A field of a row, by the end of its name: `cards-3-code` → field(row, 'code').
+ * @param {Element} row
+ * @param {string} name
+ * @returns {any} its input or select
+ */
 const field = (row, name) => row.querySelector(`[name$="-${name}"]`);
 
 addButton.addEventListener('click', () => addRow());
 
 rows.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-row')) e.target.closest('.card-row').remove();
+    const target = /** @type {HTMLElement} */ (e.target);
+
+    if (target.classList.contains('remove-row')) /** @type {Element} */ (target.closest('.card-row')).remove();
 });
 
 // a code typed by hand no longer limits the rarities to the ones of the code
 // the quick add filled in
 rows.addEventListener('input', (e) => {
-    if (!e.target.name?.endsWith('-code')) return;
+    const target = /** @type {HTMLInputElement} */ (e.target);
 
-    const select = field(e.target.closest('.card-row'), 'rarity');
+    if (!target.name?.endsWith('-code')) return;
 
-    if (select.dataset.forCode && select.dataset.forCode !== e.target.value.toUpperCase()) {
+    const select = field(/** @type {Element} */ (target.closest('.card-row')), 'rarity');
+
+    if (select.dataset.forCode && select.dataset.forCode !== target.value.toUpperCase()) {
         limitRarities(select, null);
     }
 });
 
 // ---------- quick add from a set ----------
 
-const setInput = document.getElementById('qa-set');
-const statusSelect = document.getElementById('qa-status');
-const numberInput = document.getElementById('qa-number');
-const info = document.getElementById('qa-info');
-const pasteArea = document.getElementById('qa-paste');
-const pasteButton = document.getElementById('qa-paste-add');
-const rarityHelp = document.getElementById('qa-rarities');
+const setInput = /** @type {HTMLInputElement} */ (document.getElementById('qa-set'));
+const statusSelect = /** @type {HTMLSelectElement} */ (document.getElementById('qa-status'));
+const numberInput = /** @type {HTMLInputElement} */ (document.getElementById('qa-number'));
+const info = /** @type {HTMLElement} */ (document.getElementById('qa-info'));
+const pasteArea = /** @type {HTMLTextAreaElement} */ (document.getElementById('qa-paste'));
+const pasteButton = /** @type {HTMLButtonElement} */ (document.getElementById('qa-paste-add'));
+const rarityHelp = /** @type {HTMLElement} */ (document.getElementById('qa-rarities'));
 
 /** The languages of the card codes (domain::card::Language). */
 const LANGUAGES = ['EN', 'FR', 'DE', 'IT', 'SP', 'PT'];
@@ -342,7 +351,7 @@ async function addTokens(tokens) {
 
 // ---------- set code suggestions ----------
 
-const setSuggestions = document.getElementById('qa-set-suggestions');
+const setSuggestions = /** @type {HTMLDataListElement} */ (document.getElementById('qa-set-suggestions'));
 
 /**
  * The set codes of the cards already in the lot ("MAMO-FR"), the most
@@ -352,7 +361,7 @@ const setSuggestions = document.getElementById('qa-set-suggestions');
 function lotSetCodes() {
     const codes = [
         ...[...rows.querySelectorAll('.card-row')].map((row) => field(row, 'code').value),
-        ...[...document.querySelectorAll('[data-code]')].map((el) => el.dataset.code),
+        ...[.../** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-code]'))].map((el) => el.dataset.code),
     ];
     const counts = new Map();
 
@@ -367,7 +376,7 @@ function lotSetCodes() {
     return [...counts].sort((a, b) => b[1] - a[1]).map(([code]) => code);
 }
 
-const setChoices = document.getElementById('qa-set-choices');
+const setChoices = /** @type {HTMLElement} */ (document.getElementById('qa-set-choices'));
 const MAX_SET_BUTTONS = 8;
 
 /**

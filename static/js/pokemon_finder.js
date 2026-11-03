@@ -11,17 +11,19 @@
 //   from the rarity;
 // - the delete button of the wish form asks first.
 
-const finderForm = document.querySelector('#copy-form, #wish-form');
-const queryField = document.getElementById('finder-q');
-const searchButton = document.getElementById('finder-search');
-const statusLine = document.getElementById('finder-status');
-const results = document.getElementById('finder-results');
-const cardField = document.getElementById('card');
-const languageField = document.getElementById('language');
-const catalogueField = document.getElementById('catalogue');
-const variantField = document.getElementById('variant');
-const fullArtField = document.getElementById('full_art');
-const variantChoices = document.getElementById('variant-choices');
+// the finder's elements (partials/pokemon_finder.html); the form's fields
+// some pages lack are `| null`
+const finderForm = /** @type {HTMLFormElement | null} */ (document.querySelector('#copy-form, #wish-form'));
+const queryField = /** @type {HTMLInputElement} */ (document.getElementById('finder-q'));
+const searchButton = /** @type {HTMLButtonElement} */ (document.getElementById('finder-search'));
+const statusLine = /** @type {HTMLElement} */ (document.getElementById('finder-status'));
+const results = /** @type {HTMLElement} */ (document.getElementById('finder-results'));
+const cardField = /** @type {HTMLInputElement} */ (document.getElementById('card'));
+const languageField = /** @type {HTMLSelectElement | null} */ (document.getElementById('language'));
+const catalogueField = /** @type {HTMLInputElement | null} */ (document.getElementById('catalogue'));
+const variantField = /** @type {HTMLSelectElement | null} */ (document.getElementById('variant'));
+const fullArtField = /** @type {HTMLInputElement | null} */ (document.getElementById('full_art'));
+const variantChoices = /** @type {HTMLElement} */ (document.getElementById('variant-choices'));
 
 const suggestFullArt = finderForm?.hasAttribute('data-suggest-full-art');
 
@@ -160,7 +162,7 @@ async function pick(id, catalogue, secret = false) {
  */
 async function showCard({ choose = false, secret = false } = {}) {
     const id = cardField.value.trim();
-    const box = document.getElementById('finder-card');
+    const box = /** @type {HTMLElement} */ (document.getElementById('finder-card'));
 
     if (!id) {
         box.hidden = true;
@@ -189,16 +191,16 @@ async function showCard({ choose = false, secret = false } = {}) {
         return;
     }
 
-    const image = document.getElementById('finder-card-image');
+    const image = /** @type {HTMLImageElement} */ (document.getElementById('finder-card-image'));
     image.hidden = !card.image;
 
     if (card.image) image.src = card.image;
 
-    document.getElementById('finder-card-name').textContent = card.name;
-    document.getElementById('finder-card-other').textContent = card.other_name;
-    document.getElementById('finder-card-set').textContent = `${card.set_name} · No. ${card.local_id}`;
+    /** @type {HTMLElement} */ (document.getElementById('finder-card-name')).textContent = card.name;
+    /** @type {HTMLElement} */ (document.getElementById('finder-card-other')).textContent = card.other_name;
+    /** @type {HTMLElement} */ (document.getElementById('finder-card-set')).textContent = `${card.set_name} · No. ${card.local_id}`;
 
-    const rarity = document.getElementById('finder-card-rarity');
+    const rarity = /** @type {HTMLElement} */ (document.getElementById('finder-card-rarity'));
     rarity.replaceChildren();
 
     if (card.rarity) {
@@ -214,7 +216,7 @@ async function showCard({ choose = false, secret = false } = {}) {
         if (guide) rarity.append(` ${guide.symbol}.`);
     }
 
-    document.getElementById('finder-card-hint').textContent = secret
+    /** @type {HTMLElement} */ (document.getElementById('finder-card-hint')).textContent = secret
         ? 'Its number is above the set size: a chase card. Check the symbol next to the number.'
         : '';
     showOwned(card.owned ?? []);
@@ -234,7 +236,7 @@ async function showCard({ choose = false, secret = false } = {}) {
  * typed twice?), with links to them. Saving stays possible.
  */
 function showOwned(owned) {
-    const box = document.getElementById('finder-card-owned');
+    const box = /** @type {HTMLElement} */ (document.getElementById('finder-card-owned'));
     box.replaceChildren();
     box.hidden = owned.length === 0;
 
@@ -286,7 +288,7 @@ function showVariants(card) {
         button.append(look);
 
         button.addEventListener('click', () => {
-            variantField.value = variant.code;
+            /** @type {HTMLSelectElement} */ (variantField).value = variant.code;
             markVariant();
         });
         variantChoices.append(button);
@@ -304,7 +306,7 @@ function showVariants(card) {
 
 function markVariant() {
     for (const button of variantChoices.querySelectorAll('.variant-choice')) {
-        button.classList.toggle('chosen', button.dataset.variant === variantField.value);
+        button.classList.toggle('chosen', /** @type {HTMLElement} */ (button).dataset.variant === /** @type {HTMLSelectElement} */ (variantField).value);
     }
 }
 

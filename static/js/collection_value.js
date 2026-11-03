@@ -4,7 +4,7 @@
 // routes/collection/mod.rs. Also /collection/stats, whose data has no
 // `net_spent` (the prices paid stay private): the value line only.
 
-const chart = JSON.parse(document.getElementById('value-chart-data').textContent);
+const chart = JSON.parse(/** @type {string} */ (/** @type {HTMLElement} */ (document.getElementById('value-chart-data')).textContent));
 
 new Chart(document.getElementById('value_chart'), {
     type: 'line',

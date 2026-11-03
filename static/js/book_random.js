@@ -6,17 +6,18 @@
 // "Can start it now": no unread earlier volume of its series in the
 // collection (the volumes not owned don't count).
 
-const books = JSON.parse(document.getElementById('books-data').textContent);
+const books = JSON.parse(/** @type {string} */ (/** @type {HTMLElement} */ (document.getElementById('books-data')).textContent));
 
-const card = document.getElementById('book-pick');
-const none = document.getElementById('book-pick-none');
+const card = /** @type {HTMLElement} */ (document.getElementById('book-pick'));
+const none = /** @type {HTMLElement} */ (document.getElementById('book-pick-none'));
+/** @type {(name: string) => any} a part of the card: text, link or switch */
 const field = (name) => card.querySelector(`[data-pick="${name}"]`);
 
 const filters = {
-    unread: document.getElementById('pick-unread'),
-    next: document.getElementById('pick-next'),
-    language: document.getElementById('pick-language'),
-    format: document.getElementById('pick-format'),
+    unread: /** @type {HTMLInputElement} */ (document.getElementById('pick-unread')),
+    next: /** @type {HTMLInputElement} */ (document.getElementById('pick-next')),
+    language: /** @type {HTMLSelectElement} */ (document.getElementById('pick-language')),
+    format: /** @type {HTMLSelectElement} */ (document.getElementById('pick-format')),
 };
 
 let shown = null;
@@ -59,7 +60,7 @@ function showCover(book) {
     img.referrerPolicy = 'no-referrer';
     img.addEventListener('error', () => img.remove());
     img.src = book.cover;
-    card.querySelector('.book-cover').append(img);
+    /** @type {Element} */ (card.querySelector('.book-cover')).append(img);
 }
 
 function show(book, among) {
@@ -103,12 +104,12 @@ function pick() {
     show(others[Math.floor(Math.random() * others.length)], kept.length);
 }
 
-document.getElementById('pick-again').addEventListener('click', pick);
+/** @type {HTMLElement} */ (document.getElementById('pick-again')).addEventListener('click', pick);
 Object.values(filters).forEach((input) => input.addEventListener('change', pick));
 
 // the read switch (saved by book_read.js): the next picks know it
 field('switch')?.addEventListener('change', (event) => {
-    if (shown) shown.read = event.target.checked;
+    if (shown) shown.read = /** @type {HTMLInputElement} */ (event.target).checked;
 });
 
 pick();

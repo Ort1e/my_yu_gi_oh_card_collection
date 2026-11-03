@@ -2,8 +2,8 @@
 // choice of a card printed in several variants, how to recognise the one
 // chosen (static/js/pokemon_rarities.js).
 
-for (const select of document.querySelectorAll('.variant-select')) {
-    const help = select.parentElement.querySelector('[data-variant-help]');
+for (const select of /** @type {NodeListOf<HTMLSelectElement>} */ (document.querySelectorAll('.variant-select'))) {
+    const help = /** @type {HTMLElement} */ (select.parentElement).querySelector('[data-variant-help]');
 
     if (!help) continue;
 

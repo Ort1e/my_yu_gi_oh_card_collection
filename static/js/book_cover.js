@@ -2,7 +2,7 @@
 // Library, which answers 404 for a book it has no cover of. Then the image
 // is removed and the plain "book" under it shows.
 
-for (const img of document.querySelectorAll('.book-cover-image')) {
+for (const img of /** @type {NodeListOf<HTMLImageElement>} */ (document.querySelectorAll('.book-cover-image'))) {
     const drop = () => img.remove();
 
     // already failed before this script ran (a cached 404)
