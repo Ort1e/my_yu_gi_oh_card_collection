@@ -4,7 +4,8 @@
 //! format. The page carries every book as JSON and `static/js/book_random.js`
 //! filters and picks in the browser, so the public copy (static files) has
 //! it too. "Another one" never shows the same book twice in a row unless
-//! it's the only one left.
+//! it's the only one left. The public copy's carries no private book
+//! (`super::shown_books`).
 
 use std::collections::HashMap;
 
@@ -13,7 +14,7 @@ use axum::extract::State;
 use books_domain::book::{language_name, BookFormat};
 use serde_json::json;
 
-use super::{cover_url, BookRow};
+use super::{cover_url, shown_books, BookRow};
 use common::web::error::AppResult;
 use common::web::filters::json_for_script;
 use common::AppState;
@@ -51,9 +52,13 @@ struct Extra {
 /// `GET /books/random`.
 pub async fn page(State(state): State<AppState>) -> AppResult<RandomPage> {
     let pool = &state.pool;
-    let books: Vec<BookRow> = sqlx::query_as(&format!("{} ORDER BY book.id", BookRow::SELECT))
-        .fetch_all(pool)
-        .await?;
+    let shown = shown_books();
+    let books: Vec<BookRow> = sqlx::query_as(&format!(
+        "{} WHERE {shown} ORDER BY book.id",
+        BookRow::SELECT
+    ))
+    .fetch_all(pool)
+    .await?;
     let extras: HashMap<i64, Extra> =
         sqlx::query_as::<_, Extra>("SELECT id, series_id, language, page_count, isbn FROM book")
             .fetch_all(pool)
@@ -83,9 +88,10 @@ pub async fn page(State(state): State<AppState>) -> AppResult<RandomPage> {
         })
         .collect();
 
-    let codes: Vec<String> = sqlx::query_scalar(
-        "SELECT DISTINCT language FROM book WHERE language IS NOT NULL ORDER BY language",
-    )
+    let codes: Vec<String> = sqlx::query_scalar(&format!(
+        "SELECT DISTINCT language FROM book WHERE language IS NOT NULL AND {shown}
+         ORDER BY language"
+    ))
     .fetch_all(pool)
     .await?;
     let languages = codes

@@ -26,8 +26,8 @@
     <p id="scan-help" class="scan-help">Point the camera at the barcode on the back…</p>
     <button type="button" id="scan-cancel" class="btn-secondary">Cancel</button>
   </dialog>
-  <small>"Look up" fills the fields below from the catalogues (Open Library, Google Books, the BnF). "Scan": take a photo of the barcode
-    ("From a photo": one taken with the camera app before, lighter for the phone).
+  <small>"Look up" fills the fields below from the catalogues (Open Library, Google Books, the BnF). "Scan": point the camera
+    at the barcode ("From a photo": a photo of it taken before).
     A book without an ISBN: leave it empty and fill the fields by hand.</small>
 </fieldset>
 
@@ -52,7 +52,11 @@
       <input type="number" name="volume" id="volume" value="{{ values.volume }}" min="1" max="999" inputmode="numeric">
     </div>
   </div>
-  <label class="switch"><input type="checkbox" name="is_read" id="is_read" value="1" {% if values.is_read %}checked{% endif %}> Read</label>
+  <div class="switch-row">
+    <label class="switch"><input type="checkbox" name="is_read" id="is_read" value="1" {% if values.is_read %}checked{% endif %}> Read</label>
+    <label class="switch"><input type="checkbox" name="is_private" id="is_private" value="1" {% if values.is_private %}checked{% endif %}> Private</label>
+  </div>
+  <small>Private: kept off the public site (here, it shows as usual, with a 🔒).</small>
 </fieldset>
 
 <details class="more-fields" {% if !values.publisher.is_empty() || !values.year.is_empty() || !values.pages.is_empty() || !values.format.is_empty() || !values.language.is_empty() || !values.notes.is_empty() %}open{% endif %}>

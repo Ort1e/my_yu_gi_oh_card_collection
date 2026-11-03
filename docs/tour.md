@@ -489,6 +489,7 @@ ISBNs aren't shown).
 | list: every book in one table (`partials/book_table.html`, also on an author's and a series' page), searched and sorted in the page (`static/js/tables.js`); `?title=`, `?author=`, `?series=`, `?sort=` still filter; detail: cover, details, the series' other volumes and the authors' other books | `src/routes/mod.rs` |
 | add, edit, delete (refused while behind an advent door) | `src/routes/form.rs` |
 | read or not (`book.is_read`, 0020): a switch in the book tables and on a book's page (`static/js/book_read.js` → `POST /books/api/books/:id/read`), in the edit form; a ✓ in the public copy | `src/routes/api.rs`, `partials/book_table.html` |
+| private (`book.is_private`, 0023): the form's "Private" switch; a 🔒 in the app, left out of the public copy (every book query adds `routes::shown_books()`; its page answers 404 there, authors and series with only private books are left out) | `src/routes/mod.rs` |
 | "What to read?" (`/books/random`): every book as JSON in the page, `static/js/book_random.js` filters (unread, can start it now, language, format) and picks in the browser, so the public copy has it too | `src/routes/random.rs` |
 | `GET /books/api/isbn/:isbn`, the lookup as JSON; `POST /books/api/isbn-scan`, the ISBN on a barcode photo | `src/routes/api.rs`, `src/barcode.rs` |
 | authors, series (with the missing volumes), the stand-alone books (in no series) | `src/routes/authors.rs`, `series.rs` |

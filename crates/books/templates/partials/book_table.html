@@ -16,7 +16,7 @@
   <tbody>
     {% for book in books %}
     <tr>
-      <td><a href="/books/{{ book.id }}">{{ book.title }}</a>{% if !book.authors_text().is_empty() %}<div class="phone-only book-row-author">{{ book.authors_text() }}</div>{% endif %}</td>
+      <td><a href="/books/{{ book.id }}">{{ book.title }}</a>{% if book.is_private %} <span title="Private: kept off the public site" aria-label="private">🔒</span>{% endif %}{% if !book.authors_text().is_empty() %}<div class="phone-only book-row-author">{{ book.authors_text() }}</div>{% endif %}</td>
       <td class="text phone-hide" data-sort-value="{{ book.author_sort_value() }}">{{ book.authors_text() }}</td>
       <td class="text" data-sort-value="{{ book.series_sort_value() }}">{{ book.series_text() }}</td>
       <td class="phone-hide">{% match book.published_year %}{% when Some with (year) %}{{ year }}{% when None %}{% endmatch %}</td>

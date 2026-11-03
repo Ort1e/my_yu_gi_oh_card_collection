@@ -89,6 +89,12 @@ body {
     opacity: 0.85;
 }
 
+/* `hidden` always hides: the browser's own rule loses to any `display` of
+   ours (a `.btn` label stayed on screen next to the live "Scan"). */
+[hidden] {
+    display: none !important;
+}
+
 /* ------------------------------------------------------------------ */
 /* Page layout                                                          */
 /* ------------------------------------------------------------------ */

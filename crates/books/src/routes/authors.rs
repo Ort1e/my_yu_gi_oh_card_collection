@@ -2,11 +2,13 @@
 //! searched in the page like the books (`static/js/tables.js`), and the
 //! books of each.
 //! Authors are created and deleted with their books (`store::books`).
+//! In the public copy, only their books not private, and only the authors
+//! who have one (`super::shown_books`).
 
 use askama::Template;
 use axum::extract::{Path, State};
 
-use super::BookRow;
+use super::{shown_books, BookRow};
 use common::web::error::{AppResult, OrNotFound};
 use common::AppState;
 
@@ -27,11 +29,15 @@ pub struct AuthorsList {
 
 /// `/books/authors`.
 pub async fn list(State(state): State<AppState>) -> AppResult<AuthorsList> {
-    let authors = sqlx::query_as(
-        "SELECT a.id, a.name, a.sort_name,
-                (SELECT count(*) FROM book_book_author ba WHERE ba.author_id = a.id) AS books
-         FROM book_author a ORDER BY a.sort_name COLLATE NOCASE",
-    )
+    let authors = sqlx::query_as(&format!(
+        "SELECT * FROM
+             (SELECT a.id, a.name, a.sort_name,
+                     (SELECT count(*) FROM book_book_author ba JOIN book ON book.id = ba.book_id
+                      WHERE ba.author_id = a.id AND {}) AS books
+              FROM book_author a)
+         WHERE books > 0 ORDER BY sort_name COLLATE NOCASE",
+        shown_books()
+    ))
     .fetch_all(&state.pool)
     .await?;
 
@@ -53,15 +59,20 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         .fetch_optional(pool)
         .await?
         .or_404()?;
-    let books = sqlx::query_as(&format!(
-        "{} WHERE book.id IN (SELECT book_id FROM book_book_author WHERE author_id = ?)
+    let books: Vec<BookRow> = sqlx::query_as(&format!(
+        "{} WHERE book.id IN (SELECT book_id FROM book_book_author WHERE author_id = ?) AND {}
          ORDER BY book_series.name IS NULL, book_series.name COLLATE NOCASE, book.volume,
                   book.published_year, book.title COLLATE NOCASE",
-        BookRow::SELECT
+        BookRow::SELECT,
+        shown_books()
     ))
     .bind(id)
     .fetch_all(pool)
     .await?;
+    // an author has books (deleted with the last one): none = all private
+    if books.is_empty() {
+        return Err(common::web::error::AppError::NotFound);
+    }
 
     Ok(AuthorPage { name, books })
 }
