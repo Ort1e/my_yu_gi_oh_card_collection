@@ -248,7 +248,12 @@ only the NAS). She installs the app on her phone and logs in.
 
 **Updates**: Tailscale doesn't update itself here; run
 `deploy/pc/install-tailscale-on-nas.sh` again now and then (it keeps the
-NAS's identity). To remove it: `systemctl disable --now tailscaled`, delete
+NAS's identity). If its download stops on `curl: (60) … unable to get
+local issuer certificate` (seen 2026-11-03 in one terminal of the
+computer, cause not found: the certificate was Tailscale's real one), give
+curl the system's list:
+`SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt deploy/pc/install-tailscale-on-nas.sh`.
+To remove it: `systemctl disable --now tailscaled`, delete
 `/apps/tailscale` and `/etc/systemd/system/tailscaled.service`, and the
 machine in the admin page.
 
