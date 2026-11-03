@@ -1,19 +1,21 @@
-<script>
+<script lang="ts">
     // Under the title: import a YDKE string as a new version of the deck
     // (replacing the current version when it is empty), and copy the deck as
     // YDKE (computed here from the zones, so unsaved changes are included).
-    import { importYdke } from '../api.js';
-    import { ydkeUrl } from '../deck.js';
+    import { importYdke } from '../api';
+    import { ydkeUrl } from '../deck';
+    import type { ApiCard } from '../api-types/ApiCard';
+    import type { DeckZones } from '../types';
 
     /** the deck to import into; null for a version without a deck */
-    export let deckId;
-    export let zones;
+    export let deckId: number | null;
+    export let zones: DeckZones;
     /** the current version is empty: deleted once the import is done */
     export let replaceable = false;
     /** deletes the current version */
-    export let removeVersion;
+    export let removeVersion: () => Promise<unknown>;
 
-    const VARIANTS = {
+    const VARIANTS: Record<string, (card: ApiCard) => boolean> = {
         'With Proxies': () => true,
         'Without Proxies': (c) => !c.is_proxy,
         'Only Proxies': (c) => c.is_proxy,
@@ -36,7 +38,7 @@
 
         if (name === null) return;
 
-        let id;
+        let id: number;
 
         try {
             ({ id } = await importYdke(deckId, ydke.trim(), name));
@@ -55,7 +57,7 @@
         location.href = `/deck-builder/${id}`;
     }
 
-    async function copy(label) {
+    async function copy(label: string) {
         open = false;
 
         try {

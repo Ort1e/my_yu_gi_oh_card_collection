@@ -1,17 +1,22 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, englishName, imageUrl, outOfFormat } from '../deck.js';
+    import { banStatus, englishName, imageUrl, outOfFormat } from '../deck';
+    import type { ApiCard } from '../api-types/ApiCard';
+    import type { DragData, Place, Rules } from '../types';
 
-    export let card;
+    export let card: ApiCard;
     /** zone the card is in ("main", "reserve", …); null = not draggable */
-    export let from = null;
-    export let rules = null;
+    export let from: Place | null = null;
+    export let rules: Rules | null = null;
     export let selected = false;
 
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<{ select: ApiCard }>();
 
-    function dragStart(e) {
-        e.dataTransfer.setData('application/json', JSON.stringify({ cardId: card.id, from }));
+    function dragStart(e: DragEvent) {
+        if (!e.dataTransfer || from === null) return;
+
+        const data: DragData = { cardId: card.id, from };
+        e.dataTransfer.setData('application/json', JSON.stringify(data));
         e.dataTransfer.effectAllowed = 'move';
     }
 

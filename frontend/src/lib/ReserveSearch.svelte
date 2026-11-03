@@ -1,18 +1,21 @@
-<script>
+<script lang="ts">
     // The reserve: a search among the owned cards that are not in the deck.
     // The results are a drop zone; moves in and out of it are done by
     // App.svelte, which shares `cards` with this component.
     import DeckZone from './DeckZone.svelte';
-    import { banStatus, outOfFormat, sortCards } from '../deck.js';
+    import { banStatus, outOfFormat, sortCards } from '../deck';
+    import type { DeckApi } from '../api';
+    import type { ApiCard } from '../api-types/ApiCard';
+    import type { Rules } from '../types';
 
-    export let api;
-    export let cardTypes;
+    export let api: DeckApi;
+    export let cardTypes: string[];
     /** the search results */
-    export let cards;
+    export let cards: ApiCard[];
     /** ids of the cards in the deck zones (saved or not), left out of the results */
-    export let deckCardIds;
-    export let rules = null;
-    export let selectedId = null;
+    export let deckCardIds: Set<number>;
+    export let rules: Rules | null = null;
+    export let selectedId: number | null | undefined = null;
 
     const NO_FILTER = 'Please enter at least one filter to search cards.';
 
@@ -26,7 +29,7 @@
     let filters = { name: '', code: '', card_type: '' };
     let message = NO_FILTER;
 
-    let timer;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let searchId = 0;
 
     function schedule() {

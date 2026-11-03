@@ -1,22 +1,27 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, englishName, frenchDate, imageUrl, outOfFormat } from '../deck.js';
+    import { banStatus, englishName, frenchDate, imageUrl, outOfFormat } from '../deck';
+    import type { DeckApi } from '../api';
+    import type { ApiCard } from '../api-types/ApiCard';
+    import type { CardCategory } from '../api-types/CardCategory';
+    import type { Rules } from '../types';
 
-    export let card;
-    export let rules = null;
-    export let api;
+    export let card: ApiCard | null;
+    export let rules: Rules | null = null;
+    export let api: DeckApi;
     /** bumped by the parent when categories are added/removed */
     export let categoriesVersion = 0;
 
     /** true for a proxy in a deck zone: it can be swapped for an owned copy */
     export let canReplace = false;
 
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<{ replaceProxy: ApiCard }>();
 
-    let categories = null;
-    let error = null;
+    let categories: CardCategory[] | null = null;
+    let error: string | null = null;
 
-    async function load(cardId) {
+    // `_version`: only there so a new categoriesVersion loads them again
+    async function load(cardId: number, _version: number) {
         categories = null;
         error = null;
 
@@ -31,7 +36,9 @@
 
     $: if (card) load(card.id, categoriesVersion);
 
-    async function toggle(category) {
+    async function toggle(category: CardCategory) {
+        if (!card) return;
+
         const assigned = !category.assigned;
 
         try {

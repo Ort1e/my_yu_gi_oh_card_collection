@@ -1,17 +1,21 @@
-<script>
+<script lang="ts">
     // Result of the Monte Carlo simulation as one bar per category, split by
     // how many cards of it the opening hand has (0, 1, 2, 3+). The share of
     // hands with at least one card is written at the right of each bar.
     import { onDestroy } from 'svelte';
-    import { Chart, registerables } from 'chart.js';
+    import { Chart, registerables, type Plugin } from 'chart.js';
+    import type { CategoryStats } from '../api-types/CategoryStats';
+    import type { SimulationResult } from '../api-types/SimulationResult';
 
     Chart.register(...registerables);
 
-    export let result;
+    export let result: SimulationResult;
+
+    type Segment = { label: string; color: string; min: number; max: number };
 
     // One blue from light to dark: more cards, darker (an ordered scale, so a
     // single hue; checked for contrast and colour-blind readability).
-    const SEGMENTS = [
+    const SEGMENTS: Segment[] = [
         { label: '0 cards', color: '#86b6ef', min: 0, max: 0 },
         { label: '1 card', color: '#3987e5', min: 1, max: 1 },
         { label: '2 cards', color: '#1c5cab', min: 2, max: 2 },
@@ -22,27 +26,27 @@
     const MUTED = '#5c5c5c';
     const GRID = '#e6e6e6';
 
-    let canvas;
-    let chart;
+    let canvas: HTMLCanvasElement;
+    let chart: Chart<'bar', number[], string> | undefined;
 
     /** % of hands whose count of the category is between min and max */
-    function share(stats, { min, max }) {
+    function share(stats: CategoryStats, { min, max }: Segment) {
         let hands = 0;
 
         for (const [n, count] of Object.entries(stats.per_hand)) {
-            if (Number(n) >= min && Number(n) <= max) hands += count;
+            if (Number(n) >= min && Number(n) <= max) hands += count ?? 0;
         }
 
         return (hands / result.total_simulations) * 100;
     }
 
     // writes "≥1: 77%" at the right of each bar
-    const atLeastOneLabels = {
+    const atLeastOneLabels: Plugin<'bar'> = {
         id: 'atLeastOneLabels',
 
         afterDatasetsDraw(chart) {
             const { ctx, chartArea } = chart;
-            const zero = chart.data.datasets[0];
+            const zero = chart.data.datasets[0].data as number[];
 
             ctx.save();
             ctx.fillStyle = INK;
@@ -50,14 +54,14 @@
             ctx.textBaseline = 'middle';
 
             chart.getDatasetMeta(0).data.forEach((bar, i) => {
-                ctx.fillText(`≥1: ${(100 - zero.data[i]).toFixed(0)}%`, chartArea.right + 8, bar.y);
+                ctx.fillText(`≥1: ${(100 - zero[i]).toFixed(0)}%`, chartArea.right + 8, bar.y);
             });
 
             ctx.restore();
         },
     };
 
-    function draw(result) {
+    function draw(result: SimulationResult) {
         chart?.destroy();
 
         const stats = result.categories;
@@ -88,7 +92,7 @@
                         display: true,
                         text: `Cards of each category in the opening hand (${result.total_simulations} hands)`,
                         color: INK,
-                        font: { size: 14, weight: '600' },
+                        font: { size: 14, weight: 600 },
                     },
                     legend: {
                         position: 'top',
