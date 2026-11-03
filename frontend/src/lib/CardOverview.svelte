@@ -19,6 +19,10 @@
 
     let categories: CardCategory[] | null = null;
     let error: string | null = null;
+    /** the categories being saved (a click waits for the answer) */
+    let saving = new Set<number>();
+
+    $: assignedCount = categories?.filter((c) => c.assigned).length ?? 0;
 
     // `_version`: only there so a new categoriesVersion loads them again
     async function load(cardId: number, _version: number) {
@@ -38,14 +42,20 @@
 
     // only shown with a card
     async function toggle(category: CardCategory) {
+        if (saving.has(category.id)) return;
+
         const assigned = !category.assigned;
+        saving = new Set(saving).add(category.id);
 
         try {
             await api.assignCategory(card!.id, category.id, assigned);
             category.assigned = assigned;
-            categories = categories;
         } catch (e) {
             alert(`Could not change the category: ${e.message}`);
+        } finally {
+            saving.delete(category.id);
+            saving = saving;
+            categories = categories;
         }
     }
 </script>
@@ -76,20 +86,38 @@
             {/if}
         </p>
         <div class="category-selector">
-            <strong>Categories:</strong>
+            <p class="category-heading">
+                <strong>Categories</strong>
+                {#if categories && categories.length > 0}
+                    <span class="category-count">{assignedCount} of {categories.length} · click to add or remove</span>
+                {/if}
+            </p>
             {#if error}
-                Error loading categories: {error}
+                <p>Error loading categories: {error}</p>
             {:else if categories === null}
-                Loading…
+                <p>Loading…</p>
             {:else if categories.length === 0}
-                none in this deck yet.
+                <p>None in this deck yet: add them under "Test Draw".</p>
             {:else}
-                {#each categories as category (category.id)}
-                    <label class:checked={category.assigned}>
-                        <input type="checkbox" checked={category.assigned} on:change={() => toggle(category)} />
-                        <span>{category.name}</span>
-                    </label>
-                {/each}
+                <div class="category-chips">
+                    {#each categories as category (category.id)}
+                        <label
+                            class="category-chip"
+                            class:checked={category.assigned}
+                            class:saving={saving.has(category.id)}
+                            title={category.assigned ? `In "${category.name}": click to remove` : `Not in "${category.name}": click to add`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={category.assigned}
+                                disabled={saving.has(category.id)}
+                                on:change={() => toggle(category)}
+                            />
+                            <span class="mark" aria-hidden="true">{category.assigned ? '✓' : '+'}</span>
+                            <span>{category.name}</span>
+                        </label>
+                    {/each}
+                </div>
             {/if}
         </div>
     </div>
@@ -128,39 +156,87 @@
         font-size: 0.95em;
     }
 
+    /* The card's categories, on the green panel: a white chip with a ✓ for
+       the ones it is in, a dashed outline with a + for the others. */
     .category-selector {
+        margin-top: 0.75rem;
+    }
+
+    p.category-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0 8px;
+        margin-bottom: 6px;
+    }
+
+    .category-count {
+        font-size: 0.85rem;
+        opacity: 0.85;
+    }
+
+    .category-chips {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
-        margin-top: 0.5rem;
-        color: var(--text-dark);
     }
 
-    .category-selector label {
+    .category-chip {
+        position: relative;         /* holds the hidden checkbox */
         display: inline-flex;
         align-items: center;
-        background-color: var(--hover-bg);
-        border: 2px solid var(--border-color);
+        gap: 6px;
+        padding: 5px 12px;
+        border: 2px dashed rgba(255, 255, 255, 0.75);
         border-radius: 20px;
-        padding: 6px 12px;
-        cursor: pointer;
+        background-color: transparent;
+        color: #fff;
         font-size: 0.9rem;
+        cursor: pointer;
         user-select: none;
-        transition: background-color 0.2s, transform 0.15s;
+        transition: background-color 0.15s, color 0.15s;
     }
 
-    .category-selector label:hover {
-        background-color: var(--bg-color);
+    .category-chip:hover {
+        background-color: rgba(255, 255, 255, 0.2);
     }
 
-    .category-selector label.checked {
-        border-color: var(--primary);
+    .category-chip.checked {
+        border: 2px solid #fff;
+        background-color: #fff;
+        color: var(--primary);
         font-weight: bold;
-        transform: scale(1.05);
     }
 
-    .category-selector input[type="checkbox"] {
-        display: none;
+    .category-chip.checked:hover {
+        background-color: #e6ecff;
+    }
+
+    .category-chip.saving {
+        opacity: 0.6;
+        cursor: progress;
+    }
+
+    /* the keyboard reaches the hidden checkbox (Tab, then Space) */
+    .category-chip:has(input:focus-visible) {
+        outline: 3px solid #ffd54f;
+        outline-offset: 2px;
+    }
+
+    .mark {
+        width: 1em;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    /* hidden but focusable (not display: none) */
+    .category-chip input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+        pointer-events: none;
     }
 
     .replace-proxy {
