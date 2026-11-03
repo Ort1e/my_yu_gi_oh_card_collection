@@ -47,7 +47,7 @@ const GUIDES = {
             ],
         });
 
-        document.querySelector('#rarity-undescribed small').textContent =
+        /** @type {Element} */ (document.querySelector('#rarity-undescribed small')).textContent =
             `Not described yet: ${UNDESCRIBED.join(', ')}.`;
 
         showAsked(findRarity, rarityAnchor);
@@ -79,5 +79,5 @@ const GUIDES = {
     },
 };
 
-const guideList = document.getElementById('rarity-list');
+const guideList = /** @type {HTMLElement} */ (document.getElementById('rarity-list'));
 GUIDES[guideList.dataset.guide](guideList);

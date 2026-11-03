@@ -3,3 +3,10 @@
 # report is written to target/llvm-cov/html/index.html; the one-off importer
 # and the standard library are left out.
 cov = ["llvm-cov", "--workspace", "--html", "--ignore-filename-regex", "(importer/|/nix/store/)"]
+
+[env]
+# ts-rs (`#[derive(TS)] #[ts(export)]` on the deck builder API's JSON): the
+# TypeScript types `cargo test` writes for the frontend, committed; the CI
+# fails when they are stale. i64 → `number` (serde_json writes numbers).
+TS_RS_EXPORT_DIR = { value = "frontend/src/api-types", relative = true }
+TS_RS_LARGE_INT = "number"

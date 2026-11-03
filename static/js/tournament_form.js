@@ -4,12 +4,12 @@
 // (rounds-<i>-…, rounds-<i>-games-<j>-…): the server numbers the rows in the
 // order they come (backend/src/routes/tournaments/form.rs).
 
-const form = document.getElementById('tournament-form');
-const rounds = document.getElementById('rounds');
-const addRoundButton = document.getElementById('add-round');
-const roundTemplate = document.getElementById('round-template');
-const gameTemplate = document.getElementById('game-template');
-const teamSwitch = document.getElementById('is_team');
+const form = /** @type {HTMLFormElement} */ (document.getElementById('tournament-form'));
+const rounds = /** @type {HTMLElement} */ (document.getElementById('rounds'));
+const addRoundButton = /** @type {HTMLButtonElement} */ (document.getElementById('add-round'));
+const roundTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById('round-template'));
+const gameTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById('game-template'));
+const teamSwitch = /** @type {HTMLInputElement} */ (document.getElementById('is_team'));
 
 let nextRound = Number(rounds.dataset.next);
 
@@ -18,7 +18,7 @@ let nextRound = Number(rounds.dataset.next);
 /** "Round 1", "Round 2"… and in each round "Game 1", "Game 2"…, in page order. */
 function renumber() {
     rounds.querySelectorAll('.round').forEach((round, i) => {
-        round.querySelector('.round-number').textContent = i + 1;
+        /** @type {Element} */ (round.querySelector('.round-number')).textContent = /** @type {any} */ (i + 1);
 
         round.querySelectorAll('.game-number').forEach((number, j) => {
             number.textContent = `Game ${j + 1}`;
@@ -29,11 +29,11 @@ function renumber() {
 // ---------- rows ----------
 
 function addRound() {
-    const html = roundTemplate.innerHTML.replaceAll('__r__', nextRound++);
+    const html = roundTemplate.innerHTML.replaceAll('__r__', /** @type {any} */ (nextRound++));
     rounds.insertAdjacentHTML('beforeend', html);
     renumber();
 
-    rounds.lastElementChild.querySelector('select').focus();
+    /** @type {HTMLSelectElement} */ (/** @type {Element} */ (rounds.lastElementChild).querySelector('select')).focus();
 }
 
 function addGame(round) {
@@ -42,7 +42,7 @@ function addGame(round) {
 
     const html = gameTemplate.innerHTML
         .replaceAll('__r__', round.dataset.index)
-        .replaceAll('__g__', index);
+        .replaceAll('__g__', /** @type {any} */ (index));
     round.querySelector('.games').insertAdjacentHTML('beforeend', html);
     renumber();
 }
@@ -50,15 +50,15 @@ function addGame(round) {
 addRoundButton.addEventListener('click', addRound);
 
 rounds.addEventListener('click', (e) => {
-    const target = e.target;
+    const target = /** @type {HTMLElement} */ (e.target);
 
     if (target.classList.contains('add-game')) {
-        addGame(target.closest('.round'));
+        addGame(/** @type {HTMLElement} */ (target.closest('.round')));
     } else if (target.classList.contains('remove-game')) {
-        target.closest('.game').remove();
+        /** @type {Element} */ (target.closest('.game')).remove();
         renumber();
     } else if (target.classList.contains('remove-round')) {
-        target.closest('.round').remove();
+        /** @type {Element} */ (target.closest('.round')).remove();
         renumber();
     }
 });

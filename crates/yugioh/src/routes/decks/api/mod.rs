@@ -33,6 +33,7 @@ use crate::store::formats;
 use crate::store::db::Money;
 use crate::store::models::picture_url;
 use crate::web::error::AppResult;
+use ts_rs::TS;
 
 pub use categories::{add_category, assign_category, card_categories, categories, delete_category};
 pub use proxies::{add_proxy, delete_proxy, replace_proxy};
@@ -42,7 +43,8 @@ pub use simulation::monte_carlo;
 pub use version::{check_version, clone_version, delete_version, get_version, update_version};
 pub use ydke_import::import_ydke;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ApiCard {
     id: i64,
     name: String,
@@ -54,6 +56,7 @@ pub struct ApiCard {
     rarity: Option<String>,
     is_proxy: bool,
     /// Cheapest price paid for this card (Django's deck price used the min).
+    #[ts(type = "string | null")]
     price: Option<Money>,
     card_data_id: Option<i64>,
     /// Its picture's address (`store::models::picture_url`).
@@ -174,7 +177,8 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
     Ok(ids.iter().filter_map(|id| by_id.remove(id)).collect())
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct Created {
     id: i64,
 }

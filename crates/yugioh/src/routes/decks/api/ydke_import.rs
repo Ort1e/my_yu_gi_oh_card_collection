@@ -16,8 +16,10 @@ use crate::store::cards::{locked_elsewhere, new_proxy, Zone, SOLD_EXISTS};
 use crate::store::db::{begin_write, exists};
 use crate::web::error::{bad_request, non_blank, AppResult};
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, optional_fields = nullable)]
 pub struct YdkeInput {
     ydke: String,
     name: Option<String>,

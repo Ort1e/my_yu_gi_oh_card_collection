@@ -19,6 +19,8 @@ sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "macros"] }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# TypeScript types of the deck builder's JSON (frontend/src/api-types/, written by `cargo test`)
+ts-rs = { version = "12.0.1", features = ["no-serde-warnings"] }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

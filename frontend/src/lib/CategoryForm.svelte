@@ -1,20 +1,23 @@
-<script>
+<script lang="ts">
     // Adds a category to the deck version: a plain one, or a conditional one
     // (a card that counts as one category or another depending on the rest
-    // of the hand, see ApiCondition in backend/src/routes/decks/api/categories.rs).
+    // of the hand, see ApiCondition in crates/yugioh/src/routes/decks/api/categories.rs).
     import { createEventDispatcher } from 'svelte';
+    import type { DeckApi } from '../api';
+    import type { ApiCategory } from '../api-types/ApiCategory';
+    import type { ApiCondition } from '../api-types/ApiCondition';
 
-    export let api;
-    export let categories;
+    export let api: DeckApi;
+    export let categories: ApiCategory[];
 
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<{ added: void }>();
 
     let name = '';
     let conditional = false;
     let description = '';
-    let ifAnyOf = [];
-    let then = null;
-    let otherwise = null;
+    let ifAnyOf: number[] = [];
+    let then: number | null = null;
+    let otherwise: number | null = null;
 
     function reset() {
         name = '';
@@ -28,7 +31,7 @@
     async function add() {
         if (!name.trim()) return;
 
-        let condition = null;
+        let condition: ApiCondition | null = null;
 
         if (conditional) {
             if (ifAnyOf.length === 0) return alert('Choose at least one category for the condition.');

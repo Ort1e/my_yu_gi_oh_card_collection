@@ -4,7 +4,7 @@
 // in the page.
 
 document.addEventListener('submit', (event) => {
-    const message = event.target.dataset.confirm;
+    const message = /** @type {HTMLFormElement} */ (event.target).dataset.confirm;
 
     if (message && !confirm(message)) event.preventDefault();
 });

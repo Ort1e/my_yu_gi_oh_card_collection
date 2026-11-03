@@ -37,5 +37,7 @@ async function save(input) {
 
 // one listener for the page: the random pick's switch gets its book later
 document.addEventListener('change', (event) => {
-    if (event.target.matches('input[data-book-read]')) save(event.target);
+    const target = /** @type {Element} */ (event.target);
+
+    if (target.matches('input[data-book-read]')) save(target);
 });

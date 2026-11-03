@@ -3,7 +3,7 @@
 //! monsters, spells, traps: `yugioh_domain::stats::kind`), then by English
 //! name ignoring case and accents (`yugioh_domain::card::sort_name`), so the
 //! copies of a card sit together whatever their language. The deck builder
-//! sorts the same way (`frontend/src/deck.js`).
+//! sorts the same way (`frontend/src/deck.ts`).
 //! Around the cards: the version's format (its problems there, its list)
 //! or ban list (its own, else the latest one: the restricted cards and a
 //! badge on their tiles), its opening hands (the

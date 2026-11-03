@@ -4,7 +4,7 @@
 // (`/cards?page=3`) and the public copy (`cards-page-3.html`).
 
 (function () {
-    const link = document.querySelector('.back-link a');
+    const link = /** @type {HTMLAnchorElement | null} */ (document.querySelector('.back-link a'));
 
     if (!link || !document.referrer || history.length < 2) {
         return;

@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rand::seq::SliceRandom;
 use rand::Rng;
+use ts_rs::TS;
 
 #[derive(Debug, Clone)]
 pub struct Category {
@@ -35,13 +36,15 @@ impl Condition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, TS)]
+#[ts(export)]
 pub struct SimulationResult {
     pub total_simulations: u32,
     pub categories: Vec<CategoryStats>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, TS)]
+#[ts(export)]
 pub struct CategoryStats {
     pub category_id: i64,
     pub name: String,

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // The control panel: switch, rename, copy or delete the version, see its
     // read-only page (/deck-versions/:id), choose the ban list or format (and
     // see the problems there), build it, note
@@ -7,22 +7,25 @@
     // zones, so the new version goes back to App.svelte too ("reload" event).
     import { createEventDispatcher } from 'svelte';
 
-    import { frenchDate } from '../deck.js';
+    import { frenchDate } from '../deck';
+    import type { DeckApi } from '../api';
+    import type { Check } from '../api-types/Check';
+    import type { DeckVersion } from '../api-types/DeckVersion';
 
-    export let api;
-    export let deckVersionId;
+    export let api: DeckApi;
+    export let deckVersionId: number;
     /** the loaded version (shared with App.svelte: a rename updates the title) */
-    export let deck;
+    export let deck: DeckVersion;
     /** the ban list or format chosen: "12", "f3", null */
-    export let key;
+    export let key: string | null;
     /** `{format, problems}` of the saved version (App.svelte) */
-    export let check;
-    export let dirty;
+    export let check: Check;
+    export let dirty: boolean;
 
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<{ save: void; reload: DeckVersion }>();
 
-    function switchVersion(e) {
-        location.href = `/deck-builder/${e.target.value}`;
+    function switchVersion(e: Event & { currentTarget: HTMLSelectElement }) {
+        location.href = `/deck-builder/${e.currentTarget.value}`;
     }
 
     async function rename() {
@@ -55,11 +58,11 @@
         }
     }
 
-    async function toggleBuilt(e) {
-        const build = e.target.checked;
+    async function toggleBuilt(e: Event & { currentTarget: HTMLInputElement }) {
+        const build = e.currentTarget.checked;
 
         // the switch shows the saved state until the server answers
-        e.target.checked = deck.is_built;
+        e.currentTarget.checked = deck.is_built;
 
         if (dirty) {
             alert('Save the deck first: building works on the saved cards.');
@@ -79,7 +82,7 @@
             const report = updated.build_report;
 
             if (report && report.proxied_here.length + report.proxied_elsewhere.length > 0) {
-                const lines = [];
+                const lines: string[] = [];
 
                 if (report.proxied_here.length > 0) {
                     lines.push('Already in another built deck, now proxies here:', ...report.proxied_here.map((l) => `• ${l}`), '');
@@ -96,7 +99,7 @@
         }
     }
 
-    async function saveNote(field, value) {
+    async function saveNote(field: 'deck_box' | 'sleeves', value: string) {
         if ((deck[field] ?? '') === value.trim()) return;
 
         try {
@@ -108,7 +111,7 @@
     }
 
     // the read-only page shows the saved cards
-    function view(e) {
+    function view(e: MouseEvent) {
         if (dirty && !confirm('The read-only page shows the saved deck: unsaved changes are not included. Continue?')) {
             e.preventDefault();
         }
@@ -183,11 +186,11 @@
     <div class="notes">
         <label>
             Deck box
-            <input type="text" value={deck.deck_box ?? ''} placeholder="red Boulder 100+" on:change={(e) => saveNote('deck_box', e.target.value)}>
+            <input type="text" value={deck.deck_box ?? ''} placeholder="red Boulder 100+" on:change={(e) => saveNote('deck_box', e.currentTarget.value)}>
         </label>
         <label>
             Sleeves
-            <input type="text" value={deck.sleeves ?? ''} placeholder="Dragon Shield matte black" on:change={(e) => saveNote('sleeves', e.target.value)}>
+            <input type="text" value={deck.sleeves ?? ''} placeholder="Dragon Shield matte black" on:change={(e) => saveNote('sleeves', e.currentTarget.value)}>
         </label>
     </div>
 </div>

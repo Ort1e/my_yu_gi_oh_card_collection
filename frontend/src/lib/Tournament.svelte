@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
     // The tournament this version was played at: a summary, edited on the
-    // tournament pages (/tournaments, backend/src/routes/tournaments/).
-    import { frenchDate, ordinal } from '../deck.js';
+    // tournament pages (/tournaments, crates/yugioh/src/routes/tournaments/).
+    import { frenchDate, ordinal } from '../deck';
+    import type { Tournament } from '../api-types/Tournament';
 
-    export let deckVersionId;
-    export let tournament = null;
+    export let deckVersionId: number;
+    export let tournament: Tournament | null = null;
 
     $: placement = !tournament?.placement
         ? ''

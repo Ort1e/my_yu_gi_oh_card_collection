@@ -1,7 +1,13 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
-    import { deckApi } from './api.js';
-    import { ZONES, euros, rulesFields, rulesKey, rulesOf, sortCards, zonePrice } from './deck.js';
+    import { deckApi } from './api';
+    import { ZONES, euros, rulesFields, rulesKey, rulesOf, sortCards, zonePrice } from './deck';
+    import type { ApiCard } from './api-types/ApiCard';
+    import type { ApiCategory } from './api-types/ApiCategory';
+    import type { Check } from './api-types/Check';
+    import type { DeckVersion } from './api-types/DeckVersion';
+    import type { Zone } from './api-types/Zone';
+    import type { Move, Place, Zones } from './types';
     import CardOverview from './lib/CardOverview.svelte';
     import DeckZone from './lib/DeckZone.svelte';
     import ReserveSearch from './lib/ReserveSearch.svelte';
@@ -10,24 +16,30 @@
     import VersionPanel from './lib/VersionPanel.svelte';
     import YdkeToolbar from './lib/YdkeToolbar.svelte';
 
-    export let deckVersionId;
+    export let deckVersionId: number;
 
     const api = deckApi(deckVersionId);
 
-    let deck = null; // last loaded/saved version (metadata)
-    let loadError = null;
+    const ZONE_LABELS: [Zone, string][] = [
+        ['main', 'Main Deck'],
+        ['extra', 'Extra Deck'],
+        ['side', 'Side Deck'],
+    ];
+
+    let deck: DeckVersion | null = null; // last loaded/saved version (metadata)
+    let loadError: string | null = null;
     /** zone name -> cards; "reserve" holds the search results */
-    let zones = { main: [], extra: [], side: [], reserve: [] };
+    let zones: Zones = { main: [], extra: [], side: [], reserve: [] };
     /** the selector's ban list or format ("12", "f3"), saved with the deck */
-    let key = null;
+    let key: string | null = null;
     /** the version's problems in its format (`GET …/check`), for the panel */
-    let check = { format: null, problems: [] };
+    let check: Check = { format: null, problems: [] };
     let dirty = false;
-    let selected = null;
-    let categories = [];
+    let selected: ApiCard | null = null;
+    let categories: ApiCategory[] = [];
     let categoriesVersion = 0;
 
-    function setDeck(data) {
+    function setDeck(data: DeckVersion) {
         deck = data;
         key = rulesKey(data);
         zones = {
@@ -71,14 +83,14 @@
 
     // ---------- moving cards ----------
 
-    function take(zone, cardId) {
+    function take(zone: Place, cardId: number) {
         const card = zones[zone].find((c) => c.id === cardId);
         zones[zone] = zones[zone].filter((c) => c.id !== cardId);
 
         return card;
     }
 
-    async function deleteProxy(from, card) {
+    async function deleteProxy(from: Place, card: ApiCard) {
         try {
             await api.deleteProxy(card.id);
             take(from, card.id);
@@ -90,14 +102,14 @@
     }
 
     /** The deck zone (not the reserve) of `zones` holding `card`, or null. */
-    const zoneOf = (zones, card) =>
-        card ? ['main', 'extra', 'side'].find((z) => zones[z].some((c) => c.id === card.id)) ?? null : null;
+    const zoneOf = (zones: Zones, card: ApiCard | null): Zone | null =>
+        card ? (['main', 'extra', 'side'] as Zone[]).find((z) => zones[z].some((c) => c.id === card.id)) ?? null : null;
 
     $: selectedZone = zoneOf(zones, selected);
 
     // a proxy swapped for an owned copy (saved at once; the only way in a
     // built version, whose proxies are never swapped automatically)
-    async function replaceProxy({ detail: proxy }) {
+    async function replaceProxy({ detail: proxy }: CustomEvent<ApiCard>) {
         const zone = zoneOf(zones, proxy);
 
         if (!zone) return;
@@ -118,7 +130,7 @@
         }
     }
 
-    async function move({ cardId, from, to }) {
+    async function move({ cardId, from, to }: Move) {
         if (from === to || !zones[from]) return;
 
         const card = zones[from].find((c) => c.id === cardId);
@@ -144,14 +156,14 @@
         dirty = true;
     }
 
-    function dropOutside(e) {
+    function dropOutside(e: DragEvent) {
         e.preventDefault();
         const data = e.dataTransfer?.getData('application/json');
 
         if (data) move({ ...JSON.parse(data), to: 'outside' });
     }
 
-    async function addProxy({ detail: zone }) {
+    async function addProxy({ detail: zone }: CustomEvent<Zone>) {
         const name = prompt('Enter proxy card name:');
 
         if (!name?.trim()) return;
@@ -190,11 +202,11 @@
         }
     }
 
-    function beforeUnload(e) {
+    function beforeUnload(e: BeforeUnloadEvent) {
         if (dirty) e.preventDefault();
     }
 
-    const select = ({ detail }) => (selected = detail);
+    const select = ({ detail }: CustomEvent<ApiCard>) => (selected = detail);
 
     $: total = zonePrice(zones.main) + zonePrice(zones.extra) + zonePrice(zones.side);
     $: title = deck ? `${deck.deck_name ?? 'No Deck'} - ${deck.version_name}` : '';
@@ -216,7 +228,7 @@
 
     <div class="builder-container">
         <div id="deck-area">
-            {#each [['main', 'Main Deck'], ['extra', 'Extra Deck'], ['side', 'Side Deck']] as [zone, label]}
+            {#each ZONE_LABELS as [zone, label]}
                 <div class="area">
                     <h3>{label} ({zones[zone].length}, {euros(zonePrice(zones[zone]))})</h3>
                     <DeckZone

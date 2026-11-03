@@ -1,23 +1,30 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from 'svelte';
     import CardTile from './CardTile.svelte';
     import CategoryForm from './CategoryForm.svelte';
     import SimulationChart from './SimulationChart.svelte';
-    import { draw, sortCards } from '../deck.js';
+    import { draw, sortCards } from '../deck';
+    import type { DeckApi } from '../api';
+    import type { ApiCard } from '../api-types/ApiCard';
+    import type { ApiCategory } from '../api-types/ApiCategory';
+    import type { ApiCondition } from '../api-types/ApiCondition';
+    import type { CategoryStats } from '../api-types/CategoryStats';
+    import type { SimulationResult } from '../api-types/SimulationResult';
+    import type { Rules } from '../types';
 
-    export let api;
-    export let main;
-    export let categories;
-    export let rules = null;
+    export let api: DeckApi;
+    export let main: ApiCard[];
+    export let categories: ApiCategory[];
+    export let rules: Rules | null = null;
     /** the deck has unsaved changes (the simulation runs on the saved deck) */
     export let dirty = false;
 
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: ApiCard }>();
 
     let handSize = 5;
     let simulations = 10000;
-    let hand = [];
-    let result = null;
+    let hand: ApiCard[] = [];
+    let result: SimulationResult | null = null;
     let running = false;
 
     function testDraw() {
@@ -46,7 +53,7 @@
         }
     }
 
-    async function removeCategory(category) {
+    async function removeCategory(category: ApiCategory) {
         if (!confirm(`Delete the category "${category.name}"? Conditional categories using it are deleted too.`)) return;
 
         try {
@@ -61,16 +68,16 @@
     $: names = new Map(categories.map((c) => [c.id, c.name]));
 
     /** "if extender or lv5: starter, otherwise brick" */
-    function rule({ if_any_of, then, otherwise }) {
+    function rule({ if_any_of, then, otherwise }: ApiCondition) {
         const ifs = if_any_of.map((id) => names.get(id)).join(' or ');
 
         return `if ${ifs}: ${names.get(then)}, otherwise ${otherwise ? names.get(otherwise) : 'nothing'}`;
     }
 
     // stats of a category in the last result, if any
-    $: stats = new Map((result?.categories ?? []).map((s) => [s.category_id, s]));
+    $: stats = new Map<number, CategoryStats>((result?.categories ?? []).map((s) => [s.category_id, s]));
     $: maxInHand = result ? Math.max(0, ...result.categories.flatMap((s) => Object.keys(s.per_hand).map(Number))) : 0;
-    const percent = (n) => ((n / result.total_simulations) * 100).toFixed(2);
+    const percent = (n: number) => ((n / result!.total_simulations) * 100).toFixed(2);
 </script>
 
 <div class="controls">
@@ -112,7 +119,7 @@
             </td>
             <td>{s ? s.cards_in_deck : 'No info'}</td>
             <td>{s ? s.occurrences : 'No info'}</td>
-            <td>{s ? (s.occurrences / result.total_simulations).toFixed(2) : 'No info'}</td>
+            <td>{s && result ? (s.occurrences / result.total_simulations).toFixed(2) : 'No info'}</td>
             <td><button type="button" class="btn-small btn-danger" on:click={() => removeCategory(category)}>✕</button></td>
             {#if result}
                 {#each Array(maxInHand + 1) as _, n}

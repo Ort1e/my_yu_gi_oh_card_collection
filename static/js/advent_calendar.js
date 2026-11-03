@@ -3,9 +3,9 @@
 // on a click (remembered in this browser), "open / close every door", and the
 // photo shown large.
 
-const calendar = document.getElementById('advent');
+const calendar = /** @type {HTMLElement} */ (document.getElementById('advent'));
 const year = calendar.dataset.year;
-const doors = [...calendar.querySelectorAll('.door[data-day]')];
+const doors = [.../** @type {NodeListOf<HTMLElement>} */ (calendar.querySelectorAll('.door[data-day]'))];
 // the book calendars have their own key (data-storage-key)
 const storageKey = calendar.dataset.storageKey ?? `advent-calendar-${year}-opened`;
 
@@ -35,7 +35,7 @@ const opened = openedDays();
 for (const door of doors) {
     if (opened.has(door.dataset.day)) door.classList.add('open');
 
-    door.querySelector('.door-front').addEventListener('click', () => {
+    /** @type {Element} */ (door.querySelector('.door-front')).addEventListener('click', () => {
         door.classList.add('open');
         remember();
     });
@@ -50,19 +50,19 @@ function setAll(open) {
     setTimeout(remember, doors.length * 60);
 }
 
-document.getElementById('advent-open-all').addEventListener('click', () => setAll(true));
-document.getElementById('advent-close-all').addEventListener('click', () => setAll(false));
+/** @type {HTMLElement} */ (document.getElementById('advent-open-all')).addEventListener('click', () => setAll(true));
+/** @type {HTMLElement} */ (document.getElementById('advent-close-all')).addEventListener('click', () => setAll(false));
 
 // ---------- photo, large ----------
 
-const lightbox = document.getElementById('advent-lightbox');
+const lightbox = /** @type {HTMLDialogElement} */ (document.getElementById('advent-lightbox'));
 
 calendar.addEventListener('click', (e) => {
-    const photo = e.target.closest('.advent-photo');
+    const photo = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('.advent-photo'));
 
     if (!photo) return;
 
-    lightbox.querySelector('img').src = photo.dataset.full;
+    /** @type {HTMLImageElement} */ (lightbox.querySelector('img')).src = /** @type {string} */ (photo.dataset.full);
     lightbox.showModal();
 });
 

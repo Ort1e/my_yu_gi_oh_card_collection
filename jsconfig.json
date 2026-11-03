@@ -1,0 +1,6 @@
+{
+    // For the editor only (VS Code looks for a jsconfig.json above a file):
+    // the page scripts of static/js/ checked as `npm run check` does, from
+    // frontend/tsconfig.static.json (its paths stay relative to it).
+    "extends": "./frontend/tsconfig.static.json"
+}

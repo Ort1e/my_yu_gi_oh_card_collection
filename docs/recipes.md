@@ -45,7 +45,8 @@ cargo clippy --workspace --all-targets
   are compiled into the binary). `cargo install cargo-watch` +
   `cargo watch -x 'run -p backend'` restarts it on each save, if you want
   that.
-- Deck builder changed → `cd frontend && npm run build`, or `npm run dev`
+- Deck builder or a page script changed → `cd frontend && npm run check`
+  (TypeScript), then `npm run build` for the deck builder, or `npm run dev`
   for hot reload at `http://localhost:5173/?id=<deck version id>` (backend
   running on :3000).
 - The terminal shows `INFO` logs by default: one line per page or API call,
@@ -442,18 +443,41 @@ collections need):
 1. **Endpoint** in `crates/yugioh/src/routes/decks/api/` (the file of its group, or a new one
    declared and re-exported in `api/mod.rs`): input as a `#[derive(Deserialize)]`
    struct taken with `Json(body): Json<MyInput>`, output as
-   `Json<MyOutput>` with `#[derive(Serialize)]`. Bad input →
+   `Json<MyOutput>` with `#[derive(Serialize)]`. Both also derive `TS`
+   with `#[ts(export)]` (`use ts_rs::TS;`): `cargo test` writes their
+   TypeScript types into `frontend/src/api-types/` (commit them). Bad input →
    `return bad_request("why")` (the app shows the message). Money
-   serialises as a `"12.50"` string.
+   serialises as a `"12.50"` string (`#[ts(type = "string")]` on the field).
 2. **Route** under `/api/deck-versions/:id/…`: in `write_router()` if it
    changes anything, `router()` if it only reads.
-3. **Client** in `frontend/src/api.js`: one line in `deckApi(id)`, e.g.
-   `myThing: (x) => request('POST', \`${base}/my-thing\`, { x }),`.
-4. **UI** in a component in `src/lib/` (with its CSS in its `<style>`
-   block), wired in `App.svelte`. Pure helpers go in `src/deck.js`.
-   Style: 4-space indent, blank lines between logical blocks.
+3. **Client** in `frontend/src/api.ts`: one line in `deckApi(id)`, e.g.
+   `myThing: (x: number) => request<MyOutput>('POST', \`${base}/my-thing\`, { x } satisfies MyInput),`
+   (`import type { MyOutput } from './api-types/MyOutput';`).
+4. **UI** in a component in `src/lib/` (`<script lang="ts">`, its CSS in
+   its `<style>` block), wired in `App.svelte`. Pure helpers go in
+   `src/deck.ts`. Style: 4-space indent, blank lines between logical blocks.
 5. Test the endpoint in `crates/yugioh/src/tests/deck_api.rs` (`t.json(…)`, see
-   `categories_and_monte_carlo`), then `npm run build`.
+   `categories_and_monte_carlo`), then `cd frontend && npm run check && npm run build`.
+
+A field renamed in an existing struct: `cargo test` rewrites its file in
+`api-types/`, and `npm run check` lists every place of the builder that
+still uses the old name.
+
+## Add or change a page script
+
+The scripts of `static/js/` are plain JavaScript, loaded as they are by the
+templates (no build). For the checker (`cd frontend && npm run check`, and
+VS Code through the root `jsconfig.json`), give the elements their type
+with a JSDoc cast, `| null` when the page may lack it and the code checks:
+
+```js
+const field = /** @type {HTMLInputElement} */ (document.getElementById('isbn'));
+const extra = /** @type {HTMLSelectElement | null} */ (document.getElementById('language'));
+```
+
+`@param` / `@returns` where a function's arguments aren't obvious. A
+script that uses what another one defines (like `findRarity` from
+`rarities.js`): declare it in `frontend/static-globals.d.ts`.
 
 ## Play a format (Edison…)
 

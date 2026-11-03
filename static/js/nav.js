@@ -11,13 +11,13 @@
 (function () {
     const navbar = document.querySelector('.navbar');
     const links = document.getElementById('nav-links');
-    const toggle = document.querySelector('.nav-toggle');
+    const toggle = /** @type {HTMLButtonElement | null} */ (document.querySelector('.nav-toggle'));
 
     if (!navbar || !links) {
         return;
     }
 
-    const groups = [...navbar.querySelectorAll('.nav-group details')];
+    const groups = [.../** @type {NodeListOf<HTMLDetailsElement>} */ (navbar.querySelectorAll('.nav-group details'))];
 
     function closeGroups(except) {
         for (const group of groups) {
@@ -36,7 +36,7 @@
     }
 
     document.addEventListener('click', (event) => {
-        if (!navbar.contains(event.target)) {
+        if (!navbar.contains(/** @type {Node} */ (event.target))) {
             closeGroups(null);
         }
     });
@@ -64,7 +64,7 @@
     let current = null;
     let currentLength = 0;
 
-    for (const link of links.querySelectorAll('a:not(.section-switch)')) {
+    for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (links.querySelectorAll('a:not(.section-switch)'))) {
         const linkPath = new URL(link.href).pathname;
         const matches = path === linkPath || path.startsWith(linkPath.replace(/\/?$/, '/'));
 
@@ -80,7 +80,7 @@
         const group = current.closest('.nav-group');
 
         if (group) {
-            group.querySelector('summary').classList.add('nav-current');
+            /** @type {Element} */ (group.querySelector('summary')).classList.add('nav-current');
         }
     }
 })();

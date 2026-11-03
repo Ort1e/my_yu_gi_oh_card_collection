@@ -36,7 +36,7 @@ function sortBy(table, heading) {
     const compare = (a, b) => {
         const [x, y] = [cellValue(a, index), cellValue(b, index)];
 
-        if (isEmpty(x) || isEmpty(y)) return isEmpty(x) - isEmpty(y);
+        if (isEmpty(x) || isEmpty(y)) return /** @type {any} */ (isEmpty(x)) - /** @type {any} */ (isEmpty(y));
 
         const order = numeric
             ? parseFloat(x.replace(',', '.')) - parseFloat(y.replace(',', '.'))
@@ -53,8 +53,8 @@ function sortBy(table, heading) {
     heading.setAttribute('aria-sort', ascending ? 'ascending' : 'descending');
 }
 
-document.querySelectorAll('table.sortable').forEach((table) => {
-    table.querySelectorAll('thead th[data-sort]').forEach((heading) => {
+/** @type {NodeListOf<HTMLTableElement>} */ (document.querySelectorAll('table.sortable')).forEach((table) => {
+    /** @type {NodeListOf<HTMLTableCellElement>} */ (table.querySelectorAll('thead th[data-sort]')).forEach((heading) => {
         heading.title ||= 'Sort by this column';
         heading.addEventListener('click', () => sortBy(table, heading));
     });
@@ -74,7 +74,7 @@ function filter(table, query, tag) {
         if (match) shown++;
     }
 
-    const count = document.querySelector(`[data-count-for="${table.id}"]`);
+    const count = /** @type {HTMLElement | null} */ (document.querySelector(`[data-count-for="${table.id}"]`));
 
     if (count) {
         const total = table.tBodies[0].rows.length;
@@ -83,12 +83,12 @@ function filter(table, query, tag) {
     }
 }
 
-document.querySelectorAll('input[data-filter-table]').forEach((input) => {
-    const table = document.getElementById(input.dataset.filterTable);
+/** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('input[data-filter-table]')).forEach((input) => {
+    const table = /** @type {HTMLTableElement | null} */ (document.getElementById(/** @type {string} */ (input.dataset.filterTable)));
 
     if (!table) return;
 
-    const buttons = [...document.querySelectorAll(`[data-filter-tag][data-filter-for="${table.id}"]`)];
+    const buttons = [.../** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(`[data-filter-tag][data-filter-for="${table.id}"]`))];
     let tag = null;
 
     const apply = () => filter(table, input.value, tag);

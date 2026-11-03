@@ -16,6 +16,7 @@ chrono = { workspace = true }
 rand = { workspace = true }
 lopdf = { workspace = true }
 serde_json = { workspace = true }
+ts-rs = { workspace = true }
 html-escape = { workspace = true }
 
 [dev-dependencies]

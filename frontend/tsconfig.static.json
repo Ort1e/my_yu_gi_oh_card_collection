@@ -1,0 +1,20 @@
+{
+    // The page scripts (static/js/*.js), plain JavaScript loaded as they are
+    // by the templates: checked here from their JSDoc comments, never built.
+    // Each one checked in its own scope (moduleDetection), what they share
+    // at runtime declared in static-globals.d.ts.
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "strict": true,
+        "noImplicitAny": false,
+        "useUnknownInCatchVariables": false,
+        "moduleDetection": "force",
+        "skipLibCheck": true,
+        "types": []
+    },
+    "include": ["../static/js/*.js", "static-globals.d.ts"]
+}
