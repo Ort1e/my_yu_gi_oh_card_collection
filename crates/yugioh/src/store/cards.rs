@@ -9,10 +9,12 @@ use yugioh_domain::card::normalize_card_name;
 
 use crate::store::db::Money;
 use crate::web::card_rows::NewCards;
+use ts_rs::TS;
 
 /// A deck zone and its join table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "lowercase")]
+#[ts(export)]
 pub enum Zone {
     Main,
     Extra,

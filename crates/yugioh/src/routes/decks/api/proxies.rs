@@ -15,8 +15,10 @@ use crate::store::cards::{
 use crate::store::db::{begin_write, exists};
 use crate::web::error::{bad_request, required, AppResult, OrNotFound};
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
 pub struct ProxyInput {
     name: String,
     zone: Zone,
@@ -73,7 +75,8 @@ pub async fn delete_proxy(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ReplacedProxy {
     /// The owned copy now in the version, in place of the proxy.
     card: ApiCard,

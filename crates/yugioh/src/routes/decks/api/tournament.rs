@@ -4,8 +4,10 @@
 
 use serde::Serialize;
 use sqlx::SqliteConnection;
+use ts_rs::TS;
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, TS)]
+#[ts(export)]
 pub struct Tournament {
     id: i64,
     name: String,

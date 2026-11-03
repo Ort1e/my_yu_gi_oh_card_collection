@@ -18,6 +18,16 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # the tests (ts-rs) rewrote the deck builder's API types: they must be
+      # the ones committed (frontend/src/api-types/)
+      - name: API types up to date
+        run: |
+          stale=$(git status --porcelain frontend/src/api-types)
+          if [ -n "$stale" ]; then
+            echo "$stale"
+            echo "::error::frontend/src/api-types/ is stale: run cargo test and commit it"
+            exit 1
+          fi
 
   audit:
     runs-on: ubuntu-latest

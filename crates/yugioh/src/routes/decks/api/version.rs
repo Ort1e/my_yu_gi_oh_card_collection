@@ -28,15 +28,18 @@ use crate::store::db::{begin_write, exists, row_exists, Pool};
 use crate::store::formats;
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct Ydke {
     with_proxies: String,
     without_proxies: String,
     only_proxies: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct DeckVersion {
     id: i64,
     deck_id: Option<i64>,
@@ -51,6 +54,7 @@ pub struct DeckVersion {
     /// What building the version did, only in the answer to building it or
     /// to saving a built version's zones when cards were taken elsewhere.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     build_report: Option<BuildReport>,
     tournament: Option<Tournament>,
     main: Vec<ApiCard>,
@@ -66,7 +70,8 @@ pub struct DeckVersion {
 
 /// Lines for the deck builder: `"Raigeki (in Deck X - v2)"`,
 /// `"Ash Blossom & Joyous Spring → Deck Y - v1, Deck Z - test"`.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, TS)]
+#[ts(export)]
 pub struct BuildReport {
     proxied_here: Vec<String>,
     proxied_elsewhere: Vec<String>,
@@ -85,13 +90,15 @@ struct VersionHead {
     sleeves: Option<String>,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, TS)]
+#[ts(export)]
 pub struct VersionRef {
     id: i64,
     version_name: String,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, TS)]
+#[ts(export)]
 pub struct BanListRef {
     id: i64,
     date: String,
@@ -99,7 +106,8 @@ pub struct BanListRef {
 
 /// A format for the selector: `Edison v2`, and its cutoff (`YYYY-MM-DD`)
 /// for the tiles of the cards out of its pool.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, TS)]
+#[ts(export)]
 pub struct FormatRef {
     id: i64,
     label: String,
@@ -213,7 +221,8 @@ fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
     Option::<T>::deserialize(d).map(Some)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, optional_fields)]
 pub struct VersionUpdate {
     version_name: Option<String>,
     main: Option<Vec<i64>>,
@@ -548,7 +557,8 @@ pub async fn update_version(
     Ok(Json(version))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct Deleted {
     deck_id: Option<i64>,
 }
@@ -579,7 +589,8 @@ pub async fn delete_version(
     Ok(Json(Deleted { deck_id }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
 pub struct NameInput {
     name: String,
 }
@@ -634,21 +645,32 @@ pub async fn clone_version(
     Ok((StatusCode::CREATED, Json(Created { id: new_id })))
 }
 
-/// `GET /api/deck-versions/:id/check`: its problems in the format it plays
-/// (`{"format": "Edison v2", "problems": ["Raigeki: 2 copies, 1 allowed"]}`;
-/// `format` null and no problem without a format).
+/// The answer of [`check_version`]: `{"format": "Edison v2", "problems":
+/// ["Raigeki: 2 copies, 1 allowed"]}`; `format` null and no problem without
+/// a format.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct Check {
+    format: Option<String>,
+    problems: Vec<String>,
+}
+
+/// `GET /api/deck-versions/:id/check`: its problems in the format it plays.
 pub async fn check_version(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-) -> AppResult<Json<serde_json::Value>> {
+) -> AppResult<Json<Check>> {
     let mut conn = state.pool.acquire().await?;
     exists(&mut conn, "deck_version", id).await?;
     let answer = match formats::version_problems(&mut conn, id).await? {
-        Some((format, problems)) => serde_json::json!({
-            "format": format.label(),
-            "problems": problems.iter().map(|p| p.message()).collect::<Vec<_>>(),
-        }),
-        None => serde_json::json!({ "format": null, "problems": [] }),
+        Some((format, problems)) => Check {
+            format: Some(format.label()),
+            problems: problems.iter().map(|p| p.message()).collect(),
+        },
+        None => Check {
+            format: None,
+            problems: Vec::new(),
+        },
     };
     Ok(Json(answer))
 }

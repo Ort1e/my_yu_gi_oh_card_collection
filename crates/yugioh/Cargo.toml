@@ -24,6 +24,7 @@ askama_axum = { workspace = true }
 sqlx = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+ts-rs = { workspace = true }
 rust_decimal = { workspace = true }
 chrono = { workspace = true }
 reqwest = { workspace = true }

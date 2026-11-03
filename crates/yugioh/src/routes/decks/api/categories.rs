@@ -12,8 +12,10 @@ use yugioh_domain::monte_carlo;
 use crate::store::db::{begin_write, exists};
 use crate::web::error::{bad_request, required, AppError, AppResult, OrNotFound};
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ApiCategory {
     id: i64,
     name: String,
@@ -24,7 +26,8 @@ pub struct ApiCategory {
 /// A card of a conditional category counts, in a hand, as a card of `then`
 /// when the hand also has a card of one of the `if_any_of` categories, and
 /// as a card of `otherwise` (or of nothing) when it doesn't.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct ApiCondition {
     description: String,
     if_any_of: Vec<i64>,
@@ -107,7 +110,8 @@ pub async fn categories(
     Ok(Json(load_categories(&mut conn, id).await?))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, optional_fields = nullable)]
 pub struct CategoryInput {
     name: String,
     /// Present to create a conditional category.
@@ -210,7 +214,8 @@ pub async fn delete_category(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, TS)]
+#[ts(export)]
 pub struct CardCategory {
     id: i64,
     name: String,
@@ -236,7 +241,8 @@ pub async fn card_categories(
     ))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
 pub struct AssignInput {
     assigned: bool,
 }

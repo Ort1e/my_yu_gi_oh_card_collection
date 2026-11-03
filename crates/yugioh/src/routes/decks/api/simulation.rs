@@ -11,8 +11,10 @@ use crate::store::cards::Zone;
 use crate::store::db::exists;
 use crate::web::error::{bad_request, AppError, AppResult};
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
 pub struct SimulationInput {
     hand_size: usize,
     simulations: u32,

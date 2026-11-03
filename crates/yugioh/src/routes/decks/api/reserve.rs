@@ -12,8 +12,10 @@ use crate::store::db::exists;
 use crate::store::db::push_ids;
 use crate::web::error::AppResult;
 use crate::AppState;
+use ts_rs::TS;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, optional_fields = nullable)]
 pub struct ReserveQuery {
     name: Option<String>,
     code: Option<String>,
