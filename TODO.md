@@ -4,6 +4,12 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
+- **Edison on the NAS** (2026-11-03): the NAS's app has no format yet (the
+  one made on 2026-11-02 was in a local test database, gone). On the NAS's
+  address: Decks → Formats → Add, from the Konami list of 2010-03-01,
+  cutoff 2010-03-01 (the first visit fetches the set dates from
+  ygoprodeck, a few seconds), then check the cutoff (the "Edison's exact
+  cutoff" line below) and pick it in the deck builder.
 - **The book scan on the friend's phone** said "out of memory" in Chrome
   (2026-10-30): the barcode is now read on the NAS, and "From a photo"
   avoids the camera app over the browser. To check once deployed.
