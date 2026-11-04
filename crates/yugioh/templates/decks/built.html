@@ -35,6 +35,11 @@
         <li>{{ count }} × {{ name }}</li>
         {% endfor %}
       </ul>
+      <details class="wants-list">
+        <summary>Cardmarket wants list</summary>
+        <textarea id="wants-{{ built.version.id }}" class="wants-text" rows="{{ built.missing.len() + 1 }}" readonly>{{ built.wants_list() }}</textarea>
+        <p><button type="button" data-copy="wants-{{ built.version.id }}">Copy</button></p>
+      </details>
       {% endif %}
     </div>
     {% endfor %}
@@ -54,6 +59,13 @@
     </tbody>
   </table>
   </div>
+
+  <h2>Cardmarket wants list</h2>
+  <p>Paste this into a Cardmarket Yu-Gi-Oh! wants list (Wants → import a decklist). Language and condition can't be
+    in the text: after the import, set <strong>Language: English, French</strong> and
+    <strong>Min. condition: Good</strong> on the list's cards.</p>
+  <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
+  <p><button type="button" data-copy="wants-all">Copy</button></p>
   {% endif %}
   {% endif %}
 </div>
@@ -61,4 +73,5 @@
 
 {% block extra_js %}
 <script src="/static/js/tables.js"></script>
+<script src="/static/js/wants_list.js"></script>
 {% endblock %}

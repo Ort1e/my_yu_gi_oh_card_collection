@@ -348,6 +348,37 @@ async fn the_built_page_lists_what_is_missing() {
     assert!(deck.contains("built-badge"), "{deck}");
 }
 
+#[tokio::test]
+async fn the_built_page_gives_a_cardmarket_wants_list_by_english_name() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    // the card data's English name has its capitals (`en_name` is lowercase)
+    t.exec(
+        "UPDATE card_data SET json_data = '{\"name\":\"Kuriboh\"}' WHERE id = 2;
+         UPDATE card_data SET json_data = '{\"name\":\"Dark Magician\"}' WHERE id = 1;
+         UPDATE card SET is_proxy = 1 WHERE id = 1",
+    )
+    .await;
+    // a French proxy, twice, plus the Kuriboh proxy
+    put(&t, v1, &[cards[0], cards[2]]).await;
+    set_built(&t, v1, true).await;
+
+    let (status, page) = t.get("/decks/built").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    // the version's own list (sorted by English name), then the whole one
+    // (sorted like the table, by the name on the card)
+    assert!(
+        page.contains(">1 Dark Magician\n1 Kuriboh</textarea>"),
+        "{page}"
+    );
+    assert!(
+        page.contains(">1 Kuriboh\n1 Dark Magician</textarea>"),
+        "{page}"
+    );
+    assert!(!page.contains("Magicien Sombre</textarea>"), "{page}");
+    assert!(page.contains("data-copy=\"wants-all\""), "{page}");
+}
+
 async fn dm_proxy(t: &TestApp) -> i64 {
     crate::store::cards::new_proxy(
         &mut t.state.pool.acquire().await.unwrap(),
