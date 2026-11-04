@@ -51,11 +51,41 @@ struct ZoneCard {
 /// A Cardmarket wants list's text: one `"{count} {name}"` line per card.
 /// No expansion or version: any printing will do for a proxy. Language and
 /// condition can't go in the text; they are set on the list after the import.
-fn wants_list<'a>(lines: impl Iterator<Item = (usize, &'a str)>) -> String {
+pub(super) fn wants_list<'a>(lines: impl Iterator<Item = (usize, &'a str)>) -> String {
     lines
         .map(|(count, name)| format!("{count} {name}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The Cardmarket wants list of any version's proxies (built or not), by
+/// English name, sorted.
+pub(super) async fn version_wants_list(pool: &sqlx::SqlitePool, id: i64) -> AppResult<String> {
+    let names: Vec<(String, String)> = sqlx::query_as(
+        "SELECT coalesce(card.en_name, card.name),
+                coalesce(json_extract(card_data.json_data, '$.name'), card.en_name, card.name)
+         FROM (SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
+               UNION ALL SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
+               UNION ALL SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1) AS zone
+         JOIN card ON card.id = zone.card_id
+         LEFT JOIN card_data ON card_data.id = card.card_data_id
+         WHERE card.is_proxy = 1",
+    )
+    .bind(id)
+    .fetch_all(pool)
+    .await?;
+
+    // key -> (English name, count)
+    let mut missing: BTreeMap<String, (String, usize)> = BTreeMap::new();
+    for (key, english) in names {
+        missing.entry(key).or_insert((english, 0)).1 += 1;
+    }
+
+    Ok(wants_list(
+        missing
+            .values()
+            .map(|(name, count)| (*count, name.as_str())),
+    ))
 }
 
 impl BuiltPage {

@@ -371,7 +371,9 @@ missing.
   **Cardmarket wants list** (one `1 Card name` line per card, by English name
   from the card data; `static/js/wants_list.js` copies it). Language and
   condition can't be in the text: the page reminds to set them on the list
-  after the import.
+  after the import. Any version's page (`/deck-versions/:id`, built or not,
+  not in the public copy) has the same list of its own proxies
+  (`built::version_wants_list`).
 
 ## A deck version's page
 

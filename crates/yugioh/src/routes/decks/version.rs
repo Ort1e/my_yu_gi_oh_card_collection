@@ -28,6 +28,7 @@ use yugioh_domain::monte_carlo;
 use yugioh_domain::stats::{kind, CardKind};
 
 use super::api::simulation_inputs;
+use super::built::version_wants_list;
 use super::PUBLIC_VERSION;
 use crate::routes::tournaments::TournamentView;
 use crate::store::cards::Zone;
@@ -88,6 +89,9 @@ pub struct VersionPage {
     ban_list: Option<BanList>,
     hands: Vec<HandLine>,
     played: Option<TournamentView>,
+    /// The Cardmarket wants list of the version's proxies (empty: none; not
+    /// built in the public copy).
+    wants: String,
 }
 
 impl VersionPage {
@@ -95,6 +99,10 @@ impl VersionPage {
         self.version
             .deck_id
             .map_or("/decks".to_string(), |id| format!("/decks/{id}"))
+    }
+
+    fn wants_rows(&self) -> usize {
+        self.wants.lines().count() + 1
     }
 
     fn no_card(&self) -> bool {
@@ -318,6 +326,11 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         },
         hands: hands(pool, id).await?,
         played,
+        wants: if public {
+            String::new()
+        } else {
+            version_wants_list(pool, id).await?
+        },
     })
 }
 
