@@ -157,6 +157,14 @@ a.rarity-badge:hover {
     columns: 2 16rem;
 }
 
+/* A Cardmarket wants list to copy (decks/built.html). */
+.wants-text {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: 24rem;
+    font-family: monospace;
+}
+
 /* The English name under a French one (cards, lots). */
 .english-name {
     font-size: 0.85em;
