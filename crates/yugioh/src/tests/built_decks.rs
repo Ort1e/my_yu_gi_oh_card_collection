@@ -568,3 +568,183 @@ async fn saving_a_built_version_takes_its_new_cards_from_the_others() {
     assert_eq!(status, StatusCode::OK, "{body}");
     assert!(body.get("build_report").is_none());
 }
+
+/// Dark Magician plays the part of a card errata'd in 2016 ("New Pack"),
+/// printed before in "Metal Raiders"; the fixture's version plays the format
+/// "Edison" (cutoff 2010-03-01) with one proxy and one real copy coded
+/// `copy_code`. Nothing is asked to Yugipedia: its errata are cached.
+async fn errata_fixture(t: &TestApp, copy_code: &str) -> i64 {
+    let (v1, cards) = t.deck_fixture().await;
+    t.exec(
+        r#"UPDATE card_data SET json_data = '{"name":"Dark Magician","card_sets":[
+               {"set_name":"Metal Raiders","set_code":"MRD-069","set_rarity":"Common"},
+               {"set_name":"New Pack","set_code":"NEW-EN001","set_rarity":"Rare"}]}' WHERE id = 1;
+           INSERT INTO ygo_set (name, code, tcg_date) VALUES
+               ('Metal Raiders', 'MRD', '2002-06-26'), ('New Pack', 'NEW', '2016-01-29');
+           INSERT INTO deck_format (id, name, version, cutoff) VALUES (1, 'Edison', 1, '2010-03-01');
+           INSERT INTO yugipedia_errata (card_data_id, versions, checked_at) VALUES (1,
+               '[{"text":"Old text.","code":"MRD-069","set":"Metal Raiders","reprint_in":null},
+                 {"text":"New text.","code":"NEW-EN001","set":"New Pack","reprint_in":null}]',
+               date('now'));
+           UPDATE card SET is_proxy = 1 WHERE id = 1"#,
+    )
+    .await;
+    sqlx::query("UPDATE card SET code = ? WHERE id = 2")
+        .bind(copy_code)
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    put(t, v1, &[cards[0], cards[1]]).await;
+    t.exec(&format!(
+        "UPDATE deck_version SET format_id = 1 WHERE id = {v1}"
+    ))
+    .await;
+    set_built(t, v1, true).await;
+    v1
+}
+
+#[tokio::test]
+async fn the_built_page_warns_about_errata_after_the_formats_cutoff() {
+    let t = TestApp::new().await;
+    errata_fixture(&t, "NEW-FR001").await;
+
+    let (status, page) = t.get("/decks/built").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    // the proxy and the owned copy with the new text, both to buy
+    assert!(page.contains("errata'd in New Pack"), "{page}");
+    assert!(page.contains("buy Metal Raiders (MRD-069)"), "{page}");
+    assert!(
+        !page.contains("buy Metal Raiders (MRD-069), New Pack"),
+        "{page}"
+    );
+    assert!(page.contains("Old text."), "{page}");
+    assert!(page.contains("New text."), "{page}");
+    assert!(page.contains("Wrong text: 1"), "{page}");
+    assert!(
+        page.contains("owned with the wrong text: NEW-FR001"),
+        "{page}"
+    );
+    assert!(page.contains(">2 Dark Magician</textarea>"), "{page}");
+    assert!(
+        page.contains("1 replace owned copies with the wrong text"),
+        "{page}"
+    );
+    assert!(!page.contains("being looked up"), "{page}");
+}
+
+#[tokio::test]
+async fn an_owned_copy_printed_with_the_right_text_is_not_missing() {
+    let t = TestApp::new().await;
+    errata_fixture(&t, "MRD-FR069").await;
+
+    let (_, page) = t.get("/decks/built").await;
+    assert!(page.contains("errata'd in New Pack"), "{page}");
+    assert!(!page.contains("Wrong text:"), "{page}");
+    assert!(!page.contains("owned with the wrong text"), "{page}");
+    assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
+
+    // a copy whose set has no date is not judged either
+    t.exec("UPDATE card SET code = 'ZZZ-FR001' WHERE id = 2")
+        .await;
+    let (_, page) = t.get("/decks/built").await;
+    assert!(!page.contains("Wrong text:"), "{page}");
+}
+
+#[tokio::test]
+async fn no_errata_warning_for_a_later_cutoff_or_no_cutoff() {
+    let t = TestApp::new().await;
+    let v1 = errata_fixture(&t, "NEW-FR001").await;
+
+    // the format's cutoff is after the errata
+    t.exec("UPDATE deck_format SET cutoff = '2020-01-01'").await;
+    let (_, page) = t.get("/decks/built").await;
+    assert!(!page.contains('⚠'), "{page}");
+    assert!(!page.contains("Wrong text:"), "{page}");
+    assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
+
+    // neither a format nor a ban list: no cutoff
+    t.exec(&format!(
+        "UPDATE deck_version SET format_id = NULL WHERE id = {v1}"
+    ))
+    .await;
+    let (_, page) = t.get("/decks/built").await;
+    assert!(!page.contains('⚠'), "{page}");
+    assert!(!page.contains("Wrong text:"), "{page}");
+}
+
+#[tokio::test]
+async fn a_ban_list_version_is_judged_at_the_ban_lists_date() {
+    let t = TestApp::new().await;
+    let v1 = errata_fixture(&t, "NEW-FR001").await;
+    t.exec("INSERT INTO advanced_ban_list (id, date) VALUES (1, '2010-03-01')")
+        .await;
+    t.exec(&format!(
+        "UPDATE deck_version SET format_id = NULL, ban_list_id = 1 WHERE id = {v1}"
+    ))
+    .await;
+    let (_, page) = t.get("/decks/built").await;
+    assert!(
+        page.contains("ban list 01/03/2010: errata'd in New Pack"),
+        "{page}"
+    );
+    assert!(page.contains("Wrong text: 1"), "{page}");
+
+    // a list from after the errata: nothing to warn
+    t.exec("UPDATE advanced_ban_list SET date = '2017-01-01'")
+        .await;
+    let (_, page) = t.get("/decks/built").await;
+    assert!(!page.contains('⚠'), "{page}");
+}
+
+#[tokio::test]
+async fn the_deck_builders_check_lists_the_errata() {
+    let t = TestApp::new().await;
+    let v1 = errata_fixture(&t, "NEW-FR001").await;
+
+    let (status, check) = t
+        .json(
+            "GET",
+            &format!("/api/deck-versions/{v1}/check"),
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{check}");
+    assert_eq!(check["errata_pending"], 0);
+    let errata = check["errata"].as_array().unwrap();
+    assert_eq!(errata.len(), 1, "{check}");
+    assert_eq!(errata[0]["count"], 2);
+    assert_eq!(errata[0]["wrong_text"], json!(["NEW-FR001"]));
+    assert_eq!(errata[0]["warning"]["changed_in"], "New Pack");
+    assert_eq!(errata[0]["warning"]["new_text"], "New text.");
+
+    // no format nor ban list: none
+    t.exec(&format!(
+        "UPDATE deck_version SET format_id = NULL WHERE id = {v1}"
+    ))
+    .await;
+    let (_, check) = t
+        .json(
+            "GET",
+            &format!("/api/deck-versions/{v1}/check"),
+            json!(null),
+        )
+        .await;
+    assert_eq!(check["errata"], json!([]));
+}
+
+#[tokio::test]
+async fn the_built_page_says_when_errata_are_still_being_looked_up() {
+    let t = TestApp::new().await;
+    errata_fixture(&t, "NEW-FR001").await;
+    t.exec("DELETE FROM yugipedia_errata").await;
+
+    let (status, page) = t.get("/decks/built").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(
+        page.contains("Errata are being looked up on Yugipedia for 1 card(s)"),
+        "{page}"
+    );
+    assert!(!page.contains('⚠'), "{page}");
+    // meanwhile the proxy is missing as before
+    assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
+}

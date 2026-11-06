@@ -176,6 +176,31 @@
     {:else if check.problems.length > 0}
         <p class="format-problems">{check.problems[0]}</p>
     {/if}
+
+    {#if check.errata.length > 0}
+        <p class="format-title">⚠ Text changed since the cutoff (as saved):</p>
+        <ul class="format-problems">
+            {#each check.errata as card}
+                <li>
+                    {card.count} × {card.name}
+                    {#if card.wrong_text.length > 0}
+                        (owned with the wrong text: {card.wrong_text.join(', ')})
+                    {/if}
+                    {#if card.warning}
+                        <details class="errata">
+                            <summary>{card.warning.format}: errata'd in {card.warning.changed_in}, buy {card.warning.right_sets}</summary>
+                            <p><strong>Text at the cutoff</strong>: {card.warning.old_text}</p>
+                            <p><strong>Text today</strong>: {card.warning.new_text}</p>
+                        </details>
+                    {/if}
+                </li>
+            {/each}
+        </ul>
+    {/if}
+
+    {#if check.errata_pending > 0}
+        <p class="hint">Errata being looked up on Yugipedia for {check.errata_pending} card(s): reload in a minute.</p>
+    {/if}
 </div>
 
 <div class="control">
@@ -232,6 +257,10 @@
         margin: 0;
         padding-left: 1.2rem;
         color: #ffb3b3;
+    }
+
+    .errata summary {
+        cursor: pointer;
     }
 
     .notes {

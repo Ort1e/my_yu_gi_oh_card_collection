@@ -8,6 +8,11 @@
 //! page (or the public copy) never waits on Yugipedia, and a picture that
 //! can't be had shows ygoprodeck's (`routes::cards::images`).
 //!
+//! The errata of a card (`Card Errata:<name>`, its English table of text
+//! versions, `yugioh_domain::errata`) are cached the same way in
+//! `yugipedia_errata` and asked in the background ([`spawn_errata`]) for
+//! `/decks/built`.
+//!
 //! A new copy gets its printing's picture by itself, after its linking
 //! ([`spawn_find_pictures`], when there is no doubt); `find-pictures` does it
 //! for the whole collection, and the edit page lets a person choose.
@@ -19,12 +24,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use common::db::{is_fresh, today};
 use common::http::Throttle;
 use common::{media, photos};
 use serde_json::Value;
+use yugioh_domain::errata::{self, TextVersion};
 use yugioh_domain::printing_picture::{automatic, candidates};
 use yugioh_domain::rarity::Rarity;
 
@@ -39,6 +46,9 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A gallery is asked again after this many days (new printings, scans).
 pub const GALLERY_DAYS: i64 = 30;
+
+/// Errata are rare: asked again after this many days (about 3 months).
+pub const ERRATA_DAYS: i64 = 90;
 
 pub(crate) static YUGIPEDIA: Throttle = Throttle::new(Duration::from_secs(1));
 pub(crate) static PICTURES: Throttle = Throttle::new(Duration::from_secs(2));
@@ -60,17 +70,11 @@ pub async fn gallery(
         return Ok(files);
     }
 
-    let json: String = sqlx::query_scalar("SELECT json_data FROM card_data WHERE id = ?")
-        .bind(card_data_id)
-        .fetch_one(pool)
-        .await?;
-    let json: Value = serde_json::from_str(&json)
-        .map_err(|e| AppError::Internal(format!("bad card json: {e}")))?;
-    let Some(name) = json["name"].as_str() else {
+    let Some(name) = card_name(pool, card_data_id).await? else {
         return Ok(None);
     };
 
-    let files = fetch_gallery(http, name).await?;
+    let files = fetch_gallery(http, &name).await?;
     sqlx::query(
         "INSERT INTO yugipedia_gallery (card_data_id, files, checked_at) VALUES (?, ?, ?)
          ON CONFLICT (card_data_id) DO UPDATE SET files = excluded.files,
@@ -130,20 +134,7 @@ async fn fetch_gallery(http: &reqwest::Client, name: &str) -> AppResult<Option<V
         .collect();
         query.append(&mut next);
 
-        YUGIPEDIA.wait().await;
-        let fail = |e: reqwest::Error| AppError::Internal(format!("Yugipedia: {e}"));
-        let json: Value = http
-            .get(API_URL)
-            .query(&query)
-            .header(reqwest::header::USER_AGENT, USER_AGENT)
-            .timeout(TIMEOUT)
-            .send()
-            .await
-            .and_then(reqwest::Response::error_for_status)
-            .map_err(fail)?
-            .json()
-            .await
-            .map_err(fail)?;
+        let json = api_get(http, &query).await?;
 
         // each picture of the gallery is a page of the answer
         let pages = json["query"]["pages"].as_object().into_iter().flatten();
@@ -169,6 +160,23 @@ async fn fetch_gallery(http: &reqwest::Client, name: &str) -> AppResult<Option<V
             .collect();
     }
     Ok(Some(files.into_iter().collect::<Vec<_>>()).filter(|f| !f.is_empty()))
+}
+
+/// One call of the MediaWiki API, through [`YUGIPEDIA`]'s throttle.
+async fn api_get(http: &reqwest::Client, query: &[(String, String)]) -> AppResult<Value> {
+    YUGIPEDIA.wait().await;
+    let fail = |e: reqwest::Error| AppError::Internal(format!("Yugipedia: {e}"));
+    http.get(API_URL)
+        .query(query)
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .timeout(TIMEOUT)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(fail)?
+        .json()
+        .await
+        .map_err(fail)
 }
 
 /// Requests for one gallery at most (a few thousand pictures): a guard
@@ -262,6 +270,134 @@ pub fn file_name(file: &str) -> String {
         })
         .collect();
     format!("{stem}.jpg")
+}
+
+/// The English name of a card data (`None`: its JSON has none).
+async fn card_name(pool: &Pool, card_data_id: i64) -> AppResult<Option<String>> {
+    let json: String = sqlx::query_scalar("SELECT json_data FROM card_data WHERE id = ?")
+        .bind(card_data_id)
+        .fetch_one(pool)
+        .await?;
+    let json: Value = serde_json::from_str(&json)
+        .map_err(|e| AppError::Internal(format!("bad card json: {e}")))?;
+    Ok(json["name"].as_str().map(str::to_string))
+}
+
+/// The versions of the text of card data `card_data_id` (`Card Errata:`),
+/// from the cache when fresh, else from Yugipedia (and cached). `None` when
+/// Yugipedia has no errata for the card; an error when it can't be reached.
+pub async fn errata(
+    pool: &Pool,
+    http: &reqwest::Client,
+    card_data_id: i64,
+) -> AppResult<Option<Vec<TextVersion>>> {
+    if let Some(versions) = cached_errata(pool, card_data_id).await? {
+        return Ok(versions);
+    }
+    let Some(name) = card_name(pool, card_data_id).await? else {
+        return Ok(None);
+    };
+
+    let versions = fetch_errata(http, &name).await?;
+    sqlx::query(
+        "INSERT INTO yugipedia_errata (card_data_id, versions, checked_at) VALUES (?, ?, ?)
+         ON CONFLICT (card_data_id) DO UPDATE SET versions = excluded.versions,
+             checked_at = excluded.checked_at",
+    )
+    .bind(card_data_id)
+    .bind(
+        versions
+            .as_ref()
+            .and_then(|v| serde_json::to_string(v).ok()),
+    )
+    .bind(today().to_string())
+    .execute(pool)
+    .await?;
+    Ok(versions)
+}
+
+/// The cached errata, without asking Yugipedia: `Some(versions)` when there
+/// is a fresh row, `None` when it must be asked.
+pub async fn cached_errata(
+    pool: &Pool,
+    card_data_id: i64,
+) -> AppResult<Option<Option<Vec<TextVersion>>>> {
+    let row: Option<(Option<String>, String)> =
+        sqlx::query_as("SELECT versions, checked_at FROM yugipedia_errata WHERE card_data_id = ?")
+            .bind(card_data_id)
+            .fetch_optional(pool)
+            .await?;
+    let Some((versions, checked_at)) = row else {
+        return Ok(None);
+    };
+    if !is_fresh(&checked_at, ERRATA_DAYS, today()) {
+        return Ok(None);
+    }
+    Ok(Some(versions.and_then(|v| serde_json::from_str(&v).ok())))
+}
+
+/// The parsed versions of `Card Errata:<name>`; `None` when the page doesn't
+/// exist or has no English version.
+async fn fetch_errata(http: &reqwest::Client, name: &str) -> AppResult<Option<Vec<TextVersion>>> {
+    let title = format!("Card Errata:{name}");
+    let query: Vec<(String, String)> = [
+        ("action", "query"),
+        ("format", "json"),
+        ("formatversion", "2"),
+        ("prop", "revisions"),
+        ("rvprop", "content"),
+        ("rvslots", "main"),
+        ("redirects", "1"),
+        ("titles", title.as_str()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+
+    let json = api_get(http, &query).await?;
+    let page = &json["query"]["pages"][0];
+    if page.get("missing").is_some() {
+        return Ok(None);
+    }
+    let Some(wikitext) = page["revisions"][0]["slots"]["main"]["content"].as_str() else {
+        return Ok(None);
+    };
+    Ok(Some(errata::parse(wikitext)).filter(|v| !v.is_empty()))
+}
+
+/// Card data whose errata are being asked in the background (two page
+/// views don't start two lookups of the same card).
+static ERRATA_ASKED: Mutex<BTreeSet<i64>> = Mutex::new(BTreeSet::new());
+
+/// In the background: [`errata`] for these card data, one at a time
+/// (Yugipedia's throttle), logged when one fails. Not in tests, which
+/// insert the `yugipedia_errata` rows themselves.
+pub fn spawn_errata(state: AppState, card_data_ids: Vec<i64>) {
+    if cfg!(test) {
+        return;
+    }
+    let ids: Vec<i64> = {
+        let mut asked = ERRATA_ASKED.lock().unwrap_or_else(|e| e.into_inner());
+        card_data_ids
+            .into_iter()
+            .filter(|id| asked.insert(*id))
+            .collect()
+    };
+    if ids.is_empty() {
+        return;
+    }
+
+    tokio::spawn(async move {
+        for id in ids {
+            if let Err(e) = errata(&state.pool, &state.http, id).await {
+                tracing::warn!(card_data_id = id, "looking up errata: {e:?}");
+            }
+            ERRATA_ASKED
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(&id);
+        }
+    });
 }
 
 #[derive(sqlx::FromRow)]

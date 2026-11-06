@@ -853,6 +853,27 @@ had. (The first deployment let the public copy download them, ~600 at
 once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.
 
+### Errata (`/decks/built`)
+
+A card's text can change after a format's cutoff (Edison…): a printing
+bought for a proxy then has the wrong text. Yugipedia's
+`Card Errata:<name>` page lists the versions of the text in its
+`== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
+first carried it); `yugioh_domain::errata` parses it, dates each version by
+its set (`ygo_set`, by code then by name; a reprint product's date wins) and
+tells which one was in force at the cutoff and when the next one came. A
+printing is right when it came out between the two. `store/yugipedia.rs`
+fetches and caches it (`yugipedia_errata`, 90 days: errata are rare) **in the background**
+(`spawn_errata`): the page shows what is cached, starts the lookups for the
+rest and says "reload in a minute". It warns on any text change, old and new
+text folded so the owner judges; the Cardmarket wants lists carry names
+only, the expansion is picked by hand. Owned copies coded in a set printed
+outside the window count as missing too ("wrong text"); a copy whose set has
+no date isn't judged. The cutoff is the version's format's, else its ban list's date
+(`store/errata.rs`, shared with the deck builder: the version panel lists the
+same cards from `GET /api/deck-versions/:id/check`); a version with neither has
+none: no warning.
+
 ## The collection value
 
 `/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
