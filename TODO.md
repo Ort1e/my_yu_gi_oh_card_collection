@@ -4,6 +4,17 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
+- **Errata on the built decks' purchases** (2026-11-06): on `/decks/built`, in
+  each version's "Missing" list and in the shopping table, warn about a card
+  whose text was errata'd after the version's format (Edison…), and show the
+  set whose printing has the right text. Data: Yugipedia (client, throttle and
+  cache already in `crates/yugioh/src/store/yugipedia.rs`; no errata in
+  ygoprodeck or the DB). Needs: where the errata come from (page parsing,
+  cached like `yugipedia_gallery`), a pure rule in `yugioh-domain` (owner's
+  logic: is the printing right for the format's cutoff?), the format's cutoff
+  from `deck_format`; versions on a ban list only have no cutoff. Touches
+  `routes/decks/built.rs` (`ShoppingLine`, `BuiltVersion.missing`) and
+  `templates/decks/built.html`.
 - **Edison on the NAS** (2026-11-03): the NAS's app has no format yet (the
   one made on 2026-11-02 was in a local test database, gone). On the NAS's
   address: Decks → Formats → Add, from the Konami list of 2010-03-01,
