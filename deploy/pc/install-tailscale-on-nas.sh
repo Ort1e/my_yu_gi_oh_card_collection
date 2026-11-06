@@ -1,5 +1,5 @@
 #!/bin/bash
-# From the computer, at home: install (or update) Tailscale on the NAS, so
+# From the computer (at home the first time): install (or update) Tailscale on the NAS, so
 # that the app and SSH are reachable from our own devices from anywhere,
 # with no port opened on the box (deploy/README.md, "From outside home").
 #
@@ -13,7 +13,8 @@
 #   2. `tailscale serve`: the app at https://<nas>.<tailnet>.ts.net (a real
 #      certificate). The first time, it may print a link to turn on HTTPS
 #      for the account.
-# Run it again to update Tailscale. NAS: the SSH host (default `nas`).
+# Run it again to update Tailscale, at home or through Tailscale itself
+# (NAS=nas-ts). NAS: the SSH host (default `nas`).
 set -euo pipefail
 NAS="${NAS:-nas}"
 here=$(dirname "$(readlink -f "$0")")
@@ -37,10 +38,20 @@ if [ "$expected" != "$actual" ]; then
 fi
 echo "Tailscale $version downloaded and checked"
 
-scp -q "$work/$archive" "$here/../nas/tailscaled.service" "$NAS:/tmp/"
+# Through Tailscale (NAS=nas-ts, away from home), restarting tailscaled cuts
+# the SSH connection: the install runs in one connection that ends with the
+# restart, the rest in a new one. No shared connection (ControlMaster: it
+# would hang once cut), and a cut connection noticed within 15 s.
+remote() {
+    ssh -o ControlPath=none -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$NAS" "$@"
+}
+ssh -O exit "$NAS" 2> /dev/null || true
+
+scp -q -o ControlPath=none "$work/$archive" "$here/../nas/tailscaled.service" "$NAS:/tmp/"
 # the script runs on the NAS; only the archive's name is expanded here
 # shellcheck disable=SC2029
-ssh "$NAS" "bash -s -- '$archive'" <<'REMOTE'
+remote "bash -s -- '$archive'" <<'REMOTE' || [ $? = 255 ]
 set -euo pipefail
 archive=$1
 dir=/apps/tailscale
@@ -55,8 +66,20 @@ rm -rf "$unpacked" "/tmp/$archive" /tmp/tailscaled.service
 
 systemctl daemon-reload
 systemctl enable tailscaled.service
-systemctl restart tailscaled.service
-ts() { "$dir/tailscale" --socket=/run/tailscale/tailscaled.sock "$@"; }
+echo "installed; restarting tailscaled (through Tailscale, the connection drops: wait)"
+# systemd does it even if this connection is cut on the way
+systemctl --no-block restart tailscaled.service
+REMOTE
+
+# the NAS again (through Tailscale: once tailscaled is back, up to 2 min)
+for _ in $(seq 12); do
+    remote true 2> /dev/null && break
+    sleep 5
+done
+
+remote 'bash -s' <<'REMOTE'
+set -euo pipefail
+ts() { /apps/tailscale/tailscale --socket=/run/tailscale/tailscaled.sock "$@"; }
 for _ in $(seq 20); do
     ts version > /dev/null 2>&1 && break
     sleep 1

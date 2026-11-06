@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use askama::Template;
 use axum::extract::State;
 
+use crate::store::errata::{CardRef, Context, ErrataWarning, MissingCard, Verdicts};
 use crate::store::models::DeckVersionRow;
 use crate::web::error::AppResult;
 use crate::AppState;
@@ -15,10 +16,10 @@ pub struct BuiltVersion {
     version: DeckVersionRow,
     cards: usize,
     proxies: usize,
-    /// (card name, count), by name.
-    missing: Vec<(String, usize)>,
-    /// (English name, count), for the Cardmarket wants list.
-    missing_english: Vec<(String, usize)>,
+    /// Real copies with the wrong text for the version's format or ban list.
+    wrong_text: usize,
+    /// By name.
+    missing: Vec<MissingCard>,
 }
 
 /// A card missing from the built versions: its name, how many, and where.
@@ -27,7 +28,11 @@ pub struct ShoppingLine {
     /// The name Cardmarket knows the card by.
     english_name: String,
     count: usize,
+    /// How many of them replace an owned copy with the wrong text.
+    wrong_text: usize,
     decks: String,
+    /// One per format or ban list the card is errata'd in.
+    warnings: Vec<ErrataWarning>,
 }
 
 #[derive(Template)]
@@ -35,17 +40,15 @@ pub struct ShoppingLine {
 pub struct BuiltPage {
     versions: Vec<BuiltVersion>,
     shopping: Vec<ShoppingLine>,
+    /// Cards whose errata are being looked up on Yugipedia.
+    errata_pending: usize,
 }
 
 #[derive(sqlx::FromRow)]
 struct ZoneCard {
     deck_version_id: i64,
-    name: String,
-    /// Groups the copies of a card (`en_name`, else the name).
-    key: String,
-    /// The English name as written on the card data (`en_name` is lowercase).
-    english_name: String,
-    is_proxy: bool,
+    #[sqlx(flatten)]
+    card: CardRef,
 }
 
 /// A Cardmarket wants list's text: one `"{count} {name}"` line per card.
@@ -103,9 +106,9 @@ impl BuiltVersion {
     /// This version's missing cards as a Cardmarket wants list.
     pub fn wants_list(&self) -> String {
         wants_list(
-            self.missing_english
+            self.missing
                 .iter()
-                .map(|(name, count)| (*count, name.as_str())),
+                .map(|m| (m.count, m.english_name.as_str())),
         )
     }
 }
@@ -118,11 +121,8 @@ pub async fn page(State(state): State<AppState>) -> AppResult<BuiltPage> {
     ))
     .fetch_all(pool)
     .await?;
-    let cards: Vec<ZoneCard> = sqlx::query_as(
-        "SELECT zone.deck_version_id, card.name, coalesce(card.en_name, card.name) AS key,
-                coalesce(json_extract(card_data.json_data, '$.name'), card.en_name, card.name)
-                    AS english_name,
-                card.is_proxy
+    let cards: Vec<ZoneCard> = sqlx::query_as(&format!(
+        "SELECT zone.deck_version_id, {}
          FROM (SELECT deck_version_id, card_id FROM deck_version_main_deck
                UNION ALL SELECT deck_version_id, card_id FROM deck_version_extra_deck
                UNION ALL SELECT deck_version_id, card_id FROM deck_version_side_deck) AS zone
@@ -131,60 +131,75 @@ pub async fn page(State(state): State<AppState>) -> AppResult<BuiltPage> {
          LEFT JOIN card_data ON card_data.id = card.card_data_id
          WHERE deck_version.is_built = 1
          ORDER BY card.name",
-    )
+        CardRef::COLUMNS
+    ))
     .fetch_all(pool)
     .await?;
 
-    // key -> (name, English name, count, versions' full names)
-    let mut shopping: BTreeMap<String, (String, String, usize, Vec<String>)> = BTreeMap::new();
+    let ids: Vec<i64> = rows.iter().map(|v| v.id).collect();
+    let contexts = crate::store::errata::contexts(pool, &ids).await?;
+    let probes: Vec<(&Context, &CardRef)> = cards
+        .iter()
+        .filter_map(|c| Some((contexts.get(&c.deck_version_id)?, &c.card)))
+        .collect();
+    let verdicts = Verdicts::load(&state, &probes).await?;
+
+    // key -> the line, with the versions' full names
+    let mut shopping: BTreeMap<String, (ShoppingLine, Vec<String>)> = BTreeMap::new();
     let mut versions = Vec::new();
     for version in rows {
-        let in_version = cards.iter().filter(|c| c.deck_version_id == version.id);
-        let mut missing: BTreeMap<&str, (&str, &str, usize)> = BTreeMap::new();
-        let (mut count, mut proxies) = (0, 0);
-        for card in in_version {
-            count += 1;
-            if card.is_proxy {
-                proxies += 1;
-                missing
-                    .entry(&card.key)
-                    .or_insert((&card.name, &card.english_name, 0))
-                    .2 += 1;
+        let in_version: Vec<&CardRef> = cards
+            .iter()
+            .filter(|c| c.deck_version_id == version.id)
+            .map(|c| &c.card)
+            .collect();
+        let proxies = in_version.iter().filter(|c| c.is_proxy).count();
+        let missing = verdicts.missing(contexts.get(&version.id), in_version.iter().copied());
+
+        for (key, card) in &missing.lines {
+            let (line, decks) = shopping.entry(key.clone()).or_insert_with(|| {
+                (
+                    ShoppingLine {
+                        name: card.name.clone(),
+                        english_name: card.english_name.clone(),
+                        count: 0,
+                        wrong_text: 0,
+                        decks: String::new(),
+                        warnings: Vec::new(),
+                    },
+                    Vec::new(),
+                )
+            });
+            line.count += card.count;
+            line.wrong_text += card.wrong_text.len();
+            decks.push(version.full_name());
+            if let Some(warning) = &card.warning {
+                if !line.warnings.iter().any(|w| w.format == warning.format) {
+                    line.warnings.push(warning.clone());
+                }
             }
         }
-
-        for (key, (name, english, n)) in &missing {
-            let line = shopping
-                .entry(key.to_string())
-                .or_insert_with(|| (name.to_string(), english.to_string(), 0, Vec::new()));
-            line.2 += n;
-            line.3.push(version.full_name());
-        }
         versions.push(BuiltVersion {
-            cards: count,
+            cards: in_version.len(),
             proxies,
-            missing: missing
-                .values()
-                .map(|(name, _, n)| (name.to_string(), *n))
-                .collect(),
-            missing_english: missing
-                .values()
-                .map(|(_, english, n)| (english.to_string(), *n))
-                .collect(),
+            wrong_text: missing.wrong_text,
+            missing: missing.lines.into_values().collect(),
             version,
         });
     }
 
     let mut shopping: Vec<ShoppingLine> = shopping
         .into_values()
-        .map(|(name, english_name, count, decks)| ShoppingLine {
-            name,
-            english_name,
-            count,
-            decks: decks.join(", "),
+        .map(|(mut line, decks)| {
+            line.decks = decks.join(", ");
+            line
         })
         .collect();
     shopping.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
-    Ok(BuiltPage { versions, shopping })
+    Ok(BuiltPage {
+        versions,
+        shopping,
+        errata_pending: verdicts.pending,
+    })
 }

@@ -196,7 +196,7 @@ async fn a_deck_version_plays_a_format() {
             "Dark Magician: 2 copies, 1 allowed",
             "Kuriboh: released on 01/01/2012, after the format's cutoff",
             "Kuriboh: forbidden (1 in the deck)",
-        ] })
+        ], "errata": [], "errata_pending": 2 })
     );
 
     // a ban list and a format: refused, nothing changed
@@ -234,7 +234,8 @@ async fn a_deck_version_plays_a_format() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("2 deck versions play this format"), "{page}");
 
-    // back to a ban list: no check any more
+    // back to a ban list: no format check any more (its cards' errata are
+    // still looked up, at the list's date)
     let (status, _) = t
         .json(
             "PATCH",
@@ -244,7 +245,10 @@ async fn a_deck_version_plays_a_format() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let (_, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
-    assert_eq!(check, json!({ "format": null, "problems": [] }));
+    assert_eq!(
+        check,
+        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 2 })
+    );
 }
 
 #[tokio::test]

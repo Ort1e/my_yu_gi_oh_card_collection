@@ -17,7 +17,9 @@ if pgrep -x backend > /dev/null; then
     exit 1
 fi
 
-latest=$(ssh "$NAS" "ls -1 $BACKUP_DIR/app-*.db | sort | tail -1")
+# the nightly copies only (app-YYYY-MM-DD.db): a copy made by hand
+# (app-before-….db) would sort after them
+latest=$(ssh "$NAS" "ls -1 $BACKUP_DIR/app-[0-9]*.db | sort | tail -1")
 [ -n "$latest" ] || { echo "no copy on the NAS"; exit 1; }
 scp -q "$NAS:$latest" data/app.db
 rm -f data/app.db-wal data/app.db-shm

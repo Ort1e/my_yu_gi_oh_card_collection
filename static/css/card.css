@@ -157,6 +157,29 @@ a.rarity-badge:hover {
     columns: 2 16rem;
 }
 
+.missing-cards li {
+    break-inside: avoid;
+}
+
+/* A card errata'd after its format's cutoff (decks/errata_warning.html). */
+.errata {
+    margin: 0.15rem 0;
+    font-size: 0.9em;
+}
+
+.errata summary {
+    cursor: pointer;
+}
+
+.errata-owned {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.errata-pending {
+    font-style: italic;
+}
+
 /* A Cardmarket wants list to copy (decks/built.html). */
 .wants-text {
     box-sizing: border-box;

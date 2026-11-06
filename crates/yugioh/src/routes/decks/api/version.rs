@@ -25,6 +25,7 @@ use crate::store::cards::{
 };
 use crate::store::db::push_ids;
 use crate::store::db::{begin_write, exists, row_exists, Pool};
+use crate::store::errata::{self, CardRef, Context, MissingCard, Verdicts};
 use crate::store::formats;
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
@@ -646,31 +647,70 @@ pub async fn clone_version(
 }
 
 /// The answer of [`check_version`]: `{"format": "Edison v2", "problems":
-/// ["Raigeki: 2 copies, 1 allowed"]}`; `format` null and no problem without
-/// a format.
+/// ["Raigeki: 2 copies, 1 allowed"], "errata": [...], "errata_pending": 0}`;
+/// `format` null and no problem without a format. `errata`: the proxies and
+/// owned copies whose text was errata'd after the cutoff of the format or
+/// the ban list (`store::errata`); `errata_pending`: cards still being
+/// looked up on Yugipedia.
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct Check {
     format: Option<String>,
     problems: Vec<String>,
+    errata: Vec<MissingCard>,
+    errata_pending: usize,
 }
 
-/// `GET /api/deck-versions/:id/check`: its problems in the format it plays.
+/// `GET /api/deck-versions/:id/check`: its problems in the format it plays,
+/// and its cards errata'd since the format's cutoff or the ban list's date.
 pub async fn check_version(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Check>> {
     let mut conn = state.pool.acquire().await?;
     exists(&mut conn, "deck_version", id).await?;
-    let answer = match formats::version_problems(&mut conn, id).await? {
-        Some((format, problems)) => Check {
-            format: Some(format.label()),
-            problems: problems.iter().map(|p| p.message()).collect(),
-        },
-        None => Check {
-            format: None,
-            problems: Vec::new(),
-        },
+    let (format, problems) = match formats::version_problems(&mut conn, id).await? {
+        Some((format, problems)) => (
+            Some(format.label()),
+            problems.iter().map(|p| p.message()).collect(),
+        ),
+        None => (None, Vec::new()),
     };
-    Ok(Json(answer))
+    drop(conn);
+
+    let contexts = errata::contexts(&state.pool, &[id]).await?;
+    let (errata, errata_pending) = match contexts.get(&id) {
+        Some(context) => {
+            let cards: Vec<CardRef> = sqlx::query_as(&format!(
+                "SELECT {}
+                 FROM (SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
+                       UNION ALL SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
+                       UNION ALL SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1) AS zone
+                 JOIN card ON card.id = zone.card_id
+                 LEFT JOIN card_data ON card_data.id = card.card_data_id
+                 ORDER BY card.name",
+                CardRef::COLUMNS
+            ))
+            .bind(id)
+            .fetch_all(&state.pool)
+            .await?;
+            let probes: Vec<(&Context, &CardRef)> = cards.iter().map(|c| (context, c)).collect();
+            let verdicts = Verdicts::load(&state, &probes).await?;
+            let missing = verdicts.missing(Some(context), cards.iter());
+            // only the cards with a warning: a proxy without errata is no news
+            let lines = missing
+                .lines
+                .into_values()
+                .filter(|m| m.warning.is_some())
+                .collect();
+            (lines, verdicts.pending)
+        }
+        None => (Vec::new(), 0),
+    };
+    Ok(Json(Check {
+        format,
+        problems,
+        errata,
+        errata_pending,
+    }))
 }
