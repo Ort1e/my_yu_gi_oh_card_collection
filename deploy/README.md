@@ -242,13 +242,22 @@ anywhere (the NAS is on from 7:00 to 22:00):
   	IdentitiesOnly yes
   ```
 
+  Or, so that `nas` itself goes through Tailscale whenever the home
+  address doesn't answer (no `NAS=` needed), above `Host nas`:
+
+  ```
+  Match host nas !exec "timeout 1 bash -c '</dev/tcp/192.168.1.202/22' 2>/dev/null"
+  	HostName lahochenas3
+  ```
+
 **The friend**: in the admin page, **Users** → **Invite** (her own
 account in our network), or **Machines** → the NAS → **Share** (she sees
 only the NAS). She installs the app on her phone and logs in.
 
 **Updates**: Tailscale doesn't update itself here; run
 `deploy/pc/install-tailscale-on-nas.sh` again now and then (it keeps the
-NAS's identity). If its download stops on `curl: (60) … unable to get
+NAS's identity), at home or from anywhere (`NAS=nas-ts`: the SSH
+connection drops when tailscaled restarts, the script connects again). If its download stops on `curl: (60) … unable to get
 local issuer certificate` (seen 2026-11-03 in one terminal of the
 computer, cause not found: the certificate was Tailscale's real one), give
 curl the system's list:
