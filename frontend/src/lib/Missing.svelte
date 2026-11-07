@@ -1,5 +1,5 @@
 <script lang="ts">
-    // What is still missing to play the deck for real: its proxies, grouped,
+    // The To buy tab (was Missing): what is still missing to play the deck for real: its proxies, grouped,
     // with the errata warnings, a link to buy each on Cardmarket, the
     // estimated cost and the Cardmarket wants list.
     import { createEventDispatcher } from 'svelte';
@@ -45,7 +45,7 @@
 </script>
 
 <div class="missing">
-    <h3>Missing: {missingCount} card{missingCount === 1 ? '' : 's'}</h3>
+    <h3>To buy: {missingCount} card{missingCount === 1 ? '' : 's'}</h3>
 
     {#if missingCount === 0}
         <p>Nothing missing: every card of this version is a copy you own.</p>

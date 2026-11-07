@@ -595,7 +595,7 @@ missing.
   **Cardmarket wants list** (one `1 Card name` line per card, by English name
   from the card data; `static/js/wants_list.js` copies it). Language and
   condition can't be in the text: the page reminds to set them on the list
-  after the import. The version's own list is in the builder's Missing tab
+  after the import. The version's own list is in the builder's To buy tab
   (`built::version_wants_list`). Build and unbuild in the builder's Settings tab.
 
 ## A deck's history
@@ -638,7 +638,7 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
 `/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
 `static/css/decks.css`) shows a version **read-only**, for the app and the
 public copy (in the app, one "Edit in the builder" button; the public
-toggle moved to the builder's Settings, the wants list to its Missing tab): its zones as the card grid (by kind, then English name), and
+toggle moved to the builder's Settings, the wants list to its To buy tab): its zones as the card grid (by kind, then English name), and
 around them:
 
 - **the format** it plays (its problems there: `store::formats::version_problems`,
@@ -704,8 +704,8 @@ group the lists by the version they were taken from.
   double loss = loss, byes apart), games (draws and unfinished out of the
   rate), by version, by your deck's labels, matchups, die, first/second.
   `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
-- **Deck builder**: the tournament panel is a summary with links to these
-  pages (`decks/api/tournament.rs`).
+- **Deck builder**: the header shows a "Played at …" link (`deck.tournament`, a summary from
+  `decks/api/tournament.rs`) and "+ Tournament with this version" in its ⋯ menu.
 - **Public**: the list, the stats and each tournament are in the public copy,
   without the buttons, the filter (it needs the server), the labels page
   and the old `notes`. The list played is public with it; the version it

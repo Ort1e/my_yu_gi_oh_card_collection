@@ -48,10 +48,11 @@
     /** the last test draw, for the Build tab's banner */
     let simulation: SimulationResult | null = null;
 
-    const TABS = ['build', 'missing', 'draw', 'history', 'settings'] as const;
+    const TABS = ['build', 'to-buy', 'draw', 'history', 'settings'] as const;
     type Tab = (typeof TABS)[number];
 
-    const tabFromHash = (): Tab => TABS.find((t) => `#${t}` === location.hash) ?? 'build';
+    // #missing, the old name of the To buy tab, still opens it
+    const tabFromHash = (): Tab => (location.hash === '#missing' ? 'to-buy' : TABS.find((t) => `#${t}` === location.hash) ?? 'build');
 
     let tab: Tab = tabFromHash();
 
@@ -329,6 +330,7 @@
             {zones}
             {dirty}
             {total}
+            {missingCount}
             {rulesLabel}
             on:save={save}
             on:discard={discard}
@@ -337,7 +339,7 @@
 
         <nav class="tabs">
             <button type="button" class:active={tab === 'build'} on:click={() => showTab('build')}>Build</button>
-            <button type="button" class:active={tab === 'missing'} on:click={() => showTab('missing')}>Missing ({missingCount})</button>
+            <button type="button" class:active={tab === 'to-buy'} on:click={() => showTab('to-buy')}>To buy ({missingCount})</button>
             <button type="button" class:active={tab === 'draw'} on:click={() => showTab('draw')}>Test draw</button>
             <button type="button" class:active={tab === 'history'} on:click={() => showTab('history')}>History</button>
             <button type="button" class:active={tab === 'settings'} on:click={() => showTab('settings')}>Settings</button>
@@ -403,7 +405,7 @@
                     </div>
                 </aside>
             </div>
-        {:else if tab === 'missing'}
+        {:else if tab === 'to-buy'}
             <div class="area">
                 <Missing
                     {zones}
@@ -438,10 +440,8 @@
                     {api}
                     bind:deck
                     bind:key
-                    {zones}
                     bind:dirty
                     on:reload={({ detail }) => setDeck(detail)}
-                    on:go={({ detail }) => go(detail)}
                 />
             </div>
         {/if}

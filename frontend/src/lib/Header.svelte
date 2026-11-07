@@ -1,7 +1,10 @@
 <script lang="ts">
     // The sticky header: deck name, the version switcher (its last entry
     // makes a new version), the badges, the counts and the price, Save and
-    // Discard while there are unsaved changes, and the ⋯ menu.
+    // Discard while there are unsaved changes, and the ⋯ menu (Rename, the
+    // read-only page, Export / Play, a tournament with this version, Delete:
+    // each exists only here). Also: owned/missing counts, the month's budget
+    // left, the tournament the list was played at.
     import { createEventDispatcher } from 'svelte';
 
     import { euros } from '../deck';
@@ -18,6 +21,8 @@
     export let zones: DeckZones;
     export let dirty: boolean;
     export let total: number;
+    /** proxies in the zones as they are on the screen */
+    export let missingCount: number;
     /** "Edison v2" or "List of 01/04/2026", null without rules */
     export let rulesLabel: string | null;
 
@@ -29,6 +34,8 @@
     let newVersion: NewVersionDialog;
 
     $: counts = `${zones.main.length} / ${zones.extra.length} / ${zones.side.length}`;
+    $: cards = zones.main.length + zones.extra.length + zones.side.length;
+    $: budgetLeft = deck.budget_left == null ? null : Number(deck.budget_left);
 
     async function switchVersion(e: Event & { currentTarget: HTMLSelectElement }) {
         const value = e.currentTarget.value;
@@ -142,6 +149,20 @@
         {counts} · {euros(total)}
     </div>
 
+    <div class="numbers" title="Copies you own and cards still to buy (proxies)">
+        {cards - missingCount} owned ·
+        {#if missingCount > 0}<a class="to-buy" href="#to-buy">{missingCount} to buy</a>{:else}nothing to buy{/if}
+        {#if budgetLeft != null}
+            · <a class="to-buy" href="/budget" target="_blank" rel="noopener" title="This month's budget">{budgetLeft >= 0 ? `${euros(budgetLeft)} left` : `${euros(-budgetLeft)} over`} this month</a>
+        {/if}
+    </div>
+
+    {#if deck.tournament}
+        <div class="numbers">
+            <a class="to-buy" href="/tournaments/{deck.tournament.id}" target="_blank" rel="noopener">Played at {deck.tournament.name}</a>
+        </div>
+    {/if}
+
     <div class="actions">
         {#if dirty}
             <span class="unsaved" title="Unsaved changes">●</span>
@@ -161,6 +182,8 @@
                     <div class="section">
                         <ExportActions {zones} name={`${deck.deck_name ?? 'deck'}-${deck.version_name}`} />
                     </div>
+
+                    <a class="item" href="/tournaments/add?version={deck.id}" target="_blank" rel="noopener">+ Tournament with this version ↗</a>
 
                     <button type="button" class="item danger" on:click={remove}>Delete this version</button>
                 </div>
@@ -216,6 +239,11 @@
 
     .numbers {
         font-variant-numeric: tabular-nums;
+    }
+
+    .to-buy {
+        color: var(--text-light);
+        text-decoration: underline;
     }
 
     .actions {

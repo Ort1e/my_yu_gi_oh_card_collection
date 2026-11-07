@@ -1,6 +1,7 @@
 <script lang="ts">
-    // The Settings tab: name, ban list or format, built, deck box and
-    // sleeves, shown on the public site, the tournament, export, delete.
+    // The Settings tab, three blocks: Rules (ban list or format), Physical
+    // deck (built, deck box, sleeves), Sharing (public site). Rename, Export /
+    // Play, the tournament and Delete are in the header's ⋯ menu.
     // The ban list or format is saved with the zones (Save in the header);
     // everything else saves at once, with a toast. Building changes the
     // zones, so the new version goes back to App.svelte ("reload" event).
@@ -9,10 +10,7 @@
     import { frenchDate } from '../deck';
     import type { DeckApi } from '../api';
     import type { DeckVersion } from '../api-types/DeckVersion';
-    import type { DeckZones } from '../types';
     import { askYes, inform } from './dialog';
-    import ExportActions from './ExportActions.svelte';
-    import Tournament from './Tournament.svelte';
     import { toast } from './toast';
 
     export let api: DeckApi;
@@ -20,34 +18,9 @@
     export let deck: DeckVersion;
     /** the ban list or format chosen: "12", "f3", null */
     export let key: string | null;
-    export let zones: DeckZones;
     export let dirty: boolean;
 
-    const dispatch = createEventDispatcher<{ reload: DeckVersion; go: string }>();
-
-    let name = deck.version_name;
-
-    async function saveName() {
-        const trimmed = name.trim();
-
-        if (!trimmed || trimmed === deck.version_name) {
-            name = deck.version_name;
-
-            return;
-        }
-
-        try {
-            const updated = await api.update({ version_name: trimmed });
-
-            deck.version_name = updated.version_name;
-            deck.versions = updated.versions;
-            deck = deck;
-            toast.ok('Renamed');
-        } catch (e) {
-            name = deck.version_name;
-            toast.error(`Rename failed: ${e.message}`);
-        }
-    }
+    const dispatch = createEventDispatcher<{ reload: DeckVersion }>();
 
     async function toggleBuilt(e: Event & { currentTarget: HTMLInputElement }) {
         const build = e.currentTarget.checked;
@@ -125,34 +98,12 @@
             toast.error(`Could not save it: ${err.message}`);
         }
     }
-
-    async function remove() {
-        const sure = await askYes({
-            title: 'Delete this version?',
-            message: `Delete the version "${deck.version_name}"? Its proxies go with it.`,
-            confirmLabel: 'Delete',
-            danger: true,
-        });
-
-        if (!sure) return;
-
-        try {
-            const { deck_id } = await api.remove();
-
-            dispatch('go', deck_id ? `/decks/${deck_id}` : '/decks');
-        } catch (e) {
-            toast.error(`Delete failed: ${e.message}`);
-        }
-    }
 </script>
 
 <div class="settings">
     <section>
-        <label for="version-name">Name</label>
-        <input id="version-name" type="text" bind:value={name} on:change={saveName} />
-    </section>
+        <h3>Rules</h3>
 
-    <section>
         <label for="ban-list-select">Ban list or format</label>
         <select id="ban-list-select" bind:value={key} on:change={() => (dirty = true)}>
             {#if deck.formats.length > 0}
@@ -176,6 +127,8 @@
     </section>
 
     <section>
+        <h3>Physical deck</h3>
+
         <label class="switch" title="A built version locks its real cards: they are out of the collection for the other decks">
             <input type="checkbox" checked={deck.is_built} on:change={toggleBuilt} />
             Built (locks its cards)
@@ -184,20 +137,22 @@
             A built version's real cards are out of the collection for every other deck, which get proxies instead.
             Build or unbuild on the saved cards.
         </span>
-    </section>
 
-    <section class="notes">
-        <label>
-            Deck box
-            <input type="text" value={deck.deck_box ?? ''} placeholder="red Boulder 100+" on:change={(e) => saveNote('deck_box', e.currentTarget.value)} />
-        </label>
-        <label>
-            Sleeves
-            <input type="text" value={deck.sleeves ?? ''} placeholder="Dragon Shield matte black" on:change={(e) => saveNote('sleeves', e.currentTarget.value)} />
-        </label>
+        <div class="notes">
+            <label>
+                Deck box
+                <input type="text" value={deck.deck_box ?? ''} placeholder="red Boulder 100+" on:change={(e) => saveNote('deck_box', e.currentTarget.value)} />
+            </label>
+            <label>
+                Sleeves
+                <input type="text" value={deck.sleeves ?? ''} placeholder="Dragon Shield matte black" on:change={(e) => saveNote('sleeves', e.currentTarget.value)} />
+            </label>
+        </div>
     </section>
 
     <section>
+        <h3>Sharing</h3>
+
         {#if deck.tournament}
             <p class="hint">On the public site: played in a tournament.</p>
         {:else}
@@ -208,21 +163,6 @@
         {/if}
         <a href="/deck-versions/{deck.id}" target="_blank" rel="noopener">The read-only page ↗</a>
     </section>
-
-    <section>
-        <h3>Tournament</h3>
-        <Tournament deckVersionId={deck.id} tournament={deck.tournament} />
-    </section>
-
-    <section>
-        <h3>Export / Play</h3>
-        <ExportActions {zones} name={`${deck.deck_name ?? 'deck'}-${deck.version_name}`} />
-    </section>
-
-    <details class="danger-zone">
-        <summary>Danger zone</summary>
-        <button type="button" class="btn-danger" on:click={remove}>Delete this version</button>
-    </details>
 </div>
 
 <style>
@@ -250,6 +190,7 @@
     }
 
     .notes {
+        display: flex;
         flex-direction: row;
         flex-wrap: wrap;
         gap: 0.5rem 1rem;
@@ -259,8 +200,4 @@
         flex: 1 1 12rem;
     }
 
-    .danger-zone summary {
-        cursor: pointer;
-        margin-bottom: 0.5rem;
-    }
 </style>

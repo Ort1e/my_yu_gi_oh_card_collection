@@ -25,7 +25,7 @@ use crate::store::cards::{
     delete_orphan_proxies, locked_elsewhere, proxy_copy, swap_card, Zone, IN_VERSION,
 };
 use crate::store::db::push_ids;
-use crate::store::db::{begin_write, exists, row_exists, Pool};
+use crate::store::db::{begin_write, exists, row_exists, Money, Pool};
 use crate::store::errata::{self, CardRef, Context, MissingCard, Verdicts};
 use crate::store::formats;
 use crate::store::snapshots;
@@ -63,6 +63,10 @@ pub struct DeckVersion {
     #[ts(optional)]
     build_report: Option<BuildReport>,
     tournament: Option<Tournament>,
+    /// What is left of this month's budget (negative when over it), for the
+    /// builder's header; `None` when no budget was ever set.
+    #[ts(type = "string | null")]
+    budget_left: Option<Money>,
     main: Vec<ApiCard>,
     extra: Vec<ApiCard>,
     side: Vec<ApiCard>,
@@ -207,6 +211,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         sleeves: head.sleeves,
         build_report: None,
         tournament,
+        budget_left: crate::routes::budget::left_this_month(pool).await?,
         ydke: ydke(&main, &extra, &side),
         main,
         extra,

@@ -14,6 +14,16 @@ async fn deck_version_zones_and_reserve() {
     assert_eq!(deck["main"], json!([]));
     assert_eq!(deck["versions"].as_array().unwrap().len(), 1);
     assert_eq!(deck["ydke"]["with_proxies"], "ydke://!!!");
+    assert_eq!(deck["budget_left"], json!(null), "no budget set yet");
+
+    // a budget for this month: what is left of it shows in the header
+    let month = crate::store::db::today().format("%Y-%m-01").to_string();
+    t.exec(&format!(
+        "INSERT INTO monthly_budget (month, amount) VALUES ('{month}', '30.00')"
+    ))
+    .await;
+    let (_, deck) = t.json("GET", &uri, json!(null)).await;
+    assert!(deck["budget_left"].is_string(), "{deck}");
 
     // reserve: owned, non-proxy cards only
     let (_, reserve) = t

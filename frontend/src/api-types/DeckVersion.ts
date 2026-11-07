@@ -21,7 +21,12 @@ is_public: boolean, deck_box: string | null, sleeves: string | null,
  * What building the version did, only in the answer to building it or
  * to saving a built version's zones when cards were taken elsewhere.
  */
-build_report?: BuildReport, tournament: Tournament | null, main: Array<ApiCard>, extra: Array<ApiCard>, side: Array<ApiCard>, ydke: Ydke, 
+build_report?: BuildReport, tournament: Tournament | null, 
+/**
+ * What is left of this month's budget (negative when over it), for the
+ * builder's header; `None` when no budget was ever set.
+ */
+budget_left: string | null, main: Array<ApiCard>, extra: Array<ApiCard>, side: Array<ApiCard>, ydke: Ydke, 
 /**
  * Other versions of the same deck, for the version switcher.
  */

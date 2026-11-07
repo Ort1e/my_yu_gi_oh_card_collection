@@ -104,6 +104,24 @@ impl BudgetData {
         })
     }
 }
+/// What is left to spend this month (the month's budget and one-off
+/// contributions less what lots cost), negative when over it. `None` when no
+/// budget was ever set. Shown in the deck builder's header.
+pub async fn left_this_month(pool: &Pool) -> AppResult<Option<Money>> {
+    let data = BudgetData::load(pool).await?;
+
+    if data.budgets.is_empty() {
+        return Ok(None);
+    }
+
+    // most recent month first
+    let current = budget::recap(&data.lots, &data.budgets, today(), false);
+
+    Ok(current
+        .first()
+        .map(|month| Money(month.budget - month.spent)))
+}
+
 #[derive(Template)]
 #[template(path = "budget/overview.html")]
 pub struct BudgetPage {
