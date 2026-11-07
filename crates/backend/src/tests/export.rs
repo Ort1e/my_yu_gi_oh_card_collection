@@ -89,6 +89,7 @@ async fn the_public_copy_holds_nothing_private() {
         "deck-versions-12.html",
         "tournaments.html",
         "tournaments-1.html",
+        "tournaments-stats.html",
         "img/card-image-1.webp",
         "static/css/style.css",
         "static/js/card_preview.js",

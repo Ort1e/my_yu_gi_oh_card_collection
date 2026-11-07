@@ -60,6 +60,7 @@ pub fn router() -> Router<AppState> {
         .route("/formats", get(formats::list))
         .route("/formats/:id", get(formats::detail))
         .route("/tournaments", get(tournaments::list))
+        .route("/tournaments/stats", get(tournaments::stats::page))
         .route("/tournaments/labels", get(tournaments::labels::list))
         .route("/tournaments/:id", get(tournaments::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))

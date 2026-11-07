@@ -13,11 +13,12 @@ use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
 
 /// The pages the copy starts from; the first one is its home page.
-const START: [&str; 13] = [
+const START: [&str; 14] = [
     "/cards",
     "/collection/stats",
     "/decks",
     "/tournaments",
+    "/tournaments/stats",
     "/rarities",
     "/pokemon",
     "/pokemon/wishlist",
@@ -95,6 +96,7 @@ mod tests {
             "/deck-versions/4",
             "/deck-snapshots/4",
             "/tournaments",
+            "/tournaments/stats",
             "/tournaments/2",
             "/card-image/1",
             "/card-picture/Ash-RA04-EN-UR-1E.jpg",

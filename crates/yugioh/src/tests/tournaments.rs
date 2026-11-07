@@ -105,6 +105,8 @@ async fn adding_a_tournament_with_rounds_games_and_labels() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("Locals"));
     assert!(page.contains("Test - v1"));
+    let (status, page) = t.get("/tournaments/stats").await;
+    assert_eq!(status, StatusCode::OK);
     assert!(page.contains("Matchups"));
 }
 
@@ -271,7 +273,7 @@ async fn labels_are_renamed_and_merged() {
     assert_eq!(status, StatusCode::SEE_OTHER);
     let (_, page) = t.get("/decks/1").await;
     assert!(page.contains("Labels: Mitsurugi, Orcustrated"), "{page}");
-    assert!(page.contains("/tournaments?deck=1"));
+    assert!(page.contains("/tournaments/stats?deck=1"));
     let (_, page) = t.get("/decks/1/edit").await;
     assert!(page.contains("value=\"Mitsurugi, Orcustrated\""));
 }
@@ -294,6 +296,26 @@ async fn the_list_filters_and_the_old_notes() {
     assert!(page.contains("Locals") && !page.contains("Regionals"));
     let (_, page) = t.get("/tournaments?deck=1&since=nonsense").await;
     assert!(page.contains("Locals") && !page.contains("Regionals"));
+
+    // the list has no stats any more: they are on their own page, which
+    // follows the same filter
+    let (_, page) = t.get("/tournaments").await;
+    assert!(!page.contains("By deck version"), "{page}");
+    assert!(page.contains("/tournaments/stats\""), "{page}");
+    let (_, page) = t.get("/tournaments?since=2026-01-01&deck=1").await;
+    assert!(
+        page.contains("/tournaments/stats?since=2026-01-01&amp;deck=1"),
+        "{page}"
+    );
+    let (status, page) = t.get("/tournaments/stats").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains("By deck version") && page.contains("Overall"),
+        "{page}"
+    );
+    assert!(page.contains("action=\"/tournaments/stats\""), "{page}");
+    let (_, page) = t.get("/tournaments/stats?deck=1&since=nonsense").await;
+    assert!(page.contains("By deck version"), "{page}");
 
     let (_, page) = t.get("/tournaments/2").await;
     assert!(page.contains("Old notes") && page.contains("vs DDD 1/2"));

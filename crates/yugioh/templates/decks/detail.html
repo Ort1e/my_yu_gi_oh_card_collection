@@ -14,7 +14,7 @@
       <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
       {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
       {% if !common::export::public_copy() %}
-      {% if has_tournaments %}<div><a href="/tournaments?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
+      {% if has_tournaments %}<div><a href="/tournaments/stats?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
       {% endif %}
     </div>
     {% if !common::export::public_copy() %}

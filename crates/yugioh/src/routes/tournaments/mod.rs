@@ -1,13 +1,13 @@
-//! `/tournaments`: every tournament with its record, and the stats
-//! (`yugioh_domain::tournament::stats`); `/tournaments/:id`: one tournament round
-//! by round. The forms are in `form.rs`, the labels page in `labels.rs`
-//! (docs/tour.md, "Tournaments").
+//! `/tournaments`: every tournament with its record; `/tournaments/stats`:
+//! the stats (`stats.rs`, `yugioh_domain::tournament::stats`), both following
+//! the same filter; `/tournaments/:id`: one tournament round by round. The
+//! forms are in `form.rs`, the labels page in `labels.rs` (docs/tour.md,
+//! "Tournaments").
 
 mod data;
 pub mod form;
 pub mod labels;
-
-use std::collections::HashMap;
+pub mod stats;
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
@@ -109,36 +109,6 @@ pub struct ListRow {
     placement_rank: String,
 }
 
-pub struct StatLine {
-    name: String,
-    href: Option<String>,
-    rounds: u32,
-    record: String,
-    rate: String,
-}
-
-impl StatLine {
-    fn new(name: impl Into<String>, href: Option<String>, r: &Record) -> StatLine {
-        StatLine {
-            name: name.into(),
-            href,
-            rounds: r.wins + r.losses + r.draws,
-            record: record_text(r),
-            rate: rate_text(r),
-        }
-    }
-}
-
-/// One table of the stats.
-pub struct StatSection {
-    title: &'static str,
-    /// The heading of the first column.
-    what: &'static str,
-    /// "Rounds" or "Games".
-    counted: &'static str,
-    lines: Vec<StatLine>,
-}
-
 pub struct DeckOption {
     id: i64,
     name: String,
@@ -149,77 +119,57 @@ pub struct DeckOption {
 #[template(path = "tournaments/list.html")]
 pub struct ListPage {
     rows: Vec<ListRow>,
-    sections: Vec<StatSection>,
-    byes: u32,
     since: String,
     decks: Vec<DeckOption>,
     filtered: bool,
+    /// The stats page with the same filter.
+    stats_href: String,
 }
 
-fn sections(s: &Stats, version_names: &HashMap<i64, String>) -> Vec<StatSection> {
-    let labels = |lines: &[(String, Record)]| {
-        lines
-            .iter()
-            .map(|(name, r)| StatLine::new(name.clone(), None, r))
-            .collect()
-    };
-    vec![
-        StatSection {
-            title: "Overall",
-            what: "",
-            counted: "Played",
-            lines: vec![
-                StatLine::new("Rounds", None, &s.rounds),
-                StatLine::new("Games", None, &s.games),
-            ],
-        },
-        StatSection {
-            title: "By deck version",
-            what: "Version",
-            counted: "Rounds",
-            lines: s
-                .per_version
-                .iter()
-                .map(|(id, r)| {
-                    let name = version_names
-                        .get(id)
-                        .cloned()
-                        .unwrap_or_else(|| format!("Version #{id}"));
-                    StatLine::new(name, Some(format!("/deck-versions/{id}")), r)
-                })
-                .collect(),
-        },
-        StatSection {
-            title: "By your deck's labels",
-            what: "Label",
-            counted: "Rounds",
-            lines: labels(&s.per_own_label),
-        },
-        StatSection {
-            title: "Matchups",
-            what: "Against",
-            counted: "Rounds",
-            lines: labels(&s.matchups),
-        },
-        StatSection {
-            title: "Die",
-            what: "",
-            counted: "Rounds",
-            lines: vec![
-                StatLine::new("Die won", None, &s.die_won),
-                StatLine::new("Die lost", None, &s.die_lost),
-            ],
-        },
-        StatSection {
-            title: "First or second",
-            what: "",
-            counted: "Games",
-            lines: vec![
-                StatLine::new("Going first", None, &s.going_first),
-                StatLine::new("Going second", None, &s.going_second),
-            ],
-        },
-    ]
+impl ListPage {
+    /// Where the filter form goes (`filter.html`).
+    fn filter_action(&self) -> &'static str {
+        "/tournaments"
+    }
+}
+
+impl Filter {
+    /// `?since=…&deck=…` of what is set, "" when nothing is.
+    fn query(&self) -> String {
+        let mut query = url::form_urlencoded::Serializer::new(String::new());
+        if let Some(since) = self.since() {
+            query.append_pair("since", &since);
+        }
+        if let Some(deck) = self.deck_id() {
+            query.append_pair("deck", &deck.to_string());
+        }
+        let query = query.finish();
+        if query.is_empty() {
+            query
+        } else {
+            format!("?{query}")
+        }
+    }
+}
+
+/// The decks with a list played in a tournament, for the filter's menu.
+async fn deck_options(pool: &Pool, selected: Option<i64>) -> AppResult<Vec<DeckOption>> {
+    let decks: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT DISTINCT deck.id, deck.name FROM deck
+         JOIN deck_snapshot s ON s.deck_id = deck.id
+         WHERE s.tournament_id IS NOT NULL ORDER BY deck.name COLLATE NOCASE",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(decks
+        .into_iter()
+        .map(|(id, name)| DeckOption {
+            id,
+            name,
+            selected: selected == Some(id),
+        })
+        .collect())
 }
 
 /// `GET /tournaments`.
@@ -251,35 +201,12 @@ pub async fn list(
         })
         .collect();
 
-    let version_names: HashMap<i64, String> = loaded
-        .tournaments
-        .iter()
-        .filter_map(|t| Some((t.version_id?, t.version_full_name()?)))
-        .collect();
-    let all = stats(&loaded.all_records());
-
-    let decks: Vec<(i64, String)> = sqlx::query_as(
-        "SELECT DISTINCT deck.id, deck.name FROM deck
-         JOIN deck_snapshot s ON s.deck_id = deck.id
-         WHERE s.tournament_id IS NOT NULL ORDER BY deck.name COLLATE NOCASE",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-
     Ok(ListPage {
         rows,
-        sections: sections(&all, &version_names),
-        byes: all.byes,
         since: which.since.clone().unwrap_or_default(),
-        decks: decks
-            .into_iter()
-            .map(|(id, name)| DeckOption {
-                id,
-                name,
-                selected: which.deck_id == Some(id),
-            })
-            .collect(),
+        decks: deck_options(&state.pool, which.deck_id).await?,
         filtered: which.since.is_some() || which.deck_id.is_some(),
+        stats_href: format!("/tournaments/stats{}", filter.query()),
     })
 }
 

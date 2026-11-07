@@ -682,7 +682,9 @@ was. A version can still be edited (a mistake to fix).
 
 `/tournaments` (`routes/tournaments/`, `templates/tournaments/`,
 `static/css/tournaments.css`): every tournament with its record and
-placement, then the stats, both following the filter (`?since=`, `?deck=`).
+placement, and `/tournaments/stats` (`stats.rs`, `stats.html`) the stats;
+both follow the same filter (`?since=`, `?deck=`, `filter.html`) and link to
+each other keeping it.
 A tournament has numbered **rounds** (`tournament_round`: opponent's deck as
 written, its labels, die, result, team result, comment), each with any number
 of **games** (`tournament_game`: won, lost, draw (replayed, so more than 3
@@ -708,7 +710,7 @@ group the lists by the version they were taken from.
   `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
 - **Deck builder**: the header shows a "Played at …" link (`deck.tournament`, a summary from
   `decks/api/tournament.rs`) and "+ Tournament with this version" in its ⋯ menu.
-- **Public**: the list, the stats and each tournament are in the public copy,
+- **Public**: the list, the stats page (unfiltered: the copy keeps no filter) and each tournament are in the public copy,
   without the buttons, the filter (it needs the server), the labels page
   and the old `notes`. The list played is public with it; the version it
   was taken from shows the tournament and links to that list.
