@@ -501,7 +501,7 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), To buy tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
 
 The builder does **all the editing**, and it is where the collection meets
 competitive play: it reads the collection (copies owned, proxies, built decks
@@ -595,8 +595,10 @@ missing.
   **Cardmarket wants list** (one `1 Card name` line per card, by English name
   from the card data; `static/js/wants_list.js` copies it). Language and
   condition can't be in the text: the page reminds to set them on the list
-  after the import. The version's own list is in the builder's To buy tab
-  (`built::version_wants_list`). Build and unbuild in the builder's Settings tab.
+  after the import (`built::WANTS_NOTE`, also sent to the builder as
+  `Check.wants_note`: one text). A version's own list exists only in the
+  builder's To buy tab (`built::version_wants_list`); each version card here
+  links to it (`#to-buy`). Build and unbuild in the builder's Settings tab.
 
 ## A deck's history
 

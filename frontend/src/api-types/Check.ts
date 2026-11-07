@@ -8,6 +8,7 @@ import type { MissingCard } from "./MissingCard";
  * owned copies whose text was errata'd after the cutoff of the format or
  * the ban list (`store::errata`); `errata_pending`: cards still being
  * looked up on Yugipedia. `wants`: the Cardmarket wants list of the
- * version's proxies, one `count name` per line (empty: none).
+ * version's proxies, one `count name` per line (empty: none); `wants_note`:
+ * what to do with it (shared with `/decks/built`).
  */
-export type Check = { format: string | null, problems: Array<string>, errata: Array<MissingCard>, errata_pending: number, wants: string, };
+export type Check = { format: string | null, problems: Array<string>, errata: Array<MissingCard>, errata_pending: number, wants: string, wants_note: string, };

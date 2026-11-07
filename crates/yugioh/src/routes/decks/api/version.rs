@@ -20,7 +20,7 @@ use yugioh_domain::ydke::YdkeDeck;
 use super::tournament::Tournament;
 use super::{load_cards, ApiCard, Created};
 use crate::routes::cards::card_types;
-use crate::routes::decks::built::version_wants_list;
+use crate::routes::decks::built::{version_wants_list, WANTS_NOTE};
 use crate::store::cards::{
     delete_orphan_proxies, locked_elsewhere, proxy_copy, swap_card, Zone, IN_VERSION,
 };
@@ -699,7 +699,8 @@ pub(crate) async fn copy_version(pool: &Pool, id: i64, name: &str) -> AppResult<
 /// owned copies whose text was errata'd after the cutoff of the format or
 /// the ban list (`store::errata`); `errata_pending`: cards still being
 /// looked up on Yugipedia. `wants`: the Cardmarket wants list of the
-/// version's proxies, one `count name` per line (empty: none).
+/// version's proxies, one `count name` per line (empty: none); `wants_note`:
+/// what to do with it (shared with `/decks/built`).
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct Check {
@@ -708,6 +709,7 @@ pub struct Check {
     errata: Vec<MissingCard>,
     errata_pending: usize,
     wants: String,
+    wants_note: &'static str,
 }
 
 /// `GET /api/deck-versions/:id/check`: its problems in the format it plays,
@@ -762,5 +764,6 @@ pub async fn check_version(
         errata,
         errata_pending,
         wants: version_wants_list(&state.pool, id).await?,
+        wants_note: WANTS_NOTE,
     }))
 }

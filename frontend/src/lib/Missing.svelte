@@ -116,10 +116,7 @@
             <button type="button" on:click={copyWants}>Copy</button>
             <a class="btn btn-secondary" href="https://www.cardmarket.com/en/YuGiOh/Wants" target="_blank" rel="noopener">Open my Cardmarket wants lists ↗</a>
         </p>
-        <p class="hint">
-            Paste it into a Cardmarket Yu-Gi-Oh! wants list, then set <strong>Language: English, French</strong> and
-            <strong>Min. condition: Good</strong> on its cards.
-        </p>
+        <p class="hint">{check.wants_note}</p>
     {:else}
         <p class="hint">No proxy: nothing to put in a wants list.</p>
     {/if}

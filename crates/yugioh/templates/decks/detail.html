@@ -44,7 +44,7 @@
         </td>
         <td>{{ version.main_count }}</td><td>{{ version.extra_count }}</td><td>{{ version.side_count }}</td>
         {% if !common::export::public_copy() %}
-        <td>{% if version.proxies > 0 %}<a href="/deck-builder/{{ version.id }}#missing">{{ version.proxies }}</a>{% else %}0{% endif %}</td>
+        <td>{% if version.proxies > 0 %}<a href="/deck-builder/{{ version.id }}#to-buy">{{ version.proxies }}</a>{% else %}0{% endif %}</td>
         {% endif %}
         <td class="text">{% match version.format_label %}{% when Some with (label) %}{{ label }}{% when None %}{% match version.ban_list_date %}{% when Some with (date) %}List of {{ date|date }}{% when None %}—{% endmatch %}{% endmatch %}</td>
         <td class="text">{% match version.tournament_id %}{% when Some with (tournament_id) %}<a href="/tournaments/{{ tournament_id }}">{{ version.tournament_name.as_deref().unwrap_or("") }}</a>{% when None %}—{% endmatch %}</td>

@@ -139,7 +139,7 @@ version, or a YDKE).
 `/deck-builder/:id` does **all the editing**. It is where the two worlds meet:
 it uses the collection (copies owned, proxies, built decks that lock cards)
 and plans competitive play (the next tournament, what to buy). Five tabs
-(kept in the address: `#build`, `#missing`, `#draw`, `#history`,
+(kept in the address: `#build`, `#to-buy`, `#draw`, `#history`,
 `#settings`):
 
 | Tab | For |

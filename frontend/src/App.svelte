@@ -40,7 +40,7 @@
     /** the selector's ban list or format ("12", "f3"), saved with the deck */
     let key: string | null = null;
     /** the version's problems in its format (`GET …/check`), for the panel */
-    let check: Check = { format: null, problems: [], errata: [], errata_pending: 0, wants: '' };
+    let check: Check = { format: null, problems: [], errata: [], errata_pending: 0, wants: '', wants_note: '' };
     let dirty = false;
     let selected: ApiCard | null = null;
     let categories: ApiCategory[] = [];
@@ -79,7 +79,7 @@
         try {
             check = await api.check();
         } catch (e) {
-            check = { format: null, problems: [`Could not check the format: ${e.message}`], errata: [], errata_pending: 0, wants: '' };
+            check = { format: null, problems: [`Could not check the format: ${e.message}`], errata: [], errata_pending: 0, wants: '', wants_note: '' };
         }
     }
 

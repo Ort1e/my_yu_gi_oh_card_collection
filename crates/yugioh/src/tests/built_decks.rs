@@ -365,12 +365,17 @@ async fn the_built_page_gives_a_cardmarket_wants_list_by_english_name() {
 
     let (status, page) = t.get("/decks/built").await;
     assert_eq!(status, StatusCode::OK, "{page}");
-    // the version's own list (sorted by English name), then the whole one
-    // (sorted like the table, by the name on the card)
+    // only the whole list (sorted like the table, by the name on the card):
+    // each version's own list is in the deck builder's To buy tab
     assert!(
-        page.contains(">1 Dark Magician\n1 Kuriboh</textarea>"),
+        !page.contains(">1 Dark Magician\n1 Kuriboh</textarea>"),
         "{page}"
     );
+    assert!(
+        page.contains(&format!("/deck-builder/{v1}#to-buy")),
+        "{page}"
+    );
+    assert!(page.contains("Min. condition: Good"), "{page}");
     assert!(
         page.contains(">1 Kuriboh\n1 Dark Magician</textarea>"),
         "{page}"

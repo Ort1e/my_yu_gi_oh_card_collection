@@ -19,7 +19,7 @@
   <div class="card-list">
     {% for built in versions %}
     <div class="card">
-      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}#missing">{{ built.version.full_name() }}</a></div>
+      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}#to-buy">{{ built.version.full_name() }}</a></div>
       <div class="card-meta-line">
         <div>Deck box: {{ built.version.deck_box.as_deref().unwrap_or("—") }}</div>
         <div>Sleeves: {{ built.version.sleeves.as_deref().unwrap_or("—") }}</div>
@@ -39,11 +39,7 @@
         </li>
         {% endfor %}
       </ul>
-      <details class="wants-list">
-        <summary>Cardmarket wants list</summary>
-        <textarea id="wants-{{ built.version.id }}" class="wants-text" rows="{{ built.missing.len() + 1 }}" readonly>{{ built.wants_list() }}</textarea>
-        <p><button type="button" data-copy="wants-{{ built.version.id }}">Copy</button></p>
-      </details>
+      <p><a href="/deck-builder/{{ built.version.id }}#to-buy">To buy tab: cost and wants list ↗</a></p>
       {% endif %}
     </div>
     {% endfor %}
@@ -72,9 +68,7 @@
   </div>
 
   <h2>Cardmarket wants list</h2>
-  <p>Paste this into a Cardmarket Yu-Gi-Oh! wants list (Wants → import a decklist). Language and condition can't be
-    in the text: after the import, set <strong>Language: English, French</strong> and
-    <strong>Min. condition: Good</strong> on the list's cards.</p>
+  <p>{{ self.wants_note() }}</p>
   <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
   <p><button type="button" data-copy="wants-all">Copy</button>
     <a class="btn btn-secondary" href="https://www.cardmarket.com/en/YuGiOh/Wants" target="_blank" rel="noopener">Open my Cardmarket wants lists ↗</a></p>

@@ -51,6 +51,13 @@ struct ZoneCard {
     card: CardRef,
 }
 
+/// What to do with a wants list's text, shown with every wants list (this
+/// page's and the deck builder's To buy tab, in `Check::wants_note`).
+pub const WANTS_NOTE: &str =
+    "Paste it into a Cardmarket Yu-Gi-Oh! wants list (Wants → import a decklist). \
+Language and condition can't be in the text: after the import, set Language: English, French \
+and Min. condition: Good on the list's cards.";
+
 /// A Cardmarket wants list's text: one `"{count} {name}"` line per card.
 /// No expansion or version: any printing will do for a proxy. Language and
 /// condition can't go in the text; they are set on the list after the import.
@@ -102,14 +109,9 @@ impl BuiltPage {
     }
 }
 
-impl BuiltVersion {
-    /// This version's missing cards as a Cardmarket wants list.
-    pub fn wants_list(&self) -> String {
-        wants_list(
-            self.missing
-                .iter()
-                .map(|m| (m.count, m.english_name.as_str())),
-        )
+impl BuiltPage {
+    pub fn wants_note(&self) -> &'static str {
+        WANTS_NOTE
     }
 }
 

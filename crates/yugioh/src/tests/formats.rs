@@ -196,7 +196,8 @@ async fn a_deck_version_plays_a_format() {
             "Dark Magician: 2 copies, 1 allowed",
             "Kuriboh: released on 01/01/2012, after the format's cutoff",
             "Kuriboh: forbidden (1 in the deck)",
-        ], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh" })
+        ], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh",
+                "wants_note": check["wants_note"] })
     );
 
     // a ban list and a format: refused, nothing changed
@@ -247,7 +248,8 @@ async fn a_deck_version_plays_a_format() {
     let (_, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
     assert_eq!(
         check,
-        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh" })
+        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh",
+                "wants_note": check["wants_note"] })
     );
 }
 
