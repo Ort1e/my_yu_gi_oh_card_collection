@@ -66,3 +66,26 @@ a.value-tile:hover {
         font-size: 1.3rem;
     }
 }
+
+/* A folded section of the value page (and the price moves): its heading is the summary. */
+.value-fold > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.value-fold > summary::-webkit-details-marker {
+    display: none;
+}
+
+.value-fold > summary h2,
+.value-fold > summary h3 {
+    display: inline-block;
+}
+
+.value-fold > summary::before {
+    content: '▸ ';
+}
+
+.value-fold[open] > summary::before {
+    content: '▾ ';
+}

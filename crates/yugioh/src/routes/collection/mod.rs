@@ -8,6 +8,7 @@ mod sections;
 pub mod stats;
 
 pub use data::ValueData;
+pub use sections::{deck_values, DeckLine};
 
 use askama::Template;
 use axum::extract::State;
@@ -16,8 +17,8 @@ use rust_decimal::Decimal;
 use yugioh_domain::valuation::{unit_totals_on, Totals, UnitTotals};
 
 use sections::{
-    chart_json, copy_lines, deck_values, lot_lines, moves, percent, top_n, CopyLine, DeckLine,
-    LotLine, Moves, TOP_COPIES, TOP_LOTS,
+    chart_json, copy_lines, lot_lines, moves, percent, top_n, CopyLine, LotLine, Moves, TOP_COPIES,
+    TOP_LOTS,
 };
 
 use crate::store::db::today;
@@ -40,7 +41,6 @@ pub struct ValuePage {
     top: Vec<CopyLine>,
     losses: Vec<CopyLine>,
     moves: Vec<Moves>,
-    decks: Vec<DeckLine>,
     /// The purchase lots (with cards) against their full price: the
     /// [`TOP_LOTS`] whose cards are worth the most today, with the biggest
     /// gains, with the worst losses.
@@ -145,7 +145,6 @@ pub async fn page(State(state): State<AppState>) -> AppResult<ValuePage> {
         top,
         losses,
         moves: moves(&data),
-        decks: deck_values(pool, &data.latest).await?,
         lots_by_value,
         lots_by_gain,
         lots_by_loss,

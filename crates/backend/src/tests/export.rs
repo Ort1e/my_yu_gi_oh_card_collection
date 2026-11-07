@@ -137,6 +137,12 @@ async fn the_public_copy_holds_nothing_private() {
     ] {
         assert!(pages.contains(shown), "{shown} is missing");
     }
+    // the statistics keep the most valuable cards in the copy, which has no
+    // Value page to send them to
+    let stats = std::fs::read_to_string(out.join("collection-stats.html")).unwrap();
+    assert!(stats.contains("The most valuable"), "{stats}");
+    assert!(!stats.contains("/collection/value"), "{stats}");
+
     // a page of the copy links only to the copy's files
     for (i, _) in pages.match_indices("href=\"") {
         let link = &pages[i + 6..];

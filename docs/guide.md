@@ -54,10 +54,12 @@ is left, so you see what a deck would cost before buying.
 
 ### Value and statistics
 - `/collection/value`: what the collection is worth (Cardmarket prices, with
-  ygoprodeck's as a fallback), the gain over what the lots cost, the biggest
-  movers, by lot. Prices are fetched weekly.
+  ygoprodeck's as a fallback) and the gain over what the lots cost, with the
+  chart; the top copies, the biggest movers and the lots are folded sections.
+  The value of each deck is on *Built decks*. Prices are fetched weekly.
 - `/collection/stats`: the collection counted by rarity, kind, set, language
-  and condition. No prices paid, so it is also in the public copy.
+  and condition, the latest added. No prices paid, so it is also in the public
+  copy (which also keeps there the most valuable cards and the movers).
 
 ### Pack openings
 - **Yu-Gi-Oh! advent calendar** (*Advent*, behind the login): a gift lot
@@ -178,8 +180,9 @@ Two paths through the builder:
 
 ### Built decks
 `/decks/built`: the decks you physically built: their missing cards, the
-shopping list for all of them and the Cardmarket wants list, errata
-warnings (a card whose text changed after the format's cutoff). A *Shopping
+shopping list for all of them and the Cardmarket wants list (a version's own
+list is in the builder's *To buy* tab), errata warnings, and the value of
+each deck (a card whose text changed after the format's cutoff). A *Shopping
 list* page of its own is planned (see
 [specs/deck-lists.md](specs/deck-lists.md)).
 

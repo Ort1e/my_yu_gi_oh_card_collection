@@ -7,9 +7,11 @@ use std::collections::BTreeMap;
 use askama::Template;
 use axum::extract::State;
 
+use crate::routes::collection::{deck_values, DeckLine, ValueData};
 use crate::store::errata::{CardRef, Context, ErrataWarning, MissingCard, Verdicts};
 use crate::store::models::DeckVersionRow;
 use crate::web::error::AppResult;
+use crate::web::filters;
 use crate::AppState;
 
 pub struct BuiltVersion {
@@ -42,6 +44,9 @@ pub struct BuiltPage {
     shopping: Vec<ShoppingLine>,
     /// Cards whose errata are being looked up on Yugipedia.
     errata_pending: usize,
+    /// Each deck's latest version: its value and what its proxies would
+    /// cost (was on `/collection/value`).
+    decks: Vec<DeckLine>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -199,9 +204,12 @@ pub async fn page(State(state): State<AppState>) -> AppResult<BuiltPage> {
         .collect();
     shopping.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
+    let values = ValueData::load(pool).await?;
+
     Ok(BuiltPage {
         versions,
         shopping,
         errata_pending: verdicts.pending,
+        decks: deck_values(pool, &values.latest).await?,
     })
 }

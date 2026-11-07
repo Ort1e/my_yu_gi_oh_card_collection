@@ -390,8 +390,13 @@ none: no warning.
 
 ## The collection value
 
-`/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
-and a "Market" line on card pages. Two price sources, both refreshed weekly
+`/collection/value` (`routes/collection/mod.rs`: the summary tiles and the chart
+open, the top copies, losses, price moves and lots in folded `<details>`), a tile
+on the dashboard, and a "Market" line on card pages. The value of each deck
+(`sections::deck_values`) is the last section of `/decks/built`;
+`/collection/stats` sends to the value page for the chart and the movers, and
+keeps them only in the public copy, which has no value page (it would show what
+was paid). Two price sources, both refreshed weekly
 by `refresh-prices`:
 
 - **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
@@ -1023,7 +1028,7 @@ runs. They are **the app's own pages**, saved as files:
    it for its pages like a browser, inside `common::export::public_copy()`
    (a tokio task-local, true only there);
 2. it starts from `START` (`/cards`, `/collection/stats`, `/decks`,
-   `/tournaments`, `/rarities`, `/pokemon`, the wishlist and guide,
+   `/tournaments`, `/tournaments/stats`, `/rarities`, `/pokemon`, the wishlist and guide,
    `/books`, authors, series) and follows the links, **only** to the
    addresses `public()` accepts: those, a card's, a deck's, a deck
    version's, a tournament's, a copy's, a book's, an author's or a series'

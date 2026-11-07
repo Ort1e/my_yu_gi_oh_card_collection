@@ -1,6 +1,7 @@
 {# The biggest price moves of the cards owned (routes/collection/sections.rs `moves`): `moves` must be set. #}
   {% for period in moves %}
-  <h2>Biggest moves: {{ period.title }}</h2>
+  <details class="value-fold">
+  <summary><h2>Biggest moves: {{ period.title }}</h2></summary>
   {% if period.lines.is_empty() %}
   <p>No price of an owned card moved by 0.50 € or more.</p>
   {% else %}
@@ -23,5 +24,6 @@
   </table>
   </div>
   {% endif %}
+  </details>
   {% endfor %}
 
