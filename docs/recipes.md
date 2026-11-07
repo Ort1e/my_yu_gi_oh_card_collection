@@ -1,15 +1,14 @@
 # Recipes
 
 Step-by-step guides for the usual changes. Read [tour.md](tour.md) first for
-how the pieces fit. Everything runs inside the Nix shell (direnv loads it),
+how the pieces fit (and [guide.md](guide.md) for what the app does). Everything runs inside the Nix shell (direnv loads it),
 from the repo root.
 
-Using the app:
+Using the app (the phone, books, Pokémon, the advent calendar) is in the
+[user guide](guide.md). Here:
 
-- [Use the app from a phone](#use-the-app-from-a-phone)
-- [Add books](#add-books)
-- [Add Pokémon cards](#add-pokémon-cards)
-- [Add next year's advent calendar](#add-next-years-advent-calendar)
+Running it:
+
 - [Back the data up to git](#back-the-data-up-to-git)
 - [Run the app on the NAS](#run-the-app-on-the-nas)
 
@@ -17,6 +16,7 @@ Changing it:
 
 - [Daily workflow](#daily-workflow)
 - [Ship a change to the NAS](#ship-a-change-to-the-nas)
+- [The development server from a phone](#the-development-server-from-a-phone)
 - [Add a read-only page](#add-a-read-only-page)
 - [Add a form that changes data](#add-a-form-that-changes-data)
 - [Change the database schema](#change-the-database-schema)
@@ -97,46 +97,7 @@ everything is in [deploy/README.md](../deploy/README.md) (SSH, first
 install, the nightly job, updates, the OVH upload, backups to git, what to
 type when something goes wrong).
 
-## Use the app from a phone
-
-On the home Wi-Fi (not mobile data), open **`http://192.168.1.202:3000`**
-and log in with your own password. Bookmark it, or "Add to home screen"
-for an app-like icon; the session lasts, restarts included.
-
-**From anywhere, with the Tailscale app** on the phone (logged in to our
-Tailscale account: deploy/README.md, "From outside home"): open the app's
-HTTPS address, `https://lahochenas3.<name>.ts.net`. It works at home too,
-and it's the better one: HTTPS, so **the live book scan works without
-the Chrome setting below**. The NAS is on from 7:00 to 22:00.
-
-**To scan books with the live camera at `http://192.168.1.202:3000`** (Chrome, once per phone): open
-`chrome://flags`, search "Insecure origins treated as secure", enable it,
-type `http://192.168.1.202:3000` in its box, then "Relaunch". "📷 Scan"
-then shows the camera in the page and reads the barcode as soon as it's
-in view. Without it, "Scan" opens the camera app, and a phone short of
-memory may close Chrome meanwhile ("not enough memory", photo lost).
-
-**If the page doesn't load** on one phone while it works elsewhere:
-
-- the phone is on the home Wi-Fi, not a guest network (guests can't see
-  the NAS) nor mobile data (a weak Wi-Fi makes some phones switch);
-- type `http://` in full: browsers set to "HTTPS only" or "Always use
-  secure connections" (Chrome, Firefox, Brave, Samsung Internet) try
-  `https://…`, which the NAS doesn't serve; the setting can allow this one
-  site;
-- no VPN, ad blocker app or "private DNS" app running on the phone: some
-  send every page through the internet, where the NAS can't be reached;
-- another browser on the same phone, and `http://192.168.1.202:3000/login`
-  directly.
-
-**Limits of `http://192.168.1.202:3000`:** it's plain HTTP. Fine at home, but the password crosses the
-Wi-Fi unencrypted, and browsers keep the live camera to HTTPS sites (the
-book barcode scan opens the camera app instead, unless Chrome's setting
-above trusts the address: then the camera is live in the page). Never forward port 3000 on the
-box: the NAS must stay unreachable from the internet (Tailscale needs no
-open port).
-
-### The development server from a phone
+## The development server from a phone
 
 To try a change on a phone before it ships, the phone talks to the server
 running on the PC, over the home Wi-Fi. By default the server only answers
@@ -170,93 +131,10 @@ the PC itself (`127.0.0.1`).
 2. On the phone, on the home Wi-Fi: `http://<PC address>:3000`, e.g.
    `http://192.168.1.51:3000`.
 
-If it doesn't load: the checks above, plus the port
+If it doesn't load: the checks in the guide's "From a phone", plus the port
 (`sudo iptables -L nixos-fw -n | grep 3000`); from the PC itself,
 `http://<PC address>:3000` must work too. To go back to PC-only: remove
 `BIND_ADDR` from `.env`.
-
-## Add books
-
-In the app: **Books** in the menu (or `/books`) → **Add**.
-
-1. The ISBN: type it (13 digits under the barcode; hyphens are fine, an old
-   10-digit one too), or **📷 Scan** on a phone (take the photo close,
-   flat and well lit), or a USB barcode scanner on the PC.
-2. "Look up" fills title, authors, publisher, year, pages, language, often
-   the series (check it: the catalogues write it in many ways). "Already in
-   the list" means this edition is there; another edition or format has
-   its own ISBN.
-3. Fix what needs it, **Add the book**: the empty form comes back for the
-   next one.
-
-The lookup asks Open Library, Google Books and the BnF (French national
-library: asked first for a French edition, `978-2…`). Google needs the
-`GOOGLE_BOOKS_API_KEY` setting (see the README's settings); the app stops at
-800 Google lookups a day, under its free quota.
-
-**Read or not:** the switch in the **Read** column of the book lists, or on
-the book's page. **🎲 Random** (in the menu, also on the public site) picks
-a book to read: unread ones you can start now (no unread earlier volume of
-the series) by default, a language or format if you like; **Another one**
-picks again.
-
-A book without an ISBN: fill the fields by hand. A series page lists the
-missing volumes, each with a link to add it. A book given away: its edit
-page → **Delete this book** (refused while it is behind an advent calendar
-door: empty that day first).
-
-**Book advent calendar:** Books → **Advent** → **Add calendar**, then for
-each day its book (its ISBN: a book not in the list yet is looked up and
-added; or `#id`) and its photo. The photos go into
-`media/book_advent_calendar_photos/<year>/` on the NAS, and into git with
-the data (see [Back the data up to git](#back-the-data-up-to-git)).
-
-## Add Pokémon cards
-
-In the app: **Pokémon** in the header (or `/pokemon`) → **Add**.
-
-- **A booster opening** (Add → A booster opening): the set code printed at
-  the bottom of the cards, next to the number (**FNE** 067/064 on a French
-  card, SFA on an English one, the set id like SV6a on a Japanese one), the
-  language, the date, then the numbers: `12 34 45r 67x2` (`r` reverse holo,
-  `h` holo, `x2` two copies; a card numbered by a letter, like the Mew
-  cards of 30th Celebration: `B`). 30th Celebration (**30C**) shares its
-  code with its Classic Collection: type the set size after the number
-  (`1/30`), or pick the card on the next step. A Classic Collection
-  reprint shows the old card's number: type it with its size (`33/181`)
-  and pick it in the list, or find it by name (`30C Zekrom`). A Trainer
-  Gallery card (TG29/TG30) prints its main set's code: `ASR TG29`, or
-  `TG29` alone in the finder (every TG29 is listed, with its set). A
-  Japanese card: its set id and number, the rarity letters after it are
-  fine (`SV3a 071/062 AR`, `sv3a 071/062ar`), with the language Japanese. A
-  Sword & Shield card prints no set code, only its symbol, the number and a
-  regulation mark: type it as printed, `F 034/189` (the set is found by its
-  size, the mark tells apart the sets of the same size); the results show
-  the set's code (ASR) to use in the booster form. Cards come
-  in near mint unless changed.
-- **The openings** (Openings in the header): each booster with its cards
-  and value. A card forgotten: the opening's page → **Add cards by
-  number** or **Add one card**; a card in the wrong opening: its edit
-  page, "From a booster opening". Saved in the wrong language (the form
-  starts in the last opening's): **Date, language, note** changes all its
-  cards. **Find the cards** shows each card with its
-  picture and rarity: check the variant (the guide says how to tell them
-  apart), full art, condition; a count of 0 leaves a card out. **Save**.
-- **One card** (Add → One card: a single, a gift, a graded card): find it by
-  its printed code (`FNE 067`) or its name in the language chosen below
-  (Japanese: a Japanese name, or the English/French name of the Pokémon),
-  pick it, choose its variant among those printed, then the rest.
-- **The wishlist**: Wishlist → Add a wish (a card, the language and variant
-  wanted or any, the most you would pay, a priority). Its row turns green
-  when Cardmarket's trend is at or under your price. Adding a copy that
-  fulfils a wish offers "Mark it got"; "I got it" on a wish opens the add
-  form pre-filled.
-- A card sold or given away: its page → **Edit or mark sold** (a date, a
-  price or none). Cards are never deleted.
-
-Prices come with the weekly refresh (`refresh-prices`), and when a card is
-first added. Pictures are a cache in `media/pokemon_card_images/` (not
-backed up to git, like `card_images/`): downloaded again when missing.
 
 ## Add a read-only page
 
@@ -542,25 +420,6 @@ For a table view as well, take the `view` parameter (`View::from_param`),
 size the page with `view.page_size()`, keep it in the page links
 (`view.keep(querystring)`) and link the other view
 (`view.other_href(path, querystring)`): `/cards` does all of it.
-
-## Add next year's advent calendar
-
-All in the app, behind the login:
-
-1. **Advent** in the menu (the list of calendars) → **Add calendar** → the
-   year → **Create the calendar**: its edit page opens.
-2. **Create its lot** (top of the edit page): a gift lot (0 €, December 1st,
-   seller "Advent calendar") linked to the calendar. Its page opens: add the
-   cards there (the quick add takes a set code and numbers). Cards bought
-   in other lots (Cardmarket orders) don't need to be in it.
-3. Back on the edit page (the lot page links to it), for each day: its card
-   (the lot's cards not used yet are suggested in the field; else its code,
-   `MAMO-FR023`, or `#id`, the number in the card's page address) and its
-   photo. Save. Days can be filled one at a time, through December.
-4. A photo still sideways (some phones don't record the orientation): ↺ ↻.
-
-The photos go into `media/advent_calendar_photos/<year>/` on the NAS, and
-into git with the data (see [Back the data up to git](#back-the-data-up-to-git)).
 
 ## Write a handler test
 

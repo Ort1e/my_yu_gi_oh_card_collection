@@ -1,23 +1,29 @@
 # My card and book collection
 
-A personal web app for three collections at home:
+## What it's for
 
-- **Yu-Gi-Oh! cards**: the cards owned, the lots they were bought or sold in
-  (a Cardmarket shipment PDF fills the lot form), sellers, a monthly budget,
-  the market value of the collection (Cardmarket and ygoprodeck prices),
-  decks with a deck builder (YDKE import/export, categories, opening-hand
-  simulation, built decks), tournaments, the Forbidden & Limited lists and
-  advent calendars;
-- **books**: the novels at home, added by ISBN (looked up, or scanned with a
-  phone), with authors, series and their missing volumes, and book advent
-  calendars;
-- **Pokémon cards**: mostly booster openings, in French, English and
-  Japanese, with a wishlist and Cardmarket prices.
+A personal web app with four goals, in this order:
+
+1. **Manage the Yu-Gi-Oh! card collection** (the main one): the cards owned,
+   the lots they were bought or sold in (a Cardmarket shipment PDF fills the
+   lot form), sellers, a monthly budget, the market value, statistics and
+   advent calendars; also a **Pokémon** collection (booster openings,
+   wishlist, prices). Pages: Cards, Lots, Sellers, Budget, Value, Statistics,
+   Advent, Rarities, `/pokemon`.
+2. **Play competitively**: decks with a deck builder (YDKE import/export,
+   categories, opening-hand simulation), built decks and what to buy for
+   them, formats and the Forbidden & Limited lists, tournaments with their
+   rounds, the list played and statistics. Pages: Decks, Built decks,
+   Formats, Tournaments, Stats.
+3. **Share a public copy**: every morning the NAS puts a read-only static
+   site (the cards, statistics, market values, the public decks and the
+   tournaments, the books; nothing private) on a web hosting.
+4. **Keep the books**: the novels at home, added by ISBN (looked up, or
+   scanned with a phone), with authors, series and their missing volumes,
+   and book advent calendars. Pages: `/books`.
 
 It runs on a NAS at home, for the home network only. Every morning the NAS
-backs the data up and puts a read-only **public copy** (the three
-collections with their market values, the tournaments and the deck
-versions played in them or chosen, nothing else) on a web hosting.
+backs the data up and writes the public copy.
 
 Written in Rust; it replaced the original Django app in October 2026 (still
 in the history, tag `django-final`).
@@ -43,21 +49,25 @@ Library, Google Books and the BnF's catalogue (ISBN lookups).
 Read in this order; each step assumes the ones before.
 
 1. **This README**: what the app is, how to start it on your computer.
-2. **[docs/tour.md](docs/tour.md)**: the architecture, an hour with the
-   code open. The crates, a page request, a form, the database, the domain
-   crates, the deck builder, then each collection and what they share.
-3. **[docs/recipes.md](docs/recipes.md)**: how to do the usual things.
-   Using the app (books, Pokémon cards, the advent calendar, from a phone)
-   and changing it (a page, a form, a migration, business logic, a deck
-   builder feature, a test).
-4. **[deploy/README.md](deploy/README.md)**: the NAS and the public copy.
+2. **[docs/guide.md](docs/guide.md)**: the user guide, by goal. The menus,
+   the pages and the usual tasks (a lot, a deck, a tournament, books, the
+   phone).
+3. **[docs/tour.md](docs/tour.md)**: the architecture, an hour with the
+   code open. The foundations (crates, a page request, a form, the
+   database), then each goal: the collection, competitive play, the public
+   copy, the books and Pokémon.
+4. **[docs/recipes.md](docs/recipes.md)**: how to change it (a page, a
+   form, a migration, business logic, a deck builder feature, a test) and
+   run it (backups, the NAS).
+5. **[deploy/README.md](deploy/README.md)**: the NAS and the public copy.
    SSH, first install, the nightly job, updates, backups to git, what to
    type when something goes wrong.
-5. **[CLAUDE.md](CLAUDE.md)**: the project's conventions in one dense page
-   (database rules, privacy rule for the shipment PDFs, who writes what),
-   written for Claude but a good checklist for anyone.
-6. **[TODO.md](TODO.md)** (what's next) and **[docs/specs/](docs/specs/)**
-   (designs not built yet).
+6. **[CLAUDE.md](CLAUDE.md)**: the project's conventions in one dense page
+   (goals, database rules, privacy rule for the shipment PDFs, who writes
+   what), written for Claude but a good checklist for anyone.
+7. **[TODO.md](TODO.md)** (what's next). Designs not built yet go in
+   `docs/specs/` (the folder is created when one is needed; today:
+   [browsing.md](docs/specs/browsing.md), [deck-lists.md](docs/specs/deck-lists.md)).
 
 ## Running it on your computer
 

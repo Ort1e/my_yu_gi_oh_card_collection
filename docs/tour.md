@@ -1,23 +1,38 @@
 # A tour of the code
 
-This is the reading guide for the Rust version of the app. It assumes you
-know the Django version (and the collection itself) well, and shows where
-everything went. For step-by-step changes, see [recipes.md](recipes.md).
+This is the reading guide for the code. What the app does, page by page, is
+in the [user guide](guide.md); for step-by-step changes, see
+[recipes.md](recipes.md).
 
-Suggested reading order, about an hour with the code open next to it:
+The app has four goals, and the tour follows them after the foundations:
 
-1. [The big picture](#the-big-picture) (this file)
-2. [Following a page request](#following-a-page-request): `crates/yugioh/src/routes/sellers/mod.rs`
-3. [Following a form](#following-a-form): `crates/yugioh/src/routes/sellers/form.rs`, then `lots/form/add.rs`
-4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `crates/common/src/db.rs`
-5. [The domain crates](#the-domain-crates): `crates/yugioh-domain/src/lib.rs` and one module, e.g. `ydke.rs`
-6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `crates/yugioh/src/routes/decks/api/`
-7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `crates/yugioh/src/store/card_data/`
-8. [Tests](#tests): `crates/*/src/tests/`
-9. [The books](#the-books): `crates/books/`, a second, smaller collection
-10. [The Pokémon cards](#the-pokémon-cards): `crates/pokemon/`, a third one, with prices
-11. [What the collections share](#what-the-collections-share): `crates/common/`, `crates/advent/`
-12. [Where it runs](#where-it-runs): the NAS, the public copy, `deploy/`
+1. **The foundations**: [the big picture](#the-big-picture),
+   [a page request](#following-a-page-request)
+   (`crates/yugioh/src/routes/sellers/mod.rs`),
+   [a form](#following-a-form) (`routes/sellers/form.rs`, then
+   `lots/form/add.rs`), [the database](#the-database)
+   (`migrations/0002_ygo_schema.sql`, `crates/common/src/db.rs`),
+   [the domain crates](#the-domain-crates) (`crates/yugioh-domain/src/lib.rs`
+   and one module, e.g. `ydke.rs`).
+2. **The card collection** (goal 1): [ygoprodeck](#talking-to-ygoprodeck)
+   (`crates/yugioh/src/store/card_data/`), [pictures](#a-printings-picture-yugipedia),
+   [the collection value](#the-collection-value),
+   [the advent calendar](#the-advent-calendar).
+3. **Competitive play** (goal 2), where the deck builder links the collection
+   (copies owned, proxies, locks) to the tournaments (what to buy, which list
+   was played): [the deck builder](#the-deck-builder)
+   (`frontend/src/App.svelte`, `crates/yugioh/src/routes/decks/api/`),
+   [built decks](#built-decks), [a deck's history](#a-decks-history),
+   [a version's page](#a-deck-versions-page), [formats](#formats),
+   [tournaments](#tournaments).
+4. **The public copy** (goal 3): [where it runs](#where-it-runs): the NAS, the
+   export, `deploy/`.
+5. **The books** (goal 4): [the books](#the-books) (`crates/books/`), and the
+   third collection, [the Pokémon cards](#the-pokémon-cards) (`crates/pokemon/`).
+6. **Across them**: [what the collections share](#what-the-collections-share)
+   (`crates/common/`, `crates/advent/`), [the login](#login),
+   [maintenance commands](#maintenance-commands), [tests](#tests)
+   (`crates/*/src/tests/`).
 
 ## The big picture
 
@@ -293,6 +308,185 @@ errors). That is the place to look when the Rust version behaves
 differently from what you remember. Unit tests sit at the bottom of each
 file (`#[cfg(test)] mod tests`).
 
+## Talking to ygoprodeck
+
+All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
+are in `crates/yugioh/src/store/card_data/` (the client in `mod.rs`, then
+`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
+second and blocks the IP for an hour above that: `YGOPRODECK.wait()` (a
+`common::http::Throttle`) keeps every call of the server 60 ms apart, and
+what can be remembered is.
+
+| What | Call | Remembered in |
+|---|---|---|
+| a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
+| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
+| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
+| a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
+| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
+| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
+
+Two rules: call ygoprodeck **before** opening a write transaction (the calls
+write through the pool), and only through these functions. Tests never call
+it: `TestApp` pre-inserts the card data they need (and translations, in
+`card_translation`). The shapes ygoprodeck answers are reshaped in pure
+functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
+rarity names), which are unit-tested on small synthetic JSON.
+
+## A printing's picture: Yugipedia
+
+ygoprodeck has one picture per artwork, in English: a French copy, an
+Extended Art or an alternate art shows the wrong one. Yugipedia has a
+picture of each printing, named after it
+(`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
+Extended Art). A copy can take one: `card.picture` (migration 0019), served
+by `/card-picture/:name` (one address per picture, so the public copy keeps
+it once for all the copies of a printing; downloaded once, kept as a JPEG in
+`media/card_pictures/`); without it, the copy shows ygoprodeck's picture
+(`store::models::picture_url`, used by the grid, the card page, the advent
+doors and the deck builder's `ApiCard.image`).
+
+| Piece | Where |
+|---|---|
+| reading a file name, the files of a copy's printing, the one to take without asking | `yugioh_domain::printing_picture` (`parse`, `candidates`, `automatic`) |
+| the card galleries (MediaWiki API, `Card Gallery:<name>`, 500 files a page), one request a second (`YUGIPEDIA` throttle), cached in `yugipedia_gallery` for 30 days | `yugioh/src/store/yugipedia.rs` |
+| the automatic pictures: copies with an automatic picture get their printing's when there is one artwork for it (`find_pictures`) | new cards at the end of their linking (`card_data/linking.rs`), a new code or rarity (`spawn_find_pictures`), the whole collection by hand (`find-pictures`, `commands/find_pictures.rs`: once for the cards added before, then now and then for the scans Yugipedia adds later) |
+| the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
+
+A new code, rarity or name puts an automatic picture back to ygoprodeck's
+and looks for the new printing's.
+
+The pictures come straight from Yugipedia's media server
+(`ms.yugipedia.com/<h>/<hh>/<name>`, `hh` from the md5 of the name: one
+request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
+Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
+and tried again. The automatic pass downloads a picture **before** giving
+it to a copy, so a page or the public copy never asks Yugipedia; and
+`/card-picture/:name` answers ygoprodeck's picture when its own can't be
+had. (The first deployment let the public copy download them, ~600 at
+once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
+never called by them.
+
+### Errata (`/decks/built`)
+
+A card's text can change after a format's cutoff (Edison…): a printing
+bought for a proxy then has the wrong text. Yugipedia's
+`Card Errata:<name>` page lists the versions of the text in its
+`== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
+first carried it); `yugioh_domain::errata` parses it, dates each version by
+its set (`ygo_set`, by code then by name; a reprint product's date wins) and
+tells which one was in force at the cutoff and when the next one came. A
+printing is right when it came out between the two. `store/yugipedia.rs`
+fetches and caches it (`yugipedia_errata`, 90 days: errata are rare) **in the background**
+(`spawn_errata`): the page shows what is cached, starts the lookups for the
+rest and says "reload in a minute". It warns on any text change, old and new
+text folded so the owner judges; the Cardmarket wants lists carry names
+only, the expansion is picked by hand. Owned copies coded in a set printed
+outside the window count as missing too ("wrong text"); a copy whose set has
+no date isn't judged. The cutoff is the version's format's, else its ban list's date
+(`store/errata.rs`, shared with the deck builder: the version panel lists the
+same cards from `GET /api/deck-versions/:id/check`); a version with neither has
+none: no warning.
+
+## The collection value
+
+`/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
+and a "Market" line on card pages. Two price sources, both refreshed weekly
+by `refresh-prices`:
+
+- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
+  `yugioh_domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
+  MB) downloaded into memory, a price **per printing**. Only what the
+  collection needs is kept (migration 0009): the products named like our
+  card data, each set code's expansion, the price history of the linked
+  products. The files are never saved. They have no set code and no rarity,
+  so each copy is linked to its product by a guess: the set code's
+  expansion is the one holding most of the set's card names (ygoprodeck),
+  twins (OCG version, reprint) told apart by the date they were added; then
+  the product with the card's name there, by rarity rank against price rank
+  when there are several. About 80% of the copies get one; the rest, or a
+  wrong guess, are set on the card's edit page ("Cardmarket product",
+  `card.cardmarket_product_manual = 1`, kept by the refreshes). Its price
+  (the trend, else the 30-day average) covers every language and edition.
+- **ygoprodeck** (`card_price`): one price per card name, the cheapest
+  printing's, an estimate usually too low for old or high rarity copies.
+  Used for the copies without a product. The `card_prices` copy inside
+  `card_data.json_data` is never used: it dates from when the card was
+  linked.
+
+Cardmarket's API takes no new users and scraping its site is against its
+terms; the price guide files are its open download.
+
+`yugioh_domain::valuation` does the sums:
+- a copy's price: its product's (`Prices::of`), else its card name's;
+- a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
+  × language (non-English 0.9), totals rounded to the cent;
+- a copy counts on date D when its purchase lot (not cancelled) is dated on
+  or before D and it has no sale lot by D; proxies never count;
+- the **gain/loss uses the lot prices** (`lot.price`, shipping included,
+  less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
+  migration 0016; the budget counts the same cost in the lot's month):
+  value of the copies owned + sale lots − purchase lots, up to D. Unite
+  prices can't do it: many lots were bought as a whole, without a price per
+  card;
+- beside it, the copies that do have a unite price are compared card by
+  card (value against that price, no shipping share);
+- each purchase lot against its **full price** (`lot_gain`): the value of
+  its cards still owned, plus what its sold cards brought (their price in
+  the sale lot), minus `lot.price` (non-card items included); the lots
+  without cards (sleeves, boxes) are left out;
+- price moves: since the previous refresh and over 3 months, cards owned
+  now, moves under 0.50 € left out (one line per price, the same source on
+  both dates).
+
+The lists show estimates too: each card on `/cards` (its picture tile, and
+the table view) and on a lot's page
+(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
+the card's latest price, its product's else its name's), and each purchase
+lot the value of its cards still owned (`fill_lot_estimates`).
+
+The page loads every row (`store::valuation::owned_copies`, `lots`,
+`prices_by_date`) and computes in Rust: money is never summed in SQL. The
+chart is `static/js/collection_value.js`; the card page's price line is an
+SVG drawn by the server (`cards::sparkline`).
+
+## The advent calendar
+
+`/advent-calendar/:year` (`static/js/advent_calendar.js`,
+`static/css/advent.css`): 24 doors that open on the photo and the card of
+the day. The tables `advent_calendar` (one per year) and
+`advent_calendar_entry` (day, card, photo) come from Django, which had no
+page for them. The photos are in `media/advent_calendar_photos/<year>/`
+(upright, 1600 px, metadata stripped; the full-size originals in
+`originals/`). They show handwritten notes, so the pages and the photos are
+behind the login.
+
+The card and book calendars are one engine, the `advent` crate:
+
+| Piece | Where |
+|---|---|
+| what a collection's calendars are: tables, texts, what is behind a door, how a day field finds it | the `advent::Calendar` trait (`crates/advent/src/lib.rs`) and its `Spec` |
+| the list and a calendar's page | `advent/src/pages.rs`, `advent/templates/advent/{list,calendar}.html` |
+| create a calendar, fill a day (multipart), turn a photo, empty a day | `advent/src/form.rs` (+ `day_form.rs`), `templates/advent/{add,edit}.html` |
+| the photo files: written, turned, deleted | `advent/src/calendar_photos.rs` (resizing: `common::photos`) |
+| the cards: a card by code or `#id`, the door's picture and text, the calendar's lot | `yugioh/src/routes/advent/mod.rs` (`Cards`), `yugioh/templates/advent/{door,lot}.html` |
+| the books: a book by ISBN (looked up and added) or `#id` | `books/src/routes/advent/mod.rs` (`Books`), `books/templates/books/advent/door.html` |
+
+`advent::routes::<Cards>()` gives the routes under the calendar's base
+(`/advent-calendar`, `/books/advent-calendar`), its pages private and its
+photo folder too; each collection merges them into its own `Routes`. A day
+is filled on the edit page with an item (`#id`, a code, an ISBN) and a
+photo; `common::photos` makes the copy shown on the page (upright from the
+EXIF orientation, 1600 px, re-encoded without metadata) and the original is
+kept in `originals/`; ↺ ↻ turn a photo that came out sideways. Each save
+writes new file names, so browsers never show an old photo, and deletes the
+previous files.
+
+A card calendar can have its own lot (`advent_calendar.lot_id`, migration
+0006, "Create its lot" on the edit page, `POST /advent-calendar/:year/lot`,
+in the yugioh crate): its cards are added on the usual lot page, then
+suggested in the day fields; the lot page links back to the calendar.
+
 ## The deck builder
 
 A Svelte 4 app in TypeScript in `frontend/`, built by Vite into `static/deck-builder/`
@@ -307,22 +501,35 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, History tab, settings (`VersionPanel`), simulation, tournament, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `tournament.rs`, `ydke_import.rs` |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
 
-The builder does **all the editing**, in five tabs kept in `location.hash`
-(`#build`, `#missing`, `#draw`, `#history`, `#settings`; `/deck-builder/:id#missing`
-works). Build: the zones, the format banner, "+ Missing card" (a proxy by
-name), the collection search and the selected card. Missing: the proxies
-with a Cardmarket link and trend price, the errata warnings, "Use my copy",
-the version's Cardmarket wants list (`Check.wants`, from
-`built::version_wants_list`). Test draw: the Monte Carlo, run on the zones
-as they are now (`main` in the request; without it, the saved deck).
-History: the deck's saved lists (`…/history`), what changed from one to the
-zones on the screen (`…/compare`, the diff done in Rust), and "Name this
-save" (`PATCH` `snapshot_name`). Settings: name, ban list or format, built, deck box, sleeves, public
-(`PATCH` `is_public`), tournament, delete. The Export / Play menu copies a
-YDKE, downloads a `.ydk` (`deck.ts` `ydkFile`) and links to DuelingBook and
-YGOPRODeck; a `.ydk` can also be imported (`ydkToYdke`).
+The builder does **all the editing**, and it is where the collection meets
+competitive play: it reads the collection (copies owned, proxies, built decks
+that lock cards) and plans the next tournament (the format, what to buy, the
+list played). Five tabs kept in `location.hash` (`#build`, `#to-buy`,
+`#draw`, `#history`, `#settings`; `#missing` still opens To buy, so old links
+work):
+
+- **Build**: the zones, the format banner, "+ Missing card" (a proxy by
+  name), the collection search and the selected card.
+- **To buy** (was Missing): the proxies with a Cardmarket link and trend
+  price, the cost, the errata warnings, "Use my copy", the version's
+  Cardmarket wants list (`Check.wants`, from `built::version_wants_list`).
+- **Test draw**: the Monte Carlo, run on the zones as they are now (`main` in
+  the request; without it, the saved deck).
+- **History**: the deck's saved lists (`…/history`), what changed from one to
+  the zones on the screen (`…/compare`, the diff done in Rust), and "Name this
+  save" (`PATCH` `snapshot_name`).
+- **Settings**, three blocks: *Rules* (ban list or format), *Physical deck*
+  (built, deck box, sleeves), *Sharing* (public, `PATCH` `is_public`).
+
+The header holds the rest: the owned/missing counts and this month's budget
+left (`budget_left` in the version's GET, from `yugioh_domain::budget`), a
+"Played at …" link when a list of the deck was played in a tournament, and
+the ⋯ menu: Rename, Export / Play (copy a YDKE, download a `.ydk`
+(`deck.ts` `ydkFile`), links to DuelingBook and YGOPRODeck; a `.ydk` can also
+be imported, `ydkToYdke`), "+ Tournament with this version"
+(`/tournaments/add?version=`) and Delete. Each action lives in one place only.
 
 Moving cards between zones and changing the format only change the app's
 local state until the sticky **Save** (or Discard) in the header
@@ -504,42 +711,36 @@ group the lists by the version they were taken from.
   and the old `notes`. The list played is public with it; the version it
   was taken from shows the tournament and links to that list.
 
-## The advent calendar
+## Where it runs
 
-`/advent-calendar/:year` (`static/js/advent_calendar.js`,
-`static/css/advent.css`): 24 doors that open on the photo and the card of
-the day. The tables `advent_calendar` (one per year) and
-`advent_calendar_entry` (day, card, photo) come from Django, which had no
-page for them. The photos are in `media/advent_calendar_photos/<year>/`
-(upright, 1600 px, metadata stripped; the full-size originals in
-`originals/`). They show handwritten notes, so the pages and the photos are
-behind the login.
+```
+ computers, phones (home Wi-Fi)                  anyone
+        │ http://192.168.1.202:3000              │ https://<domain>/collection/
+        ▼                                        ▼
+ ┌──────────────── NAS ─────────────────┐   OVH free hosting
+ │ /apps/collection       the app        │   (static files only:
+ │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
+ │ /Data500/…-backups     nightly copies  │    small pictures, ~20 MB)
+ │ nightly: backup, export + upload,     │
+ │          update of the app            │
+ └───────────────────────────────────────┘
+        ▲ the computer: pulls the latest copy into the data submodule
+          (deploy/pc/pull-backup.sh)
+```
 
-The card and book calendars are one engine, the `advent` crate:
-
-| Piece | Where |
-|---|---|
-| what a collection's calendars are: tables, texts, what is behind a door, how a day field finds it | the `advent::Calendar` trait (`crates/advent/src/lib.rs`) and its `Spec` |
-| the list and a calendar's page | `advent/src/pages.rs`, `advent/templates/advent/{list,calendar}.html` |
-| create a calendar, fill a day (multipart), turn a photo, empty a day | `advent/src/form.rs` (+ `day_form.rs`), `templates/advent/{add,edit}.html` |
-| the photo files: written, turned, deleted | `advent/src/calendar_photos.rs` (resizing: `common::photos`) |
-| the cards: a card by code or `#id`, the door's picture and text, the calendar's lot | `yugioh/src/routes/advent/mod.rs` (`Cards`), `yugioh/templates/advent/{door,lot}.html` |
-| the books: a book by ISBN (looked up and added) or `#id` | `books/src/routes/advent/mod.rs` (`Books`), `books/templates/books/advent/door.html` |
-
-`advent::routes::<Cards>()` gives the routes under the calendar's base
-(`/advent-calendar`, `/books/advent-calendar`), its pages private and its
-photo folder too; each collection merges them into its own `Routes`. A day
-is filled on the edit page with an item (`#id`, a code, an ISBN) and a
-photo; `common::photos` makes the copy shown on the page (upright from the
-EXIF orientation, 1600 px, re-encoded without metadata) and the original is
-kept in `originals/`; ↺ ↻ turn a photo that came out sideways. Each save
-writes new file names, so browsers never show an old photo, and deletes the
-previous files.
-
-A card calendar can have its own lot (`advent_calendar.lot_id`, migration
-0006, "Create its lot" on the edit page, `POST /advent-calendar/:year/lot`,
-in the yugioh crate): its cards are added on the usual lot page, then
-suggested in the day fields; the lot page links back to the calendar.
+- **The app** runs on the NAS (a ReadyNAS on Debian 8) as a systemd
+  service, for the home network only, every page behind the login
+  (`PUBLIC_READS=0`).
+- **Its build** comes from the CI: the job `nas-build` makes one static
+  binary (musl, for any x86-64 processor) with the deck builder and the
+  stylesheets, on pull requests into `main` and pushes to it;
+  `nas-release` publishes it as the release `nas-latest` once every check
+  is green. The NAS downloads it every morning (`fetch-release`), backs up,
+  replaces and restarts, and goes back to the previous version if the new
+  one doesn't answer.
+- **The public copy** (`export-public`) is uploaded over SFTP to the OVH
+  hosting, changed files only.
+- The scripts and the step-by-step guide: [deploy/README.md](../deploy/README.md).
 
 ## The books
 
@@ -714,6 +915,25 @@ has the same per row (`static/js/pokemon_booster.js`). The guide
 (`/pokemon/rarities`) is data in `static/js/pokemon_rarities.js`, like the
 Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 
+## What the collections share
+
+Besides the plumbing (`common::web`, `common::db`), these were written once
+for every collection:
+
+| What | Where | Used by |
+|---|---|---|
+| the picture grid of cards: `CardTile` (the whole picture in its collection's proportions, `CardShape`; the name on two lines, the other name, the print, the details; at the bottom the condition badge, tags and value; faded when sold), every tile of a page the same size with its lines in the same places; and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
+| the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
+| the advent calendars | the `advent` crate | cards, books |
+| the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
+| one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
+| "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
+| a picture downloaded once into `media/`, and the ones no card uses deleted (`clean-pictures`, daily) | `common::media::fetch_once`, `picture`, `remove_unused` | `/card-image/:id`, `/pokemon/card-image/…` |
+| a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
+| background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
+| card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
+| photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
+
 ## Login
 
 `common::web::auth`: with a password set, every collection's `write` and
@@ -847,198 +1067,6 @@ You rarely need `clean-cards` by hand: the server runs it in the background
 summary line in the log), and the actions that make a cleanup necessary do
 their part themselves (saving deck zones deletes unused proxies, saving new
 cards links, translates and swaps proxies).
-
-## Talking to ygoprodeck
-
-All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
-are in `crates/yugioh/src/store/card_data/` (the client in `mod.rs`, then
-`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
-second and blocks the IP for an hour above that: `YGOPRODECK.wait()` (a
-`common::http::Throttle`) keeps every call of the server 60 ms apart, and
-what can be remembered is.
-
-| What | Call | Remembered in |
-|---|---|---|
-| a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
-| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
-| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
-| a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
-| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
-| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
-
-Two rules: call ygoprodeck **before** opening a write transaction (the calls
-write through the pool), and only through these functions. Tests never call
-it: `TestApp` pre-inserts the card data they need (and translations, in
-`card_translation`). The shapes ygoprodeck answers are reshaped in pure
-functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
-rarity names), which are unit-tested on small synthetic JSON.
-
-## A printing's picture: Yugipedia
-
-ygoprodeck has one picture per artwork, in English: a French copy, an
-Extended Art or an alternate art shows the wrong one. Yugipedia has a
-picture of each printing, named after it
-(`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
-Extended Art). A copy can take one: `card.picture` (migration 0019), served
-by `/card-picture/:name` (one address per picture, so the public copy keeps
-it once for all the copies of a printing; downloaded once, kept as a JPEG in
-`media/card_pictures/`); without it, the copy shows ygoprodeck's picture
-(`store::models::picture_url`, used by the grid, the card page, the advent
-doors and the deck builder's `ApiCard.image`).
-
-| Piece | Where |
-|---|---|
-| reading a file name, the files of a copy's printing, the one to take without asking | `yugioh_domain::printing_picture` (`parse`, `candidates`, `automatic`) |
-| the card galleries (MediaWiki API, `Card Gallery:<name>`, 500 files a page), one request a second (`YUGIPEDIA` throttle), cached in `yugipedia_gallery` for 30 days | `yugioh/src/store/yugipedia.rs` |
-| the automatic pictures: copies with an automatic picture get their printing's when there is one artwork for it (`find_pictures`) | new cards at the end of their linking (`card_data/linking.rs`), a new code or rarity (`spawn_find_pictures`), the whole collection by hand (`find-pictures`, `commands/find_pictures.rs`: once for the cards added before, then now and then for the scans Yugipedia adds later) |
-| the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
-
-A new code, rarity or name puts an automatic picture back to ygoprodeck's
-and looks for the new printing's.
-
-The pictures come straight from Yugipedia's media server
-(`ms.yugipedia.com/<h>/<hh>/<name>`, `hh` from the md5 of the name: one
-request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
-Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
-and tried again. The automatic pass downloads a picture **before** giving
-it to a copy, so a page or the public copy never asks Yugipedia; and
-`/card-picture/:name` answers ygoprodeck's picture when its own can't be
-had. (The first deployment let the public copy download them, ~600 at
-once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
-never called by them.
-
-### Errata (`/decks/built`)
-
-A card's text can change after a format's cutoff (Edison…): a printing
-bought for a proxy then has the wrong text. Yugipedia's
-`Card Errata:<name>` page lists the versions of the text in its
-`== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
-first carried it); `yugioh_domain::errata` parses it, dates each version by
-its set (`ygo_set`, by code then by name; a reprint product's date wins) and
-tells which one was in force at the cutoff and when the next one came. A
-printing is right when it came out between the two. `store/yugipedia.rs`
-fetches and caches it (`yugipedia_errata`, 90 days: errata are rare) **in the background**
-(`spawn_errata`): the page shows what is cached, starts the lookups for the
-rest and says "reload in a minute". It warns on any text change, old and new
-text folded so the owner judges; the Cardmarket wants lists carry names
-only, the expansion is picked by hand. Owned copies coded in a set printed
-outside the window count as missing too ("wrong text"); a copy whose set has
-no date isn't judged. The cutoff is the version's format's, else its ban list's date
-(`store/errata.rs`, shared with the deck builder: the version panel lists the
-same cards from `GET /api/deck-versions/:id/check`); a version with neither has
-none: no warning.
-
-## The collection value
-
-`/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
-and a "Market" line on card pages. Two price sources, both refreshed weekly
-by `refresh-prices`:
-
-- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
-  `yugioh_domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
-  MB) downloaded into memory, a price **per printing**. Only what the
-  collection needs is kept (migration 0009): the products named like our
-  card data, each set code's expansion, the price history of the linked
-  products. The files are never saved. They have no set code and no rarity,
-  so each copy is linked to its product by a guess: the set code's
-  expansion is the one holding most of the set's card names (ygoprodeck),
-  twins (OCG version, reprint) told apart by the date they were added; then
-  the product with the card's name there, by rarity rank against price rank
-  when there are several. About 80% of the copies get one; the rest, or a
-  wrong guess, are set on the card's edit page ("Cardmarket product",
-  `card.cardmarket_product_manual = 1`, kept by the refreshes). Its price
-  (the trend, else the 30-day average) covers every language and edition.
-- **ygoprodeck** (`card_price`): one price per card name, the cheapest
-  printing's, an estimate usually too low for old or high rarity copies.
-  Used for the copies without a product. The `card_prices` copy inside
-  `card_data.json_data` is never used: it dates from when the card was
-  linked.
-
-Cardmarket's API takes no new users and scraping its site is against its
-terms; the price guide files are its open download.
-
-`yugioh_domain::valuation` does the sums:
-- a copy's price: its product's (`Prices::of`), else its card name's;
-- a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
-  × language (non-English 0.9), totals rounded to the cent;
-- a copy counts on date D when its purchase lot (not cancelled) is dated on
-  or before D and it has no sale lot by D; proxies never count;
-- the **gain/loss uses the lot prices** (`lot.price`, shipping included,
-  less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
-  migration 0016; the budget counts the same cost in the lot's month):
-  value of the copies owned + sale lots − purchase lots, up to D. Unite
-  prices can't do it: many lots were bought as a whole, without a price per
-  card;
-- beside it, the copies that do have a unite price are compared card by
-  card (value against that price, no shipping share);
-- each purchase lot against its **full price** (`lot_gain`): the value of
-  its cards still owned, plus what its sold cards brought (their price in
-  the sale lot), minus `lot.price` (non-card items included); the lots
-  without cards (sleeves, boxes) are left out;
-- price moves: since the previous refresh and over 3 months, cards owned
-  now, moves under 0.50 € left out (one line per price, the same source on
-  both dates).
-
-The lists show estimates too: each card on `/cards` (its picture tile, and
-the table view) and on a lot's page
-(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
-the card's latest price, its product's else its name's), and each purchase
-lot the value of its cards still owned (`fill_lot_estimates`).
-
-The page loads every row (`store::valuation::owned_copies`, `lots`,
-`prices_by_date`) and computes in Rust: money is never summed in SQL. The
-chart is `static/js/collection_value.js`; the card page's price line is an
-SVG drawn by the server (`cards::sparkline`).
-
-## What the collections share
-
-Besides the plumbing (`common::web`, `common::db`), these were written once
-for every collection:
-
-| What | Where | Used by |
-|---|---|---|
-| the picture grid of cards: `CardTile` (the whole picture in its collection's proportions, `CardShape`; the name on two lines, the other name, the print, the details; at the bottom the condition badge, tags and value; faded when sold), every tile of a page the same size with its lines in the same places; and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
-| the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
-| the advent calendars | the `advent` crate | cards, books |
-| the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
-| one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
-| "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
-| a picture downloaded once into `media/`, and the ones no card uses deleted (`clean-pictures`, daily) | `common::media::fetch_once`, `picture`, `remove_unused` | `/card-image/:id`, `/pokemon/card-image/…` |
-| a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
-| background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
-| card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
-| photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
-
-## Where it runs
-
-```
- computers, phones (home Wi-Fi)                  anyone
-        │ http://192.168.1.202:3000              │ https://<domain>/collection/
-        ▼                                        ▼
- ┌──────────────── NAS ─────────────────┐   OVH free hosting
- │ /apps/collection       the app        │   (static files only:
- │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
- │ /Data500/…-backups     nightly copies  │    small pictures, ~20 MB)
- │ nightly: backup, export + upload,     │
- │          update of the app            │
- └───────────────────────────────────────┘
-        ▲ the computer: pulls the latest copy into the data submodule
-          (deploy/pc/pull-backup.sh)
-```
-
-- **The app** runs on the NAS (a ReadyNAS on Debian 8) as a systemd
-  service, for the home network only, every page behind the login
-  (`PUBLIC_READS=0`).
-- **Its build** comes from the CI: the job `nas-build` makes one static
-  binary (musl, for any x86-64 processor) with the deck builder and the
-  stylesheets, on pull requests into `main` and pushes to it;
-  `nas-release` publishes it as the release `nas-latest` once every check
-  is green. The NAS downloads it every morning (`fetch-release`), backs up,
-  replaces and restarts, and goes back to the previous version if the new
-  one doesn't answer.
-- **The public copy** (`export-public`) is uploaded over SFTP to the OVH
-  hosting, changed files only.
-- The scripts and the step-by-step guide: [deploy/README.md](../deploy/README.md).
 
 ## Tests
 

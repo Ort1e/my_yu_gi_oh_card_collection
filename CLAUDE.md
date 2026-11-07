@@ -6,6 +6,18 @@ Plus a separate **book collection** (the owner's wife's novels: ISBN lookup and 
 authors, series, book advent calendars) under `/books`, and a **Pokémon card collection** (mostly
 booster pulls, French/English/Japanese, wishlist, Cardmarket prices from TCGdex) under `/pokemon`.
 
+## Goals — read first
+
+What the app is for, in priority order (details and the usual tasks per goal: `docs/guide.md`):
+1. **Manage the card collection** (main): cards, lots, sellers, budget, value, statistics, advent calendars, Pokémon. Menus **Collection** and **Pokémon**.
+2. **Competitive play**: decks, the deck builder, built decks, formats, tournaments and their stats. Menus **Decks** (the bridge: the builder uses the collection and plans what to buy) and **Tournaments**.
+3. **A public copy** to share: read-only static pages, no private data. Not a menu: a build (`export-public`).
+4. **The books** (the owner's wife's novels). Menu **Books**.
+
+### Where a feature goes (UI)
+- **One function per page**, one place per action (a button, a panel, a wants list exists once; link to it from elsewhere, don't repeat it). Reading pages and data-entry forms are separate pages.
+- Before adding a page or a panel, read `docs/guide.md` (and `docs/specs/browsing.md`, the list of overlaps still to fix): put it under the goal's menu entry, and update the guide and `docs/tour.md` in the same commit.
+
 ## History — read first
 
 - `main` is the **Rust app** (the one in use), deployed on the owner's NAS (`deploy/README.md`). Its live data is on the NAS (`/Data1To/collection/app.db`); `data/app.db` (data submodule) is a copy brought by `deploy/pc/pull-backup.sh`.
@@ -13,7 +25,7 @@ booster pulls, French/English/Japanese, wishlist, Cardmarket prices from TCGdex)
   `django-final`: `git show django-final:my_ygo_cards/models/deck.py`,
   `git ls-tree -r --name-only django-final`, or `git archive django-final my_ygo_cards | tar -x -C <scratch dir>`.
   Its `deck_builder_frontend/` is an abandoned React stub.
-- Human-oriented docs: `docs/tour.md` (architecture), `docs/recipes.md` (how to change things). Keep them in sync.
+- Human-oriented docs: `docs/guide.md` (what the app does, by goal), `docs/tour.md` (architecture), `docs/recipes.md` (how to change things). Keep them in sync.
 - `docs/specs/`: specs of work **not done yet** (handed to the owner or to Claude). Delete a spec once it's implemented, after moving what's still useful into the code's doc comments or the docs (git history keeps it).
 
 ## Division of work — read first
@@ -106,7 +118,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (use
 - Pokémon (every route starts with `/pokemon`; templates override `{% block nav %}` with `partials/pokemon_nav.html` and set `{% block body_class %}pokemon`): `/pokemon` (pictures or `?view=table`, filters, value), `/pokemon/:id`, `/pokemon/add` (one card: the card finder `partials/pokemon_finder.html` + `static/js/pokemon_finder.js`), `/pokemon/add/booster[?opening=]` (numbers → `step=preview` → `step=save`: a new opening, or more cards to one), `/pokemon/openings[/:id[/edit]]`, `/pokemon/:id/edit` (also "sold"; **no delete**), `/pokemon/wishlist[/add|/:id/edit]`, `POST /pokemon/wishlist/:id/{delete,got}`, `/pokemon/rarities` (guide: `static/js/pokemon_rarities.js`), `GET /pokemon/api/{search,card}` (login, 401 JSON), `/pokemon/card-image/:card_id/:lang`. Reads public.
 - Card lists: one picture grid for both card collections (`common::web::tiles::CardTile`, `partials/card_grid.html`, `static/css/tiles.css`), a table with `?view=table` (`View`). Rarity guides: data per collection (`static/js/rarities.js`, `pokemon_rarities.js`), one renderer (`static/js/rarity_guide.js`, `data-guide`).
 - Tables of data: one convention for all (`static/css/style.css`, "Data tables": `table.numbers` in `.table-scroll`, unit in the heading, `.text` columns, `sortable` + `static/js/tables.js` for sorting and search). The lot page groups the same copies on one row (`routes/lots/mod.rs`, `CopyGroup`).
-- Phones: every page is responsive (`@media (max-width: 760px)` at the end of each stylesheet; header not fixed there). The deck builder is desktop-only. Phone access: docs/recipes.md, "Use the app from a phone".
+- Phones: every page is responsive (`@media (max-width: 760px)` at the end of each stylesheet; header not fixed there). The deck builder is desktop-only. Phone access: docs/guide.md, "From a phone".
 - Edition: `/{cards,sellers,lots,decks}/:id/edit` (GET form, POST save); `POST /decks/:id/delete` (versions cascade, orphan proxies removed), `POST /decks/:id/versions` (new version, `start` = `empty` / `copy:<version id>` / `ydke` → deck builder). `/deck-versions/:id` is the read-only view; `/decks/:id` is the hub (versions table); the builder (`/deck-builder/:id`, tabs Build / Missing / Test draw / Settings in `location.hash`) does all the editing.
 - **Cards, unites, lots and sellers are never deleted** (they are the collection's history): no delete routes for them. Deck versions are edited/deleted only in the deck builder.
 - `/card-image/:card_data_id` serves `media/card_images/<name>.jpg`, downloading it once from the URL in `card_data.json_data` if missing. `/card-picture/:name` serves a printing's picture (one address per picture, shared by its copies: once in the public copy) (`card.picture`, Yugipedia) from `media/card_pictures/` (JPEG, downloaded once, by `find_pictures` before it sets one; ygoprodeck's picture when it can't be had; downloads one every 2 s, 429 waited for: never let a page or the export start hundreds); `/cards/:id/pictures/:n` (login) the edit page's choices, `/cards/:id/edit?pictures=1` asks Yugipedia for the gallery. Pictures go through `store::models::picture_url`. `/static`, `/media` are plain file servers, except `/media/shipment_files`, `/media/advent_calendar_photos` and `/media/book_advent_calendar_photos` (login required: each crate's `Routes::private_media`, served by `common::app`).
