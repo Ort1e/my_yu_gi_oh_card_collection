@@ -6,9 +6,9 @@
 <ul class="nav-links" id="nav-links">
   <li><a href="/cards">Cards</a></li>
   <li><a href="/collection/stats">Statistics</a></li>
+  <li><a href="/rarities">Rarities</a></li>
   <li><a href="/decks">Decks</a></li>
   <li><a href="/tournaments">Tournaments</a></li>
-  <li><a href="/rarities">Rarities</a></li>
   <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
   <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
 </ul>
@@ -16,6 +16,7 @@
 <div class="logo">
   <a href="/">My Yu-Gi-Oh! Cards</a>
 </div>
+{# Menus by goal: the collection, then competitive play (Decks is the bridge between the two). #}
 <ul class="nav-links" id="nav-links">
   <li class="nav-group">
     <details>
@@ -24,8 +25,10 @@
         <li><a href="/cards?proxy=false&sold=false">Cards</a></li>
         <li><a href="/lots">Lots</a></li>
         <li><a href="/sellers">Sellers</a></li>
+        <li><a href="/budget">Budget</a></li>
         <li><a href="/collection/value">Value</a></li>
         <li><a href="/collection/stats">Statistics</a></li>
+        <li><a href="/advent-calendar">Advent</a></li>
         <li><a href="/rarities">Rarities</a></li>
       </ul>
     </details>
@@ -36,13 +39,18 @@
       <ul class="nav-submenu">
         <li><a href="/decks">Decks</a></li>
         <li><a href="/decks/built">Built decks</a></li>
-        <li><a href="/formats">Formats</a></li>
-        <li><a href="/tournaments">Tournaments</a></li>
       </ul>
     </details>
   </li>
-  <li><a href="/budget">Budget</a></li>
-  <li><a href="/advent-calendar">Advent</a></li>
+  <li class="nav-group">
+    <details>
+      <summary>Tournaments</summary>
+      <ul class="nav-submenu">
+        <li><a href="/tournaments">Tournaments</a></li>
+        <li><a href="/formats">Formats</a></li>
+      </ul>
+    </details>
+  </li>
   <li><a href="/pokemon" class="section-switch" title="The Pokémon card collection">Pokémon</a></li>
   <li><a href="/books" class="section-switch" title="The book collection">Books</a></li>
   <li><a href="/login">Account</a></li>
