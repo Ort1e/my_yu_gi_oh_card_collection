@@ -81,6 +81,8 @@ pub fn router() -> Router<AppState> {
             "/api/deck-versions/:id/monte-carlo",
             post(decks::api::monte_carlo),
         )
+        .route("/api/deck-versions/:id/history", get(decks::api::history))
+        .route("/api/deck-versions/:id/compare", post(decks::api::compare))
 }
 
 /// Routes that serve files rather than pages (kept out of the request log:

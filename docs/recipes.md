@@ -495,6 +495,25 @@ script that uses what another one defines (like `findRarity` from
    update): **New version** on its page, then edit the copy. The decks
    keep the version they play until you switch them.
 
+## Keep a deck's lists (history)
+
+Every **Save** in the deck builder keeps the list in the deck's history
+(several saves within 30 minutes count as one); nothing to do by hand.
+
+1. **Before an event, or a list worth keeping**: builder → **History** tab →
+   **Name this save** (save the deck first). Named lists are never replaced.
+2. **A tournament**: choose the version in the tournament form; its list is
+   saved with the tournament, so editing the deck afterwards doesn't change
+   what was played. Editing the tournament keeps that list unless you
+   choose a version again.
+3. **What changed**: the History tab compares a saved list with the zones on
+   the screen (saved or not); a list's page (`/deck-snapshots/:id`, from the
+   deck page's History) compares it with the previous one, another list, or
+   a version now.
+4. **Go back to an old list**: its page → **New version from this list**
+   (your free copies, proxies for the rest). Old versions you no longer
+   play can be deleted: their lists stay in the history.
+
 ## Fix a card's picture
 
 A card showing the wrong art (an Extended Art, a French card shown in

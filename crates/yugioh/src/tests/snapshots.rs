@@ -260,3 +260,48 @@ async fn a_saved_list_becomes_a_version_again() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn the_builder_compares_the_screen_with_a_saved_list() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    let uri = format!("/api/deck-versions/{version}");
+    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+
+    let (status, list) = t.json("GET", &format!("{uri}/history"), json!(null)).await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["version_name"], "v1");
+    assert_eq!(list[0]["main"], 1);
+    let id = list[0]["id"].as_i64().unwrap();
+
+    // unsaved: one more copy, the proxy in the side deck
+    let (status, changes) = t
+        .json(
+            "POST",
+            &format!("{uri}/compare"),
+            json!({ "snapshot_id": id, "main": [cards[0], cards[1]], "extra": [], "side": [cards[2]] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{changes}");
+    assert_eq!(
+        changes,
+        json!([
+            { "zone": "main", "name": "Magicien Sombre", "before": 1, "after": 2 },
+            { "zone": "side", "name": "Kuriboh", "before": 0, "after": 1 },
+        ])
+    );
+
+    // another deck's list: not found
+    t.post("/decks/add", &[("name", "Other"), ("version_name", "v1")])
+        .await;
+    let other = t.scalar("SELECT max(id) FROM deck_version").await;
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{other}/compare"),
+            json!({ "snapshot_id": id, "main": [], "extra": [], "side": [] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

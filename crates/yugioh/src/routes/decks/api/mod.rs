@@ -15,6 +15,7 @@
 //! One file per group of routes; the card JSON shared by all of them is here.
 
 mod categories;
+mod history;
 mod proxies;
 mod reserve;
 mod simulation;
@@ -36,6 +37,7 @@ use crate::web::error::AppResult;
 use ts_rs::TS;
 
 pub use categories::{add_category, assign_category, card_categories, categories, delete_category};
+pub use history::{compare, history};
 pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
 pub(crate) use simulation::inputs as simulation_inputs;

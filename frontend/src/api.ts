@@ -3,12 +3,14 @@
 // (api-types/): `satisfies` ties each body to its input type.
 
 import type { ApiCard } from './api-types/ApiCard';
+import type { ApiChange } from './api-types/ApiChange';
 import type { ApiCategory } from './api-types/ApiCategory';
 import type { ApiCondition } from './api-types/ApiCondition';
 import type { AssignInput } from './api-types/AssignInput';
 import type { CardCategory } from './api-types/CardCategory';
 import type { CategoryInput } from './api-types/CategoryInput';
 import type { Check } from './api-types/Check';
+import type { CompareInput } from './api-types/CompareInput';
 import type { Created } from './api-types/Created';
 import type { DeckVersion } from './api-types/DeckVersion';
 import type { Deleted } from './api-types/Deleted';
@@ -18,6 +20,7 @@ import type { ReplacedProxy } from './api-types/ReplacedProxy';
 import type { ReserveQuery } from './api-types/ReserveQuery';
 import type { SimulationInput } from './api-types/SimulationInput';
 import type { SimulationResult } from './api-types/SimulationResult';
+import type { Snapshot } from './api-types/Snapshot';
 import type { VersionUpdate } from './api-types/VersionUpdate';
 import type { YdkeInput } from './api-types/YdkeInput';
 import type { Zone } from './api-types/Zone';
@@ -81,6 +84,16 @@ export function deckApi(id: number) {
                 simulations,
                 main,
             } satisfies SimulationInput),
+        /** The deck's saved lists, newest first. */
+        history: () => request<Snapshot[]>('GET', `${base}/history`),
+        /** What changed from saved list `snapshotId` to these zones (card ids, saved or not). */
+        compare: (snapshotId: number, main: number[], extra: number[], side: number[]) =>
+            request<ApiChange[]>('POST', `${base}/compare`, {
+                snapshot_id: snapshotId,
+                main,
+                extra,
+                side,
+            } satisfies CompareInput),
     };
 }
 

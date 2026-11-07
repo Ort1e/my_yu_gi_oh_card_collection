@@ -14,6 +14,7 @@
     import Dialog from './lib/Dialog.svelte';
     import FormatBanner from './lib/FormatBanner.svelte';
     import Header from './lib/Header.svelte';
+    import History from './lib/History.svelte';
     import Missing from './lib/Missing.svelte';
     import ReserveSearch from './lib/ReserveSearch.svelte';
     import Simulation from './lib/Simulation.svelte';
@@ -47,7 +48,7 @@
     /** the last test draw, for the Build tab's banner */
     let simulation: SimulationResult | null = null;
 
-    const TABS = ['build', 'missing', 'draw', 'settings'] as const;
+    const TABS = ['build', 'missing', 'draw', 'history', 'settings'] as const;
     type Tab = (typeof TABS)[number];
 
     const tabFromHash = (): Tab => TABS.find((t) => `#${t}` === location.hash) ?? 'build';
@@ -338,6 +339,7 @@
             <button type="button" class:active={tab === 'build'} on:click={() => showTab('build')}>Build</button>
             <button type="button" class:active={tab === 'missing'} on:click={() => showTab('missing')}>Missing ({missingCount})</button>
             <button type="button" class:active={tab === 'draw'} on:click={() => showTab('draw')}>Test draw</button>
+            <button type="button" class:active={tab === 'history'} on:click={() => showTab('history')}>History</button>
             <button type="button" class:active={tab === 'settings'} on:click={() => showTab('settings')}>Settings</button>
         </nav>
 
@@ -425,6 +427,10 @@
                         categoriesVersion += 1;
                     }}
                 />
+            </div>
+        {:else if tab === 'history'}
+            <div class="area">
+                <History {api} bind:deck {zones} {dirty} />
             </div>
         {:else}
             <div class="area">

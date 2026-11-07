@@ -307,17 +307,19 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, settings (`VersionPanel`), simulation, tournament, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, History tab, settings (`VersionPanel`), simulation, tournament, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `tournament.rs`, `ydke_import.rs` |
 
-The builder does **all the editing**, in four tabs kept in `location.hash`
-(`#build`, `#missing`, `#test-draw`, `#settings`; `/deck-builder/:id#missing`
+The builder does **all the editing**, in five tabs kept in `location.hash`
+(`#build`, `#missing`, `#draw`, `#history`, `#settings`; `/deck-builder/:id#missing`
 works). Build: the zones, the format banner, "+ Missing card" (a proxy by
 name), the collection search and the selected card. Missing: the proxies
 with a Cardmarket link and trend price, the errata warnings, "Use my copy",
 the version's Cardmarket wants list (`Check.wants`, from
 `built::version_wants_list`). Test draw: the Monte Carlo, run on the zones
 as they are now (`main` in the request; without it, the saved deck).
-Settings: name, ban list or format, built, deck box, sleeves, public
+History: the deck's saved lists (`…/history`), what changed from one to the
+zones on the screen (`…/compare`, the diff done in Rust), and "Name this
+save" (`PATCH` `snapshot_name`). Settings: name, ban list or format, built, deck box, sleeves, public
 (`PATCH` `is_public`), tournament, delete. The Export / Play menu copies a
 YDKE, downloads a `.ydk` (`deck.ts` `ydkFile`) and links to DuelingBook and
 YGOPRODeck; a `.ydk` can also be imported (`ydkToYdke`).
@@ -389,6 +391,41 @@ missing.
   after the import. The version's own list is in the builder's Missing tab
   (`built::version_wants_list`). Build and unbuild in the builder's Settings tab.
 
+## A deck's history
+
+Each time a version's zones are saved (the builder's Save, a copy, a YDKE
+import, a new version from a saved list), `store::snapshots::record` writes
+a **snapshot**: what the zones hold by card (card data, else the name of a
+card not linked yet) and count, never the copies: no proxy, no lock, a few
+rows (`deck_snapshot`, `deck_snapshot_card`). The rules are in
+`yugioh_domain::deck_history`: `coalesce` skips a save with the same cards,
+and replaces the version's last snapshot when it is an automatic one less
+than 30 minutes old (`SESSION`: a building session gives one snapshot);
+`diff` gives the changes, by zone, added first.
+
+- A snapshot belongs to the **deck** (`version_id` SET NULL): deleting a
+  version keeps its history, so versions can be few (one per idea, not one
+  per state).
+- **Kept** ones (`Snapshot::kept`): named (its page, or "Name this save" in
+  the builder), a tournament's, or public. Only an automatic one can be
+  deleted.
+- **A tournament's list** (`deck_snapshot.tournament_id`, one per
+  tournament): the form freezes the chosen version's list when it saves
+  (`snapshots::freeze`); editing the tournament afterwards offers "Keep the
+  list saved" (the default) or a version's list again. The version keeps
+  changing; the list played doesn't. `deck_version.tournament_id` (0011) is
+  left NULL and unused since 0025.
+- **Pages** (`routes/decks/snapshots.rs`): the History table of the deck's
+  page (`partials/deck_history.html`; automatic ones folded), and
+  `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes
+  since the previous list of its version, or `?vs=<id>` / `?vs=version:<id>`
+  (that version now); name, public, delete, and "New version from this list"
+  (`api::create_version_from_list`, shared with the YDKE import: owned free
+  copies, else proxies).
+- **Public**: a snapshot when ticked or a tournament's
+  (`snapshots::PUBLIC_SNAPSHOT`), compared with the previous public one; a
+  deck when one of its versions or snapshots is.
+
 ## A deck version's page
 
 `/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
@@ -440,9 +477,10 @@ placement, then the stats, both following the filter (`?since=`, `?deck=`).
 A tournament has numbered **rounds** (`tournament_round`: opponent's deck as
 written, its labels, die, result, team result, comment), each with any number
 of **games** (`tournament_game`: won, lost, draw (replayed, so more than 3
-games) or unfinished (cut by time), first/second, comment). The version
-played is still `deck_version.tournament_id`, one version at most; a copy of
-a version (`clone`) doesn't take it.
+games) or unfinished (cut by time), first/second, comment). The list
+played is a snapshot of the deck's history (`deck_snapshot.tournament_id`,
+frozen when the form is saved: "A deck's history"); the stats "by version"
+group the lists by the version they were taken from.
 
 - **Labels** (`deck_label`): archetype/engine names, one table for your decks
   (`deck_deck_label`, on the deck edit page) and the opponents' rounds
@@ -463,7 +501,8 @@ a version (`clone`) doesn't take it.
   pages (`decks/api/tournament.rs`).
 - **Public**: the list, the stats and each tournament are in the public copy,
   without the buttons, the filter (it needs the server), the labels page
-  and the old `notes`. The version played shows the tournament too.
+  and the old `notes`. The list played is public with it; the version it
+  was taken from shows the tournament and links to that list.
 
 ## The advent calendar
 
