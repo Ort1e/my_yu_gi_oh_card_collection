@@ -6,18 +6,12 @@ place per action, reads separate from data entry"). Goals and menus:
 [../guide.md](../guide.md). Priority: **H** = confuses daily use, **M** =
 annoying, **L** = cosmetic.
 
-## Being done (removed from here when shipped)
+## Done (2026-11-07)
 
-1. Menus by goal (Collection · Decks · Tournaments, then Pokémon and Books).
-2. The builder's Settings tab (about 8 unrelated parts; Rename, Export and
-   Delete each appeared twice): tabs Build · To buy · Test draw · History ·
-   Settings, the rest in the header.
-3. The Cardmarket wants list was in 3 places: one per version (To buy tab)
-   and one for all built decks (`/decks/built`).
-4. `/tournaments` was a list and a stats dashboard: stats move to
-   `/tournaments/stats`.
-5. `/collection/value` was very long and repeated parts of
-   `/collection/stats`: folded sections, "by deck" moved.
+Menus by goal; the builder's tabs (Build · To buy · Test draw · History ·
+Settings) and header; one place per wants list; `/tournaments/stats`; a
+shorter `/collection/value` (folded sections, the decks' values on
+`/decks/built`). They are described in [../guide.md](../guide.md).
 
 ## To do
 
