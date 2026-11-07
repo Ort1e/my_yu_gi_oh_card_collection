@@ -33,12 +33,24 @@ pub async fn import_ydke(
     Path(deck_id): Path<i64>,
     Json(input): Json<YdkeInput>,
 ) -> AppResult<(StatusCode, Json<Created>)> {
-    let deck = match YdkeDeck::parse(input.ydke.trim()) {
+    let name = non_blank(input.name).unwrap_or_else(|| "Imported".to_string());
+    let version_id = import_into_deck(&state, deck_id, &input.ydke, &name).await?;
+    Ok((StatusCode::CREATED, Json(Created { id: version_id })))
+}
+
+/// The import itself (also the deck page's "new version" form): the id of
+/// the new version `name` of `deck_id`.
+pub(crate) async fn import_into_deck(
+    state: &AppState,
+    deck_id: i64,
+    ydke: &str,
+    name: &str,
+) -> AppResult<i64> {
+    let deck = match YdkeDeck::parse(ydke.trim()) {
         Ok(d) => d,
         Err(e) => return bad_request(e.to_string()),
     };
     exists(&mut *state.pool.acquire().await?, "deck", deck_id).await?;
-    let name = non_blank(input.name).unwrap_or_else(|| "Imported".to_string());
 
     // Resolve card data first (network), outside the transaction.
     let mut data: HashMap<u32, Option<(i64, String)>> = HashMap::new();
@@ -54,7 +66,7 @@ pub async fn import_ydke(
     let version_id: i64 =
         sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
             .bind(deck_id)
-            .bind(&name)
+            .bind(name)
             .execute(&mut *tx)
             .await?
             .last_insert_rowid();
@@ -94,5 +106,5 @@ pub async fn import_ydke(
     }
     tx.commit().await?;
     tracing::info!(deck_id, version_id, "deck version imported from YDKE");
-    Ok((StatusCode::CREATED, Json(Created { id: version_id })))
+    Ok(version_id)
 }

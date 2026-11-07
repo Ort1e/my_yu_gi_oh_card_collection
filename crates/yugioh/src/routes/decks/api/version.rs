@@ -20,6 +20,7 @@ use yugioh_domain::ydke::YdkeDeck;
 use super::tournament::Tournament;
 use super::{load_cards, ApiCard, Created};
 use crate::routes::cards::card_types;
+use crate::routes::decks::built::version_wants_list;
 use crate::store::cards::{
     delete_orphan_proxies, locked_elsewhere, proxy_copy, swap_card, Zone, IN_VERSION,
 };
@@ -50,6 +51,9 @@ pub struct DeckVersion {
     /// The format it plays instead of a ban list (never both).
     format_id: Option<i64>,
     is_built: bool,
+    /// Shown on the public site by hand (a version played in a tournament is
+    /// shown anyway).
+    is_public: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
     /// What building the version did, only in the answer to building it or
@@ -87,6 +91,7 @@ struct VersionHead {
     format_id: Option<i64>,
     tournament_id: Option<i64>,
     is_built: bool,
+    is_public: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
 }
@@ -143,7 +148,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let head: VersionHead = sqlx::query_as(
         "SELECT deck_version.deck_id, deck.name AS deck_name, deck_version.version_name,
                 deck_version.ban_list_id, deck_version.format_id, deck_version.tournament_id,
-                deck_version.is_built,
+                deck_version.is_built, deck_version.is_public,
                 deck_version.deck_box, deck_version.sleeves
          FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
          WHERE deck_version.id = ?",
@@ -193,6 +198,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         ban_list_id: head.ban_list_id,
         format_id: head.format_id,
         is_built: head.is_built,
+        is_public: head.is_public,
         deck_box: head.deck_box,
         sleeves: head.sleeves,
         build_report: None,
@@ -234,6 +240,8 @@ pub struct VersionUpdate {
     #[serde(default, deserialize_with = "present")]
     format_id: Option<Option<i64>>,
     is_built: Option<bool>,
+    /// Show the version on the public site, or hide it.
+    is_public: Option<bool>,
     /// Present and `null` or blank: cleared.
     #[serde(default, deserialize_with = "present")]
     deck_box: Option<Option<String>>,
@@ -491,6 +499,13 @@ pub async fn update_version(
             zone.insert(&mut tx, id, card_id).await?;
         }
     }
+    if let Some(is_public) = update.is_public {
+        sqlx::query("UPDATE deck_version SET is_public = ? WHERE id = ?")
+            .bind(is_public)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
     for (column, value) in [("deck_box", &update.deck_box), ("sleeves", &update.sleeves)] {
         if let Some(value) = value {
             sqlx::query(&format!(
@@ -604,8 +619,15 @@ pub async fn clone_version(
     Path(id): Path<i64>,
     Json(input): Json<NameInput>,
 ) -> AppResult<(StatusCode, Json<Created>)> {
-    let name = required(&input.name, "The version name can't be empty.")?;
-    let mut tx = begin_write(&state.pool).await?;
+    let new_id = copy_version(&state.pool, id, &input.name).await?;
+    Ok((StatusCode::CREATED, Json(Created { id: new_id })))
+}
+
+/// The copy itself (also the deck page's "new version" form): the id of the
+/// new version `name`.
+pub(crate) async fn copy_version(pool: &Pool, id: i64, name: &str) -> AppResult<i64> {
+    let name = required(name, "The version name can't be empty.")?;
+    let mut tx = begin_write(pool).await?;
     exists(&mut tx, "deck_version", id).await?;
     let new_id: i64 = sqlx::query(
         "INSERT INTO deck_version (deck_id, version_name, ban_list_id, format_id)
@@ -643,7 +665,7 @@ pub async fn clone_version(
         version_id = new_id,
         "deck version copied"
     );
-    Ok((StatusCode::CREATED, Json(Created { id: new_id })))
+    Ok(new_id)
 }
 
 /// The answer of [`check_version`]: `{"format": "Edison v2", "problems":
@@ -651,7 +673,8 @@ pub async fn clone_version(
 /// `format` null and no problem without a format. `errata`: the proxies and
 /// owned copies whose text was errata'd after the cutoff of the format or
 /// the ban list (`store::errata`); `errata_pending`: cards still being
-/// looked up on Yugipedia.
+/// looked up on Yugipedia. `wants`: the Cardmarket wants list of the
+/// version's proxies, one `count name` per line (empty: none).
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct Check {
@@ -659,6 +682,7 @@ pub struct Check {
     problems: Vec<String>,
     errata: Vec<MissingCard>,
     errata_pending: usize,
+    wants: String,
 }
 
 /// `GET /api/deck-versions/:id/check`: its problems in the format it plays,
@@ -712,5 +736,6 @@ pub async fn check_version(
         problems,
         errata,
         errata_pending,
+        wants: version_wants_list(&state.pool, id).await?,
     }))
 }

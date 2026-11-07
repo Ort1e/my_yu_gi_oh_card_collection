@@ -1,6 +1,7 @@
 <script lang="ts">
+    import { toast } from './toast';
     import { createEventDispatcher } from 'svelte';
-    import { banStatus, englishName, frenchDate, imageUrl, outOfFormat } from '../deck';
+    import { banStatus, cardmarketUrl, englishName, euros, frenchDate, imageUrl, outOfFormat, trendOf } from '../deck';
     import type { DeckApi } from '../api';
     import type { ApiCard } from '../api-types/ApiCard';
     import type { CardCategory } from '../api-types/CardCategory';
@@ -51,7 +52,7 @@
             await api.assignCategory(card!.id, category.id, assigned);
             category.assigned = assigned;
         } catch (e) {
-            alert(`Could not change the category: ${e.message}`);
+            toast.error(`Could not change the category: ${e.message}`);
         } finally {
             saving.delete(category.id);
             saving = saving;
@@ -68,6 +69,10 @@
         <p>Type: {card.card_type || '—'}</p>
         <p>Code: {card.code || '—'}</p>
         <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
+        <p>
+            <a href={cardmarketUrl(card)} target="_blank" rel="noopener">Cardmarket ↗</a>
+            {#if trendOf(card) !== null}<span class="hint">trend {euros(trendOf(card) ?? 0)}</span>{/if}
+        </p>
         <p>Ban Status: {banStatus(card, rules) || 'Unlimited'}</p>
         <p>
             First TCG release: {card.first_release ? frenchDate(card.first_release) : 'unknown'}

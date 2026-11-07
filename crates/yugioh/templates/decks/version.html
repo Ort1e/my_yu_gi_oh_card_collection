@@ -23,15 +23,7 @@
   </div>
   {% if !common::export::public_copy() %}
   <div class="button-row">
-    <a href="/deck-builder/{{ version.id }}" class="btn">Open in the deck builder</a>
-    {% if version.played %}
-    <span>On the public site: played in a tournament.</span>
-    {% else %}
-    <form method="post" action="/deck-versions/{{ version.id }}/public" class="inline">
-      <input type="hidden" name="is_public" value="{% if version.is_public %}0{% else %}1{% endif %}">
-      <button type="submit" class="btn-secondary">{% if version.is_public %}Hide from the public site{% else %}Show on the public site{% endif %}</button>
-    </form>
-    {% endif %}
+    <a href="/deck-builder/{{ version.id }}" class="btn">Edit in the builder</a>
   </div>
   {% endif %}
 </div>
@@ -100,15 +92,6 @@
 <p>No card in this version yet.</p>
 {% endif %}
 
-{% if !wants.is_empty() && !common::export::public_copy() %}
-<details class="wants-list">
-  <summary>Cardmarket wants list (the proxies)</summary>
-  <p class="hint">Paste it into a Cardmarket Yu-Gi-Oh! wants list, then set <strong>Language: English, French</strong> and <strong>Min. condition: Good</strong> on its cards.</p>
-  <textarea id="wants-version" class="wants-text" rows="{{ self.wants_rows() }}" readonly>{{ wants }}</textarea>
-  <p><button type="button" data-copy="wants-version">Copy</button></p>
-</details>
-{% endif %}
-
 {% match played %}{% when Some with (played) %}
 <section id="tournament" class="deck-tournament">
   <h2>Played at <a href="/tournaments/{{ played.id }}">{{ played.name }}</a>{% if played.is_team %} <span class="badge">Team</span>{% endif %}</h2>
@@ -130,5 +113,4 @@
 
 {% block extra_js %}
 <script src="/static/js/card_preview.js"></script>
-{% if !common::export::public_copy() %}<script src="/static/js/wants_list.js"></script>{% endif %}
 {% endblock %}

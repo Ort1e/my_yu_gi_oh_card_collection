@@ -133,6 +133,25 @@ async fn categories_and_monte_carlo() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
+    // on the zones as they are on the screen, saved or not: one card only
+    let (status, result) = t
+        .json(
+            "POST",
+            &format!("{uri}/monte-carlo"),
+            json!({ "hand_size": 5, "simulations": 100, "main": [cards[0]] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(result["categories"][0]["cards_in_deck"], 1);
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("{uri}/monte-carlo"),
+            json!({ "hand_size": 5, "simulations": 100, "main": [999_999] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
     // removing a card from the deck drops its assignments
     t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
     assert_eq!(

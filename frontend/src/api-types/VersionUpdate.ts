@@ -2,6 +2,10 @@
 
 export type VersionUpdate = { version_name?: string, main?: Array<number>, extra?: Array<number>, side?: Array<number>, ban_list_id?: number | null, format_id?: number | null, is_built?: boolean, 
 /**
+ * Show the version on the public site, or hide it.
+ */
+is_public?: boolean, 
+/**
  * Present and `null` or blank: cleared.
  */
 deck_box?: string | null, sleeves?: string | null, };

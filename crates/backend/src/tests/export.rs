@@ -171,6 +171,10 @@ async fn the_public_copy_holds_nothing_private() {
         "src=\"/",
         "Edit",
         "your max",
+        "wants list",
+        "Show on the public site",
+        "cardmarket.com",
+        "name=\"version_name\"",
     ] {
         assert!(!pages.contains(private), "{private} is in the public copy");
     }

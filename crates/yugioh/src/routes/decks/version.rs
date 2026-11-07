@@ -10,17 +10,16 @@
 //! deck builder's Monte Carlo on its categories, `yugioh_domain::monte_carlo`,
 //! going first and second) and the tournament it was played in, round by
 //! round.
-//! The deck builder (`/deck-builder/:id`) is a button away in the app; the
+//! The page is only the read-only view: all the editing is in the deck builder
+//! (`/deck-builder/:id`, a button away in the app), which also shows or hides
+//! the version on the public site (`is_public`, the `PATCH` of its API). The
 //! public copy shows only the versions on the public site (`PUBLIC_VERSION`),
-//! without the buttons. `POST /deck-versions/:id/public` shows or hides a
-//! version there.
+//! without the button.
 
 use std::collections::{BTreeMap, HashMap};
 
 use askama::Template;
 use axum::extract::{Path, State};
-use axum::response::Redirect;
-use axum::Form;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use yugioh_domain::card::sort_name;
@@ -28,16 +27,14 @@ use yugioh_domain::monte_carlo;
 use yugioh_domain::stats::{kind, CardKind};
 
 use super::api::simulation_inputs;
-use super::built::version_wants_list;
 use super::PUBLIC_VERSION;
 use crate::routes::tournaments::TournamentView;
 use crate::store::cards::Zone;
-use crate::store::db::{begin_write, Pool};
+use crate::store::db::Pool;
 use crate::store::formats;
 use crate::store::models::{CardRow, DeckVersionRow};
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::filters;
-use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
 use common::web::tiles::CardTile;
 
@@ -89,9 +86,6 @@ pub struct VersionPage {
     ban_list: Option<BanList>,
     hands: Vec<HandLine>,
     played: Option<TournamentView>,
-    /// The Cardmarket wants list of the version's proxies (empty: none; not
-    /// built in the public copy).
-    wants: String,
 }
 
 impl VersionPage {
@@ -99,10 +93,6 @@ impl VersionPage {
         self.version
             .deck_id
             .map_or("/decks".to_string(), |id| format!("/decks/{id}"))
-    }
-
-    fn wants_rows(&self) -> usize {
-        self.wants.lines().count() + 1
     }
 
     fn no_card(&self) -> bool {
@@ -326,34 +316,5 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         },
         hands: hands(pool, id).await?,
         played,
-        wants: if public {
-            String::new()
-        } else {
-            version_wants_list(pool, id).await?
-        },
     })
-}
-
-/// Show the version on the public site (`is_public=1`) or hide it (`0`); one
-/// played in a tournament is shown anyway.
-pub async fn set_public(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Form(pairs): Form<Pairs>,
-) -> AppResult<Redirect> {
-    let is_public = FormData::new(pairs).get("is_public") == Some("1");
-    let mut tx = begin_write(&state.pool).await?;
-    let updated = sqlx::query("UPDATE deck_version SET is_public = ? WHERE id = ?")
-        .bind(is_public)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-    if updated == 0 {
-        return Err(AppError::NotFound);
-    }
-    tx.commit().await?;
-    tracing::info!(version_id = id, is_public, "deck version shown or hidden");
-
-    Ok(Redirect::to(&format!("/deck-versions/{id}")))
 }

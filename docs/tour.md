@@ -307,11 +307,26 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), Missing tab, settings (`VersionPanel`), simulation, tournament, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
 
-Moving cards between zones only changes the app's local state until
-**Save** (`PATCH /api/deck-versions/:id` with the three zones). Proxies,
-categories and the tournament are saved immediately. Errors come back as
+The builder does **all the editing**, in four tabs kept in `location.hash`
+(`#build`, `#missing`, `#test-draw`, `#settings`; `/deck-builder/:id#missing`
+works). Build: the zones, the format banner, "+ Missing card" (a proxy by
+name), the collection search and the selected card. Missing: the proxies
+with a Cardmarket link and trend price, the errata warnings, "Use my copy",
+the version's Cardmarket wants list (`Check.wants`, from
+`built::version_wants_list`). Test draw: the Monte Carlo, run on the zones
+as they are now (`main` in the request; without it, the saved deck).
+Settings: name, ban list or format, built, deck box, sleeves, public
+(`PATCH` `is_public`), tournament, delete. The Export / Play menu copies a
+YDKE, downloads a `.ydk` (`deck.ts` `ydkFile`) and links to DuelingBook and
+YGOPRODeck; a `.ydk` can also be imported (`ydkToYdke`).
+
+Moving cards between zones and changing the format only change the app's
+local state until the sticky **Save** (or Discard) in the header
+(`PATCH /api/deck-versions/:id` with the three zones). Everything else
+(proxies, categories, the tournament, settings) is saved at once, with a
+small toast. Errors come back as
 `{"error": "…"}` with a 4xx status, and `api.ts` turns them into exceptions
 the app shows to you.
 
@@ -371,15 +386,15 @@ missing.
   **Cardmarket wants list** (one `1 Card name` line per card, by English name
   from the card data; `static/js/wants_list.js` copies it). Language and
   condition can't be in the text: the page reminds to set them on the list
-  after the import. Any version's page (`/deck-versions/:id`, built or not,
-  not in the public copy) has the same list of its own proxies
-  (`built::version_wants_list`).
+  after the import. The version's own list is in the builder's Missing tab
+  (`built::version_wants_list`). Build and unbuild in the builder's Settings tab.
 
 ## A deck version's page
 
 `/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
-`static/css/decks.css`) shows a version read-only, for the app and the
-public copy: its zones as the card grid (by kind, then English name), and
+`static/css/decks.css`) shows a version **read-only**, for the app and the
+public copy (in the app, one "Edit in the builder" button; the public
+toggle moved to the builder's Settings, the wants list to its Missing tab): its zones as the card grid (by kind, then English name), and
 around them:
 
 - **the format** it plays (its problems there: `store::formats::version_problems`,

@@ -19,7 +19,7 @@ use serde::Deserialize;
 use sqlx::Row;
 
 use crate::store::db::Pool;
-use crate::store::models::{version_full_name, DeckVersionRow};
+use crate::store::models::version_full_name;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
 use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
@@ -132,6 +132,57 @@ pub async fn list(
     })
 }
 
+/// One row of the versions table of a deck's page.
+#[derive(Debug, sqlx::FromRow)]
+pub struct VersionLine {
+    id: i64,
+    version_name: String,
+    is_built: bool,
+    is_public: bool,
+    main_count: i64,
+    extra_count: i64,
+    side_count: i64,
+    /// Cards still missing: the proxies in its zones.
+    proxies: i64,
+    /// `Edison v2`, when it plays a format.
+    format_label: Option<String>,
+    /// The date of the ban list it plays (`YYYY-MM-DD`).
+    ban_list_date: Option<String>,
+    tournament_id: Option<i64>,
+    tournament_name: Option<String>,
+}
+
+impl VersionLine {
+    /// On the public site: shown by hand, or played in a tournament.
+    fn on_public_site(&self) -> bool {
+        self.is_public || self.tournament_id.is_some()
+    }
+}
+
+/// How a "new version" starts: the form's `start` field.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Start {
+    Empty,
+    /// A copy of this version.
+    Copy(i64),
+    /// Cards imported from a YDKE.
+    Ydke,
+}
+
+impl Start {
+    /// `empty`, `copy:<version id>` or `ydke`; `None` for anything else.
+    pub fn parse(value: &str) -> Option<Start> {
+        match value.trim() {
+            "empty" => Some(Start::Empty),
+            "ydke" => Some(Start::Ydke),
+            other => other
+                .strip_prefix("copy:")
+                .and_then(|id| id.parse().ok())
+                .map(Start::Copy),
+        }
+    }
+}
+
 #[derive(Template)]
 #[template(path = "decks/detail.html")]
 pub struct DeckDetail {
@@ -141,9 +192,20 @@ pub struct DeckDetail {
     /// Whether a version of it was played in a tournament.
     has_tournaments: bool,
     /// Its versions (in the public copy, those on the public site).
-    versions: Vec<DeckVersionRow>,
+    versions: Vec<VersionLine>,
+    /// What the "new version" form got, to fill it again after an error.
+    start: String,
+    version_name: String,
+    ydke: String,
     /// Errors of the "new version" form.
     errors: Vec<String>,
+}
+
+impl DeckDetail {
+    /// Whether the form starts from `value` (`empty`, `copy:12`, `ydke`).
+    fn starts_with(&self, value: &str) -> bool {
+        self.start == value
+    }
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<DeckDetail> {
@@ -165,8 +227,23 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
     .await?
     .or_404()?;
     let versions = sqlx::query_as(&format!(
-        "{} WHERE deck_version.deck_id = ?{} ORDER BY deck_version.version_name DESC",
-        DeckVersionRow::SELECT,
+        "SELECT deck_version.id, deck_version.version_name, deck_version.is_built,
+                deck_version.is_public,
+                (SELECT count(*) FROM deck_version_main_deck WHERE deck_version_id = deck_version.id) AS main_count,
+                (SELECT count(*) FROM deck_version_extra_deck WHERE deck_version_id = deck_version.id) AS extra_count,
+                (SELECT count(*) FROM deck_version_side_deck WHERE deck_version_id = deck_version.id) AS side_count,
+                (SELECT count(*) FROM (
+                    SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = deck_version.id
+                    UNION ALL SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = deck_version.id
+                    UNION ALL SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = deck_version.id
+                 ) AS zone JOIN card ON card.id = zone.card_id WHERE card.is_proxy = 1) AS proxies,
+                (SELECT name || ' v' || version FROM deck_format
+                 WHERE deck_format.id = deck_version.format_id) AS format_label,
+                (SELECT date FROM advanced_ban_list
+                 WHERE advanced_ban_list.id = deck_version.ban_list_id) AS ban_list_date,
+                deck_version.tournament_id, tournament.name AS tournament_name
+         FROM deck_version LEFT JOIN tournament ON tournament.id = deck_version.tournament_id
+         WHERE deck_version.deck_id = ?{} ORDER BY deck_version.version_name DESC",
         if public {
             format!(" AND {PUBLIC_VERSION}")
         } else {
@@ -192,6 +269,9 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
         labels,
         has_tournaments,
         versions,
+        start: String::from("empty"),
+        version_name: String::new(),
+        ydke: String::new(),
         errors,
     })
 }

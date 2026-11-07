@@ -386,18 +386,34 @@ async fn any_version_page_gives_its_wants_list() {
     t.exec("UPDATE card_data SET json_data = '{\"name\":\"Kuriboh\"}' WHERE id = 2")
         .await;
 
-    // not built, one proxy and one real card
+    // not built, one proxy and one real card: the builder's Missing tab
+    // gets the list from the version's check
     put(&t, v1, &[cards[0], cards[2]]).await;
-    let (status, page) = t.get(&format!("/deck-versions/{v1}")).await;
-    assert_eq!(status, StatusCode::OK, "{page}");
-    assert!(page.contains(">1 Kuriboh</textarea>"), "{page}");
-    assert!(page.contains("data-copy=\"wants-version\""), "{page}");
+    let (status, check) = t
+        .json(
+            "GET",
+            &format!("/api/deck-versions/{v1}/check"),
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{check}");
+    assert_eq!(check["wants"], "1 Kuriboh");
+
+    // the read-only page has no wants list any more
+    let (_, page) = t.get(&format!("/deck-versions/{v1}")).await;
+    assert!(!page.contains("wants-version"), "{page}");
 
     // no proxy: no wants list
     t.exec("DELETE FROM deck_version_main_deck WHERE card_id = 3")
         .await;
-    let (_, page) = t.get(&format!("/deck-versions/{v1}")).await;
-    assert!(!page.contains("wants-version"), "{page}");
+    let (_, check) = t
+        .json(
+            "GET",
+            &format!("/api/deck-versions/{v1}/check"),
+            json!(null),
+        )
+        .await;
+    assert_eq!(check["wants"], "");
 }
 
 async fn dm_proxy(t: &TestApp) -> i64 {

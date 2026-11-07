@@ -22,4 +22,15 @@ ban: { [key in string]: string },
  * Its first TCG release (`YYYY-MM-DD`), for the formats' card pools;
  * `None`: unknown (an OCG card, or not linked yet).
  */
-first_release: string | null, };
+first_release: string | null, 
+/**
+ * Its Cardmarket product (`card.cardmarket_product_id`), for the
+ * product page; `None` for a proxy or a copy not linked.
+ */
+cardmarket_product_id: number | null, 
+/**
+ * Cardmarket's trend price in EUR: the linked product's, else the
+ * cheapest product named like the card (what a proxy would cost);
+ * `None`: no price known.
+ */
+cardmarket_trend: string | null, };

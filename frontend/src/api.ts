@@ -74,10 +74,12 @@ export function deckApi(id: number) {
         cardCategories: (cardId: number) => request<CardCategory[]>('GET', `${base}/cards/${cardId}/categories`),
         assignCategory: (cardId: number, categoryId: number, assigned: boolean) =>
             request<null>('PUT', `${base}/cards/${cardId}/categories/${categoryId}`, { assigned } satisfies AssignInput),
-        simulate: (handSize: number, simulations: number) =>
+        /** `main`: the Main Deck's card ids as they are on the screen (saved or not). */
+        simulate: (handSize: number, simulations: number, main: number[]) =>
             request<SimulationResult>('POST', `${base}/monte-carlo`, {
                 hand_size: handSize,
                 simulations,
+                main,
             } satisfies SimulationInput),
     };
 }

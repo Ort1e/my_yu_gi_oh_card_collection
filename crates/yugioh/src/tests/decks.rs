@@ -1,6 +1,9 @@
 //! Decks: list sorts, creation, edition, a version's cards, versions,
 //! deletion.
 
+use serde_json::json;
+use yugioh_domain::ydke::YdkeDeck;
+
 use super::*;
 
 #[tokio::test]
@@ -262,30 +265,35 @@ async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
     let deck = t.scalar("SELECT id FROM deck").await;
     let is_public = || t.scalar("SELECT is_public FROM deck_version");
 
+    // the read-only page has no button: the deck builder does it
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("Show on the public site"), "{page}");
+    assert!(!page.contains("Show on the public site"), "{page}");
+    assert!(page.contains("Edit in the builder"), "{page}");
     let (_, page) = t.get(&format!("/decks/{deck}")).await;
     assert!(!page.contains(r#"title="Shown on the public site""#));
 
-    let path = format!("/deck-versions/{version}/public");
-    let (status, location) = t.post(&path, &[("is_public", "1")]).await;
-    assert_eq!(status, StatusCode::SEE_OTHER);
-    assert_eq!(location, format!("/deck-versions/{version}"));
+    let uri = format!("/api/deck-versions/{version}");
+    let (status, saved) = t.json("PATCH", &uri, json!({ "is_public": true })).await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    assert_eq!(saved["is_public"], true);
     assert_eq!(is_public().await, 1);
-    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("Hide from the public site"), "{page}");
     let (_, page) = t.get(&format!("/decks/{deck}")).await;
     assert!(
         page.contains(r#"title="Shown on the public site""#),
         "{page}"
     );
 
-    t.post(&path, &[("is_public", "0")]).await;
+    t.json("PATCH", &uri, json!({ "is_public": false })).await;
     assert_eq!(is_public().await, 0);
+
+    // the old form route is gone
     assert_eq!(
-        t.post("/deck-versions/999/public", &[("is_public", "1")])
-            .await
-            .0,
+        t.post(
+            &format!("/deck-versions/{version}/public"),
+            &[("is_public", "1")]
+        )
+        .await
+        .0,
         StatusCode::NOT_FOUND
     );
 
@@ -296,7 +304,6 @@ async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
     )
     .await;
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("On the public site: played in a tournament."));
     assert!(!page.contains("Show on the public site"));
 }
 
@@ -336,5 +343,106 @@ async fn a_version_sorts_by_kind_then_english_name() {
             "Kuriboh",
             "Pot de Cupidité"
         ]
+    );
+}
+
+#[tokio::test]
+async fn a_new_version_starts_empty_as_a_copy_or_from_a_ydke() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let path = format!("/decks/{deck}/versions");
+    t.exec(&format!(
+        "INSERT INTO deck_version_main_deck (deck_version_id, card_id) VALUES ({version}, {})",
+        cards[0]
+    ))
+    .await;
+
+    // a copy of a version of the deck: the same cards
+    let (status, location) = t
+        .post(
+            &path,
+            &[
+                ("version_name", "copy"),
+                ("start", &format!("copy:{version}")),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let copy = t
+        .scalar("SELECT id FROM deck_version WHERE version_name = 'copy'")
+        .await;
+    assert_eq!(location, format!("/deck-builder/{copy}"));
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT count(*) FROM deck_version_main_deck WHERE deck_version_id = {copy}"
+        ))
+        .await,
+        1
+    );
+
+    // not a version of this deck
+    let (status, page) = t
+        .post(&path, &[("version_name", "x"), ("start", "copy:999")])
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("not one of this deck"), "{page}");
+
+    // a YDKE: its cards, the unknown ones as proxies
+    let ydke = YdkeDeck {
+        main: vec![46986414],
+        extra: vec![],
+        side: vec![],
+    }
+    .to_url();
+    let (status, location) = t
+        .post(
+            &path,
+            &[
+                ("version_name", "imported"),
+                ("start", "ydke"),
+                ("ydke", &ydke),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
+    let imported = t
+        .scalar("SELECT id FROM deck_version WHERE version_name = 'imported'")
+        .await;
+    assert_eq!(location, format!("/deck-builder/{imported}"));
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT count(*) FROM deck_version_main_deck WHERE deck_version_id = {imported}"
+        ))
+        .await,
+        1
+    );
+
+    // a YDKE start without a (readable) YDKE re-renders the form
+    for text in ["", "nonsense"] {
+        let (status, page) = t
+            .post(
+                &path,
+                &[("version_name", "bad"), ("start", "ydke"), ("ydke", text)],
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            page.contains(r#"name="version_name""#) && page.contains("YDKE"),
+            "{page}"
+        );
+    }
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM deck_version WHERE version_name = 'bad'")
+            .await,
+        0
+    );
+
+    // the table of versions
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(page.contains(&format!("/deck-builder/{copy}")), "{page}");
+    assert!(
+        page.contains("List of") || page.contains("<td class=\"text\">—</td>"),
+        "{page}"
     );
 }

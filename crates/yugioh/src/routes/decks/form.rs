@@ -7,7 +7,9 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
 use yugioh_domain::tournament::split_labels;
+use yugioh_domain::ydke::YdkeDeck;
 
+use super::{api, Start};
 use crate::routes::tournaments::{deck_labels, label_names};
 use crate::store::cards::delete_orphan_proxies;
 use crate::store::db::{begin_write, exists};
@@ -157,28 +159,80 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     Ok(Redirect::to("/decks"))
 }
 
-/// New empty version of the deck, opened in the deck builder.
+/// New version of the deck, opened in the deck builder. The form's `start`:
+/// `empty` (the default), `copy:<version id>` (a copy of a version of this
+/// deck: the clone of the deck builder) or `ydke` (the cards of the `ydke`
+/// field: the import of the deck builder).
 pub async fn add_version(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Form(pairs): Form<Pairs>,
 ) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
-    let Some(version_name) = form.required("version_name", "Version name") else {
-        let page = super::load_detail(&state.pool, id, form.errors).await?;
+    let version_name = form.required("version_name", "Version name");
+    let start_text = form.text("start");
+    let ydke = form.text("ydke");
+    let name_text = form.text("version_name");
+
+    let start = if start_text.trim().is_empty() {
+        Some(Start::Empty)
+    } else {
+        Start::parse(&start_text)
+    };
+    if start.is_none() {
+        form.errors
+            .push("Choose how the version starts.".to_string());
+    }
+
+    // a copy is of a version of this deck
+    if let Some(Start::Copy(from)) = start {
+        let of_this_deck: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM deck_version WHERE id = ? AND deck_id = ?)",
+        )
+        .bind(from)
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
+        if !of_this_deck {
+            form.errors
+                .push("The version to copy is not one of this deck's.".to_string());
+        }
+    }
+    if start == Some(Start::Ydke) {
+        if ydke.trim().is_empty() {
+            form.errors.push("Paste the YDKE to import.".to_string());
+        } else if let Err(e) = YdkeDeck::parse(ydke.trim()) {
+            form.errors.push(format!("This YDKE can't be read: {e}"));
+        }
+    }
+
+    let (Some(version_name), Some(start), true) = (version_name, start, form.errors.is_empty())
+    else {
+        let mut page = super::load_detail(&state.pool, id, form.errors).await?;
+        page.start = start_text;
+        page.version_name = name_text;
+        page.ydke = ydke;
         return Ok(page.into_response());
     };
 
-    let mut tx = begin_write(&state.pool).await?;
-    exists(&mut tx, "deck", id).await?;
-    let version_id = sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
-        .bind(id)
-        .bind(&version_name)
-        .execute(&mut *tx)
-        .await?
-        .last_insert_rowid();
-    tx.commit().await?;
-    tracing::info!(deck_id = id, version_id, "deck version created");
+    let version_id = match start {
+        Start::Empty => {
+            let mut tx = begin_write(&state.pool).await?;
+            exists(&mut tx, "deck", id).await?;
+            let version_id =
+                sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
+                    .bind(id)
+                    .bind(&version_name)
+                    .execute(&mut *tx)
+                    .await?
+                    .last_insert_rowid();
+            tx.commit().await?;
+            tracing::info!(deck_id = id, version_id, "deck version created");
+            version_id
+        }
+        Start::Copy(from) => api::copy_version(&state.pool, from, &version_name).await?,
+        Start::Ydke => api::import_into_deck(&state, id, &ydke, &version_name).await?,
+    };
 
     Ok(Redirect::to(&format!("/deck-builder/{version_id}")).into_response())
 }

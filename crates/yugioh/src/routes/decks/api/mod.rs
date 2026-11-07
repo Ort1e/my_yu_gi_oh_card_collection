@@ -40,7 +40,9 @@ pub use proxies::{add_proxy, delete_proxy, replace_proxy};
 pub use reserve::reserve;
 pub(crate) use simulation::inputs as simulation_inputs;
 pub use simulation::monte_carlo;
+pub(crate) use version::copy_version;
 pub use version::{check_version, clone_version, delete_version, get_version, update_version};
+pub(crate) use ydke_import::import_into_deck;
 pub use ydke_import::import_ydke;
 
 #[derive(Debug, Serialize, TS)]
@@ -69,6 +71,14 @@ pub struct ApiCard {
     /// Its first TCG release (`YYYY-MM-DD`), for the formats' card pools;
     /// `None`: unknown (an OCG card, or not linked yet).
     first_release: Option<String>,
+    /// Its Cardmarket product (`card.cardmarket_product_id`), for the
+    /// product page; `None` for a proxy or a copy not linked.
+    cardmarket_product_id: Option<i64>,
+    /// Cardmarket's trend price in EUR: the linked product's, else the
+    /// cheapest product named like the card (what a proxy would cost);
+    /// `None`: no price known.
+    #[ts(type = "string | null")]
+    cardmarket_trend: Option<Money>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -85,6 +95,8 @@ struct CardRecord {
     picture_file: Option<String>,
     card_type: Option<String>,
     ygopro_id: Option<i64>,
+    cardmarket_product_id: Option<i64>,
+    linked_trend: Option<Money>,
 }
 
 /// The cards with these ids, in the same order (unknown ids are skipped).
@@ -104,8 +116,11 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.last_known_status, card.rarity,
                 card.is_proxy, card.card_data_id, card.picture AS picture_file,
-                card_data.card_type, card_data.ygopro_id
-         FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN ",
+                card_data.card_type, card_data.ygopro_id,
+                card.cardmarket_product_id, cardmarket_product.trend AS linked_trend
+         FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id
+         LEFT JOIN cardmarket_product ON cardmarket_product.id = card.cardmarket_product_id
+         WHERE card.id IN ",
     );
     push_ids(&mut qb, unique.iter().copied());
     let records: Vec<CardRecord> = qb.build_query_as().fetch_all(&mut *conn).await?;
@@ -142,6 +157,30 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
                 .insert(ban_list_id.to_string(), status);
         }
     }
+    // a card without a linked product: the cheapest product named like it
+    // (compared here, a price is text)
+    let mut named_trends: HashMap<i64, Money> = HashMap::new();
+    let unlinked: Vec<i64> = records
+        .iter()
+        .filter(|r| r.linked_trend.is_none())
+        .filter_map(|r| r.card_data_id)
+        .collect();
+    if !unlinked.is_empty() {
+        let mut qb = QueryBuilder::new(
+            "SELECT card_data.id, cardmarket_product.trend
+             FROM card_data JOIN cardmarket_product ON cardmarket_product.name_key = card_data.en_name
+             WHERE cardmarket_product.trend IS NOT NULL AND card_data.id IN ",
+        );
+        push_ids(&mut qb, unlinked.iter().copied());
+        for (data_id, trend) in qb
+            .build_query_as::<(i64, Money)>()
+            .fetch_all(&mut *conn)
+            .await?
+        {
+            let best = named_trends.entry(data_id).or_insert(trend);
+            *best = (*best).min(trend);
+        }
+    }
     let releases = formats::first_releases(&mut *conn, data_ids.iter().copied()).await?;
 
     let mut by_id: HashMap<i64, ApiCard> = records
@@ -150,6 +189,10 @@ async fn load_cards(conn: &mut SqliteConnection, ids: &[i64]) -> AppResult<Vec<A
             let card = ApiCard {
                 id: r.id,
                 price: prices.get(&r.id).copied(),
+                cardmarket_product_id: r.cardmarket_product_id,
+                cardmarket_trend: r
+                    .linked_trend
+                    .or_else(|| r.card_data_id.and_then(|d| named_trends.get(&d).copied())),
                 ban: r
                     .card_data_id
                     .and_then(|d| bans.get(&d).cloned())

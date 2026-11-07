@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { toast } from './toast';
+    import { askYes } from './dialog';
     import { createEventDispatcher } from 'svelte';
     import CardTile from './CardTile.svelte';
     import CategoryForm from './CategoryForm.svelte';
@@ -16,15 +18,14 @@
     export let main: ApiCard[];
     export let categories: ApiCategory[];
     export let rules: Rules | null = null;
-    /** the deck has unsaved changes (the simulation runs on the saved deck) */
-    export let dirty = false;
+    /** the last run (the Build tab's banner shows its headline) */
+    export let result: SimulationResult | null = null;
 
     const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: ApiCard }>();
 
     let handSize = 5;
     let simulations = 10000;
     let hand: ApiCard[] = [];
-    let result: SimulationResult | null = null;
     let running = false;
 
     function testDraw() {
@@ -35,9 +36,9 @@
         running = true;
 
         try {
-            result = await api.simulate(Number(handSize), Number(simulations));
+            result = await api.simulate(Number(handSize), Number(simulations), main.map((c) => c.id));
         } catch (e) {
-            alert(`Simulation failed: ${e.message}`);
+            toast.error(`Simulation failed: ${e.message}`);
         } finally {
             running = false;
         }
@@ -49,19 +50,26 @@
         try {
             dispatch('categories', await api.categories());
         } catch (e) {
-            alert(`Could not reload the categories: ${e.message}`);
+            toast.error(`Could not reload the categories: ${e.message}`);
         }
     }
 
     async function removeCategory(category: ApiCategory) {
-        if (!confirm(`Delete the category "${category.name}"? Conditional categories using it are deleted too.`)) return;
+        const sure = await askYes({
+            title: 'Delete the category?',
+            message: `Delete the category "${category.name}"? Conditional categories using it are deleted too.`,
+            confirmLabel: 'Delete',
+            danger: true,
+        });
+
+        if (!sure) return;
 
         try {
             await api.deleteCategory(category.id);
             result = null;
             await reloadCategories();
         } catch (e) {
-            alert(`Could not delete the category: ${e.message}`);
+            toast.error(`Could not delete the category: ${e.message}`);
         }
     }
 
@@ -87,7 +95,6 @@
 <div class="controls">
     <button type="button" on:click={run} disabled={running}>{running ? 'Running…' : 'Run Simulation'}</button>
     <label>Simulations <input type="number" bind:value={simulations} min="1" max="1000000" /></label>
-    {#if dirty}<span class="warning">Unsaved changes: the simulation uses the saved deck.</span>{/if}
 </div>
 
 <div class="dropzone">

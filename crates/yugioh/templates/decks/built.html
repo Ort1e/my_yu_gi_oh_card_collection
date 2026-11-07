@@ -11,7 +11,7 @@
   <h1>Built decks</h1>
   <p class="back-link"><a href="/decks">← All decks</a></p>
   <p>A built version locks its real cards: they belong to it alone, out of the collection for the other decks.
-    Build or unbuild a version in the deck builder (version panel). Its proxies are the cards still missing to play it for real.</p>
+    Build or unbuild a version in the deck builder's Settings tab. Its proxies are the cards still missing to play it for real.</p>
 
   {% if versions.is_empty() %}
   <p>No built deck yet.</p>
@@ -19,7 +19,7 @@
   <div class="card-list">
     {% for built in versions %}
     <div class="card">
-      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}">{{ built.version.full_name() }}</a></div>
+      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}#missing">{{ built.version.full_name() }}</a></div>
       <div class="card-meta-line">
         <div>Deck box: {{ built.version.deck_box.as_deref().unwrap_or("—") }}</div>
         <div>Sleeves: {{ built.version.sleeves.as_deref().unwrap_or("—") }}</div>
@@ -59,13 +59,13 @@
   {% else %}
   <div class="table-scroll">
   <table class="numbers sortable">
-    <thead><tr><th data-sort="text">Card</th><th data-sort="number">Count</th><th class="text" data-sort="text">For</th><th class="text">Right printing</th></tr></thead>
+    <thead><tr><th data-sort="text">Card</th><th data-sort="number">Count</th><th class="text" data-sort="text">For</th><th class="text">Right printing</th><th class="text">Cardmarket</th></tr></thead>
     <tbody>
       {% for line in shopping %}
       <tr><td>{{ line.name }}</td><td>{{ line.count }}</td><td class="text">{{ line.decks }}</td><td class="text">
         {% if line.wrong_text > 0 %}<span class="errata-owned">{{ line.wrong_text }} replace owned copies with the wrong text</span>{% endif %}
         {% for warning in line.warnings %}{% include "decks/errata_warning.html" %}{% endfor %}
-      </td></tr>
+      </td><td class="text"><a href="https://www.cardmarket.com/en/YuGiOh/Products/Search?searchString={{ line.english_name|urlencode }}" target="_blank" rel="noopener">Buy ↗</a></td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -76,7 +76,8 @@
     in the text: after the import, set <strong>Language: English, French</strong> and
     <strong>Min. condition: Good</strong> on the list's cards.</p>
   <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
-  <p><button type="button" data-copy="wants-all">Copy</button></p>
+  <p><button type="button" data-copy="wants-all">Copy</button>
+    <a class="btn btn-secondary" href="https://www.cardmarket.com/en/YuGiOh/Wants" target="_blank" rel="noopener">Open my Cardmarket wants lists ↗</a></p>
   {% endif %}
   {% endif %}
 </div>
