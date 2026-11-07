@@ -54,13 +54,17 @@ async fn adding_a_tournament_with_rounds_games_and_labels() {
     assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
     assert_eq!(location, "/tournaments/1");
 
+    // the list played, saved by the form
     assert_eq!(
-        t.scalar("SELECT tournament_id FROM deck_version WHERE id = 1")
+        t.scalar("SELECT version_id FROM deck_snapshot WHERE tournament_id = 1")
             .await,
-        1
+        v
     );
-    // the deck played: its read-only page, from the tournament and the list
-    let link = format!(r#"href="/deck-versions/{v}""#);
+    let snapshot = t
+        .scalar("SELECT id FROM deck_snapshot WHERE tournament_id = 1")
+        .await;
+    // linked from the tournament and the list
+    let link = format!(r#"href="/deck-snapshots/{snapshot}""#);
     assert!(t.get("/tournaments/1").await.1.contains(&link));
     assert!(t.get("/tournaments").await.1.contains(&link));
     assert_eq!(
@@ -133,10 +137,10 @@ async fn editing_replaces_the_rounds() {
     assert_eq!(t.scalar("SELECT count(*) FROM tournament_game").await, 0);
     assert_eq!(t.scalar("SELECT count(*) FROM deck_label").await, 0);
     assert_eq!(
-        t.scalar("SELECT count(*) FROM deck_version WHERE tournament_id IS NOT NULL")
+        t.scalar("SELECT count(*) FROM deck_snapshot WHERE tournament_id IS NOT NULL")
             .await,
         0,
-        "the version is no longer the one played"
+        "no list played any more"
     );
 }
 

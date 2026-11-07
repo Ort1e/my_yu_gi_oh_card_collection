@@ -10,6 +10,7 @@ pub mod card;
 pub mod card_set;
 pub mod cardmarket;
 pub mod cardmarket_catalog;
+pub mod deck_history;
 pub mod errata;
 pub mod format;
 pub mod lot;

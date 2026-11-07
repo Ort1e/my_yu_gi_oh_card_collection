@@ -10,6 +10,7 @@ pub mod formats;
 pub mod models;
 pub mod prices;
 pub mod shipment_files;
+pub mod snapshots;
 pub mod tournaments;
 pub mod valuation;
 pub mod yugipedia;

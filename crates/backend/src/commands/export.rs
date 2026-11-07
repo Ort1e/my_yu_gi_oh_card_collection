@@ -30,13 +30,14 @@ const START: [&str; 13] = [
 ];
 
 /// The addresses the copy may hold: the start pages, a card's, a deck's, a
-/// deck version's, a tournament's, a copy's, a book's, an author's, a
+/// deck version's, a deck's saved list, a tournament's, a copy's, a book's, an author's, a
 /// series' page, and the card pictures (ygoprodeck's, the printings' own).
 fn public(path: &str) -> bool {
-    const NUMBERED: [&str; 8] = [
+    const NUMBERED: [&str; 9] = [
         "/cards/",
         "/decks/",
         "/deck-versions/",
+        "/deck-snapshots/",
         "/tournaments/",
         "/pokemon/",
         "/books/",
@@ -92,6 +93,7 @@ mod tests {
             "/pokemon/7",
             "/decks/1",
             "/deck-versions/4",
+            "/deck-snapshots/4",
             "/tournaments",
             "/tournaments/2",
             "/card-image/1",

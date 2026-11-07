@@ -42,8 +42,8 @@ pub(crate) use simulation::inputs as simulation_inputs;
 pub use simulation::monte_carlo;
 pub(crate) use version::copy_version;
 pub use version::{check_version, clone_version, delete_version, get_version, update_version};
-pub(crate) use ydke_import::import_into_deck;
 pub use ydke_import::import_ydke;
+pub(crate) use ydke_import::{create_version_from_list, import_into_deck, ListCard};
 
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]

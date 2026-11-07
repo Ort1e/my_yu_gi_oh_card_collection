@@ -2,15 +2,21 @@
 //! (`version.rs`), the built decks, the forms; the deck builder's shell
 //! page and its JSON API.
 //!
+//! A deck's history (`snapshots.rs`): what its versions held, saved by
+//! card each time their zones are saved; the named ones and the lists
+//! played in tournaments are kept.
+//!
 //! In the public copy (`common::export::public_copy`), only the versions
-//! played in a tournament or shown by hand (`deck_version.is_public`, the
-//! button on the version's page), and the decks that have one:
+//! shown by hand (`deck_version.is_public`, in the deck builder's Settings),
+//! the snapshots shown by hand or played in a tournament
+//! (`store::snapshots::PUBLIC_SNAPSHOT`), and the decks that have one:
 //! [`PUBLIC_VERSION`], [`PUBLIC_DECK`]. The others answer 404 there, so the
 //! copy leaves them out.
 
 pub mod api;
 pub mod built;
 pub mod form;
+pub mod snapshots;
 pub mod version;
 
 use askama::Template;
@@ -26,13 +32,15 @@ use crate::web::pagination::{self, Page, PageParam, PAGE_SIZE};
 use crate::AppState;
 
 /// SQL: whether `deck_version` is on the public site.
-pub const PUBLIC_VERSION: &str =
-    "(deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL)";
+pub const PUBLIC_VERSION: &str = "(deck_version.is_public = 1)";
 
-/// SQL: whether `deck` is on the public site: one of its versions is.
+/// SQL: whether `deck` is on the public site: one of its versions or
+/// snapshots is.
 pub const PUBLIC_DECK: &str =
-    "EXISTS (SELECT 1 FROM deck_version WHERE deck_version.deck_id = deck.id
-     AND (deck_version.is_public = 1 OR deck_version.tournament_id IS NOT NULL))";
+    "(EXISTS (SELECT 1 FROM deck_version WHERE deck_version.deck_id = deck.id
+      AND deck_version.is_public = 1)
+     OR EXISTS (SELECT 1 FROM deck_snapshot WHERE deck_snapshot.deck_id = deck.id
+      AND (deck_snapshot.is_public = 1 OR deck_snapshot.tournament_id IS NOT NULL)))";
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct DeckRow {
@@ -113,8 +121,8 @@ pub async fn list(
         "SELECT deck.id, deck.name, deck.description,
            (SELECT count(*) FROM deck_version WHERE deck_version.deck_id = deck.id
             AND {versions_shown}) AS versions,
-           (SELECT max(t.date) FROM deck_version v JOIN tournament t ON t.id = v.tournament_id
-            WHERE v.deck_id = deck.id) AS last_tournament
+           (SELECT max(t.date) FROM deck_snapshot s JOIN tournament t ON t.id = s.tournament_id
+            WHERE s.deck_id = deck.id) AS last_tournament
          FROM deck WHERE {decks_shown}{} LIMIT ? OFFSET ?",
         sort.order_by()
     ))
@@ -148,14 +156,15 @@ pub struct VersionLine {
     format_label: Option<String>,
     /// The date of the ban list it plays (`YYYY-MM-DD`).
     ban_list_date: Option<String>,
+    /// The last tournament played with a list taken from it.
     tournament_id: Option<i64>,
     tournament_name: Option<String>,
 }
 
 impl VersionLine {
-    /// On the public site: shown by hand, or played in a tournament.
+    /// On the public site: shown by hand.
     fn on_public_site(&self) -> bool {
-        self.is_public || self.tournament_id.is_some()
+        self.is_public
     }
 }
 
@@ -189,8 +198,10 @@ pub struct DeckDetail {
     deck: DeckRow,
     /// Its labels, comma-separated.
     labels: String,
-    /// Whether a version of it was played in a tournament.
+    /// Whether it was played in a tournament.
     has_tournaments: bool,
+    /// Its history, newest first (in the public copy, the public snapshots).
+    history: Vec<snapshots::HistoryLine>,
     /// Its versions (in the public copy, those on the public site).
     versions: Vec<VersionLine>,
     /// What the "new version" form got, to fill it again after an error.
@@ -202,6 +213,16 @@ pub struct DeckDetail {
 }
 
 impl DeckDetail {
+    /// The named, tournament and public lists of its history.
+    fn kept_history(&self) -> Vec<&snapshots::HistoryLine> {
+        self.history.iter().filter(|l| l.snapshot.kept()).collect()
+    }
+
+    /// The lists saved automatically.
+    fn automatic_history(&self) -> Vec<&snapshots::HistoryLine> {
+        self.history.iter().filter(|l| !l.snapshot.kept()).collect()
+    }
+
     /// Whether the form starts from `value` (`empty`, `copy:12`, `ydke`).
     fn starts_with(&self, value: &str) -> bool {
         self.start == value
@@ -241,8 +262,12 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
                  WHERE deck_format.id = deck_version.format_id) AS format_label,
                 (SELECT date FROM advanced_ban_list
                  WHERE advanced_ban_list.id = deck_version.ban_list_id) AS ban_list_date,
-                deck_version.tournament_id, tournament.name AS tournament_name
-         FROM deck_version LEFT JOIN tournament ON tournament.id = deck_version.tournament_id
+                tournament.id AS tournament_id, tournament.name AS tournament_name
+         FROM deck_version
+         LEFT JOIN tournament ON tournament.id =
+             (SELECT s.tournament_id FROM deck_snapshot s
+              WHERE s.version_id = deck_version.id AND s.tournament_id IS NOT NULL
+              ORDER BY s.created_at DESC LIMIT 1)
          WHERE deck_version.deck_id = ?{} ORDER BY deck_version.version_name DESC",
         if public {
             format!(" AND {PUBLIC_VERSION}")
@@ -258,16 +283,19 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
         .await?
         .join(", ");
     let has_tournaments = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM deck_version WHERE deck_id = ? AND tournament_id IS NOT NULL)",
+        "SELECT EXISTS (SELECT 1 FROM deck_snapshot WHERE deck_id = ? AND tournament_id IS NOT NULL)",
     )
     .bind(id)
     .fetch_one(pool)
     .await?;
 
+    let history = snapshots::history(pool, id, public).await?;
+
     Ok(DeckDetail {
         deck,
         labels,
         has_tournaments,
+        history,
         versions,
         start: String::from("empty"),
         version_name: String::new(),

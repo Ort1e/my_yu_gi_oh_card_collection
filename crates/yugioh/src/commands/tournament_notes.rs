@@ -161,12 +161,11 @@ async fn run(state: &AppState, file: &Path, dry_run: bool) -> anyhow::Result<Rep
         }
 
         tournaments::set_results(&mut tx, t.id, &results).await?;
-        let deck: Option<i64> = sqlx::query_scalar(
-            "SELECT deck_id FROM deck_version WHERE tournament_id = ? AND deck_id IS NOT NULL",
-        )
-        .bind(t.id)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let deck: Option<i64> =
+            sqlx::query_scalar("SELECT deck_id FROM deck_snapshot WHERE tournament_id = ?")
+                .bind(t.id)
+                .fetch_optional(&mut *tx)
+                .await?;
         if let Some(deck) = deck {
             tournaments::add_deck_labels(&mut tx, deck, &clean_labels(&t.own_labels)).await?;
         }
@@ -216,7 +215,9 @@ mod tests {
             "INSERT INTO deck (id, name) VALUES (1, 'Orcust');
              INSERT INTO tournament (id, name, date, notes) VALUES
                  (1, 'Locals', '2025-09-21', 'old text'), (2, 'Team', '2025-11-30', NULL);
-             INSERT INTO deck_version (id, deck_id, version_name, tournament_id) VALUES (1, 1, 'v1', 1);
+             INSERT INTO deck_version (id, deck_id, version_name) VALUES (1, 1, 'v1');
+             INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+                 VALUES (1, 1, '2025-09-21 00:00:00', 1);
              INSERT INTO deck_label (name) VALUES ('K9');",
         )
         .execute(&t.state.pool)

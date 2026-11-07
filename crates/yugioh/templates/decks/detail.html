@@ -55,6 +55,26 @@
   </table>
   </div>
 
+  {% if !history.is_empty() %}
+  <h2 class="card-title" id="history">History</h2>
+  <p class="hint">Each save of a version's cards is kept here{% if !common::export::public_copy() %} (an automatic one is replaced by the next save within 30 minutes); name a list on its page to keep it{% endif %}. Changes: since the previous list of the same version.</p>
+  {% let kept = self.kept_history() %}
+  {% if !kept.is_empty() %}
+  {% let lines = kept %}
+  {% include "partials/deck_history.html" %}
+  {% endif %}
+  {% if !common::export::public_copy() %}
+  {% let automatic = self.automatic_history() %}
+  {% if !automatic.is_empty() %}
+  <details class="deck-history-automatic">
+    <summary>{{ automatic.len() }} automatic save{% if automatic.len() > 1 %}s{% endif %}</summary>
+    {% let lines = automatic %}
+    {% include "partials/deck_history.html" %}
+  </details>
+  {% endif %}
+  {% endif %}
+  {% endif %}
+
   {% if !common::export::public_copy() %}
   <form method="post" action="/decks/{{ deck.id }}/versions">
     <fieldset>

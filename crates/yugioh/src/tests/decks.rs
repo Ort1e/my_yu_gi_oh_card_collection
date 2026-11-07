@@ -12,8 +12,10 @@ async fn deck_list_sorts() {
     sqlx::query(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Old', '2025-09-21'), (2, 'New', '2026-02-08');
          INSERT INTO deck (id, name) VALUES (1, 'Played long ago'), (2, 'Played lately'), (3, 'Never played');
-         INSERT INTO deck_version (deck_id, version_name, tournament_id) VALUES
-             (1, 'v1', 1), (2, 'v1', NULL), (2, 'v2', 2), (3, 'v1', NULL);",
+         INSERT INTO deck_version (id, deck_id, version_name) VALUES
+             (1, 1, 'v1'), (2, 2, 'v1'), (3, 2, 'v2'), (4, 3, 'v1');
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id) VALUES
+             (1, 1, '2025-09-21 00:00:00', 1), (2, 3, '2026-02-08 00:00:00', 2);",
     )
     .execute(&t.state.pool)
     .await
@@ -157,7 +159,9 @@ async fn a_version_shows_its_cards_by_zone() {
     let (version, cards) = t.deck_fixture().await;
     t.exec(&format!(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
-         UPDATE deck_version SET tournament_id = 1, deck_box = 'red box';
+         UPDATE deck_version SET deck_box = 'red box';
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+             SELECT deck_id, id, '2026-02-08 00:00:00', 1 FROM deck_version;
          INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
          INSERT INTO deck_version_side_deck VALUES ({version}, {});",
         cards[0], cards[1], cards[2]
@@ -206,7 +210,8 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
          INSERT INTO tournament_round (id, tournament_id, number, result, opponent_deck, comment)
              VALUES (1, 1, 1, 'win', 'Yummy', 'quick round');
          INSERT INTO tournament_game (round_id, number, result, comment) VALUES (1, 1, 'won', 'god hand');
-         UPDATE deck_version SET tournament_id = 1;",
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+             SELECT deck_id, id, '2026-02-08 00:00:00', 1 FROM deck_version;",
         cards[0], cards[1], cards[0]
     ))
     .await;
@@ -297,12 +302,14 @@ async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
         StatusCode::NOT_FOUND
     );
 
-    // played in a tournament: shown anyway, no button
+    // played in a tournament: its saved list is public, not the version
     t.exec(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
-         UPDATE deck_version SET tournament_id = 1;",
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+             SELECT deck_id, id, '2026-02-08 00:00:00', 1 FROM deck_version;",
     )
     .await;
+    assert_eq!(is_public().await, 0);
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
     assert!(!page.contains("Show on the public site"));
 }

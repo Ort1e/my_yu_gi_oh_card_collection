@@ -54,6 +54,7 @@ pub fn router() -> Router<AppState> {
         .route("/decks/built", get(decks::built::page))
         .route("/decks/:id", get(decks::detail))
         .route("/deck-versions/:id", get(decks::version::page))
+        .route("/deck-snapshots/:id", get(decks::snapshots::page))
         .route("/deck-builder/:id", get(decks::builder))
         .route("/rarities", get(reference::rarities::page))
         .route("/formats", get(formats::list))
@@ -156,6 +157,13 @@ pub fn write_router() -> Router<AppState> {
         )
         .route("/decks/:id/delete", post(decks::form::delete))
         .route("/decks/:id/versions", post(decks::form::add_version))
+        .route("/deck-snapshots/:id/name", post(decks::snapshots::set_name))
+        .route(
+            "/deck-snapshots/:id/public",
+            post(decks::snapshots::set_public),
+        )
+        .route("/deck-snapshots/:id/delete", post(decks::snapshots::delete))
+        .route("/deck-snapshots/:id/branch", post(decks::snapshots::branch))
         .route("/budget/manage", get(budget::form::page))
         .route("/budget/manage/budget", post(budget::form::set_budget))
         .route("/budget/manage/apports", post(budget::form::add_apport))

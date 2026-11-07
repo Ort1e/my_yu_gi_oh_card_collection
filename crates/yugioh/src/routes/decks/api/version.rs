@@ -28,6 +28,7 @@ use crate::store::db::push_ids;
 use crate::store::db::{begin_write, exists, row_exists, Pool};
 use crate::store::errata::{self, CardRef, Context, MissingCard, Verdicts};
 use crate::store::formats;
+use crate::store::snapshots;
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
 use ts_rs::TS;
@@ -147,7 +148,10 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let mut conn = pool.acquire().await?;
     let head: VersionHead = sqlx::query_as(
         "SELECT deck_version.deck_id, deck.name AS deck_name, deck_version.version_name,
-                deck_version.ban_list_id, deck_version.format_id, deck_version.tournament_id,
+                deck_version.ban_list_id, deck_version.format_id,
+                (SELECT tournament_id FROM deck_snapshot
+                 WHERE version_id = deck_version.id AND tournament_id IS NOT NULL
+                 ORDER BY created_at DESC LIMIT 1) AS tournament_id,
                 deck_version.is_built, deck_version.is_public,
                 deck_version.deck_box, deck_version.sleeves
          FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
@@ -247,6 +251,9 @@ pub struct VersionUpdate {
     deck_box: Option<Option<String>>,
     #[serde(default, deserialize_with = "present")]
     sleeves: Option<Option<String>>,
+    /// "Name this save": the name of the snapshot of the version's cards
+    /// once saved (`store::snapshots::name_current`).
+    snapshot_name: Option<String>,
 }
 
 /// The cards of `card_ids` locked by a built version other than
@@ -558,10 +565,22 @@ pub async fn update_version(
         }
         _ => {}
     }
+
+    // the history: what the zones hold now, by card
+    let snapshot_id = if zones_changed {
+        snapshots::record(&mut tx, id).await?
+    } else {
+        None
+    };
+    if let Some(name) = &update.snapshot_name {
+        let name = required(name, "The name can't be empty.")?;
+        snapshots::name_current(&mut tx, id, name).await?;
+    }
     tx.commit().await?;
     tracing::info!(
         version_id = id,
         zones_changed,
+        ?snapshot_id,
         proxies_deleted,
         renamed,
         ban_list_changed,
@@ -659,6 +678,7 @@ pub(crate) async fn copy_version(pool: &Pool, id: i64, name: &str) -> AppResult<
             zone.insert(&mut tx, new_id, card_id).await?;
         }
     }
+    snapshots::record(&mut tx, new_id).await?;
     tx.commit().await?;
     tracing::info!(
         from_version_id = id,

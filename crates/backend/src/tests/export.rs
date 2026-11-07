@@ -20,13 +20,19 @@ async fn the_public_copy_holds_nothing_private() {
              VALUES (1, 'Rennes local', '2025-07-01', 'Fun deck', 'old tournament note');
          INSERT INTO tournament_round (tournament_id, number, result, comment)
              VALUES (1, 1, 'win', 'quick round');
-         -- public: a version played in a tournament, a version shown by hand
+         -- public: the list played in a tournament, a version shown by hand
          INSERT INTO deck (id, name) VALUES (2, 'Played deck'), (3, 'Ticked deck');
-         INSERT INTO deck_version (id, deck_id, version_name, tournament_id, is_public) VALUES
-             (10, 2, 'Played version', 1, 0), (11, 2, 'Draft version', NULL, 0),
-             (12, 3, 'Any version', NULL, 1), (14, 3, 'Hidden version', NULL, 0),
-             (13, 1, 'Secret version', NULL, 0);
+         INSERT INTO deck_version (id, deck_id, version_name, is_public) VALUES
+             (10, 2, 'Played version', 0), (11, 2, 'Draft version', 0),
+             (12, 3, 'Any version', 1), (14, 3, 'Hidden version', 0),
+             (13, 1, 'Secret version', 0);
          INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
+         INSERT INTO deck_snapshot (id, deck_id, version_id, created_at, name, tournament_id) VALUES
+             (20, 2, 10, '2025-07-01 00:00:00', 'Played list', 1),
+             (21, 2, 11, '2025-07-02 00:00:00', 'Draft list', NULL),
+             (22, 1, 13, '2025-07-02 00:00:00', 'Secret list', NULL);
+         INSERT INTO deck_snapshot_card (snapshot_id, zone, card_data_id, name, count, position) VALUES
+             (20, 'main', 1, 'Magicien Sombre', 1, 1), (21, 'main', 2, 'Kuriboh Proxy', 1, 1);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
                                    name_en, rarity, category, variants, json, fetched_at)
@@ -79,7 +85,7 @@ async fn the_public_copy_holds_nothing_private() {
         "books-random.html",
         "decks.html",
         "decks-2.html",
-        "deck-versions-10.html",
+        "deck-snapshots-20.html",
         "deck-versions-12.html",
         "tournaments.html",
         "tournaments-1.html",
@@ -92,6 +98,9 @@ async fn the_public_copy_holds_nothing_private() {
         assert!(out.join(page).exists(), "{page} is missing");
     }
     for page in [
+        "deck-versions-10.html",
+        "deck-snapshots-21.html",
+        "deck-snapshots-22.html",
         "books-2.html",
         "books-series-1.html",
         "books-authors-1.html",
@@ -113,7 +122,7 @@ async fn the_public_copy_holds_nothing_private() {
         "Assassin&#x27;s Apprentice",
         "Collection statistics",
         "Played deck",
-        "Played version",
+        "Played list",
         "Ticked deck",
         "Any version",
         "Rennes local",
@@ -149,6 +158,8 @@ async fn the_public_copy_holds_nothing_private() {
         "Secret deck",
         "Secret version",
         "Draft version",
+        "Draft list",
+        "Secret list",
         "Hidden version",
         "deck-builder",
         "old tournament note",

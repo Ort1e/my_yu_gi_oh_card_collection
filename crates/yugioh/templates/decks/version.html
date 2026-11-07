@@ -19,7 +19,7 @@
     {% for zone in zones %}<div>{{ zone.name }}: {{ zone.tiles.len() }}</div>{% endfor %}
     {% match version.deck_box %}{% when Some with (deck_box) %}<div>Deck box: {{ deck_box }}</div>{% when None %}{% endmatch %}
     {% match version.sleeves %}{% when Some with (sleeves) %}<div>Sleeves: {{ sleeves }}</div>{% when None %}{% endmatch %}
-    {% match played %}{% when Some with (played) %}<div>Played at <a href="#tournament" class="on-card">{{ played.name }}</a> ({{ played.date|date }}{% if !played.record.is_empty() %}, {{ played.record }}{% endif %})</div>{% when None %}{% endmatch %}
+    {% match played %}{% when Some with (played) %}<div>Played at <a href="#tournament" class="on-card">{{ played.name }}</a> ({{ played.date|date }}{% if !played.record.is_empty() %}, {{ played.record }}{% endif %}){% match played.snapshot_id %}{% when Some with (s) %}: <a href="/deck-snapshots/{{ s }}" class="on-card">the list played</a>{% when None %}{% endmatch %}</div>{% when None %}{% endmatch %}
   </div>
   {% if !common::export::public_copy() %}
   <div class="button-row">

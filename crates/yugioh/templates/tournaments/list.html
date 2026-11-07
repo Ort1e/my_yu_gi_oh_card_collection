@@ -51,7 +51,7 @@
         <td data-sort-value="{{ row.date }}">{{ row.date|date }}</td>
         <td class="text"><a href="/tournaments/{{ row.id }}">{{ row.name }}</a>{% if row.is_team %} <span class="badge">Team</span>{% endif %}</td>
         <td class="text phone-hide">{{ row.location }}</td>
-        <td class="text">{% match row.version_id %}{% when Some with (v) %}<a href="/deck-versions/{{ v }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
+        <td class="text">{% match row.snapshot_id %}{% when Some with (s) %}<a href="/deck-snapshots/{{ s }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
         <td>{{ row.record }}</td>
         <td data-sort-value="{{ row.placement_rank }}">{{ row.placement }}</td>
       </tr>

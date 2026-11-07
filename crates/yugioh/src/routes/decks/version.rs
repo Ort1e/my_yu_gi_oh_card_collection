@@ -279,11 +279,15 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         zones.push(ZoneCards { name, tiles });
     }
 
-    let tournament_id: Option<i64> =
-        sqlx::query_scalar("SELECT tournament_id FROM deck_version WHERE id = ?")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
+    // the last tournament played with a list taken from this version
+    let tournament_id: Option<i64> = sqlx::query_scalar(
+        "SELECT tournament_id FROM deck_snapshot
+         WHERE version_id = ? AND tournament_id IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
     let played = match tournament_id {
         Some(tournament_id) => TournamentView::load(pool, tournament_id).await?,
         None => None,

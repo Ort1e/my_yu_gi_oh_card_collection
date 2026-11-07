@@ -33,6 +33,9 @@ pub struct TournamentRow {
     pub conclusion: Option<String>,
     /// The old free-text notes, until moved and cleared.
     pub notes: Option<String>,
+    /// The list played (`deck_snapshot.tournament_id`), if noted.
+    pub snapshot_id: Option<i64>,
+    /// The version it was taken from (gone: `None`).
     pub version_id: Option<i64>,
     pub deck_id: Option<i64>,
     deck_name: Option<String>,
@@ -40,7 +43,8 @@ pub struct TournamentRow {
 }
 
 impl TournamentRow {
-    /// "Deck - version" of the version played.
+    /// "Deck - list" of the list played: the snapshot's name, else its
+    /// version's.
     pub fn version_full_name(&self) -> Option<String> {
         self.version_name
             .as_deref()
@@ -151,11 +155,14 @@ impl Loaded {
 pub async fn load(pool: &Pool, which: &Which) -> AppResult<Loaded> {
     let mut qb = QueryBuilder::new(
         "SELECT t.id, t.name, t.date, t.location, t.placement, t.players, t.is_team,
-                t.conclusion, t.notes, v.id AS version_id, v.deck_id, deck.name AS deck_name,
-                v.version_name
+                t.conclusion, t.notes, s.id AS snapshot_id, s.version_id, s.deck_id,
+                deck.name AS deck_name,
+                CASE WHEN s.id IS NOT NULL
+                     THEN COALESCE(s.name, v.version_name, 'saved list') END AS version_name
          FROM tournament t
-         LEFT JOIN deck_version v ON v.tournament_id = t.id
-         LEFT JOIN deck ON deck.id = v.deck_id
+         LEFT JOIN deck_snapshot s ON s.tournament_id = t.id
+         LEFT JOIN deck_version v ON v.id = s.version_id
+         LEFT JOIN deck ON deck.id = s.deck_id
          WHERE 1",
     );
     if let Some(id) = which.id {
@@ -165,7 +172,7 @@ pub async fn load(pool: &Pool, which: &Which) -> AppResult<Loaded> {
         qb.push(" AND t.date >= ").push_bind(since.clone());
     }
     if let Some(deck) = which.deck_id {
-        qb.push(" AND v.deck_id = ").push_bind(deck);
+        qb.push(" AND s.deck_id = ").push_bind(deck);
     }
     qb.push(" ORDER BY t.date DESC, t.id DESC");
     let tournaments: Vec<TournamentRow> = qb.build_query_as().fetch_all(pool).await?;

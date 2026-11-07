@@ -47,13 +47,17 @@
         <input type="text" name="location" id="location" value="{{ values.location }}" maxlength="255">
       </div>
       <div class="wide">
-        <label for="version_id">Deck version played:</label>
+        <label for="version_id">Deck list played:</label>
         <select name="version_id" id="version_id">
           <option value="">— not noted —</option>
+          {% match frozen %}{% when Some with (frozen) %}<option value="keep" {% if values.version_id == "keep" %}selected{% endif %}>Keep the list saved: {{ frozen }}</option>{% when None %}{% endmatch %}
+          <optgroup label="Save the list a version holds now">
           {% for version in versions %}
           <option value="{{ version.id }}" {% if version.selected %}selected{% endif %}>{{ version.name }}</option>
           {% endfor %}
+          </optgroup>
         </select>
+        <small>The list is saved when the tournament is: editing the version afterwards doesn't change it.</small>
       </div>
     </div>
     <div class="field-row">

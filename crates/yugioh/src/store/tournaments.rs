@@ -7,14 +7,28 @@ use chrono::NaiveDate;
 use sqlx::SqliteConnection;
 use yugioh_domain::tournament::{Die, GameResult, RoundResult};
 
+use crate::store::snapshots;
+
 /// The name, date and place of a tournament, and the version played.
 #[derive(Debug, Clone)]
 pub struct TournamentHead {
     pub name: String,
     pub date: NaiveDate,
     pub location: Option<String>,
-    /// The deck version played (`deck_version.tournament_id`), if known.
-    pub version_id: Option<i64>,
+    /// The deck list played.
+    pub played: Played,
+}
+
+/// What a tournament form says of the deck list played (a snapshot linked
+/// by `deck_snapshot.tournament_id`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Played {
+    /// Not noted: no list linked.
+    NotNoted,
+    /// The list already linked stays as it is (frozen).
+    Keep,
+    /// The list this version holds now, frozen (`store::snapshots::freeze`).
+    Version(i64),
 }
 
 /// What happened at a tournament.
@@ -62,7 +76,7 @@ pub async fn insert(
         .execute(&mut *conn)
         .await?
         .last_insert_rowid();
-    set_version(conn, id, head.version_id).await?;
+    set_played(conn, id, head.played).await?;
     set_results(conn, id, results).await?;
     Ok(id)
 }
@@ -93,7 +107,7 @@ pub async fn update(
         return Ok(false);
     }
 
-    set_version(conn, id, head.version_id).await?;
+    set_played(conn, id, head.played).await?;
     set_results(conn, id, results).await?;
     Ok(true)
 }
@@ -110,22 +124,14 @@ pub async fn delete(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<bool> 
     Ok(deleted > 0)
 }
 
-/// The version played: only `version_id` points to this tournament.
-async fn set_version(
-    conn: &mut SqliteConnection,
-    id: i64,
-    version_id: Option<i64>,
-) -> sqlx::Result<()> {
-    sqlx::query("UPDATE deck_version SET tournament_id = NULL WHERE tournament_id = ?")
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-    if let Some(version) = version_id {
-        sqlx::query("UPDATE deck_version SET tournament_id = ? WHERE id = ?")
-            .bind(id)
-            .bind(version)
-            .execute(&mut *conn)
-            .await?;
+/// The list played: kept, unlinked, or a version's frozen now.
+async fn set_played(conn: &mut SqliteConnection, id: i64, played: Played) -> sqlx::Result<()> {
+    match played {
+        Played::Keep => {}
+        Played::NotNoted => snapshots::unlink_tournament(conn, id).await?,
+        Played::Version(version) => {
+            snapshots::freeze(conn, version, id).await?;
+        }
     }
     Ok(())
 }

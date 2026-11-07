@@ -13,6 +13,7 @@ mod formats;
 mod lots;
 mod rarity;
 mod security;
+mod snapshots;
 mod tournaments;
 
 use std::ops::Deref;

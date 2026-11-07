@@ -8,4 +8,9 @@ is_public?: boolean,
 /**
  * Present and `null` or blank: cleared.
  */
-deck_box?: string | null, sleeves?: string | null, };
+deck_box?: string | null, sleeves?: string | null, 
+/**
+ * "Name this save": the name of the snapshot of the version's cards
+ * once saved (`store::snapshots::name_current`).
+ */
+snapshot_name?: string, };

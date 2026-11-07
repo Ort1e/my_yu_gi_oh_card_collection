@@ -100,7 +100,7 @@ pub struct ListRow {
     date: String,
     name: String,
     location: String,
-    version_id: Option<i64>,
+    snapshot_id: Option<i64>,
     version_name: String,
     is_team: bool,
     record: String,
@@ -242,7 +242,7 @@ pub async fn list(
             date: t.date.clone(),
             name: t.name.clone(),
             location: t.location.clone().unwrap_or_default(),
-            version_id: t.version_id,
+            snapshot_id: t.snapshot_id,
             version_name: t.version_full_name().unwrap_or_default(),
             is_team: t.is_team,
             record: tournament_record(&stats(&loaded.records_of(t))),
@@ -260,8 +260,8 @@ pub async fn list(
 
     let decks: Vec<(i64, String)> = sqlx::query_as(
         "SELECT DISTINCT deck.id, deck.name FROM deck
-         JOIN deck_version v ON v.deck_id = deck.id
-         WHERE v.tournament_id IS NOT NULL ORDER BY deck.name COLLATE NOCASE",
+         JOIN deck_snapshot s ON s.deck_id = deck.id
+         WHERE s.tournament_id IS NOT NULL ORDER BY deck.name COLLATE NOCASE",
     )
     .fetch_all(&state.pool)
     .await?;
@@ -347,7 +347,8 @@ pub struct TournamentView {
     pub(crate) name: String,
     pub(crate) date: String,
     pub(crate) location: String,
-    pub(crate) version_id: Option<i64>,
+    /// The list played.
+    pub(crate) snapshot_id: Option<i64>,
     pub(crate) version_name: String,
     pub(crate) is_team: bool,
     pub(crate) record: String,
@@ -374,7 +375,7 @@ impl TournamentView {
             name: t.name.clone(),
             date: t.date.clone(),
             location: t.location.clone().unwrap_or_default(),
-            version_id: t.version_id,
+            snapshot_id: t.snapshot_id,
             version_name: t.version_full_name().unwrap_or_default(),
             is_team: t.is_team,
             record: tournament_record(&stats(&loaded.records_of(t))),
