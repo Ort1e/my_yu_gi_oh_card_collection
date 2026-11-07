@@ -133,7 +133,10 @@ pub fn write_router() -> Router<AppState> {
             "/lots/add/shipment",
             post(lots::form::upload).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
         )
-        .route("/lots/:id/cards", post(lots::form::add_cards))
+        .route(
+            "/lots/:id/add-cards",
+            get(lots::form::add_cards_page).post(lots::form::add_cards),
+        )
         .route(
             "/lots/:id/edit",
             get(lots::form::edit_page).post(lots::form::update),

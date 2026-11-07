@@ -43,6 +43,9 @@ refund), its cards. **Lots → Add**:
 - by hand: type the cards, or use the quick add (a set code, then tick the
   cards of the set).
 
+Cards forgotten or arrived later: the lot's page → **Add cards** (the same
+rows and quick add, on their own page; the lot page itself only reads).
+
 New cards are linked to ygoprodeck's card data in the background, and
 replace deck proxies they correspond to. **Sellers** lists who you bought
 from, with what you spent.

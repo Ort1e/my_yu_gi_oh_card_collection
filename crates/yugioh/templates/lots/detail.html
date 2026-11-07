@@ -9,7 +9,7 @@
 {% block content %}
 <div class="inside-container">
 <h1>{{ lot.title() }}</h1>
-<div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a></div>
+<div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a> <a href="/lots/{{ lot.id }}/add-cards" class="btn">Add cards</a></div>
 
 <div class="card wide-card">
   <div class="card-meta-line">
@@ -94,32 +94,9 @@
 </div>
 {% endif %}
 
-  <form method="post" action="/lots/{{ lot.id }}/cards" class="plain">
-    <h2>Add cards</h2>
-    {% include "partials/form_errors.html" %}
-    <div id="card-rows">
-      {% include "partials/quick_add.html" %}
-      {% for row in rows %}
-        {% let i = loop.index0 %}
-        {% let remove_button = true %}
-        {% include "partials/card_row.html" %}
-      {% endfor %}
-      <button type="button" id="add-row" class="btn-secondary">+ Add a card</button>
-    </div>
-    <input type="submit" value="Add the cards to the lot">
-  </form>
-
-<template id="card-row-template">
-  {% let i = "__i__" %}
-  {% let row = self.blank_row() %}
-  {% let remove_button = true %}
-  {% include "partials/card_row.html" %}
-</template>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="/static/js/tables.js"></script>
-<script src="/static/js/rarities.js"></script>
-<script src="/static/js/card_rows.js"></script>
 {% endblock %}

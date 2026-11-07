@@ -11,7 +11,8 @@ annoying, **L** = cosmetic.
 Menus by goal; the builder's tabs (Build · To buy · Test draw · History ·
 Settings) and header; one place per wants list; `/tournaments/stats`; a
 shorter `/collection/value` (folded sections, the decks' values on
-`/decks/built`). They are described in [../guide.md](../guide.md).
+`/decks/built`); the cards added to a lot on their own page
+(`/lots/:id/add-cards`). They are described in [../guide.md](../guide.md).
 
 ## To do
 
@@ -19,7 +20,6 @@ shorter `/collection/value` (folded sections, the decks' values on
 |---|---|---|---|
 | 1 | **The version page** (`/deck-versions/:id`) shows the tournament round by round, besides the tournament pages, and repeats panels the builder has (ban list, wants list). | Keep the version page to the list and the opening hands; link to the tournament page ("Played at …") instead of repeating the rounds. | M |
 | 2 | **The dashboard is mostly budget**, though the main goal is the collection. | Lead with the collection (cards owned, value and its move, last lots); keep one budget line linking to `/budget`. | M |
-| 3 | **The add-cards form sits on the lot page** (reading a lot and entering its cards are one page). | A separate `/lots/:id/add-cards` (the quick add), the lot page read-only with an "Add cards" button. | M |
 | 4 | **"New version"** is offered in 3 places (the decks list, the deck hub, the builder). | Keep it on the deck hub and in the builder's header; the list links to the hub. | L |
 | 5 | **Naming a deck history save** exists on the snapshot page and in the builder's History tab. | Name in the builder (History); the snapshot page only displays it, with a link back. | L |
 | 6 | **Proxy counts** are shown in 4 places (builder header, To buy, `/decks/built`, the version page), computed by different queries. | One helper that counts them (`store`), used by all; each page shows the number and links to To buy. | M |
