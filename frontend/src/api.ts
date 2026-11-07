@@ -21,6 +21,7 @@ import type { ReserveQuery } from './api-types/ReserveQuery';
 import type { SimulationInput } from './api-types/SimulationInput';
 import type { SimulationResult } from './api-types/SimulationResult';
 import type { Snapshot } from './api-types/Snapshot';
+import type { SnapshotNameInput } from './api-types/SnapshotNameInput';
 import type { VersionUpdate } from './api-types/VersionUpdate';
 import type { YdkeInput } from './api-types/YdkeInput';
 import type { Zone } from './api-types/Zone';
@@ -94,6 +95,9 @@ export function deckApi(id: number) {
                 extra,
                 side,
             } satisfies CompareInput),
+        /** Name saved list `snapshotId` of the deck (`null`: an automatic one again). */
+        nameSnapshot: (snapshotId: number, name: string | null) =>
+            request<null>('POST', `${base}/history/${snapshotId}/name`, { name } satisfies SnapshotNameInput),
     };
 }
 

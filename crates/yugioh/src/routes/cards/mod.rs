@@ -12,7 +12,7 @@ use yugioh_domain::valuation::copy_value;
 
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
-use crate::store::models::{CardRow, DeckVersionRow, LotRow};
+use crate::store::models::{CardRow, LotRow};
 use crate::store::prices::history::card_history;
 use crate::store::valuation::fill_lot_estimates;
 use crate::web::error::{AppResult, OrNotFound};
@@ -202,11 +202,24 @@ pub struct CardDetail {
     /// The lot the card came from (its first unite) and its price there.
     lot: Option<LotRow>,
     price: Option<Money>,
-    versions: Vec<DeckVersionRow>,
+    /// The decks with this copy in one of their versions (the versions
+    /// are on the deck's page).
+    decks: Vec<CardDeck>,
     /// `None` before the card's first price refresh.
     market: Option<MarketPrice>,
     /// What the card says (`None` before its card data is linked).
     text: Option<text::CardText>,
+}
+
+/// A deck using the copy.
+#[derive(sqlx::FromRow)]
+pub struct CardDeck {
+    id: i64,
+    name: String,
+    /// How many of its versions hold the copy.
+    versions: i64,
+    /// One of them is built: the copy is locked in it.
+    built: bool,
 }
 
 /// The card's market price (`card_price`) and what this copy is worth.
@@ -288,14 +301,15 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         None => (None, None),
     };
 
-    let versions = sqlx::query_as(&format!(
-        "{} WHERE deck_version.id IN (
-            SELECT deck_version_id FROM deck_version_main_deck WHERE card_id = ?1
-            UNION SELECT deck_version_id FROM deck_version_extra_deck WHERE card_id = ?1
-            UNION SELECT deck_version_id FROM deck_version_side_deck WHERE card_id = ?1)
-         ORDER BY deck_version.id",
-        DeckVersionRow::SELECT
-    ))
+    let decks: Vec<CardDeck> = sqlx::query_as(
+        "SELECT deck.id, deck.name, COUNT(*) AS versions, MAX(v.is_built) AS built
+         FROM deck_version v JOIN deck ON deck.id = v.deck_id
+         WHERE v.id IN (
+             SELECT deck_version_id FROM deck_version_main_deck WHERE card_id = ?1
+             UNION SELECT deck_version_id FROM deck_version_extra_deck WHERE card_id = ?1
+             UNION SELECT deck_version_id FROM deck_version_side_deck WHERE card_id = ?1)
+         GROUP BY deck.id ORDER BY deck.name COLLATE NOCASE",
+    )
     .bind(id)
     .fetch_all(pool)
     .await?;
@@ -317,7 +331,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         card,
         lot,
         price,
-        versions,
+        decks,
         market,
         text,
     })

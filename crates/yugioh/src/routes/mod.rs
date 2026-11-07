@@ -163,7 +163,6 @@ pub fn write_router() -> Router<AppState> {
         )
         .route("/decks/:id/delete", post(decks::form::delete))
         .route("/decks/:id/versions", post(decks::form::add_version))
-        .route("/deck-snapshots/:id/name", post(decks::snapshots::set_name))
         .route(
             "/deck-snapshots/:id/public",
             post(decks::snapshots::set_public),
@@ -181,6 +180,10 @@ pub fn write_router() -> Router<AppState> {
         .route(
             "/api/deck-versions/:id",
             patch(decks::api::update_version).delete(decks::api::delete_version),
+        )
+        .route(
+            "/api/deck-versions/:id/history/:snapshot_id/name",
+            post(decks::api::name_snapshot),
         )
         .route(
             "/api/deck-versions/:id/clone",

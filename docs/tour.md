@@ -620,8 +620,9 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
 - A snapshot belongs to the **deck** (`version_id` SET NULL): deleting a
   version keeps its history, so versions can be few (one per idea, not one
   per state).
-- **Kept** ones (`Snapshot::kept`): named (its page, or "Name this save" in
-  the builder), a tournament's, or public. Only an automatic one can be
+- **Kept** ones (`Snapshot::kept`): named (only in the builder's History tab:
+  "Name this save", or Rename on a row, `api::name_snapshot`; its page
+  shows the name and links there), a tournament's, or public. Only an automatic one can be
   deleted.
 - **A tournament's list** (`deck_snapshot.tournament_id`, one per
   tournament): the form freezes the chosen version's list when it saves
@@ -633,7 +634,7 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
   page (`partials/deck_history.html`; automatic ones folded), and
   `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes
   since the previous list of its version, or `?vs=<id>` / `?vs=version:<id>`
-  (that version now); name, public, delete, and "New version from this list"
+  (that version now); public, delete, and "New version from this list"
   (`api::create_version_from_list`, shared with the YDKE import: owned free
   copies, else proxies).
 - **Public**: a snapshot when ticked or a tournament's

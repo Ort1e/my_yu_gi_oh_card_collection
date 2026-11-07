@@ -1,7 +1,9 @@
 <script lang="ts">
     // The deck's history: the lists saved with each save of a version's
     // zones (crates/yugioh/src/store/snapshots.rs), what changed from one of
-    // them to the zones on the screen, and "Name this save" to keep one.
+    // them to the zones on the screen, "Name this save" to keep one, and
+    // Rename for any of them (the only place lists are named: their page
+    // links here).
     import { frenchDate } from '../deck';
     import type { DeckApi } from '../api';
     import type { ApiChange } from '../api-types/ApiChange';
@@ -9,6 +11,7 @@
     import type { Snapshot } from '../api-types/Snapshot';
     import type { Zone } from '../api-types/Zone';
     import type { DeckZones } from '../types';
+    import { askText } from './dialog';
     import { toast } from './toast';
 
     export let api: DeckApi;
@@ -74,6 +77,25 @@
             saving = false;
         }
     }
+
+    async function rename(s: Snapshot) {
+        const answer = await askText({
+            title: 'Name this saved list',
+            message: 'A named list is kept. Blank: an automatic one again.',
+            default: s.name ?? '',
+            confirmLabel: 'Save the name',
+        });
+
+        if (answer === null) return;
+
+        try {
+            await api.nameSnapshot(s.id, answer || null);
+            toast.ok(answer ? `Named “${answer}”` : 'Back to an automatic list');
+            await load();
+        } catch (e) {
+            toast.error(`Could not name it: ${e.message}`);
+        }
+    }
 </script>
 
 <div class="history">
@@ -115,6 +137,7 @@
                         <td class="num">{s.side}</td>
                         <td>
                             <button type="button" class="btn-small btn-secondary" on:click={() => (chosen = s.id)}>Compare</button>
+                            <button type="button" class="btn-small btn-secondary" on:click={() => rename(s)}>Rename</button>
                         </td>
                     </tr>
                 {/each}

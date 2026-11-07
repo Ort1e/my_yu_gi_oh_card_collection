@@ -1,8 +1,7 @@
 //! A deck's history (`store::snapshots`): the History table of the deck's
 //! page ([`history`]), a snapshot's page `/deck-snapshots/:id` (its cards,
 //! what changed since the previous one of its version or `?vs=` another
-//! snapshot or a version's current list) and its writes: name, public,
-//! delete (an automatic one only), and a new version from its cards.
+//! snapshot or a version's current list) and its writes: public, delete (an automatic one only), and a new version from its cards.
 //!
 //! In the public copy: the public snapshots only (`PUBLIC_SNAPSHOT`), each
 //! compared with the previous public one of its deck.
@@ -143,6 +142,9 @@ pub struct SnapshotPage {
     version_shown: bool,
     /// Compared with a version's current list (the changes go from this one).
     vs_version: bool,
+    /// The deck builder's History tab to name it: its version's, else
+    /// another version of the deck (none left: it can't be renamed).
+    rename_href: Option<String>,
 }
 
 impl SnapshotPage {
@@ -311,7 +313,13 @@ pub async fn page(
         selected: vs == s.id.to_string(),
     }));
 
+    let rename_href = snapshot
+        .version_id
+        .or_else(|| versions.first().map(|(v, _)| *v))
+        .map(|v| format!("/deck-builder/{v}#history"));
+
     Ok(SnapshotPage {
+        rename_href,
         snapshot,
         deck_name,
         zones,
@@ -339,26 +347,6 @@ async fn deck_of(pool: &Pool, id: i64) -> AppResult<i64> {
         .fetch_optional(pool)
         .await?
         .or_404()
-}
-
-/// `POST /deck-snapshots/:id/name`: `name` (blank: back to an automatic one).
-pub async fn set_name(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Form(pairs): Form<Pairs>,
-) -> AppResult<Redirect> {
-    deck_of(&state.pool, id).await?;
-    let form = FormData::new(pairs);
-    let name = form.get("name").map(str::trim).filter(|n| !n.is_empty());
-    let mut tx = begin_write(&state.pool).await?;
-    snapshots::set_name(&mut tx, id, name).await?;
-    tx.commit().await?;
-    tracing::info!(
-        snapshot_id = id,
-        named = name.is_some(),
-        "deck snapshot named"
-    );
-    Ok(Redirect::to(&format!("/deck-snapshots/{id}")))
 }
 
 /// `POST /deck-snapshots/:id/public`: `public` checked or not.

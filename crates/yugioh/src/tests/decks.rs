@@ -453,3 +453,21 @@ async fn a_new_version_starts_empty_as_a_copy_or_from_a_ydke() {
         "{page}"
     );
 }
+
+#[tokio::test]
+async fn the_card_page_lists_the_decks_not_the_versions() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    let uri = format!("/api/deck-versions/{version}");
+    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+    t.json("POST", &format!("{uri}/clone"), json!({ "name": "v2" }))
+        .await;
+
+    let (_, page) = t.get(&format!("/cards/{}", cards[0])).await;
+    assert!(page.contains("/decks/1\""), "{page}");
+    assert!(page.contains("In 2 versions"), "{page}");
+    assert!(!page.contains("/deck-versions/"), "{page}");
+
+    let (_, page) = t.get(&format!("/cards/{}", cards[1])).await;
+    assert!(page.contains("No deck uses this copy."), "{page}");
+}

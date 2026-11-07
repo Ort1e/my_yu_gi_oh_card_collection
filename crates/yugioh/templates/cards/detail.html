@@ -81,11 +81,16 @@
   {% include "partials/lot_item.html" %}
   {% when None %}{% endmatch %}
 
-  <h2 class="card-title">Deck versions</h2>
-  {% for version in versions %}
-    {% include "partials/deck_version_item.html" %}
+  <h2 class="card-title">Decks</h2>
+  {% for deck in decks %}
+  <a href="/decks/{{ deck.id }}" class="card-link">
+    <div class="card">
+      <div class="card-title">{{ deck.name }}{% if deck.built %} <span class="built-badge" title="In a built version: locked there, out of the collection for the other decks">Built</span>{% endif %}</div>
+      <div class="card-meta-line"><div>In {{ deck.versions }} version{% if deck.versions > 1 %}s{% endif %}</div></div>
+    </div>
+  </a>
   {% else %}
-    <p>No deck versions include this card.</p>
+    <p>No deck uses this copy.</p>
   {% endfor %}
 </div>
 {% endif %}

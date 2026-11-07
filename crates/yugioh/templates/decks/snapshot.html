@@ -69,11 +69,8 @@
 <div class="deck-panels">
   <section class="deck-panel">
     <h2>Name</h2>
-    <form method="post" action="/deck-snapshots/{{ snapshot.id }}/name">
-      <label for="name">A named list is kept (blank: an automatic one again):</label>
-      <input type="text" name="name" id="name" maxlength="100" value="{{ snapshot.name.as_deref().unwrap_or("") }}">
-      <input type="submit" value="Save the name">
-    </form>
+    <p>{% match snapshot.name %}{% when Some with (name) %}Named “{{ name }}”: it is kept.{% when None %}Not named: an automatic list, replaced by the next save within 30 minutes.{% endmatch %}
+    {% match rename_href %}{% when Some with (href) %}<a href="{{ href }}">Name it in the deck builder (History)</a>{% when None %}{% endmatch %}</p>
     <form method="post" action="/deck-snapshots/{{ snapshot.id }}/public">
       <label><input type="checkbox" name="public"{% if snapshot.is_public %} checked{% endif %}> Show it on the public site{% if snapshot.tournament_id.is_some() %} (a tournament's list is shown anyway){% endif %}</label>
       <input type="submit" value="Save">

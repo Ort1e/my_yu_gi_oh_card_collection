@@ -108,17 +108,42 @@ async fn only_automatic_ones_are_deleted() {
     t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
     let id = t.scalar("SELECT id FROM deck_snapshot").await;
 
-    t.post(
-        &format!("/deck-snapshots/{id}/name"),
-        &[("name", "Keep me")],
-    )
-    .await;
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("{uri}/history/{id}/name"),
+            json!({ "name": "Keep me" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    // another deck's version can't name it
+    t.post("/decks/add", &[("name", "Other"), ("version_name", "v1")])
+        .await;
+    let other = t.scalar("SELECT MAX(id) FROM deck_version").await;
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{other}/history/{id}/name"),
+            json!({ "name": "Not mine" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (_, page) = t.get(&format!("/deck-snapshots/{id}")).await;
+    assert!(page.contains("Named “Keep me”"), "{page}");
+    assert!(
+        page.contains(&format!("/deck-builder/{version}#history")),
+        "{page}"
+    );
     let (status, _) = t.post(&format!("/deck-snapshots/{id}/delete"), &[]).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(snapshots(&t).await, 1);
 
-    t.post(&format!("/deck-snapshots/{id}/name"), &[("name", " ")])
-        .await;
+    t.json(
+        "POST",
+        &format!("{uri}/history/{id}/name"),
+        json!({ "name": " " }),
+    )
+    .await;
     let (status, location) = t.post(&format!("/deck-snapshots/{id}/delete"), &[]).await;
     assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
     assert_eq!(snapshots(&t).await, 0);

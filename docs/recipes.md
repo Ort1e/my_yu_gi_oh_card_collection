@@ -379,7 +379,8 @@ Every **Save** in the deck builder keeps the list in the deck's history
 (several saves within 30 minutes count as one); nothing to do by hand.
 
 1. **Before an event, or a list worth keeping**: builder → **History** tab →
-   **Name this save** (save the deck first). Named lists are never replaced.
+   **Name this save** (save the deck first), or **Rename** on any list of
+   the table (blank: an automatic one again). Named lists are never replaced.
 2. **A tournament**: choose the version in the tournament form; its list is
    saved with the tournament, so editing the deck afterwards doesn't change
    what was played. Editing the tournament keeps that list unless you

@@ -1,16 +1,20 @@
 //! The deck builder's History tab: the deck's saved lists
 //! (`store::snapshots`), and what changed from one to the zones on the
-//! screen, saved or not (`yugioh_domain::deck_history::diff`).
+//! screen, saved or not (`yugioh_domain::deck_history::diff`). Saved lists
+//! are named here only (the snapshot page shows the name).
 
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use sqlx::SqliteConnection;
 use ts_rs::TS;
 use yugioh_domain::deck_history::{diff, DeckZone};
 
 use crate::store::cards::Zone;
+use crate::store::db::begin_write;
 use crate::store::snapshots::{self, Snapshot};
-use crate::web::error::{AppResult, OrNotFound};
+use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::AppState;
 
 /// `GET /api/deck-versions/:id/history`: the snapshots of its deck, newest
@@ -60,17 +64,7 @@ pub async fn compare(
     Json(input): Json<CompareInput>,
 ) -> AppResult<Json<Vec<ApiChange>>> {
     let mut conn = state.pool.acquire().await?;
-    let same_deck: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM deck_snapshot s JOIN deck_version v ON v.deck_id = s.deck_id
-                        WHERE s.id = ? AND v.id = ?)",
-    )
-    .bind(input.snapshot_id)
-    .bind(id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if !same_deck {
-        return Err(crate::web::error::AppError::NotFound);
-    }
+    same_deck(&mut conn, id, input.snapshot_id).await?;
 
     let saved = snapshots::cards(&mut conn, input.snapshot_id).await?;
     let screen = snapshots::cards_of_ids(
@@ -96,4 +90,54 @@ pub async fn compare(
         })
         .collect();
     Ok(Json(changes))
+}
+
+/// Snapshot `snapshot_id` belongs to the deck of version `version_id`, else
+/// 404.
+async fn same_deck(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+    snapshot_id: i64,
+) -> AppResult<()> {
+    let same: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM deck_snapshot s JOIN deck_version v ON v.deck_id = s.deck_id
+                        WHERE s.id = ? AND v.id = ?)",
+    )
+    .bind(snapshot_id)
+    .bind(version_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if same {
+        Ok(())
+    } else {
+        Err(AppError::NotFound)
+    }
+}
+
+/// A saved list's new name: `null` or blank = back to an automatic one.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct SnapshotNameInput {
+    name: Option<String>,
+}
+
+/// `POST /api/deck-versions/:id/history/:snapshot_id/name`: name (or
+/// unname) one of the deck's saved lists. ("Name this save", for the zones
+/// as saved now, is the version's `PATCH` `snapshot_name`.)
+pub async fn name_snapshot(
+    State(state): State<AppState>,
+    Path((id, snapshot_id)): Path<(i64, i64)>,
+    Json(input): Json<SnapshotNameInput>,
+) -> AppResult<StatusCode> {
+    let name = input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
+    let mut tx = begin_write(&state.pool).await?;
+    same_deck(&mut tx, id, snapshot_id).await?;
+    snapshots::set_name(&mut tx, snapshot_id, name).await?;
+    tx.commit().await?;
+    tracing::info!(snapshot_id, named = name.is_some(), "deck snapshot named");
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -28,7 +28,8 @@ The Yu-Gi-Oh! menu is organised the same way:
 ### Cards
 `/cards`: every copy owned, as pictures or a table (`?view=table`), with
 filters (set, rarity, condition, in a deck, sold…). `/cards/:id` is one copy:
-its lot, its price history, the decks using it, its picture. **Edit** fixes
+its lot, its price history, the decks using it (each links to the deck's
+page, which lists its versions), its picture. **Edit** fixes
 the name, rarity, condition, printing picture (the edit page asks Yugipedia
 for the gallery) and the Cardmarket product. Cards are never deleted, only
 marked sold.
@@ -152,7 +153,7 @@ and plans competitive play (the next tournament, what to buy). Five tabs
 | **Build** | the zones (main, extra, side), drag and drop, the collection search, categories, the format banner. **Save** is sticky in the header |
 | **To buy** (was Missing) | the proxies (missing cards) with Cardmarket link and price, the cost, errata warnings, "Use my copy", this version's Cardmarket wants list |
 | **Test draw** | Monte Carlo opening hands on the zones as they are now |
-| **History** | the deck's saved lists, what changed, *Name this save* |
+| **History** | the deck's saved lists, what changed, *Name this save*, *Rename* (the only place lists are named) |
 | **Settings** | three blocks: **Rules** (ban list or format), **Physical deck** (built, deck box, sleeves), **Sharing** (public) |
 
 The header carries the owned/missing counts, this month's budget left, a
