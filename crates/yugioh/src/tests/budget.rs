@@ -111,3 +111,35 @@ async fn a_refund_lowers_the_cost_of_its_lot() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("The refund must be between 0 and the price."));
 }
+
+#[tokio::test]
+async fn the_dashboard_leads_with_the_collection_and_the_budget_page_has_the_charts() {
+    let t = TestApp::new().await;
+    t.deck_fixture().await;
+    let (status, page) = t.get("/").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    // 2 real copies (the proxy left out), no budget yet, the lot
+    for text in [
+        r#"<div class="value-amount">2</div>"#,
+        "No budget set yet.",
+        r#"href="/lots/1""#,
+        "New Shop",
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
+    assert!(!page.contains("charts-data"), "{page}");
+
+    // this month's budget, less the lot when it is this month's
+    t.exec(
+        "INSERT INTO monthly_budget (month, amount) VALUES (date('now', 'localtime', 'start of month'), '20.00');
+         UPDATE lot SET buy_date = date('now', 'localtime');",
+    )
+    .await;
+    let (_, page) = t.get("/").await;
+    assert!(page.contains("9.50 €"), "{page}");
+    assert!(page.contains("left to spend"), "{page}");
+
+    let (_, budget) = t.get("/budget").await;
+    assert!(budget.contains(r#"id="charts-data""#), "{budget}");
+    assert!(budget.contains("/static/js/budget_charts.js"), "{budget}");
+}

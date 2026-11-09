@@ -25,6 +25,10 @@ The Yu-Gi-Oh! menu is organised the same way:
 
 ## 1. Manage the card collection
 
+The home page (`/`) starts there: the cards owned, the collection's value
+and its move over 4 weeks, this month's budget left (a link to `/budget`),
+the last lots.
+
 ### Cards
 `/cards`: every copy owned, as pictures or a table (`?view=table`), with
 filters (set, rarity, condition, in a deck, sold…). `/cards/:id` is one copy:
@@ -52,8 +56,9 @@ replace deck proxies they correspond to. **Sellers** lists who you bought
 from, with what you spent.
 
 ### Budget
-`/budget`: the monthly allowance, what lots cost this month, one-off
-contributions (`/budget/manage`). The deck builder's *To buy* tab shows what
+`/budget`: the monthly allowance, what lots cost each month, one-off
+contributions (`/budget/manage`), and the charts (spending and shipping per
+month with the cards bought, the cards by unit price). The deck builder's *To buy* tab shows what
 is left, so you see what a deck would cost before buying.
 
 ### Value and statistics

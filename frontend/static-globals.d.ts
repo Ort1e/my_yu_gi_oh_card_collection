@@ -46,7 +46,7 @@ declare function pokemonRarityAnchor(name: string): string;
 
 // ---------- from a CDN ----------
 
-/** Chart.js, loaded from its CDN on the dashboard and the value page. */
+/** Chart.js, loaded from its CDN on the budget and value pages. */
 declare const Chart: any;
 
 // ---------- what lib.dom lacks ----------

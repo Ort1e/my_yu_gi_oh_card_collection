@@ -1,10 +1,20 @@
+//! `/budget`: the months' budget, spending and sales (most recent first),
+//! and two charts: spending and shipping per month with the cards bought,
+//! and how many cards were bought at each unit price.
+
 pub mod form;
+
+use std::collections::BTreeMap;
 
 use askama::Template;
 use axum::extract::State;
 use chrono::NaiveDate;
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use yugioh_domain::budget::{self, BudgetSummary, BudgetTotals, LotSummary, RecapEntry};
+use serde_json::json;
+use yugioh_domain::budget::{
+    self, first_of_month, BudgetSummary, BudgetTotals, LotSummary, RecapEntry,
+};
 use yugioh_domain::lot::{shipping_cost, LotType};
 
 use crate::store::db::today;
@@ -132,6 +142,8 @@ pub struct BudgetPage {
     /// Totals up to the current month.
     totals: BudgetTotals,
     available_debt: Decimal,
+    /// Chart.js data, serialised as JSON.
+    charts: String,
 }
 
 impl BudgetPage {
@@ -151,9 +163,47 @@ pub async fn overview(State(state): State<AppState>) -> AppResult<BudgetPage> {
     let current = budget::recap(&data.lots, &data.budgets, today, false);
 
     Ok(BudgetPage {
+        charts: charts(&data, &recap),
         totals_prev: BudgetTotals::compute(&recap),
         totals: BudgetTotals::compute(&current),
         recap,
         available_debt: budget::available_debt(&data.budgets),
     })
+}
+
+/// The charts' data (`static/js/budget_charts.js`), months oldest first:
+/// cards bought per month and number of cards per unit price, over the
+/// purchases not cancelled.
+fn charts(data: &BudgetData, recap: &[RecapEntry]) -> String {
+    let mut cards_per_month: BTreeMap<_, u32> = BTreeMap::new();
+    let mut cards_per_price: BTreeMap<Decimal, u32> = BTreeMap::new();
+    for (lot, (_, prices)) in data.lots.iter().zip(&data.lot_unites) {
+        if lot.is_cancelled || lot.lot_type != LotType::Purchase {
+            continue;
+        }
+        *cards_per_month
+            .entry(first_of_month(lot.buy_date))
+            .or_default() += prices.len() as u32;
+        for price in prices.iter().flatten() {
+            *cards_per_price.entry(price.normalize()).or_default() += 1;
+        }
+    }
+
+    let to_f64 = |d: Decimal| d.to_f64().unwrap_or_default();
+    let months = || recap.iter().rev();
+    let charts = json!({
+        "labels": months().map(RecapEntry::month_str).collect::<Vec<_>>(),
+        "card_spending": months().map(|e| to_f64(e.spent - e.shipping_cost)).collect::<Vec<_>>(),
+        "shipping_costs": months().map(|e| to_f64(e.shipping_cost)).collect::<Vec<_>>(),
+        "card_counts": months()
+            .map(|e| cards_per_month.get(&e.month).copied().unwrap_or(0))
+            .collect::<Vec<_>>(),
+        "cards_by_cost": cards_per_price
+            .iter()
+            .map(|(price, n)| json!({ "x": to_f64(*price), "y": n }))
+            .collect::<Vec<_>>(),
+    });
+    // `</` can't appear in JSON numbers/our labels, but escape it anyway
+    // since this is embedded in a <script>.
+    filters::json_for_script(&charts)
 }

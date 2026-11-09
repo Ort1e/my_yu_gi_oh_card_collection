@@ -293,7 +293,7 @@ factors, which `yugioh-domain` re-exports as `card::CardStatus` and
 |---|---|
 | `card` | name normalisation (`normalize_card_name`, `clean_card_name`), `CardStatus` (from `common-domain`) |
 | `lot` | `LotType`, shipping cost |
-| `budget` | monthly recap (`recap`, `BudgetTotals`, `available_debt`) for `/budget` and the dashboard |
+| `budget` | monthly recap (`recap`, `BudgetTotals`, `available_debt`) for `/budget` and the dashboard's budget tile |
 | `ydke` | `YdkeDeck::parse` / `to_url` |
 | `monte_carlo` | opening-hand simulation, conditional categories included |
 | `cardmarket` | shipment text → `Shipment` (dates, total, seller, card lines) |
