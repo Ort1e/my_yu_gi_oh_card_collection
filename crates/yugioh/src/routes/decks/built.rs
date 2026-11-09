@@ -6,9 +6,10 @@ use std::collections::BTreeMap;
 
 use askama::Template;
 use axum::extract::State;
+use rust_decimal::Decimal;
 
 use crate::routes::collection::{deck_values, DeckLine, ValueData};
-use crate::store::errata::{CardRef, Context, ErrataWarning, MissingCard, Verdicts};
+use crate::store::errata::{CardRef, Context, MissingCard, Verdicts};
 use crate::store::models::DeckVersionRow;
 use crate::web::error::AppResult;
 use crate::web::filters;
@@ -20,28 +21,72 @@ pub struct BuiltVersion {
     proxies: usize,
     /// Real copies with the wrong text for the version's format or ban list.
     wrong_text: usize,
-    /// By name.
-    missing: Vec<MissingCard>,
+    /// What is missing, by name.
+    missing: Vec<WantLine>,
 }
 
-/// A card missing from the built versions: its name, how many, and where.
-pub struct ShoppingLine {
-    name: String,
-    /// The name Cardmarket knows the card by.
-    english_name: String,
-    count: usize,
-    /// How many of them replace an owned copy with the wrong text.
-    wrong_text: usize,
-    decks: String,
-    /// One per format or ban list the card is errata'd in.
-    warnings: Vec<ErrataWarning>,
+impl BuiltVersion {
+    /// How many missing cards (with their copies) the deck lacks.
+    pub fn missing_copies(&self) -> usize {
+        self.missing.iter().map(|line| line.card.count).sum()
+    }
+
+    /// How many missing cards carry an errata warning.
+    pub fn errata_cards(&self) -> usize {
+        self.missing
+            .iter()
+            .filter(|line| line.card.warning.is_some())
+            .count()
+    }
+
+    /// What the deck's missing cards cost together, when their prices are known.
+    pub fn cost(&self) -> String {
+        let cost: Decimal = self.missing.iter().filter_map(WantLine::amount).sum();
+        format!("{:.2}", cost.round_dp(2))
+    }
+}
+
+/// A card missing from a built version, with its Cardmarket price.
+pub struct WantLine {
+    card: MissingCard,
+    /// One copy, ygoprodeck's Cardmarket price: None = no price known.
+    unit_price: Option<Decimal>,
+}
+
+impl WantLine {
+    fn amount(&self) -> Option<Decimal> {
+        self.unit_price
+            .map(|price| price * Decimal::from(self.card.count))
+    }
+
+    /// All the copies together.
+    pub fn total(&self) -> Option<String> {
+        self.unit_price.map(|price| {
+            format!(
+                "{:.2}",
+                (price * Decimal::from(self.card.count)).round_dp(2)
+            )
+        })
+    }
+
+    /// The price as the page's data attribute: empty when unknown.
+    pub fn price_attr(&self) -> String {
+        self.unit_price
+            .map(|price| price.round_dp(2).to_string())
+            .unwrap_or_default()
+    }
 }
 
 #[derive(Template)]
 #[template(path = "decks/built.html")]
 pub struct BuiltPage {
     versions: Vec<BuiltVersion>,
-    shopping: Vec<ShoppingLine>,
+    /// Every built deck's missing cards together, by English name:
+    /// `(count, name)`, for the wants list (all picked at first).
+    shopping: Vec<(usize, String)>,
+    /// What the shopping list costs, and how many of its cards have no price.
+    estimate: Decimal,
+    unpriced: usize,
     /// Cards whose errata are being looked up on Yugipedia.
     errata_pending: usize,
     /// Each deck's latest version: its value and what its proxies would
@@ -109,7 +154,7 @@ impl BuiltPage {
         wants_list(
             self.shopping
                 .iter()
-                .map(|line| (line.count, line.english_name.as_str())),
+                .map(|(count, name)| (*count, name.as_str())),
         )
     }
 }
@@ -151,8 +196,10 @@ pub async fn page(State(state): State<AppState>) -> AppResult<BuiltPage> {
         .collect();
     let verdicts = Verdicts::load(&state, &probes).await?;
 
-    // key -> the line, with the versions' full names
-    let mut shopping: BTreeMap<String, (ShoppingLine, Vec<String>)> = BTreeMap::new();
+    let values = ValueData::load(pool).await?;
+
+    // key -> (name on the card, English name, count, unit price)
+    let mut shopping: BTreeMap<String, (String, String, usize, Option<Decimal>)> = BTreeMap::new();
     let mut versions = Vec::new();
     for version in rows {
         let in_version: Vec<&CardRef> = cards
@@ -163,52 +210,48 @@ pub async fn page(State(state): State<AppState>) -> AppResult<BuiltPage> {
         let proxies = in_version.iter().filter(|c| c.is_proxy).count();
         let missing = verdicts.missing(contexts.get(&version.id), in_version.iter().copied());
 
-        for (key, card) in &missing.lines {
-            let (line, decks) = shopping.entry(key.clone()).or_insert_with(|| {
-                (
-                    ShoppingLine {
-                        name: card.name.clone(),
-                        english_name: card.english_name.clone(),
-                        count: 0,
-                        wrong_text: 0,
-                        decks: String::new(),
-                        warnings: Vec::new(),
-                    },
-                    Vec::new(),
-                )
-            });
-            line.count += card.count;
-            line.wrong_text += card.wrong_text.len();
-            decks.push(version.full_name());
-            if let Some(warning) = &card.warning {
-                if !line.warnings.iter().any(|w| w.format == warning.format) {
-                    line.warnings.push(warning.clone());
-                }
-            }
+        let mut lines = Vec::new();
+        for (key, card) in missing.lines {
+            let card_data_id = in_version
+                .iter()
+                .find(|c| c.key == key)
+                .and_then(|c| c.card_data_id);
+            let unit_price = values.latest.of(card_data_id, None);
+            let entry = shopping
+                .entry(key)
+                .or_insert_with(|| (card.name.clone(), card.english_name.clone(), 0, unit_price));
+            entry.2 += card.count;
+            lines.push(WantLine { card, unit_price });
         }
         versions.push(BuiltVersion {
             cards: in_version.len(),
             proxies,
             wrong_text: missing.wrong_text,
-            missing: missing.lines.into_values().collect(),
+            missing: lines,
             version,
         });
     }
 
-    let mut shopping: Vec<ShoppingLine> = shopping
+    let estimate = shopping
+        .values()
+        .filter_map(|(_, _, count, price)| price.map(|p| p * Decimal::from(*count)))
+        .sum();
+    let unpriced = shopping.values().filter(|(_, _, _, p)| p.is_none()).count();
+    let mut shopping: Vec<(String, String, usize)> = shopping
         .into_values()
-        .map(|(mut line, decks)| {
-            line.decks = decks.join(", ");
-            line
-        })
+        .map(|(name, english, count, _)| (name, english, count))
         .collect();
-    shopping.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-    let values = ValueData::load(pool).await?;
+    shopping.sort_by_key(|(name, _, _)| name.to_lowercase());
+    let shopping = shopping
+        .into_iter()
+        .map(|(_, english, count)| (count, english))
+        .collect();
 
     Ok(BuiltPage {
         versions,
         shopping,
+        estimate,
+        unpriced,
         errata_pending: verdicts.pending,
         decks: deck_values(pool, &values.latest).await?,
     })

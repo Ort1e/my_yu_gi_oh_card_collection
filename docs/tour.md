@@ -595,8 +595,9 @@ missing.
   it takes a `store::cards::free_copy` (a copy in no deck first), and if that
   copy was in other versions, they get a proxy of it, as building does.
 - Each version can note its **deck box** and **sleeves** (free text).
-- `/decks/built` (`routes/decks/built.rs`): each built version, what it still
-  misses (its proxies), and the shopping list of all of them, also as a
+- `/decks/built` (`routes/decks/built.rs`): each built version with its missing cards (folded, priced from
+  the latest Cardmarket price of the card data, ticked in or out by
+  `static/js/wants_list.js`), and the shopping list of all of them, also as a
   **Cardmarket wants list** (one `1 Card name` line per card, by English name
   from the card data; `static/js/wants_list.js` copies it). Language and
   condition can't be in the text: the page reminds to set them on the list

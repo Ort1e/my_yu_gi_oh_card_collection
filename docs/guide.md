@@ -190,11 +190,13 @@ Two paths through the builder:
 5. After the event, *+ Tournament with this version* (see below).
 
 ### Built decks
-`/decks/built`: the decks you physically built: their missing cards, the
-shopping list for all of them and the Cardmarket wants list (a version's own
-list is in the builder's *To buy* tab), errata warnings, and the value of
-each deck (a card whose text changed after the format's cutoff). A *Shopping
-list* page of its own is planned (see
+`/decks/built`: the decks you physically built. One card per deck (box,
+sleeves, counts, and a folded list of what is missing with its price, errata
+warnings and a Buy link), then the Cardmarket wants list of all the decks
+together with an **estimated price**. Untick a card, or a whole deck, and the
+list and the estimate follow (copy it from there). A version's own list is in
+the builder's *To buy* tab. The value of each deck is at the bottom. A
+*Shopping list* page of its own is planned (see
 [specs/deck-lists.md](specs/deck-lists.md)).
 
 ### Formats

@@ -373,11 +373,9 @@ async fn the_built_page_lists_what_is_missing() {
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("Test - v1"), "{page}");
     assert!(page.contains("Deck box: red box"), "{page}");
-    assert!(page.contains("1 × Kuriboh"), "{page}");
-    assert!(
-        page.contains("<td>Kuriboh</td><td>1</td><td class=\"text\">Test - v1</td>"),
-        "{page}"
-    );
+    assert!(page.contains("Missing: 1 copy"), "{page}");
+    assert!(page.contains("data-name=\"kuriboh\""), "{page}");
+    assert!(page.contains("Estimated price"), "{page}");
 
     // the badge on the deck page
     let (_, deck) = t.get("/decks/1").await;
@@ -418,6 +416,26 @@ async fn the_built_page_gives_a_cardmarket_wants_list_by_english_name() {
     );
     assert!(!page.contains("Magicien Sombre</textarea>"), "{page}");
     assert!(page.contains("data-copy=\"wants-all\""), "{page}");
+}
+
+#[tokio::test]
+async fn the_built_page_estimates_the_wants_list() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    // a Kuriboh proxy at 0.75, a Dark Magician proxy without a price
+    t.exec(
+        "INSERT INTO card_price (card_data_id, date, cardmarket_price) VALUES (2, '2026-11-01', '0.75');
+         UPDATE card SET is_proxy = 1 WHERE id IN (1, 3)",
+    )
+    .await;
+    put(&t, v1, &[cards[0], cards[2]]).await;
+    set_built(&t, v1, true).await;
+
+    let (status, page) = t.get("/decks/built").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("data-price=\"0.75\""), "{page}");
+    assert!(page.contains("<strong id=\"wants-total\">"), "{page}");
+    assert!(page.contains("without a price"), "{page}");
 }
 
 #[tokio::test]
@@ -677,13 +695,10 @@ async fn the_built_page_warns_about_errata_after_the_formats_cutoff() {
     assert!(page.contains("Old text."), "{page}");
     assert!(page.contains("New text."), "{page}");
     assert!(page.contains("Wrong text: 1"), "{page}");
-    assert!(
-        page.contains("owned with the wrong text: NEW-FR001"),
-        "{page}"
-    );
+    assert!(page.contains("with an errata"), "{page}");
     assert!(page.contains(">2 Dark Magician</textarea>"), "{page}");
     assert!(
-        page.contains("1 replace owned copies with the wrong text"),
+        page.contains("owned with the wrong text: NEW-FR001"),
         "{page}"
     );
     assert!(!page.contains("being looked up"), "{page}");
