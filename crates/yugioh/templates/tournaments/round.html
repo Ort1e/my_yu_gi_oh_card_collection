@@ -1,4 +1,5 @@
-{# One round of the tournament form, with its games. Needs `round` (RoundValues). #}
+{# One round of the tournament form, with its games (folded once the round
+   has a result and games). Needs `round` (RoundValues). #}
 <fieldset class="round" data-index="{{ round.index }}" data-next-game="{{ round.next_game() }}">
   <legend>Round <span class="round-number">{{ round.number() }}</span>
     <button type="button" class="remove-round btn-small btn-danger" title="Remove this round">✕</button></legend>
@@ -35,10 +36,13 @@
     </div>
   </div>
 
-  <div class="games">
-    {% for game in round.games %}{% include "tournaments/game.html" %}{% endfor %}
-  </div>
-  <button type="button" class="add-game btn-small btn-secondary">+ Add a game</button>
+  <details class="round-games" {% if !round.is_finished() %}open{% endif %}>
+    <summary>Games (<span class="games-count">{{ round.games.len() }}</span>)</summary>
+    <div class="games">
+      {% for game in round.games %}{% include "tournaments/game.html" %}{% endfor %}
+    </div>
+    <button type="button" class="add-game btn-small btn-secondary">+ Add a game</button>
+  </details>
 
   <p>
     <label for="rounds-{{ round.index }}-comment">Round comment:</label>

@@ -206,8 +206,10 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
 ### Tournaments
 - `/tournaments`: the table of tournaments with record and placement; a
   filter by date and deck. `/tournaments/add` (`?version=` pre-selects a
-  version): rounds with opponent deck labels, result, and games (won, lost,
-  draw, unfinished).
+  version), in parts: the event, the list played, the rounds (opponent deck
+  labels, result, and games: won, lost, draw, unfinished), the conclusion;
+  *Save* stays at the bottom of the screen, and on the edit page the games of
+  the rounds already noted are folded.
 - **The list played** is a snapshot of the deck's history, frozen when the
   tournament is saved. It shows on the tournament page and on the deck.
 - `/tournaments/stats` (`?since=`, `?deck=`): win rates by version, your

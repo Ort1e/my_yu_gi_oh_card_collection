@@ -103,6 +103,11 @@ impl RoundValues {
         shown_number(&self.index)
     }
 
+    /// A result and its games noted: the form folds the games.
+    fn is_finished(&self) -> bool {
+        !self.result.is_empty() && !self.games.is_empty()
+    }
+
     fn is_blank(&self) -> bool {
         self.opponent_deck.is_empty()
             && self.labels.is_empty()

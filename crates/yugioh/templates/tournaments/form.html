@@ -30,7 +30,7 @@
 
 <form method="post" action="{{ self.action() }}" id="tournament-form" {% if values.is_team %}class="is-team"{% endif %}>
   <fieldset>
-    <legend>Tournament</legend>
+    <legend>The event</legend>
     <div class="field-row">
       <div class="wide">
         <label for="name">Name:</label>
@@ -46,19 +46,6 @@
         <label for="location">Location:</label>
         <input type="text" name="location" id="location" value="{{ values.location }}" maxlength="255">
       </div>
-      <div class="wide">
-        <label for="version_id">Deck list played:</label>
-        <select name="version_id" id="version_id">
-          <option value="">— not noted —</option>
-          {% match frozen %}{% when Some with (frozen) %}<option value="keep" {% if values.version_id == "keep" %}selected{% endif %}>Keep the list saved: {{ frozen }}</option>{% when None %}{% endmatch %}
-          <optgroup label="Save the list a version holds now">
-          {% for version in versions %}
-          <option value="{{ version.id }}" {% if version.selected %}selected{% endif %}>{{ version.name }}</option>
-          {% endfor %}
-          </optgroup>
-        </select>
-        <small>The list is saved when the tournament is: editing the version afterwards doesn't change it.</small>
-      </div>
     </div>
     <div class="field-row">
       <div>
@@ -73,6 +60,26 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>The list played</legend>
+    <div class="field-row">
+      <div class="wide">
+        <label for="version_id">Deck list:</label>
+        <select name="version_id" id="version_id">
+          <option value="">— not noted —</option>
+          {% match frozen %}{% when Some with (frozen) %}<option value="keep" {% if values.version_id == "keep" %}selected{% endif %}>Keep the list saved: {{ frozen }}</option>{% when None %}{% endmatch %}
+          <optgroup label="Save the list a version holds now">
+          {% for version in versions %}
+          <option value="{{ version.id }}" {% if version.selected %}selected{% endif %}>{{ version.name }}</option>
+          {% endfor %}
+          </optgroup>
+        </select>
+        <small>The list is saved when the tournament is: editing the version afterwards doesn't change it.</small>
+      </div>
+    </div>
+  </fieldset>
+
+  <h2 class="form-section">The rounds</h2>
   <div id="rounds" data-next="{{ values.next_round() }}">
     {% for round in values.rounds %}{% include "tournaments/round.html" %}{% endfor %}
   </div>
@@ -86,7 +93,9 @@
     {% endif %}
   </fieldset>
 
-  <input type="submit" value="Save">
+  <div class="sticky-save">
+    <input type="submit" value="Save">
+  </div>
 </form>
 
 {% match id %}{% when Some with (id) %}

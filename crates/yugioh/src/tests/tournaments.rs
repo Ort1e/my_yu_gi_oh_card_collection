@@ -120,6 +120,25 @@ async fn editing_replaces_the_rounds() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("value=\"mitsu/K9\""));
     assert!(page.contains("value=\"K9, Mitsurugi\""));
+    // in sections, Save in sight; the lost round's games folded, the bye's
+    // (no game) open
+    for text in [
+        "<legend>The event</legend>",
+        "<legend>The list played</legend>",
+        r#"<h2 class="form-section">The rounds</h2>"#,
+        r#"<div class="sticky-save">"#,
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
+    assert_eq!(
+        page.matches(r#"<details class="round-games" >"#).count(),
+        1,
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"<details class="round-games" open>"#),
+        "{page}"
+    );
 
     // only the bye left, the team event unticked: the labels go too
     let (status, location) = t

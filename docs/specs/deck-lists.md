@@ -15,7 +15,8 @@ card you don't have). So:
   `delete_orphan_proxies`, the parts of `clean-cards` that keep proxies right,
   proxies made when a version is copied or built);
 - "what is missing" is a property of `card` rows (`is_proxy`), counted in 4
-  places ([browsing.md](browsing.md) #6);
+  places (builder header, To buy, `/decks/built`, the deck's hub), by
+  different queries;
 - nothing can say "I plan to play this deck, here is what I'd buy" without
   creating proxy rows.
 

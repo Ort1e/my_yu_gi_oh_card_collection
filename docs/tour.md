@@ -707,7 +707,10 @@ group the lists by the version they were taken from.
   (`set_results`), shared by the form and `import-tournament-notes`.
 - **The form** (`routes/tournaments/form.rs`, `static/js/tournament_form.js`):
   rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
-  blank rows skipped, numbered in order. The edit page shows the old free
+  blank rows skipped, numbered in order. Its parts: the event, the list
+  played, the rounds, the conclusion, then a sticky Save (`.sticky-save`);
+  a round with a result and games folds them (`RoundValues::is_finished`,
+  `<details class="round-games">`). The edit page shows the old free
   `notes` beside the form until "Clear the old notes".
 - **Stats** (`yugioh_domain::tournament::stats`): rounds (forfeit = win,
   double loss = loss, byes apart), games (draws and unfinished out of the

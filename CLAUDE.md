@@ -16,7 +16,7 @@ What the app is for, in priority order (details and the usual tasks per goal: `d
 
 ### Where a feature goes (UI)
 - **One function per page**, one place per action (a button, a panel, a wants list exists once; link to it from elsewhere, don't repeat it). Reading pages and data-entry forms are separate pages.
-- Before adding a page or a panel, read `docs/guide.md` (and `docs/specs/browsing.md`, the list of overlaps still to fix): put it under the goal's menu entry, and update the guide and `docs/tour.md` in the same commit.
+- Before adding a page or a panel, read `docs/guide.md`: put it under the goal's menu entry, and update the guide and `docs/tour.md` in the same commit.
 
 ## History — read first
 

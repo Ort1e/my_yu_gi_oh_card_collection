@@ -67,7 +67,7 @@ Read in this order; each step assumes the ones before.
    what), written for Claude but a good checklist for anyone.
 7. **[TODO.md](TODO.md)** (what's next). Designs not built yet go in
    `docs/specs/` (the folder is created when one is needed; today:
-   [browsing.md](docs/specs/browsing.md), [deck-lists.md](docs/specs/deck-lists.md)).
+   [deck-lists.md](docs/specs/deck-lists.md)).
 
 ## Running it on your computer
 
