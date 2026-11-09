@@ -222,10 +222,23 @@ already exist), then re-pointed at `missing_for_all`.
 Each step: migration (if any) tried on a copy of `data/app.db`, `cargo test`,
 `npm run check`, docs (`tour.md`, `guide.md`, CLAUDE.md) in the same commit.
 
-## Questions for the owner
+## Decisions (owner, 2026-11-09: "go with the spec")
 
-- Is a version's "missing" mark enough for a built deck, or do you want the
-  physical proxy (a printed copy) tracked? (This spec assumes the mark.)
-- Should two plain lists be allowed to "want" the same copy at once? (Yes
-  here; only built versions lock.)
-- Keep `card.is_proxy` data for old lots? (Spec: drop after one release.)
+- A built deck's missing card is a **mark** (`card_id IS NULL`), no
+  physical proxy tracked.
+- Two plain lists may want the same copy at once; only built versions lock.
+- `card.is_proxy` stays one release (always 0), then a migration drops it.
+
+## Stubs written (2026-11-09)
+
+In `crates/yugioh-domain/`, tests `#[ignore]`d until implemented (remove the
+`ignore` with the code; `cargo test -p yugioh-domain -- --ignored`):
+- `ownership.rs`: `Line`, `LineRef`, `Copy`, `availability` (copies seen from
+  one list: `owned`, `free`, `here`, `elsewhere`), `condition_rank` (best
+  first: MT, NM, unknown, EX, G, P), `missing`, `missing_for_all`.
+- `built_deck.rs`: `plan_list_build` → `ListBuildPlan { assigned, missing }`
+  (renamed `plan_build` in step 3, when the old one goes).
+
+Deviation from the text above: "the copies in the fewest other lists first"
+is gone from the building order: lists don't hold copies, so the only
+tie-break left after the condition is the oldest copy (lowest id).

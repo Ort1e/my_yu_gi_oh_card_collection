@@ -15,6 +15,7 @@ pub mod errata;
 pub mod format;
 pub mod lot;
 pub mod monte_carlo;
+pub mod ownership;
 pub mod printing_picture;
 pub mod rarity;
 pub mod stats;
