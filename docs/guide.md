@@ -227,7 +227,8 @@ notes), the Pokémon wishlist and the books (except private ones).
 It **never** contains: sellers, lots, shipment PDFs, prices paid, the budget,
 notes, ISBNs, tournaments' old notes, forms, private decks and books.
 
-A version is made public in the builder (*Settings → Sharing*); a tournament
+A version is made public in the builder (*Settings → Sharing*); a built
+version is public by default (building it turns the switch on); a tournament
 makes its list public. A book is kept out with the 🔒 switch of its form.
 Generate it by hand with `cargo run -p backend -- export-public`; the
 publishing (SFTP) is in [deploy/README.md](../deploy/README.md).

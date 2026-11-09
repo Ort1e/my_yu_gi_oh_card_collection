@@ -26,6 +26,7 @@ async fn the_public_copy_holds_nothing_private() {
              (10, 2, 'Played version', 0), (11, 2, 'Draft version', 0),
              (12, 3, 'Any version', 1), (14, 3, 'Hidden version', 0),
              (13, 1, 'Secret version', 0);
+         UPDATE deck_version SET deck_box = 'secret box', sleeves = 'secret sleeves' WHERE id = 12;
          INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
          INSERT INTO deck_snapshot (id, deck_id, version_id, created_at, name, tournament_id) VALUES
              (20, 2, 10, '2025-07-01 00:00:00', 'Played list', 1),
@@ -172,6 +173,8 @@ async fn the_public_copy_holds_nothing_private() {
         "old tournament note",
         "Deck labels",
         "secret note",
+        "secret box",
+        "secret sleeves",
         "wish note",
         "book note",
         "9780553573398",

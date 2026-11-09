@@ -164,6 +164,42 @@ async fn two_versions_of_a_deck_can_both_be_built() {
 }
 
 #[tokio::test]
+async fn a_built_version_is_public_by_default() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    put(&t, v1, &[cards[0]]).await;
+
+    let built = set_built(&t, v1, true).await;
+    assert_eq!(built["is_public"], true);
+
+    // hidden by hand, it stays hidden: saving its zones doesn't show it again
+    let (status, body) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{v1}"),
+            json!({ "is_public": false, "main": [cards[0], cards[1]] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["is_public"], false);
+
+    // unbuilding leaves the switch alone; built again, it is shown again
+    assert_eq!(set_built(&t, v1, false).await["is_public"], false);
+    assert_eq!(set_built(&t, v1, true).await["is_public"], true);
+
+    // built while hidden in the same request: the request wins
+    let v2 = version(&t, "v2", &[cards[2]]).await;
+    let (_, body) = t
+        .json(
+            "PATCH",
+            &format!("/api/deck-versions/{v2}"),
+            json!({ "is_built": true, "is_public": false }),
+        )
+        .await;
+    assert_eq!(body["is_public"], false);
+}
+
+#[tokio::test]
 async fn locked_cards_leave_the_reserve_until_unbuilt() {
     let t = TestApp::new().await;
     let (v1, cards) = t.deck_fixture().await;

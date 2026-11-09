@@ -7,7 +7,8 @@
 //! played in tournaments are kept.
 //!
 //! In the public copy (`common::export::public_copy`), only the versions
-//! shown by hand (`deck_version.is_public`, in the deck builder's Settings),
+//! shown (`deck_version.is_public`, in the deck builder's Settings; building
+//! a version turns it on),
 //! the snapshots shown by hand or played in a tournament
 //! (`store::snapshots::PUBLIC_SNAPSHOT`), and the decks that have one:
 //! [`PUBLIC_VERSION`], [`PUBLIC_DECK`]. The others answer 404 there, so the

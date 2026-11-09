@@ -25,7 +25,7 @@ counts, like the snapshots already are). "Owned / not owned" is *worked out*
 from the collection. Only a **built** version holds real copies (and, for the
 cards it lacks, a "missing" mark).
 
-## Schema (migration `0026_…sql`)
+## Schema (migration `0027_…sql`)
 
 Zones by card data and count, for every version:
 
@@ -190,7 +190,7 @@ Claude's.
 ## Planned versions and the shopping list
 
 - **Settings → Physical deck → "Planned"** (`deck_version.is_planned`,
-  migration 0026): a plain version you intend to build (the next
+  migration 0027): a plain version you intend to build (the next
   tournament). Built and planned versions are the ones whose missing cards
   count.
 - **`/decks/shopping`** (Decks menu, "Shopping list"): the cards missing from
@@ -209,7 +209,7 @@ already exist), then re-pointed at `missing_for_all`.
 
 ## Order of work
 
-1. Migration 0026 + `deck_version_card` read/write in `store/` (lists), the
+1. Migration 0027 + `deck_version_card` read/write in `store/` (lists), the
    API loading lines; the builder shows lines (plain versions only; built
    versions still through `card` rows until step 3).
 2. The owner's `availability` and `missing`; ownership shown in the builder

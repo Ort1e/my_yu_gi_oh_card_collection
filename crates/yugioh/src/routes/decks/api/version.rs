@@ -551,7 +551,17 @@ pub async fn update_version(
         .await?;
     let mut build_report = None;
     match update.is_built {
-        Some(true) if !was_built => build_report = Some(build(&mut tx, id).await?),
+        Some(true) if !was_built => {
+            build_report = Some(build(&mut tx, id).await?);
+            // a built deck is on the public site by default (hidden by hand
+            // afterwards, it stays hidden: only building turns it on)
+            if update.is_public.is_none() {
+                sqlx::query("UPDATE deck_version SET is_public = 1 WHERE id = ?")
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
         Some(false) if was_built => {
             // the proxies made in other versions stay: clean-cards swaps them back
             sqlx::query("UPDATE deck_version SET is_built = 0 WHERE id = ?")

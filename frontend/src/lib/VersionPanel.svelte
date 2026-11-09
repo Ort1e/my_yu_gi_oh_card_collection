@@ -37,7 +37,7 @@
         const sure = await askYes({
             title: build ? 'Build this version?' : 'Unbuild this version?',
             message: build
-                ? 'Its cards become its own: the ones shared with other decks become proxies there.'
+                ? 'Its cards become its own: the ones shared with other decks become proxies there. It also goes on the public site (Sharing hides it).'
                 : 'Its cards go back to the collection. The proxies made in other decks stay until clean-cards puts the cards back.',
             confirmLabel: build ? 'Build' : 'Unbuild',
         });
@@ -160,6 +160,7 @@
                 <input type="checkbox" checked={deck.is_public} on:change={togglePublic} />
                 Show on the public site
             </label>
+            <span class="hint">Building a version shows it; hidden here, it stays hidden.</span>
         {/if}
         <a href="/deck-versions/{deck.id}" target="_blank" rel="noopener">The read-only page ↗</a>
     </section>
