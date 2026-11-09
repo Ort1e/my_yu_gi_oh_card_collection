@@ -197,7 +197,7 @@ async fn a_version_shows_its_cards_by_zone() {
 }
 
 #[tokio::test]
-async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
+async fn a_version_names_its_ban_list_shows_opening_hands_and_links_its_tournament() {
     let t = TestApp::new().await;
     let (version, cards) = t.deck_fixture().await;
     t.exec(&format!(
@@ -220,7 +220,7 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     // no list chosen: the latest one, its badges on the tiles
     let shown = page().await;
     assert!(
-        shown.contains("The list of 01/04/2026 (the latest"),
+        shown.contains("Ban list: 01/04/2026 (the latest)"),
         "{shown}"
     );
     assert_eq!(
@@ -229,7 +229,6 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
             .count(),
         2
     );
-    assert!(shown.contains(r#"<td class="text">Magicien Sombre</td><td class="text"><span class="ban-status" data-ban="Limited">Limited</span></td><td>2</td>"#), "{shown}");
 
     // the version's own list
     t.exec(&format!(
@@ -237,8 +236,7 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     ))
     .await;
     let shown = page().await;
-    assert!(shown.contains("The list of 01/01/2026."), "{shown}");
-    assert!(shown.contains("No card of this version is restricted on it."));
+    assert!(shown.contains("Ban list: 01/01/2026</div>"), "{shown}");
     assert!(!shown.contains("card-tile-ban"));
 
     // 1 Starter of 2 cards: always in a 2-card hand (the whole deck), once on average
@@ -250,16 +248,15 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
         "{shown}"
     );
 
-    // the tournament, round by round
-    assert!(shown.contains(r##"href="#tournament""##));
-    for text in [
-        "Played at <a href=\"/tournaments/1\">Locals</a>",
-        "Yummy",
-        "quick round",
-        "god hand",
-        "Fun deck",
-    ] {
-        assert!(shown.contains(text), "{text}: {shown}");
+    // the tournament: a link to its page, its rounds stay there
+    assert!(
+        shown.contains(
+            r#"Played at <a href="/tournaments/1" class="on-card">Locals</a> (08/02/2026, 1-0)"#
+        ),
+        "{shown}"
+    );
+    for text in ["Yummy", "quick round", "god hand", "Fun deck"] {
+        assert!(!shown.contains(text), "{text}: {shown}");
     }
 }
 

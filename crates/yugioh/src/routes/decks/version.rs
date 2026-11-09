@@ -4,12 +4,13 @@
 //! name ignoring case and accents (`yugioh_domain::card::sort_name`), so the
 //! copies of a card sit together whatever their language. The deck builder
 //! sorts the same way (`frontend/src/deck.ts`).
-//! Around the cards: the version's format (its problems there, its list)
-//! or ban list (its own, else the latest one: the restricted cards and a
-//! badge on their tiles), its opening hands (the
-//! deck builder's Monte Carlo on its categories, `yugioh_domain::monte_carlo`,
-//! going first and second) and the tournament it was played in, round by
-//! round.
+//! Around the cards: the version's format or ban list (its own, else the
+//! latest one), named, with a badge on the restricted cards' tiles; its
+//! opening hands (the deck builder's Monte Carlo on its categories,
+//! `yugioh_domain::monte_carlo`, going first and second); and a link to the
+//! last tournament it was played in. The rest is said once elsewhere: the
+//! format's problems and the wants list in the builder's tabs, the rounds on
+//! the tournament's page.
 //! The page is only the read-only view: all the editing is in the deck builder
 //! (`/deck-builder/:id`, a button away in the app), which also shows or hides
 //! the version on the public site (`is_public`, the `PATCH` of its API). The
@@ -31,7 +32,6 @@ use super::PUBLIC_VERSION;
 use crate::routes::tournaments::TournamentView;
 use crate::store::cards::Zone;
 use crate::store::db::Pool;
-use crate::store::formats;
 use crate::store::models::{CardRow, DeckVersionRow};
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::filters;
@@ -56,11 +56,8 @@ pub struct BanList {
     date: String,
     /// Chosen in the deck builder (not the latest one by default).
     chosen: bool,
-    /// The version's restricted cards: status, English name, copies.
-    cards: Vec<(&'static str, String, usize)>,
-    /// The format played: `(id, "Edison v2", cutoff)`, its problems.
-    format: Option<(i64, String, String)>,
-    problems: Vec<String>,
+    /// The format played: `(id, "Edison v2")`.
+    format: Option<(i64, String)>,
 }
 
 /// The opening hands of one category: the share of hands with at least one
@@ -107,15 +104,17 @@ fn ban_label(status: &str) -> Option<&'static str> {
         .find(|label| *label == status)
 }
 
-/// The format a version plays, `(id, label, cutoff, its problems)`.
-async fn format(pool: &Pool, id: i64) -> AppResult<Option<(i64, String, String, Vec<String>)>> {
-    let mut conn = pool.acquire().await?;
-    Ok(formats::version_problems(&mut conn, id)
-        .await?
-        .map(|(format, problems)| {
-            let problems = problems.iter().map(|p| p.message()).collect();
-            (format.id, format.label(), format.cutoff, problems)
-        }))
+/// The format a version plays, `(id, label)`.
+async fn format(pool: &Pool, id: i64) -> AppResult<Option<(i64, String)>> {
+    let format: Option<(i64, String, i64)> = sqlx::query_as(
+        "SELECT deck_format.id, deck_format.name, deck_format.version FROM deck_format
+         JOIN deck_version ON deck_version.format_id = deck_format.id
+         WHERE deck_version.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(format.map(|(format_id, name, version)| (format_id, format!("{name} v{version}"))))
 }
 
 /// The ban list the page follows, `(id, date, chosen)`: the version's, else
@@ -221,9 +220,6 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         .into_iter()
         .filter_map(|(data_id, status)| Some((data_id, ban_label(&status)?)))
         .collect();
-    // status, English name → copies in the version
-    let mut restricted: BTreeMap<(&'static str, String), usize> = BTreeMap::new();
-
     let mut zones = Vec::new();
     for (zone, name) in Zone::ALL
         .into_iter()
@@ -269,10 +265,6 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
             .map(|(_, card)| {
                 let mut tile = card.tile();
                 tile.ban = card.card_data_id.and_then(|d| statuses.get(&d).copied());
-                if let Some(status) = tile.ban {
-                    let english = card.name_en.clone().unwrap_or_else(|| card.name.clone());
-                    *restricted.entry((status, english)).or_default() += 1;
-                }
                 tile
             })
             .collect();
@@ -296,27 +288,17 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
     Ok(VersionPage {
         version,
         zones,
-        ban_list: {
-            let cards = restricted
-                .into_iter()
-                .map(|((status, name), copies)| (status, name, copies))
-                .collect();
-            match format {
-                Some((format_id, label, cutoff, problems)) => Some(BanList {
-                    date: String::new(),
-                    chosen: true,
-                    cards,
-                    format: Some((format_id, label, cutoff)),
-                    problems,
-                }),
-                None => ban.map(|(_, date, chosen)| BanList {
-                    date,
-                    chosen,
-                    cards,
-                    format: None,
-                    problems: Vec::new(),
-                }),
-            }
+        ban_list: match format {
+            Some(format) => Some(BanList {
+                date: String::new(),
+                chosen: true,
+                format: Some(format),
+            }),
+            None => ban.map(|(_, date, chosen)| BanList {
+                date,
+                chosen,
+                format: None,
+            }),
         },
         hands: hands(pool, id).await?,
         played,

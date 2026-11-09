@@ -136,8 +136,10 @@ format → tournament → list played → stats.**
 `/decks` lists the decks; `/decks/:id` is the deck's hub: its versions, its
 history, its tournaments. A **version** is one list of 40-60 cards plus extra
 and side deck. `/deck-versions/:id` is a version's **read-only** page: the
-cards as a grid with ban badges, opening hands (5 and 6 cards), the
-tournament round by round. Its *Open in the deck builder* button leads to
+cards as a grid with ban badges, the format or ban list it plays, opening
+hands (5 and 6 cards), a link to the tournament it was played in (the
+rounds are on the tournament's page; the format's problems in the builder).
+Its *Open in the deck builder* button leads to
 the editor. New version: from the deck's hub (empty, a copy of another
 version, or a YDKE).
 

@@ -211,15 +211,12 @@ async fn a_deck_version_plays_a_format() {
         format
     );
 
-    // the read-only page: the format, its problems, the list's badges
+    // the read-only page names the format (its problems are the builder's)
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    for text in [
-        "<h2>Format</h2>",
-        r#"<a href="/formats/1">Edison v1</a>"#,
-        "Dark Magician: 2 copies, 1 allowed",
-    ] {
-        assert!(page.contains(text), "{text}: {page}");
-    }
+    assert!(
+        page.contains(r#"Format: <a href="/formats/1" class="on-card">Edison v1</a>"#),
+        "{page}"
+    );
 
     // a copy keeps the format; the format can't be deleted while played
     let (status, _) = t

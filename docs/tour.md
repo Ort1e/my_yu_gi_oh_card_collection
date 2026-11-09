@@ -649,21 +649,20 @@ public copy (in the app, one "Edit in the builder" button; the public
 toggle moved to the builder's Settings, the wants list to its To buy tab): its zones as the card grid (by kind, then English name), and
 around them:
 
-- **the format** it plays (its problems there: `store::formats::version_problems`,
-  and the format's list for the badges), else **the ban list**: the
-  version's own (chosen in the deck builder), else the latest one; the
-  restricted cards in a table, and a corner badge on their tiles
-  (`CardTile::ban`, `X`/`1`/`2` as in the builder). A ban list doesn't
-  judge the deck (no "too many copies" check), a format does;
+- **the format** it plays, else **the ban list**: the version's own
+  (chosen in the deck builder), else the latest one; named in the header,
+  and a corner badge on the restricted cards' tiles (`CardTile::ban`,
+  `X`/`1`/`2` as in the builder). The format's problems are said in the
+  builder only (`…/check`);
 - **the opening hands**: the deck builder's Monte Carlo on the version's
   categories (`decks/api/simulation.rs::inputs`, `yugioh_domain::monte_carlo`),
   10,000 hands of 5 cards (going first) and of 6 (second), seeded by the
   version's id so the public copy doesn't change from one night to the
   next; the share of hands with at least one card of each category, and
   their average number;
-- **the tournament** it was played in, round by round
-  (`tournaments::TournamentView`, the same `tournaments/rounds.html` as the
-  tournament's page).
+- **the tournament** it was last played in: a link in the header ("Played
+  at …", its record, the list played); the rounds stay on the tournament's
+  page.
 
 ## Formats
 
