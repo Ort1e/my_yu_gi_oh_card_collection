@@ -85,6 +85,20 @@ async fn a_format_from_a_konami_list_and_its_versions() {
     }
     // Kuriboh (2012) is listed but out of the pool anyway
     assert!(page.contains(r#"class="format-out""#), "{page}");
+    // a read page: the forms are on the edit page
+    assert!(page.contains(r#"href="/formats/1/edit""#), "{page}");
+    assert!(!page.contains("<form"), "{page}");
+    let (status, page) = t.get("/formats/1/edit").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    for text in [
+        r#"action="/formats/1/edit""#,
+        r#"action="/formats/1/cards""#,
+        r#"action="/formats/1/new-version""#,
+        r#"action="/formats/1/delete""#,
+        r#"<option value="Dark Magician">"#,
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
 
     // a second format of that name, a set without a date: refused
     let (status, page) = t
@@ -120,7 +134,7 @@ async fn a_format_from_a_konami_list_and_its_versions() {
     let (status, location) = t.post("/formats/1/new-version", &[]).await;
     assert_eq!(
         (status, location.as_str()),
-        (StatusCode::SEE_OTHER, "/formats/2")
+        (StatusCode::SEE_OTHER, "/formats/2/edit")
     );
     t.post("/formats/2/cards/1", &[("status", "Banned")]).await;
     let status_in = |format: i64| {
@@ -261,6 +275,7 @@ async fn reading_formats_is_public_changing_them_needs_the_login() {
         assert_eq!(t.get(page).await.0, StatusCode::OK, "{page}");
     }
     assert_eq!(t.get("/formats/add").await.0, StatusCode::SEE_OTHER);
+    assert_eq!(t.get("/formats/1/edit").await.0, StatusCode::SEE_OTHER);
     for (url, form) in [
         (
             "/formats/add",

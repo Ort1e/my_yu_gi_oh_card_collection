@@ -16,7 +16,8 @@ shorter `/collection/value` (folded sections, the decks' values on
 builder's header; saved lists named only in the builder's History tab
 (Rename on each row); the card page lists the decks using the copy, not
 their versions; the version page keeps to the list and the opening hands
-(the format or ban list named, a link to the tournament). They are described in [../guide.md](../guide.md).
+(the format or ban list named, a link to the tournament); `/formats/:id`
+reads, `/formats/:id/edit` changes. They are described in [../guide.md](../guide.md).
 
 ## To do
 
@@ -24,7 +25,6 @@ their versions; the version page keeps to the list and the opening hands
 |---|---|---|---|
 | 2 | **The dashboard is mostly budget**, though the main goal is the collection. | Lead with the collection (cards owned, value and its move, last lots); keep one budget line linking to `/budget`. | M |
 | ~~6~~ | **Proxy counts** (skipped: the [deck-lists](deck-lists.md) redesign removes proxies) are shown in 4 places (builder header, To buy, `/decks/built`, the version page), computed by different queries. | One helper that counts them (`store`), used by all; each page shows the number and links to To buy. | M |
-| 8 | **`/formats/:id` is half reference, half edit form.** | Read page for the rules (what the format forbids), the edit form on `/formats/:id/edit`, like the other entities. | M |
 | 9 | **The tournament form is long** (the tournament, the list played, rounds, games, labels in one form). | Section the form (the event, the list, the rounds) with a sticky "Save"; fold the games of finished rounds. | L |
 
 ## Larger: versions as lists

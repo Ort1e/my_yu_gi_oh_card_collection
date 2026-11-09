@@ -112,7 +112,10 @@ pub fn write_router() -> Router<AppState> {
             "/formats/add",
             get(formats::form::add_form).post(formats::form::create),
         )
-        .route("/formats/:id/edit", post(formats::form::update))
+        .route(
+            "/formats/:id/edit",
+            get(formats::edit).post(formats::form::update),
+        )
         .route("/formats/:id/cards", post(formats::form::add_card))
         .route(
             "/formats/:id/cards/:card_data_id",

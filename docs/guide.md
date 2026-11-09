@@ -194,8 +194,9 @@ list* page of its own is planned (see
 
 ### Formats
 `/formats`: the rules a deck is played under (a Konami ban list copied, with
-a cutoff date, e.g. Edison). *Add*, *edit* its list, *new version*, delete
-while unused. A version plays a ban list **or** a format, never both.
+a cutoff date, e.g. Edison). `/formats/:id` reads its rules and list;
+*Edit* (`/formats/:id/edit`) changes its name, cutoff, notes and list, makes
+a *new version*, deletes it while unused. A version plays a ban list **or** a format, never both.
 
 ### Tournaments
 - `/tournaments`: the table of tournaments with record and placement; a

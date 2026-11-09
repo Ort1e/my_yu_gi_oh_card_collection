@@ -676,7 +676,7 @@ format (`deck_version.format_id`; the save refuses both).
 |---|---|
 | the rules: a card's first release (the earliest TCG date of its sets), a deck's problems (`check`: released after the cutoff or never in the TCG, more copies than allowed, counted by English name across main, extra and side) | `yugioh-domain/src/format.rs` |
 | the sets' TCG dates (`ygo_set`, ygoprodeck's `cardsets.php`; with the weekly prices, and once when there are none); first releases, a format's rules, a version's problems; create from a Konami list (copied), new version (a copy) | `yugioh/src/store/formats.rs` |
-| `/formats` (list), `/formats/:id` (its list: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
+| `/formats` (list), `/formats/:id` (read: its rules, versions, the decks playing it, its list), `/formats/:id/edit` (`FormatEditPage`, the same data: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
 | deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.ts` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
 
 **A change of the list on a format already played**: make a new version
