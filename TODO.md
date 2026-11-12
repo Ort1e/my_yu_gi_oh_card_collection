@@ -37,6 +37,9 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
   NAS (never rebuild a parent table with foreign keys on: `ALTER TABLE …
   DROP COLUMN`, and the tests' `INSERT … is_proxy` in `clean_cards.rs`,
   `tests/advent.rs`, `store/yugipedia.rs` change with it).
+- **sqlx 0.7 → 0.8+**: clears the two sqlx advisories and RUSTSEC-2026-0459
+  (SQLite's C code in `libsqlite3-sys` 0.27, ignored in `.cargo/audit.toml`
+  for now); then drop those three `ignore` lines.
 
 ## Done
 

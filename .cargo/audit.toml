@@ -8,4 +8,9 @@ ignore = [
     # sqlx 0.7 (casts in the Postgres/MySQL binary protocols): SQLite isn't
     # concerned; fixed by sqlx 0.8 (a separate upgrade).
     "RUSTSEC-2024-0363",
+    # SQLite's C code bundled by libsqlite3-sys 0.27 (CVE-2026-119375, medium):
+    # the app only opens its own database file and never runs untrusted SQL
+    # or reads a foreign database. Fixed by libsqlite3-sys >= 0.39, i.e. the
+    # same sqlx upgrade (TODO.md, tech debt).
+    "RUSTSEC-2026-0459",
 ]
