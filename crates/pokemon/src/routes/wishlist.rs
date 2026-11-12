@@ -2,17 +2,23 @@
 //! owner wants to pay (`pokemon_domain::wish`). Public to read; adding,
 //! editing, deleting and "Mark got" behind the login. A wish is got with a
 //! copy (`got_copy_id`): the add pages offer it when a new copy fulfils it.
+//! Above the wishes, the boosters to open for them
+//! (`pokemon_domain::booster`, `store::boosters`), also in the public copy.
+
+use std::collections::HashMap;
 
 use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Form;
+use pokemon_domain::booster::{suggest, Suggestion};
 use pokemon_domain::wish::{Verdict, Wish};
 use pokemon_domain::{language_label, parse_language, Catalogue, Variant, LANGUAGES};
 use rust_decimal::Decimal;
 
 use super::form::find_card;
 use super::{card_names, image_src, money, rarities};
+use crate::store::boosters;
 use crate::store::cards::{self, WishFields};
 use crate::store::prices;
 use common::db::{begin_write, Money, Pool};
@@ -145,11 +151,41 @@ impl WishRow {
     }
 }
 
+/// A suggested booster, as the page shows it.
+pub struct BoosterRow {
+    name: String,
+    price: String,
+    wished: usize,
+    /// The TCGdex sets of its wished cards (`Étincelles Déferlantes`).
+    sets: String,
+}
+
+impl BoosterRow {
+    fn new(suggestion: &Suggestion, wanted: &[WishRow], expansions: &[Option<i64>]) -> BoosterRow {
+        let mut sets: Vec<&str> = Vec::new();
+        for (wish, expansion) in wanted.iter().zip(expansions) {
+            if *expansion == Some(suggestion.booster.expansion)
+                && !sets.contains(&wish.set_name.as_str())
+            {
+                sets.push(&wish.set_name);
+            }
+        }
+        BoosterRow {
+            name: suggestion.booster.name.clone(),
+            price: money(suggestion.booster.price),
+            wished: suggestion.wished,
+            sets: sets.join(", "),
+        }
+    }
+}
+
 #[derive(Template)]
 #[template(path = "pokemon/wishlist.html")]
 pub struct WishlistPage {
     wanted: Vec<WishRow>,
     got: Vec<WishRow>,
+    most_wished: Vec<BoosterRow>,
+    cheapest: Vec<BoosterRow>,
 }
 
 impl WishlistPage {
@@ -178,8 +214,37 @@ pub async fn list(State(state): State<AppState>) -> AppResult<WishlistPage> {
         wish.price = rule.price(card_prices);
         wish.verdict = Some(rule.verdict(wish.price));
     }
-    let (got, wanted) = wishes.into_iter().partition(|w| w.got_copy_id.is_some());
-    Ok(WishlistPage { wanted, got })
+    let (got, wanted): (Vec<WishRow>, Vec<WishRow>) =
+        wishes.into_iter().partition(|w| w.got_copy_id.is_some());
+
+    let expansion_of: HashMap<i64, Option<i64>> = sqlx::query_as(&format!(
+        "SELECT w.id, {} FROM pokemon_wish w JOIN pokemon_card c ON c.id = w.card_id
+         WHERE w.got_copy_id IS NULL",
+        boosters::EXPANSION
+    ))
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
+    let expansions: Vec<Option<i64>> = wanted
+        .iter()
+        .map(|w| expansion_of.get(&w.id).copied().flatten())
+        .collect();
+    let known = boosters::all(pool).await?;
+    let suggestions = suggest(expansions.iter().copied(), &known);
+    let rows = |list: &[Suggestion]| -> Vec<BoosterRow> {
+        list.iter()
+            .map(|s| BoosterRow::new(s, &wanted, &expansions))
+            .collect()
+    };
+    let most_wished = rows(&suggestions.most_wished);
+    let cheapest = rows(&suggestions.cheapest);
+    Ok(WishlistPage {
+        wanted,
+        got,
+        most_wished,
+        cheapest,
+    })
 }
 
 // ---------- add, edit ----------

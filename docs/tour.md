@@ -75,7 +75,7 @@ The Cargo workspace (`crates/*` and `importer`):
 | `crates/common/` | What every collection uses: state, web plumbing, DB, photos, base templates, the test harness | settings, base templates |
 | `crates/yugioh-domain/` | Pure Yu-Gi-Oh! business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
 | `crates/books-domain/`, `crates/pokemon-domain/` | The other collections' pure logic | (none) |
-| `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors | |
+| `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors, Cardmarket's price guide file (`cardmarket`) | |
 | `importer/` | One-off Django `dumpdata` loader, used for the cutover | `loaddata` |
 
 Dependencies only go down: a collection uses its domain crate, `common`
@@ -840,7 +840,7 @@ instead, like the Yu-Gi-Oh! cards); wishes can be.
 | the collection (the shared picture grid or a table, filters, value), a copy | `src/routes/mod.rs` |
 | add one copy, edit (and sell) | `src/routes/form.rs` |
 | a booster opening: numbers → preview → save | `src/routes/booster.rs` |
-| the wishlist | `src/routes/wishlist.rs` |
+| the wishlist, and its booster suggestions | `src/routes/wishlist.rs`, `src/store/boosters.rs`, `pokemon_domain::booster` |
 | the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `src/routes/api.rs` |
 | pictures, downloaded once into `media/pokemon_card_images/` (`common::media`) | `src/routes/images.rs` |
 | the rarity and variant guide | `src/routes/rarities.rs`, `static/js/pokemon_rarities.js` (drawn by `rarity_guide.js`) |
@@ -863,6 +863,14 @@ species' French and English names by its Pokédex number. The Pokémon TCG API
 | a name search | `GET /v2/{lang}/cards?name=` (Pocket cards left out) | not stored |
 | a picture | `{image}/high.webp` | `media/pokemon_card_images/` |
 | prices, weekly | the card again | `pokemon_price` |
+
+The boosters' prices come from **Cardmarket's catalogue** instead (game 6,
+the same downloadable files as the Yu-Gi-Oh! price guide, read in memory,
+weekly, `pokemon/src/store/boosters.rs`): a card's TCGdex data names its
+Cardmarket product, the singles list its expansion
+(`pokemon_card.cardmarket_expansion`), the non-singles list that
+expansion's booster, the price guide its price (`pokemon_booster`, migration
+0028). One price over every language: the files don't split them.
 
 Its filters match "contains, ignoring the case" (`eq:` is exact but
 case-sensitive), so the code keeps the exact matches; a card is only found
@@ -1017,7 +1025,8 @@ is skipped, so it is safe to run twice.
 `refresh-prices` fetches today's market price of every card data
 (`yugioh/src/store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
 Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices), then the
-Pokémon cards owned or wished from TCGdex (`pokemon/src/store/prices.rs`); the server
+Pokémon cards owned or wished from TCGdex (`pokemon/src/store/prices.rs`) and their
+boosters from Cardmarket (`pokemon/src/store/boosters.rs`); the server
 does it weekly by itself (`backend/src/commands/prices.rs::spawn_weekly`,
 `common::schedule::when_due`: checked every 6 hours, runs when the last
 Yu-Gi-Oh! refresh is 7 days old; the Pokémon refresh follows it, since it

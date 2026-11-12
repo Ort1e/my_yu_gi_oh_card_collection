@@ -6,6 +6,7 @@ edition = "2021"
 # The Pokémon collection's pure rules: no DB, no HTTP.
 
 [dependencies]
+serde = { workspace = true }
 common-domain = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }

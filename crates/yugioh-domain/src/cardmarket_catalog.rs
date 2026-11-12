@@ -6,8 +6,8 @@
 //! - [`PRODUCTS_URL`]: `{"products": [{"idProduct", "name", "idExpansion",
 //!   "dateAdded", …}]}`, names without set code nor rarity, and `""` for a
 //!   quote (`""A"" Cell Breeding Device`);
-//! - [`PRICES_URL`]: `{"createdAt", "priceGuides": [{"idProduct", "trend",
-//!   "avg30", "low", …}]}`, in EUR, over every language.
+//! - [`PRICES_URL`]: the price guide, in EUR, over every language, read by
+//!   `common_domain::cardmarket` (Pokémon's has the same shape).
 //!
 //! Neither file says which set code an expansion is, nor the rarity of a
 //! product, so an owned copy is matched to its product in two steps:
@@ -25,9 +25,10 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::NaiveDate;
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+
+pub use common_domain::cardmarket::{parse_prices, ProductPrices};
 
 use crate::card::clean_card_name;
 use crate::rarity::Rarity;
@@ -53,22 +54,6 @@ impl Product {
     }
 }
 
-/// A product's prices (EUR).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ProductPrices {
-    pub trend: Option<Decimal>,
-    pub avg30: Option<Decimal>,
-    pub low: Option<Decimal>,
-}
-
-impl ProductPrices {
-    /// The price a copy is valued at: the trend, else the 30-day average
-    /// (cards rarely sold have no trend).
-    pub fn value(&self) -> Option<Decimal> {
-        self.trend.or(self.avg30)
-    }
-}
-
 #[derive(Deserialize)]
 struct RawProducts {
     products: Vec<RawProduct>,
@@ -81,21 +66,6 @@ struct RawProduct {
     name: String,
     id_expansion: i64,
     date_added: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RawPrices {
-    price_guides: Vec<RawPrice>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RawPrice {
-    id_product: i64,
-    trend: Option<f64>,
-    avg30: Option<f64>,
-    low: Option<f64>,
 }
 
 /// The products file. Products with a date that can't be read are skipped.
@@ -113,28 +83,6 @@ pub fn parse_products(json: &[u8]) -> Result<Vec<Product>, serde_json::Error> {
                 expansion: p.id_expansion,
                 added,
             })
-        })
-        .collect())
-}
-
-/// The price guide file, by product id. Zero or negative prices count as none.
-pub fn parse_prices(json: &[u8]) -> Result<HashMap<i64, ProductPrices>, serde_json::Error> {
-    let raw: RawPrices = serde_json::from_slice(json)?;
-    let euros = |price: Option<f64>| {
-        Decimal::from_f64(price?)
-            .map(|d| d.round_dp(2))
-            .filter(|d| *d > Decimal::ZERO)
-    };
-    Ok(raw
-        .price_guides
-        .into_iter()
-        .map(|p| {
-            let prices = ProductPrices {
-                trend: euros(p.trend),
-                avg30: euros(p.avg30),
-                low: euros(p.low),
-            };
-            (p.id_product, prices)
         })
         .collect())
 }
@@ -298,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_the_two_files() {
+    fn parses_the_products_file() {
         let products = br#"{"version": 1, "createdAt": "2026-10-19T02:42:54+0200", "products": [
             {"idProduct": 101788, "name": "\"\"A\"\" Cell Breeding Device", "idCategory": 5,
              "idExpansion": 1011, "idMetacard": 101779, "dateAdded": "2007-01-01 00:00:00"},
@@ -315,18 +263,6 @@ mod tests {
             }]
         );
         assert_eq!(products[0].key(), "\"a\" cell breeding device");
-
-        let prices = br#"{"version": 1, "createdAt": "2026-10-19T02:42:54+0200", "priceGuides": [
-            {"idProduct": 1, "idCategory": 5, "avg": 0.08, "low": 0.02, "trend": 0.08, "avg30": 0.12},
-            {"idProduct": 2, "low": 38.99, "trend": null, "avg30": null},
-            {"idProduct": 3, "low": 0, "trend": 12.346, "avg30": 13.71}
-        ]}"#;
-        let prices = parse_prices(prices).unwrap();
-        assert_eq!(prices[&1].value(), Some(dec!(0.08)));
-        assert_eq!(prices[&2].value(), None);
-        assert_eq!(prices[&2].low, Some(dec!(38.99)));
-        assert_eq!(prices[&3].trend, Some(dec!(12.35)));
-        assert_eq!(prices[&3].low, None);
     }
 
     fn names(names: &[&str]) -> HashSet<String> {

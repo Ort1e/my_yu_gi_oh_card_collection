@@ -24,3 +24,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 common = { path = "../common", features = ["test-support"] }
+rust_decimal_macros = { workspace = true }

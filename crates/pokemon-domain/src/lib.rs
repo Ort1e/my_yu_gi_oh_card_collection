@@ -5,12 +5,14 @@
 //! - [`card_ref`]: the code printed at the bottom of a card (`FNE 067/064`);
 //! - [`pulls`]: a booster opening's numbers (`67 45r 12x2`);
 //! - [`price`]: a copy's market price from Cardmarket's numbers, and its value;
-//! - [`wish`]: whether a wish's price is reached, whether a copy fulfils it.
+//! - [`wish`]: whether a wish's price is reached, whether a copy fulfils it;
+//! - [`booster`]: the boosters to suggest from the wishlist (Cardmarket).
 //!
 //! TCGdex has two catalogues ([`Catalogue`]): the international cards (one
 //! card id for its French, English, German… prints) and the Japanese cards
 //! (their own sets and ids). A copy's catalogue follows its language.
 
+pub mod booster;
 pub mod card_ref;
 pub mod price;
 pub mod pulls;

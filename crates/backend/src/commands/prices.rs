@@ -1,6 +1,7 @@
 //! `refresh-prices`: the Yu-Gi-Oh! prices (`yugioh::commands::prices`:
 //! ygoprodeck, then Cardmarket's price guide), then the Pokémon cards' from
-//! TCGdex (`pokemon::store::prices`). The server also runs it by itself
+//! TCGdex (`pokemon::store::prices`) and their boosters from Cardmarket's
+//! catalogue (`pokemon::store::boosters`). The server also runs it by itself
 //! every week ([`spawn_weekly`]).
 
 use std::time::Duration;
@@ -14,6 +15,9 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     yugioh_prices::refresh(state, dry_run).await?;
     let report =
         pokemon::store::prices::refresh(&state.pool, &state.http, today(), dry_run).await?;
+    println!("{}", report.summary());
+    let report =
+        pokemon::store::boosters::refresh(&state.pool, &state.http, today(), dry_run).await?;
     println!("{}", report.summary());
 
     if dry_run {
@@ -38,13 +42,17 @@ pub fn spawn_weekly(state: AppState) {
     );
 }
 
-/// The three refreshes, each even when the one before failed (they are
+/// The four refreshes, each even when the one before failed (they are
 /// independent).
 async fn refresh_in_background(state: &AppState) {
     yugioh_prices::refresh_in_background(state).await;
     match pokemon::store::prices::refresh(&state.pool, &state.http, today(), false).await {
         Ok(report) => tracing::info!("{}", report.summary()),
         Err(e) => tracing::warn!("background Pokémon price refresh: {e}"),
+    }
+    match pokemon::store::boosters::refresh(&state.pool, &state.http, today(), false).await {
+        Ok(report) => tracing::info!("{}", report.summary()),
+        Err(e) => tracing::warn!("background Pokémon booster refresh: {e}"),
     }
 }
 

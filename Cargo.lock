@@ -500,7 +500,9 @@ name = "common-domain"
 version = "0.1.0"
 dependencies = [
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1891,6 +1893,7 @@ dependencies = [
  "pokemon-domain",
  "reqwest",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "serde_json",
  "sqlx",
@@ -1907,6 +1910,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "rust_decimal_macros",
+ "serde",
  "serde_json",
 ]
 

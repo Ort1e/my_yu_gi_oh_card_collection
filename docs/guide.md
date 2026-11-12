@@ -106,6 +106,10 @@ and Japanese, with a wishlist and Cardmarket prices (weekly).
   printed code (`FNE 067`) or name, pick it, choose its variant.
 - **The wishlist**: *Wishlist → Add a wish*; its row turns green when the
   trend is at or under your price. *I got it* opens the add form pre-filled.
+  Above the wishes, *Boosters to open*: the 3 boosters with the most wished
+  cards, and the 3 cheapest with at least one (Cardmarket's price, every
+  language together, weekly; a Trainer Gallery card counts for its main
+  set's booster, a promo for none). Also in the public copy.
 - A card sold or given away: its page → *Edit or mark sold*. Never deleted.
 
 Pictures are a cache (`media/pokemon_card_images/`), downloaded again when

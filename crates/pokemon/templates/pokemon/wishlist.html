@@ -17,6 +17,29 @@
 {% endif %}
 <p>Prices: Cardmarket's trend, refreshed every week.{% if !common::export::public_copy() %} <a href="/pokemon/wishlist/add" class="btn">Add a wish</a>{% endif %}</p>
 
+{% if !most_wished.is_empty() %}
+<section class="booster-suggestions">
+  <h2>Boosters to open</h2>
+  <div class="suggestion-lists">
+    <div>
+      <h3>Most wished cards</h3>
+      <ol>
+        {% for booster in most_wished %}{% include "partials/booster_suggestion.html" %}{% endfor %}
+      </ol>
+    </div>
+    {% if !cheapest.is_empty() %}
+    <div>
+      <h3>Cheapest</h3>
+      <ol>
+        {% for booster in cheapest %}{% include "partials/booster_suggestion.html" %}{% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+  </div>
+  <p class="hint">Cardmarket's booster prices, every language together, refreshed every week.</p>
+</section>
+{% endif %}
+
 {% if wanted.is_empty() %}
 <p>No wish yet.</p>
 {% else %}
