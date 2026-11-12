@@ -364,8 +364,7 @@ Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
 and tried again. The automatic pass downloads a picture **before** giving
 it to a copy, so a page or the public copy never asks Yugipedia; and
 `/card-picture/:name` answers ygoprodeck's picture when its own can't be
-had. (The first deployment let the public copy download them, ~600 at
-once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
+had (hundreds at once would be refused). Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.
 
 ### Errata (`/decks/shopping`)
@@ -461,8 +460,7 @@ SVG drawn by the server (`cards::sparkline`).
 `/advent-calendar/:year` (`static/js/advent_calendar.js`,
 `static/css/advent.css`): 24 doors that open on the photo and the card of
 the day. The tables `advent_calendar` (one per year) and
-`advent_calendar_entry` (day, card, photo) come from Django, which had no
-page for them. The photos are in `media/advent_calendar_photos/<year>/`
+`advent_calendar_entry` (day, card, photo) hold them. The photos are in `media/advent_calendar_photos/<year>/`
 (upright, 1600 px, metadata stripped; the full-size originals in
 `originals/`). They show handwritten notes, so the pages and the photos are
 behind the login.
@@ -513,8 +511,7 @@ The builder does **all the editing**, and it is where the collection meets
 competitive play: it reads the collection (copies owned, the ones built
 decks hold) and plans the next tournament (the format, what to buy, the
 list played). Five tabs kept in `location.hash` (`#build`, `#to-buy`,
-`#draw`, `#history`, `#settings`; `#missing` still opens To buy, so old links
-work):
+`#draw`, `#history`, `#settings`; `#missing` still opens To buy):
 
 - **Build**: the zones (one tile per copy: the API sends a line of 3 as 3
   tiles, `ApiCard`, the builder gives each an id of its own, `types.ts`
@@ -522,7 +519,7 @@ work):
   the format banner, "+ Card by name" (`…/lookup`), the card search
   (`…/reserve`: owned cards, and by name the known ones, with their counts)
   and the selected card.
-- **To buy** (was Missing): the missing tiles with a Cardmarket link and
+- **To buy**: the missing tiles with a Cardmarket link and
   trend price, the cost, the errata warnings, "Take free copies" (a built
   version), the version's Cardmarket wants list (`Check.wants`, from
   `shopping::version_wants_list`).
@@ -578,8 +575,8 @@ of the snapshots. Whether a line is owned is worked out from the collection
 version) or *elsewhere*; the rest are *free*. A list's tiles of a card beyond
 `free + here`, in zone order, are **missing** (`ownership::missing`); the
 builder works the same rule out again as you edit (`deck.ts` `markMissing`).
-There are no proxy `card` rows any more (`card.is_proxy` stays 0 until a
-migration drops it).
+There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
+(a migration will drop it).
 
 - **Built** (`deck_version.is_built`, 0010): the physical deck exists, so the
   version holds copies (`deck_version_copy`: one slot per copy of a line,
@@ -640,8 +637,8 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
   tournament): the form freezes the chosen version's list when it saves
   (`snapshots::freeze`); editing the tournament afterwards offers "Keep the
   list saved" (the default) or a version's list again. The version keeps
-  changing; the list played doesn't. `deck_version.tournament_id` (0011) is
-  left NULL and unused since 0025.
+  changing; the list played doesn't. `deck_version.tournament_id` (0011) is a dead
+  column, always NULL.
 - **Pages** (`routes/decks/snapshots.rs`): the History table of the deck's
   page (`partials/deck_history.html`; automatic ones folded), and
   `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes
@@ -805,9 +802,9 @@ sends the photo **to the NAS**, which reads the barcode (`books::barcode`:
 `common::photos::grey` decodes a JPEG straight at 1/2, 1/4 or 1/8 of its
 size, then `rxing`, a Rust ZXing, tries 1600 and 800 px, as taken and
 turned a quarter turn). Plain HTTP on the home network can't use the live
-camera (browsers keep it to HTTPS), hence the photo. It used to be read in
-the browser: a whole camera photo took more memory than a phone had. On the
-NAS it takes 2 to 3 s and 60 MB (measured 2026-10-30; decoded whole, a
+camera (browsers keep it to HTTPS), hence the photo. It is read on the NAS,
+not in the browser: a whole camera photo took more memory than a phone had.
+On the NAS it takes 2 to 3 s and 60 MB (measured 2026-10-30; decoded whole, a
 50 MP photo took 8 s and 300 MB).
 
 Like ygoprodeck: the lookup happens **before** any write transaction, and

@@ -6,13 +6,16 @@ the code works, see [tour.md](tour.md); for how to change it,
 
 The app has four goals, in this order of importance:
 
-1. **[Manage the card collection](#1-manage-the-card-collection)**: what is
-   owned, what it cost, what it is worth. (Menu **Collection**, plus
-   **Pokémon**.)
-2. **[Play competitively](#2-play-competitively)**: decks, built decks,
-   formats, tournaments. (Menus **Decks** and **Tournaments**.)
-3. **[Share a public copy](#3-the-public-copy)**: a read-only site.
-4. **[Keep the books](#4-books)**: the novels at home. (Menu **Books**.)
+1. **[Manage the card collection](#1-manage-the-card-collection)** (the
+   main one): cards, lots, sellers, budget, value, statistics, advent
+   calendars, Pokémon. (Menus **Collection** and **Pokémon**.)
+2. **[Play competitively](#2-play-competitively)**: decks, the deck builder,
+   built decks, formats, tournaments and their stats. (Menus **Decks**, the
+   bridge: the builder uses the collection and plans what to buy, and
+   **Tournaments**.)
+3. **[A public copy](#3-a-public-copy)** to share: read-only static pages,
+   no private data. Not a menu: a build (`export-public`).
+4. **[The books](#4-the-books)** (the owner's wife's novels). (Menu **Books**.)
 
 The Yu-Gi-Oh! menu is organised the same way:
 
@@ -37,6 +40,14 @@ page, which lists its versions), its picture. **Edit** fixes
 the name, rarity, condition, printing picture (the edit page asks Yugipedia
 for the gallery) and the Cardmarket product. Cards are never deleted, only
 marked sold.
+
+**A card showing the wrong art** (an Extended Art, a French card shown in
+English): open its edit page, "Picture". The pictures of its printing come
+from Yugipedia (looked up when the card was added; otherwise "Look on
+Yugipedia"); click the right one, tick "The same for every copy…" if they
+all are, and save. `cargo run -p backend -- find-pictures` does it for the
+whole collection (the cards added before, the scans Yugipedia adds later) and
+lists the copies with several artworks to choose from.
 
 ### Lots and the shipment PDF
 A **lot** is one purchase, sale or gift: a seller, a date, a price (minus a
@@ -162,7 +173,7 @@ and plans competitive play (the next tournament, what to buy). Five tabs
 | Tab | For |
 |---|---|
 | **Build** | the zones (main, extra, side), drag and drop, the collection search, categories, the format banner. **Save** is sticky in the header |
-| **To buy** (was Missing) | the missing cards (not owned, or owned but held by another built deck) with Cardmarket link and price, the cost, errata warnings, "Take free copies" (a built deck), this version's Cardmarket wants list |
+| **To buy** | the missing cards (not owned, or owned but held by another built deck) with Cardmarket link and price, the cost, errata warnings, "Take free copies" (a built deck), this version's Cardmarket wants list |
 | **Test draw** | Monte Carlo opening hands on the zones as they are now |
 | **History** | the deck's saved lists, what changed, *Name this save*, *Rename* (the only place lists are named) |
 | **Settings** | three blocks: **Rules** (ban list or format), **Physical deck** (built or planned, deck box, sleeves), **Sharing** (public) |
@@ -203,6 +214,26 @@ out from the collection; only a **built** version holds copies.
 4. *History* keeps every save; *Name this save* marks the list you will play.
 5. After the event, *+ Tournament with this version* (see below).
 
+### A deck's history
+
+Every **Save** in the deck builder keeps the list in the deck's history
+(several saves within 30 minutes count as one); nothing to do by hand.
+
+1. **Before an event, or a list worth keeping**: builder → **History** tab →
+   **Name this save** (save the deck first), or **Rename** on any list of
+   the table (blank: an automatic one again). Named lists are never replaced.
+2. **A tournament**: choose the version in the tournament form; its list is
+   saved with the tournament, so editing the deck afterwards doesn't change
+   what was played. Editing the tournament keeps that list unless you
+   choose a version again.
+3. **What changed**: the History tab compares a saved list with the zones on
+   the screen (saved or not); a list's page (`/deck-snapshots/:id`, from the
+   deck page's History) compares it with the previous one, another list, or
+   a version now.
+4. **Go back to an old list**: its page → **New version from this list**
+   (its cards and counts; the collection says what you own). Old versions you no longer
+   play can be deleted: their lists stay in the history.
+
 ### Built decks
 `/decks/built`: the decks you physically built. One card per deck (box,
 sleeves, its cards and the copies it holds, how many are missing), then the
@@ -223,6 +254,23 @@ a cutoff date, e.g. Edison). `/formats/:id` reads its rules and list;
 *Edit* (`/formats/:id/edit`) changes its name, cutoff, notes and list, makes
 a *new version*, deletes it while unused. A version plays a ban list **or** a format, never both.
 
+**Play a format (Edison…)**
+
+1. **Tournaments → Formats → Add a format**: its name, its cutoff (a date, or
+   the set it ends with: the date comes from ygoprodeck's list of sets),
+   the Konami list it starts from (its cards are copied).
+2. On the format's page: add the cards of its own list (English name, as
+   on ygoprodeck), change a status, take one off. Check the cutoff: the
+   sets' dates are ygoprodeck's.
+3. In the deck builder, **Ban list or format** → the format, **Save**: the
+   problems show under it (too many copies, cards released after the
+   cutoff: greyed with "Out" on their tiles), and the card search can keep only
+   the legal cards. The read-only page of the version shows them too.
+4. The format's list changes after decks were built with it (a community
+   update): **New version** on its page, then edit the copy. The decks
+   keep the version they play until you switch them.
+
+
 ### Tournaments
 - `/tournaments`: the table of tournaments with record and placement; a
   filter by date and deck. `/tournaments/add` (`?version=` pre-selects a
@@ -236,7 +284,7 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   deck's labels, matchups, die, first/second. *Labels* (`/tournaments/labels`)
   renames or merges archetype names.
 
-## 3. The public copy
+## 3. A public copy
 
 Every morning the NAS writes a **read-only static site** and uploads it to a
 web hosting. It contains: the Yu-Gi-Oh! and Pokémon cards, the statistics,
@@ -253,7 +301,7 @@ makes its list public. A book is kept out with the 🔒 switch of its form.
 Generate it by hand with `cargo run -p backend -- export-public`; the
 publishing (SFTP) is in [deploy/README.md](../deploy/README.md).
 
-## 4. Books
+## 4. The books
 
 Menu **Books** (`/books`). The book collection is the owner's wife's novels.
 

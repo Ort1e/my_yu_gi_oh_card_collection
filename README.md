@@ -2,25 +2,26 @@
 
 ## What it's for
 
-A personal web app with four goals, in this order:
+A personal web app with four goals, in this order of importance (the guide
+has the details and the usual tasks of each):
 
-1. **Manage the Yu-Gi-Oh! card collection** (the main one): the cards owned,
-   the lots they were bought or sold in (a Cardmarket shipment PDF fills the
-   lot form), sellers, a monthly budget, the market value, statistics and
-   advent calendars; also a **Pokémon** collection (booster openings,
-   wishlist, prices). Pages: Cards, Lots, Sellers, Budget, Value, Statistics,
-   Advent, Rarities, `/pokemon`.
+1. **Manage the card collection** (the main one): the cards owned, the lots
+   they were bought or sold in (a Cardmarket shipment PDF fills the lot form),
+   sellers, a monthly budget, the market value, statistics, advent
+   calendars; also the **Pokémon** cards (booster openings, wishlist,
+   prices). Menus **Collection** and **Pokémon**.
 2. **Play competitively**: decks with a deck builder (YDKE import/export,
    categories, opening-hand simulation), built decks and what to buy for
    them, formats and the Forbidden & Limited lists, tournaments with their
-   rounds, the list played and statistics. Pages: Decks, Built decks,
-   Formats, Tournaments, Stats.
-3. **Share a public copy**: every morning the NAS puts a read-only static
-   site (the cards, statistics, market values, the public decks and the
-   tournaments, the books; nothing private) on a web hosting.
-4. **Keep the books**: the novels at home, added by ISBN (looked up, or
+   rounds, the list played and statistics. Menus **Decks** (the bridge: the
+   builder uses the collection and plans what to buy) and **Tournaments**.
+3. **A public copy** to share: every morning the NAS puts a read-only static
+   site on a web hosting (the cards, statistics, market values, the public
+   decks and tournaments, the books; nothing private). Not a menu: a build
+   (`export-public`).
+4. **The books** (the owner's wife's novels): added by ISBN (looked up, or
    scanned with a phone), with authors, series and their missing volumes,
-   and book advent calendars. Pages: `/books`.
+   and book advent calendars. Menu **Books**.
 
 It runs on a NAS at home, for the home network only. Every morning the NAS
 backs the data up and writes the public copy.
@@ -65,9 +66,9 @@ Read in this order; each step assumes the ones before.
 6. **[CLAUDE.md](CLAUDE.md)**: the project's conventions in one dense page
    (goals, database rules, privacy rule for the shipment PDFs, who writes
    what), written for Claude but a good checklist for anyone.
-7. **[TODO.md](TODO.md)** (what's next). Designs not built yet go in
-   `docs/specs/` (the folder is created when one is needed; today:
-   [deck-lists.md](docs/specs/deck-lists.md)).
+7. **[TODO.md](TODO.md)**: what's next. A design not built yet goes in
+   `docs/specs/` (the folder is created when one is needed, and the spec
+   deleted once built).
 
 ## Running it on your computer
 
@@ -109,7 +110,7 @@ The server binary is also the maintenance tool:
 
 ```bash
 cargo run -p backend -- scrap-ban-list    # new Forbidden & Limited lists
-cargo run -p backend -- clean-cards       # tidy names, card data links, proxies (also daily, by itself)
+cargo run -p backend -- clean-cards       # tidy names, card data links, rarities (also daily, by itself)
 cargo run -p backend -- refresh-prices    # market prices (also weekly, by itself)
 cargo run -p backend -- clean-pictures    # delete pictures no card uses (also daily)
 cargo run -p backend -- export-public     # the public copy, into public-export/

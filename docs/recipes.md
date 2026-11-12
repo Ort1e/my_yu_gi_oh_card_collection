@@ -4,8 +4,8 @@ Step-by-step guides for the usual changes. Read [tour.md](tour.md) first for
 how the pieces fit (and [guide.md](guide.md) for what the app does). Everything runs inside the Nix shell (direnv loads it),
 from the repo root.
 
-Using the app (the phone, books, Pokémon, the advent calendar) is in the
-[user guide](guide.md). Here:
+Using the app (the phone, formats, deck history, pictures, books, Pokémon, the
+advent calendar) is in the [user guide](guide.md). Here:
 
 Running it:
 
@@ -356,52 +356,6 @@ const extra = /** @type {HTMLSelectElement | null} */ (document.getElementById('
 `@param` / `@returns` where a function's arguments aren't obvious. A
 script that uses what another one defines (like `findRarity` from
 `rarities.js`): declare it in `frontend/static-globals.d.ts`.
-
-## Play a format (Edison…)
-
-1. **Decks → Formats → Add a format**: its name, its cutoff (a date, or
-   the set it ends with: the date comes from ygoprodeck's list of sets),
-   the Konami list it starts from (its cards are copied).
-2. On the format's page: add the cards of its own list (English name, as
-   on ygoprodeck), change a status, take one off. Check the cutoff: the
-   sets' dates are ygoprodeck's.
-3. In the deck builder, **Ban list or format** → the format, **Save**: the
-   problems show under it (too many copies, cards released after the
-   cutoff: greyed with "Out" on their tiles), and the card search can keep only
-   the legal cards. The read-only page of the version shows them too.
-4. The format's list changes after decks were built with it (a community
-   update): **New version** on its page, then edit the copy. The decks
-   keep the version they play until you switch them.
-
-## Keep a deck's lists (history)
-
-Every **Save** in the deck builder keeps the list in the deck's history
-(several saves within 30 minutes count as one); nothing to do by hand.
-
-1. **Before an event, or a list worth keeping**: builder → **History** tab →
-   **Name this save** (save the deck first), or **Rename** on any list of
-   the table (blank: an automatic one again). Named lists are never replaced.
-2. **A tournament**: choose the version in the tournament form; its list is
-   saved with the tournament, so editing the deck afterwards doesn't change
-   what was played. Editing the tournament keeps that list unless you
-   choose a version again.
-3. **What changed**: the History tab compares a saved list with the zones on
-   the screen (saved or not); a list's page (`/deck-snapshots/:id`, from the
-   deck page's History) compares it with the previous one, another list, or
-   a version now.
-4. **Go back to an old list**: its page → **New version from this list**
-   (its cards and counts; the collection says what you own). Old versions you no longer
-   play can be deleted: their lists stay in the history.
-
-## Fix a card's picture
-
-A card showing the wrong art (an Extended Art, a French card shown in
-English): open its edit page, "Picture". The pictures of its printing come
-from Yugipedia (looked up when the card was added; otherwise "Look on
-Yugipedia"); click the right one, tick "The same for every copy…" if they
-all are, and save. `cargo run -p backend -- find-pictures` looks for the whole collection
-(the cards added before, the scans Yugipedia adds later) and lists the
-copies with several artworks to choose from (tour.md, "A printing's picture: Yugipedia").
 
 ## Show cards as pictures
 

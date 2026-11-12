@@ -4,49 +4,59 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ## Open
 
-- **Edison on the NAS** (2026-11-03): the NAS's app has no format yet (the
-  one made on 2026-11-02 was in a local test database, gone). On the NAS's
-  address: Decks → Formats → Add, from the Konami list of 2010-03-01,
-  cutoff 2010-03-01 (the first visit fetches the set dates from
-  ygoprodeck, a few seconds), then check the cutoff (the "Edison's exact
-  cutoff" line below) and pick it in the deck builder.
-- **The book scan on the friend's phone** said "out of memory" in Chrome
-  (2026-10-30): the barcode is now read on the NAS, and "From a photo"
-  avoids the camera app over the browser. To check once deployed.
-- **Book data to fix by hand** (seen 2026-10-30): Harry Potter and the
-  Goblet of Fire has volume 3 (it's 4); the series "Robert Langdon --" and
-  "Red Rising, 3" were badly read from Open Library (fixed for new
-  lookups): rename them in their books' forms.
-- **Tailscale on the NAS** (ready 2026-11-02, to run at home): the
-  owner runs `deploy/pc/install-tailscale-on-nas.sh`, approves the NAS,
-  turns HTTPS on, disables its key expiry, installs the app on the
-  devices, invites the friend (deploy/README.md, "From outside home").
-  Then check: the app at its `ts.net` address from mobile data, the live
-  book scan on the friend's phone over HTTPS, `NAS=nas-ts` scripts.
-- **The Google Books key** (2026-11-02): it answered 503 "backendFailed"
-  the hour it was made. Check that lookups say `googlebooks` in
-  `book_data.source` once it's on the NAS (`GOOGLE_BOOKS_API_KEY` in
-  `/apps/collection/collection.env`). 9781464266430 is still unknown to
-  every catalogue.
-- **Testers of the public copy:** after the 2026-10-28 changes (back link,
-  full screen card, bigger tile text), is the text still too small on
-  phones? If so: bigger text on phones everywhere, not only the tiles.
-- Maybe: statistics for the Pokémon cards and the books too (by set,
-  rarity, language; by author, series, format), like `/collection/stats`.
-- Maybe: hide the add/edit buttons a user can't use (they get a "Not
-  allowed" page today).
-- **Edison's exact cutoff**: the format made on 2026-11-02 should be
-  checked against the community's definition (ygoprodeck's set dates are
-  used: The Shining Darkness = 07/05/2010 there). Goat or others: from
-  `/formats/add`.
+### On the NAS (owner, after the next deploy)
+
+- **Check the migrations**: the NAS is at 0023; the next build brings
+  0024–0028 (errata, deck history, formats, deck lists, booster
+  suggestions). Applied cleanly to a copy of the NAS's database (2026-11-12).
+- **The Edison format** (2026-11-03): the NAS has no format yet. Tournaments
+  → Formats → Add, from the Konami list of 2010-03-01, cutoff 2010-03-01 (the
+  first visit fetches the set dates from ygoprodeck, a few seconds). Check
+  the cutoff against the community's definition (ygoprodeck's set dates are
+  used: The Shining Darkness = 07/05/2010 there), then pick the format in the
+  deck builder. Goat or others: the same way.
+- **`backend find-pictures`** for the cards added before the Yugipedia
+  pictures (~10 min), if the cards still show ygoprodeck's art.
+
+### Ideas
+
+- Statistics for the Pokémon cards and the books too (by set, rarity,
+  language; by author, series, format), like `/collection/stats`.
+- Hide the add/edit buttons a user can't use (they get a "Not allowed" page
+  today).
+- Choosing which copy fills a built deck's slot (today: best condition
+  first, then the oldest, `built_deck::plan_build`; the owner's module).
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
   the app from the home network (ZAP).
-- Maybe: Dependabot for the Cargo and npm updates (weekly, onto `dev`).
+- Dependabot for the Cargo and npm updates (weekly, onto `dev`).
+
+### Tech debt
+
+- **Dead columns**: `card.is_proxy` (always 0) and `deck_version.tournament_id`
+  (always NULL): drop them in migration `0029`, once 0024–0028 run on the
+  NAS (never rebuild a parent table with foreign keys on: `ALTER TABLE …
+  DROP COLUMN`, and the tests' `INSERT … is_proxy` in `clean_cards.rs`,
+  `tests/advent.rs`, `store/yugipedia.rs` change with it).
 
 ## Done
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-11-12: checked on the NAS: the book scan on the friend's phone, the
+  book data fixed by hand, Tailscale (HTTPS address, live scan), the Google
+  Books key, the public copy's text size on phones.
+- 2026-11-12: booster suggestions on the Pokémon wishlist (the 3 boosters
+  with the most wished cards, the 3 cheapest with one; 0028).
+- 2026-11-09: the shopping list (`/decks/shopping`): built then planned
+  decks sharing the collection's copies, errata, a Cardmarket wants list
+  with its estimate and the budget left.
+- 2026-11-12: deck versions as lists (0027): only built decks hold copies,
+  the others see the collection as it is; built decks public by default.
+- 2026-11-07: a deck's history (0025): a snapshot on every save, naming,
+  comparing, a tournament's frozen list, "New version from this list".
+- 2026-11-09: formats read and edit pages; the tournaments' form in parts.
+- 2026-11-07: the menus by goal (Collection, Decks, Tournaments), the deck
+  builder in tabs, the deck page as a hub.
 - 2026-11-06: errata on the built decks: Yugipedia's errata cached
   (`yugipedia_errata`), the pure rule in `yugioh-domain::errata`, warnings on
   `/decks/built` and the deck builder's `…/check`.
