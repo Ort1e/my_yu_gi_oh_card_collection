@@ -9,8 +9,10 @@ use sqlx::{QueryBuilder, SqliteConnection};
 use yugioh_domain::monte_carlo::{self, Category, SimulationResult};
 
 use super::categories::load_categories;
-use crate::store::cards::Zone;
+use yugioh_domain::deck_history::DeckZone;
+
 use crate::store::db::{exists, push_ids};
+use crate::store::lists;
 use crate::web::error::{bad_request, AppError, AppResult};
 use crate::AppState;
 use ts_rs::TS;
@@ -20,23 +22,33 @@ use ts_rs::TS;
 pub struct SimulationInput {
     hand_size: usize,
     simulations: u32,
-    /// The Main Deck to draw from (card ids), saved or not; without it the
-    /// saved Main Deck is used.
+    /// The Main Deck to draw from (its tiles: card data ids, one per copy;
+    /// `null` for a card known by its name only), saved or not; without it
+    /// the saved Main Deck is used.
     #[serde(default)]
     #[ts(optional)]
-    main: Option<Vec<i64>>,
+    main: Option<Vec<Option<i64>>>,
 }
 
-/// What a simulation of version `id` needs: its Main Deck, its categories
-/// and which cards are in them (also the read-only page, `decks::version`).
+/// A card known by its name only, in the draw: in no category.
+const NAME_ONLY: i64 = -1;
+
+/// What a simulation of version `id` needs: its Main Deck (a card data id
+/// per copy), its categories and which cards are in them (also the
+/// read-only page, `decks::version`).
 pub(crate) async fn inputs(
     conn: &mut SqliteConnection,
     id: i64,
 ) -> AppResult<(Vec<i64>, Vec<Category>, Vec<(i64, i64)>)> {
-    let main = Zone::Main.card_ids(&mut *conn, id).await?;
+    let main: Vec<i64> = lists::lines(&mut *conn, id)
+        .await?
+        .iter()
+        .filter(|l| l.zone == DeckZone::Main)
+        .flat_map(|l| (0..l.count).map(|_| l.card_data_id.unwrap_or(NAME_ONLY)))
+        .collect();
     let categories = load_categories(&mut *conn, id).await?;
     let assignments: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT card_id, category_id FROM card_category_assignment
+        "SELECT card_data_id, category_id FROM card_category_assignment
          WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?)",
     )
     .bind(id)
@@ -59,12 +71,13 @@ pub async fn monte_carlo(
     }
     let mut conn = state.pool.acquire().await?;
     exists(&mut conn, "deck_version", id).await?;
-    let (saved_main, categories, mut assignments) = inputs(&mut conn, id).await?;
+    let (saved_main, categories, assignments) = inputs(&mut conn, id).await?;
     let main = match input.main {
-        Some(ids) => {
-            // the cards must exist: ids of the screen's zones, maybe not saved
+        Some(tiles) => {
+            // the cards must exist: the screen's zones, maybe not saved
+            let ids: HashSet<i64> = tiles.iter().flatten().copied().collect();
             if !ids.is_empty() {
-                let mut qb = QueryBuilder::new("SELECT id FROM card WHERE id IN ");
+                let mut qb = QueryBuilder::new("SELECT id FROM card_data WHERE id IN ");
                 push_ids(&mut qb, ids.iter().copied());
                 let known: HashSet<i64> = qb
                     .build_query_scalar()
@@ -76,16 +89,9 @@ pub async fn monte_carlo(
                     return bad_request(format!("Card {unknown} doesn't exist any more."));
                 }
             }
-            // the cards that left the Main Deck on the screen no longer count
-            // in their categories ("cards in the deck")
-            let kept: HashSet<i64> = ids.iter().copied().collect();
-            let removed: HashSet<i64> = saved_main
-                .iter()
-                .copied()
-                .filter(|card| !kept.contains(card))
-                .collect();
-            assignments.retain(|(card, _)| !removed.contains(card));
-            ids
+            // a card that left the Main Deck counts no more in its
+            // categories (`simulate` counts the deck's copies)
+            tiles.into_iter().map(|t| t.unwrap_or(NAME_ONLY)).collect()
         }
         None => saved_main,
     };

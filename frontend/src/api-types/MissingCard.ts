@@ -2,8 +2,8 @@
 import type { ErrataWarning } from "./ErrataWarning";
 
 /**
- * A card missing from a version: its proxies, plus its real copies with
- * the wrong text.
+ * A card missing from a version: its missing copies, plus a built
+ * version's copies with the wrong text.
  */
 export type MissingCard = { name: string, 
 /**
@@ -11,7 +11,7 @@ export type MissingCard = { name: string,
  */
 english_name: string, 
 /**
- * Proxies and wrong-text copies together.
+ * Missing and wrong-text copies together.
  */
 count: number, 
 /**

@@ -99,8 +99,8 @@ const PAGES: &[&str] = &[
 async fn private_mode_puts_every_page_behind_the_login() {
     let t = TestApp::with_config(deployed()).await;
     t.exec(
-        "INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy)
-             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 1, 0)",
+        "INSERT INTO card (id, name, en_name, code, card_data_id)
+             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 1)",
     )
     .await;
     std::fs::create_dir_all(t.state.media_dir.join("card_images")).unwrap();
@@ -169,8 +169,8 @@ async fn each_user_has_a_password_and_a_secure_cookie() {
 async fn the_friend_sees_everything_and_changes_the_books_only() {
     let t = TestApp::with_config(deployed()).await;
     t.exec(
-        "INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy)
-             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 1, 0)",
+        "INSERT INTO card (id, name, en_name, code, card_data_id)
+             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 1)",
     )
     .await;
     // the rights are checked before the handler: a missing version will do

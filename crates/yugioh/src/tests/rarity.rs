@@ -83,7 +83,7 @@ async fn cards_filter_and_edit() {
 }
 
 #[tokio::test]
-async fn deck_builder_cards_have_their_rarity() {
+async fn a_built_decks_copies_have_their_rarity() {
     let t = TestApp::new().await;
     let (version, cards) = t.deck_fixture().await;
     sqlx::query("UPDATE card SET rarity = 'Ultra Rare' WHERE id = ?")
@@ -91,22 +91,16 @@ async fn deck_builder_cards_have_their_rarity() {
         .execute(&t.state.pool)
         .await
         .unwrap();
-
-    let (status, found) = t
-        .json(
-            "POST",
-            &format!("/api/deck-versions/{version}/reserve"),
-            json!({ "name": "magicien" }),
-        )
+    t.set_main(version, &[(crate::testing::DM, "Magicien Sombre", 2)])
         .await;
-    assert_eq!(status, StatusCode::OK);
+    let deck = t.patch(version, json!({ "is_built": true })).await;
     let rarity = |id: i64| {
-        found
+        deck["main"]
             .as_array()
             .unwrap()
             .iter()
-            .find(|c| c["id"] == id)
-            .map(|c| c["rarity"].clone())
+            .find(|c| c["copy"]["id"] == id)
+            .map(|c| c["copy"]["rarity"].clone())
     };
     assert_eq!(rarity(cards[0]), Some(json!("Ultra Rare")));
     assert_eq!(rarity(cards[1]), Some(json!(null)));

@@ -1,40 +1,33 @@
-//! Built decks: building a version locks its real cards (`yugioh_domain::built_deck`,
-//! `decks/api/version.rs`), and the collection reads skip them.
+//! Built decks: only a built version holds copies (`store::lists`,
+//! `decks/api/version.rs`); building takes free copies, best condition first,
+//! and never touches the other versions.
 
 use serde_json::{json, Value};
-use yugioh_domain::ydke::YdkeDeck;
 
 use super::*;
-use crate::store::cards::replace_proxies;
+use crate::testing::{tiles, DM, KURIBOH};
 
-/// A new version of the fixture's deck with these main deck cards.
-async fn version(t: &TestApp, name: &str, cards: &[i64]) -> i64 {
+/// A new version of the fixture's deck listing these main deck cards.
+async fn version(t: &TestApp, name: &str, cards: &[(Option<i64>, &str, usize)]) -> i64 {
     let id = sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (1, ?)")
         .bind(name)
         .execute(&t.state.pool)
         .await
         .unwrap()
         .last_insert_rowid();
-    put(t, id, cards).await;
+    t.set_main(id, cards).await;
     id
 }
 
-/// Put cards in a version's main deck, as a stale page could have saved them.
-async fn put(t: &TestApp, version: i64, cards: &[i64]) {
-    for card in cards {
-        sqlx::query("INSERT INTO deck_version_main_deck (deck_version_id, card_id) VALUES (?, ?)")
-            .bind(version)
-            .bind(card)
-            .execute(&t.state.pool)
-            .await
-            .unwrap();
-    }
+async fn set_built(t: &TestApp, version: i64, built: bool) -> Value {
+    t.patch(version, json!({ "is_built": built })).await
 }
 
-async fn main_deck(t: &TestApp, version: i64) -> Vec<(i64, bool, Option<i64>)> {
-    sqlx::query_as(
-        "SELECT card.id, card.is_proxy, card.card_data_id FROM deck_version_main_deck z
-         JOIN card ON card.id = z.card_id WHERE z.deck_version_id = ? ORDER BY z.rowid",
+/// The copies a version holds, in slot order (`None`: missing).
+async fn slots(t: &TestApp, version: i64) -> Vec<Option<i64>> {
+    sqlx::query_scalar(
+        "SELECT card_id FROM deck_version_copy WHERE deck_version_id = ?
+         ORDER BY zone, position, slot",
     )
     .bind(version)
     .fetch_all(&t.state.pool)
@@ -42,145 +35,100 @@ async fn main_deck(t: &TestApp, version: i64) -> Vec<(i64, bool, Option<i64>)> {
     .unwrap()
 }
 
-async fn set_built(t: &TestApp, version: i64, built: bool) -> Value {
-    let (status, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{version}"),
-            json!({ "is_built": built }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    body
-}
-
-async fn reserve_ids(t: &TestApp, version: i64) -> Vec<i64> {
-    let (status, body) = t
-        .json(
-            "POST",
-            &format!("/api/deck-versions/{version}/reserve"),
-            json!({}),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    body.as_array()
+/// `missing` of each Main Deck tile.
+fn missing(deck: &Value) -> Vec<bool> {
+    deck["main"]
+        .as_array()
         .unwrap()
         .iter()
-        .map(|c| c["id"].as_i64().unwrap())
+        .map(|c| c["missing"].as_bool().unwrap())
         .collect()
 }
 
+const DM2: (Option<i64>, &str, usize) = (DM, "Magicien Sombre", 2);
+
 #[tokio::test]
-async fn building_turns_the_shared_cards_into_proxies_elsewhere() {
+async fn building_takes_free_copies_and_leaves_the_others_alone() {
     let t = TestApp::new().await;
     let (v1, cards) = t.deck_fixture().await;
-    let (dm1, dm2, kuriboh) = (cards[0], cards[1], cards[2]);
-    put(&t, v1, &[dm1, kuriboh]).await;
-    let v2 = version(&t, "v2", &[dm1, dm2]).await;
-    // a category of v2 on the shared card
-    sqlx::query(
-        "INSERT INTO card_category (id, name, deck_version_id) VALUES (50, 'Starter', ?);
-         INSERT INTO card_category_assignment (category_id, card_id) VALUES (50, ?);",
-    )
-    .bind(v2)
-    .bind(dm1)
-    .execute(&t.state.pool)
-    .await
-    .unwrap();
+    // the second copy in better condition: taken first
+    t.exec(&format!(
+        "UPDATE card SET last_known_status = 'EX' WHERE id = {}",
+        cards[0]
+    ))
+    .await;
+    t.set_main(v1, &[(DM, "Magicien Sombre", 1), (KURIBOH, "Kuriboh", 1)])
+        .await;
+    let v2 = version(&t, "v2", &[DM2]).await;
 
     let built = set_built(&t, v1, true).await;
     assert_eq!(built["is_built"], true);
-    assert_eq!(built["build_report"]["proxied_here"], json!([]));
-    assert_eq!(
-        built["build_report"]["proxied_elsewhere"],
-        json!(["Magicien Sombre → Test - v2"])
-    );
+    assert_eq!(built["build_report"], json!({ "copies": 1, "missing": 1 }));
+    assert_eq!(slots(&t, v1).await, vec![Some(cards[1]), None]);
+    assert_eq!(built["main"][0]["copy"]["id"], cards[1]);
+    assert_eq!(built["main"][0]["here"], 1);
+    assert_eq!(missing(&built), vec![false, true]);
 
-    // v1 keeps its card; v2 has a proxy of it (same card data), dm2 stays
-    assert_eq!(main_deck(&t, v1).await[0], (dm1, false, Some(1)));
-    let v2_cards = main_deck(&t, v2).await;
-    let (proxy, is_proxy, data) = v2_cards[0];
-    assert!(is_proxy && data == Some(1) && proxy != dm1);
-    assert_eq!(v2_cards[1], (dm2, false, Some(1)));
-    assert_eq!(
-        t.text(&format!("SELECT name FROM card WHERE id = {proxy}"))
-            .await
-            .as_deref(),
-        Some("Magicien Sombre")
-    );
-    // the category moved to the proxy
-    assert_eq!(
-        t.scalar("SELECT card_id FROM card_category_assignment WHERE category_id = 50")
-            .await,
-        proxy
-    );
-
-    // the answer without building has no report
-    let (_, again) = t
-        .json("GET", &format!("/api/deck-versions/{v1}"), json!(null))
+    // the other version holds nothing and lost nothing: one copy is free
+    // for it now, so one of its two is missing
+    assert!(slots(&t, v2).await.is_empty());
+    let (_, other) = t
+        .json("GET", &format!("/api/deck-versions/{v2}"), json!(null))
         .await;
-    assert!(again.get("build_report").is_none(), "{again}");
-}
+    assert_eq!(missing(&other), vec![false, true]);
+    assert_eq!(other["main"][0]["free"], 1);
 
-#[tokio::test]
-async fn the_first_built_deck_keeps_its_cards() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
-    set_built(&t, v1, true).await;
-
-    // a version saved by a stale page with the locked card
-    let v2 = version(&t, "v2", &[cards[0], cards[1]]).await;
-    let built = set_built(&t, v2, true).await;
-    assert_eq!(
-        built["build_report"]["proxied_here"],
-        json!(["Magicien Sombre (in Test - v1)"])
-    );
-
-    assert_eq!(main_deck(&t, v1).await, vec![(cards[0], false, Some(1))]);
-    let v2_cards = main_deck(&t, v2).await;
-    assert!(v2_cards[0].1, "a proxy in the second built version");
-    assert_eq!(v2_cards[1], (cards[1], false, Some(1)));
-}
-
-#[tokio::test]
-async fn two_versions_of_a_deck_can_both_be_built() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
-    let v2 = version(&t, "v2", &[cards[1]]).await;
-
-    set_built(&t, v1, true).await;
-    set_built(&t, v2, true).await;
-    assert_eq!(
-        t.scalar("SELECT count(*) FROM deck_version WHERE is_built = 1")
-            .await,
-        2
-    );
-    // and unbuilt: only the flag changes
-    let unbuilt = set_built(&t, v2, false).await;
+    // unbuilt: the copy is free again
+    let unbuilt = set_built(&t, v1, false).await;
     assert_eq!(unbuilt["is_built"], false);
-    assert_eq!(main_deck(&t, v2).await, vec![(cards[1], false, Some(1))]);
+    assert!(slots(&t, v1).await.is_empty());
+    let (_, other) = t
+        .json("GET", &format!("/api/deck-versions/{v2}"), json!(null))
+        .await;
+    assert_eq!(missing(&other), vec![false, false]);
 }
 
 #[tokio::test]
-async fn a_built_version_is_public_by_default() {
+async fn the_first_built_deck_keeps_its_copies() {
     let t = TestApp::new().await;
     let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
+    t.set_main(v1, &[DM2]).await;
+    let v2 = version(&t, "v2", &[(DM, "Magicien Sombre", 1)]).await;
+
+    set_built(&t, v1, true).await;
+    let built = set_built(&t, v2, true).await;
+    assert_eq!(built["build_report"], json!({ "copies": 0, "missing": 1 }));
+    assert_eq!(slots(&t, v1).await, vec![Some(cards[0]), Some(cards[1])]);
+    assert_eq!(slots(&t, v2).await, vec![None]);
+
+    // the card page: held by a built version
+    let (_, page) = t.get(&format!("/cards/{}", cards[0])).await;
+    assert!(page.contains("built-badge"), "{page}");
+}
+
+#[tokio::test]
+async fn a_built_version_is_public_by_default_and_no_longer_planned() {
+    let t = TestApp::new().await;
+    let (v1, _) = t.deck_fixture().await;
+    t.set_main(v1, &[(DM, "Magicien Sombre", 1)]).await;
+    assert_eq!(
+        t.patch(v1, json!({ "is_planned": true })).await["is_planned"],
+        true
+    );
 
     let built = set_built(&t, v1, true).await;
     assert_eq!(built["is_public"], true);
+    assert_eq!(built["is_planned"], false);
+    // a built version can't be planned
+    assert_eq!(
+        t.patch(v1, json!({ "is_planned": true })).await["is_planned"],
+        false
+    );
 
     // hidden by hand, it stays hidden: saving its zones doesn't show it again
-    let (status, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v1}"),
-            json!({ "is_public": false, "main": [cards[0], cards[1]] }),
-        )
+    let body = t
+        .patch(v1, json!({ "is_public": false, "main": tiles(&[DM2]) }))
         .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["is_public"], false);
 
     // unbuilding leaves the switch alone; built again, it is shown again
@@ -188,79 +136,142 @@ async fn a_built_version_is_public_by_default() {
     assert_eq!(set_built(&t, v1, true).await["is_public"], true);
 
     // built while hidden in the same request: the request wins
-    let v2 = version(&t, "v2", &[cards[2]]).await;
-    let (_, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v2}"),
-            json!({ "is_built": true, "is_public": false }),
-        )
+    let v2 = version(&t, "v2", &[(KURIBOH, "Kuriboh", 1)]).await;
+    let body = t
+        .patch(v2, json!({ "is_built": true, "is_public": false }))
         .await;
     assert_eq!(body["is_public"], false);
 }
 
 #[tokio::test]
-async fn locked_cards_leave_the_reserve_until_unbuilt() {
+async fn saving_a_built_version_keeps_its_copies_and_fills_new_lines() {
     let t = TestApp::new().await;
     let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
-    let v2 = version(&t, "v2", &[]).await;
-    assert_eq!(reserve_ids(&t, v2).await, vec![cards[0], cards[1]]);
-
+    t.set_main(v1, &[(DM, "Magicien Sombre", 1), (KURIBOH, "Kuriboh", 1)])
+        .await;
     set_built(&t, v1, true).await;
-    assert_eq!(reserve_ids(&t, v2).await, vec![cards[1]]);
-    // the built version's own reserve is unchanged
-    assert_eq!(reserve_ids(&t, v1).await, vec![cards[1]]);
+    assert_eq!(slots(&t, v1).await, vec![Some(cards[0]), None]);
 
-    set_built(&t, v1, false).await;
-    assert_eq!(reserve_ids(&t, v2).await, vec![cards[0], cards[1]]);
+    // a second Dark Magician: the free copy is taken; Kuriboh still missing
+    t.set_main(v1, &[(KURIBOH, "Kuriboh", 1), DM2]).await;
+    assert_eq!(
+        slots(&t, v1).await,
+        vec![None, Some(cards[0]), Some(cards[1])]
+    );
+
+    // a line removed frees its copies
+    t.set_main(v1, &[(KURIBOH, "Kuriboh", 1)]).await;
+    assert_eq!(slots(&t, v1).await, vec![None]);
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM deck_version_copy WHERE card_id IS NOT NULL")
+            .await,
+        0
+    );
 }
 
 #[tokio::test]
-async fn saving_a_card_locked_elsewhere_is_refused() {
+async fn a_copy_bought_later_waits_for_take_free_copies() {
     let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
+    let (v1, _) = t.deck_fixture().await;
+    t.set_main(v1, &[(KURIBOH, "Kuriboh", 2)]).await;
     set_built(&t, v1, true).await;
-    let v2 = version(&t, "v2", &[]).await;
+    assert_eq!(slots(&t, v1).await, vec![None, None]);
 
-    let (status, body) = t
+    // bought: free, so not to buy, but not in the deck until taken
+    let bought = sqlx::query(
+        "INSERT INTO card (name, en_name, card_data_id) VALUES ('Kuriboh', 'kuriboh', 2)",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap()
+    .last_insert_rowid();
+    let (_, deck) = t
+        .json("GET", &format!("/api/deck-versions/{v1}"), json!(null))
+        .await;
+    assert_eq!(missing(&deck), vec![false, true]);
+    assert_eq!(deck["main"][0]["copy"], json!(null));
+    assert_eq!(slots(&t, v1).await, vec![None, None]);
+
+    let (status, taken) = t
         .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v2}"),
-            json!({ "main": [cards[0], cards[1]] }),
+            "POST",
+            &format!("/api/deck-versions/{v1}/take-free"),
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{taken}");
+    assert_eq!(taken, json!({ "taken": 1, "missing": 1 }));
+    assert_eq!(slots(&t, v1).await, vec![Some(bought), None]);
+
+    // a plain version holds no copies
+    let v2 = version(&t, "v2", &[]).await;
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{v2}/take-free"),
+            json!(null),
         )
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(
-        body["error"],
-        "Magicien Sombre is already in a built deck (Test - v1), so it is no longer in \
-         your collection. Reload the page: it will be gone from the reserve; add proxies \
-         instead if this deck needs it."
-    );
-    assert!(main_deck(&t, v2).await.is_empty(), "nothing saved");
+}
 
-    // the built version itself saves its own cards
-    let (status, body) = t
+#[tokio::test]
+async fn a_sold_copy_leaves_the_built_deck_on_its_next_save() {
+    let t = TestApp::new().await;
+    let (v1, cards) = t.deck_fixture().await;
+    t.set_main(v1, &[DM2]).await;
+    set_built(&t, v1, true).await;
+    t.exec(&format!(
+        "INSERT INTO lot (id, lot_type, price, buy_date) VALUES (9, 'sale', '1.00', '2026-01-01');
+         INSERT INTO unite (lot_id, card_id) VALUES (9, {})",
+        cards[0]
+    ))
+    .await;
+    let (_, deck) = t
+        .json("GET", &format!("/api/deck-versions/{v1}"), json!(null))
+        .await;
+    assert_eq!(deck["main"][0]["owned"], 1, "sold: not owned");
+
+    t.set_main(v1, &[DM2]).await;
+    assert_eq!(slots(&t, v1).await, vec![Some(cards[1]), None]);
+}
+
+#[tokio::test]
+async fn a_copy_of_a_built_version_is_a_plain_list() {
+    let t = TestApp::new().await;
+    let (v1, _) = t.deck_fixture().await;
+    t.set_main(v1, &[DM2]).await;
+    set_built(&t, v1, true).await;
+
+    let (status, copy) = t
         .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v1}"),
-            json!({ "main": [cards[0], cards[1]] }),
+            "POST",
+            &format!("/api/deck-versions/{v1}/clone"),
+            json!({ "name": "v2" }),
         )
         .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(status, StatusCode::CREATED, "{copy}");
+    let copy = copy["id"].as_i64().unwrap();
+    assert!(slots(&t, copy).await.is_empty());
+    let (_, body) = t
+        .json("GET", &format!("/api/deck-versions/{copy}"), json!(null))
+        .await;
+    assert_eq!(body["is_built"], false);
+    assert_eq!(
+        missing(&body),
+        vec![true, true],
+        "the copies are held by v1"
+    );
 }
 
 #[tokio::test]
 async fn deck_box_and_sleeves() {
     let t = TestApp::new().await;
     let (v1, _) = t.deck_fixture().await;
-    let uri = format!("/api/deck-versions/{v1}");
 
-    let (_, body) = t
-        .json(
-            "PATCH",
-            &uri,
+    let body = t
+        .patch(
+            v1,
             json!({ "deck_box": " red Boulder 100+ ", "sleeves": "Dragon Shield matte black" }),
         )
         .await;
@@ -268,143 +279,99 @@ async fn deck_box_and_sleeves() {
     assert_eq!(body["sleeves"], "Dragon Shield matte black");
 
     // absent: kept; blank or null: cleared
-    let (_, body) = t.json("PATCH", &uri, json!({ "deck_box": "" })).await;
+    let body = t.patch(v1, json!({ "deck_box": "" })).await;
     assert_eq!(body["deck_box"], Value::Null);
     assert_eq!(body["sleeves"], "Dragon Shield matte black");
-    let (_, body) = t.json("PATCH", &uri, json!({ "sleeves": null })).await;
+    let body = t.patch(v1, json!({ "sleeves": null })).await;
     assert_eq!(body["sleeves"], Value::Null);
 }
 
 #[tokio::test]
-async fn ydke_import_skips_locked_copies() {
+async fn the_built_page_lists_the_built_decks() {
     let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0]]).await;
-    set_built(&t, v1, true).await;
-
-    let ydke = YdkeDeck {
-        main: vec![46986414, 46986414],
-        extra: vec![],
-        side: vec![],
-    }
-    .to_url();
-    let (status, body) = t
-        .json(
-            "POST",
-            "/api/decks/1/import-ydke",
-            json!({ "ydke": ydke, "name": "imported" }),
-        )
+    let (v1, _) = t.deck_fixture().await;
+    t.set_main(v1, &[(DM, "Magicien Sombre", 1), (KURIBOH, "Kuriboh", 1)])
         .await;
-    assert_eq!(status, StatusCode::CREATED, "{body}");
-    let imported = main_deck(&t, body["id"].as_i64().unwrap()).await;
-    // the free copy, then a proxy (the other copy is locked)
-    assert_eq!(imported[0], (cards[1], false, Some(1)));
-    assert!(imported[1].1);
-}
-
-#[tokio::test]
-async fn clean_cards_never_takes_a_locked_card() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0], cards[1]]).await;
-    set_built(&t, v1, true).await;
-    let proxy = crate::store::cards::new_proxy(
-        &mut t.state.pool.acquire().await.unwrap(),
-        "Dark Magician",
-        Some(1),
-    )
-    .await
-    .unwrap();
-    let v2 = version(&t, "v2", &[proxy]).await;
-
-    let mut conn = t.state.pool.acquire().await.unwrap();
-    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 0);
-    drop(conn);
-
-    // unbuilt: the owned card goes back to v2
-    set_built(&t, v1, false).await;
-    let mut conn = t.state.pool.acquire().await.unwrap();
-    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 1);
-    drop(conn);
-    assert!(!main_deck(&t, v2).await[0].1);
-}
-
-#[tokio::test]
-async fn a_copy_of_a_built_version_gets_proxies() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0], cards[1]]).await;
-    set_built(&t, v1, true).await;
-
-    let (status, body) = t
-        .json(
-            "POST",
-            &format!("/api/deck-versions/{v1}/clone"),
-            json!({ "name": "copy" }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::CREATED, "{body}");
-    let copy = body["id"].as_i64().unwrap();
-
-    let copied = main_deck(&t, copy).await;
-    assert_eq!(copied.len(), 2);
-    assert!(copied
-        .iter()
-        .all(|(id, is_proxy, data)| *is_proxy && *data == Some(1) && !cards.contains(id)));
-    let (_, body) = t
-        .json("GET", &format!("/api/deck-versions/{copy}"), json!(null))
-        .await;
-    assert_eq!(body["is_built"], false);
-}
-
-#[tokio::test]
-async fn the_built_page_lists_what_is_missing() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0], cards[2]]).await;
-    sqlx::query("UPDATE deck_version SET deck_box = 'red box' WHERE id = ?")
-        .bind(v1)
-        .execute(&t.state.pool)
-        .await
-        .unwrap();
+    t.exec(&format!(
+        "UPDATE deck_version SET deck_box = 'red box' WHERE id = {v1}"
+    ))
+    .await;
     set_built(&t, v1, true).await;
 
     let (status, page) = t.get("/decks/built").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("Test - v1"), "{page}");
     assert!(page.contains("Deck box: red box"), "{page}");
+    assert!(page.contains("Cards: 2 (1 of your copies)"), "{page}");
+    assert!(page.contains("To buy: 1"), "{page}");
+    assert!(page.contains("/decks/shopping"), "{page}");
+
+    // the shopping list: the missing card
+    let (status, page) = t.get("/decks/shopping").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("Missing: 1 copy"), "{page}");
     assert!(page.contains("data-name=\"kuriboh\""), "{page}");
     assert!(page.contains("Estimated price"), "{page}");
+    assert!(page.contains("No budget set"), "{page}");
 
-    // the badge on the deck page
+    // the badge and the missing count on the deck page
     let (_, deck) = t.get("/decks/1").await;
     assert!(deck.contains("built-badge"), "{deck}");
+    assert!(
+        deck.contains(&format!("/deck-builder/{v1}#to-buy\">1</a>")),
+        "{deck}"
+    );
+}
+
+#[tokio::test]
+async fn planned_decks_share_the_copies_on_the_shopping_list() {
+    let t = TestApp::new().await;
+    let (v1, _) = t.deck_fixture().await;
+    t.exec("UPDATE card_data SET json_data = '{\"name\":\"Dark Magician\"}' WHERE id = 1")
+        .await;
+    // 2 owned: the built deck takes them, the planned one lacks all 3
+    t.set_main(v1, &[DM2]).await;
+    set_built(&t, v1, true).await;
+    let v2 = version(&t, "v2", &[(DM, "Magicien Sombre", 3)]).await;
+    let v3 = version(&t, "v3", &[(DM, "Magicien Sombre", 3)]).await;
+
+    let (_, page) = t.get("/decks/shopping").await;
+    assert!(!page.contains("Test - v2"), "not planned yet: {page}");
+    t.patch(v2, json!({ "is_planned": true })).await;
+
+    let (status, page) = t.get("/decks/shopping").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("Test - v2"), "{page}");
+    assert!(page.contains("Planned"), "{page}");
+    assert!(
+        !page.contains(&format!("/deck-builder/{v3}")),
+        "not planned: {page}"
+    );
+    assert!(page.contains(">3 Dark Magician</textarea>"), "{page}");
+
+    // a second planned deck: 3 more, not counting the same copies twice
+    t.patch(v3, json!({ "is_planned": true })).await;
+    let (_, page) = t.get("/decks/shopping").await;
+    assert!(page.contains(">6 Dark Magician</textarea>"), "{page}");
 }
 
 #[tokio::test]
 async fn the_built_page_gives_a_cardmarket_wants_list_by_english_name() {
     let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
+    let (v1, _) = t.deck_fixture().await;
     // the card data's English name has its capitals (`en_name` is lowercase)
     t.exec(
         "UPDATE card_data SET json_data = '{\"name\":\"Kuriboh\"}' WHERE id = 2;
-         UPDATE card_data SET json_data = '{\"name\":\"Dark Magician\"}' WHERE id = 1;
-         UPDATE card SET is_proxy = 1 WHERE id = 1",
+         UPDATE card_data SET json_data = '{\"name\":\"Dark Magician\"}' WHERE id = 1;",
     )
     .await;
-    // a French proxy, twice, plus the Kuriboh proxy
-    put(&t, v1, &[cards[0], cards[2]]).await;
+    // 3 Dark Magicians (2 owned), a Kuriboh
+    t.set_main(v1, &[(DM, "Magicien Sombre", 3), (KURIBOH, "Kuriboh", 1)])
+        .await;
     set_built(&t, v1, true).await;
 
-    let (status, page) = t.get("/decks/built").await;
+    let (status, page) = t.get("/decks/shopping").await;
     assert_eq!(status, StatusCode::OK, "{page}");
-    // only the whole list (sorted like the table, by the name on the card):
-    // each version's own list is in the deck builder's To buy tab
-    assert!(
-        !page.contains(">1 Dark Magician\n1 Kuriboh</textarea>"),
-        "{page}"
-    );
     assert!(
         page.contains(&format!("/deck-builder/{v1}#to-buy")),
         "{page}"
@@ -421,17 +388,15 @@ async fn the_built_page_gives_a_cardmarket_wants_list_by_english_name() {
 #[tokio::test]
 async fn the_built_page_estimates_the_wants_list() {
     let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    // a Kuriboh proxy at 0.75, a Dark Magician proxy without a price
-    t.exec(
-        "INSERT INTO card_price (card_data_id, date, cardmarket_price) VALUES (2, '2026-11-01', '0.75');
-         UPDATE card SET is_proxy = 1 WHERE id IN (1, 3)",
-    )
-    .await;
-    put(&t, v1, &[cards[0], cards[2]]).await;
+    let (v1, _) = t.deck_fixture().await;
+    // Kuriboh at 0.75, a third Dark Magician without a price
+    t.exec("INSERT INTO card_price (card_data_id, date, cardmarket_price) VALUES (2, '2026-11-01', '0.75')")
+        .await;
+    t.set_main(v1, &[(DM, "Magicien Sombre", 3), (KURIBOH, "Kuriboh", 1)])
+        .await;
     set_built(&t, v1, true).await;
 
-    let (status, page) = t.get("/decks/built").await;
+    let (status, page) = t.get("/decks/shopping").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("data-price=\"0.75\""), "{page}");
     assert!(page.contains("<strong id=\"wants-total\">"), "{page}");
@@ -439,15 +404,15 @@ async fn the_built_page_estimates_the_wants_list() {
 }
 
 #[tokio::test]
-async fn any_version_page_gives_its_wants_list() {
+async fn any_version_gives_its_wants_list() {
     let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
+    let (v1, _) = t.deck_fixture().await;
     t.exec("UPDATE card_data SET json_data = '{\"name\":\"Kuriboh\"}' WHERE id = 2")
         .await;
 
-    // not built, one proxy and one real card: the builder's Missing tab
-    // gets the list from the version's check
-    put(&t, v1, &[cards[0], cards[2]]).await;
+    // not built: the builder's To buy tab gets the list from the check
+    t.set_main(v1, &[(DM, "Magicien Sombre", 1), (KURIBOH, "Kuriboh", 1)])
+        .await;
     let (status, check) = t
         .json(
             "GET",
@@ -458,13 +423,12 @@ async fn any_version_page_gives_its_wants_list() {
     assert_eq!(status, StatusCode::OK, "{check}");
     assert_eq!(check["wants"], "1 Kuriboh");
 
-    // the read-only page has no wants list any more
+    // the read-only page has no wants list
     let (_, page) = t.get(&format!("/deck-versions/{v1}")).await;
     assert!(!page.contains("wants-version"), "{page}");
 
-    // no proxy: no wants list
-    t.exec("DELETE FROM deck_version_main_deck WHERE card_id = 3")
-        .await;
+    // nothing missing: no wants list
+    t.set_main(v1, &[DM2]).await;
     let (_, check) = t
         .json(
             "GET",
@@ -475,201 +439,36 @@ async fn any_version_page_gives_its_wants_list() {
     assert_eq!(check["wants"], "");
 }
 
-async fn dm_proxy(t: &TestApp) -> i64 {
-    crate::store::cards::new_proxy(
-        &mut t.state.pool.acquire().await.unwrap(),
-        "Dark Magician",
-        Some(1),
-    )
-    .await
-    .unwrap()
-}
-
-async fn replace(t: &TestApp, version: i64, card: i64) -> (StatusCode, Value) {
-    t.json(
-        "POST",
-        &format!("/api/deck-versions/{version}/proxies/{card}/replace"),
-        json!(null),
-    )
-    .await
-}
-
-#[tokio::test]
-async fn built_versions_keep_their_proxies_until_swapped_by_hand() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    let (built_proxy, other_proxy) = (dm_proxy(&t).await, dm_proxy(&t).await);
-    put(&t, v1, &[built_proxy]).await;
-    set_built(&t, v1, true).await;
-    let v2 = version(&t, "v2", &[other_proxy]).await;
-
-    // the automatic swap (new lot, clean-cards) skips the built version
-    let mut conn = t.state.pool.acquire().await.unwrap();
-    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 1);
-    drop(conn);
-    assert_eq!(main_deck(&t, v1).await[0], (built_proxy, true, Some(1)));
-    assert_eq!(main_deck(&t, v2).await[0], (cards[0], false, Some(1)));
-
-    // unbuilt, it is swapped like any other version (versions that are not
-    // built may share a copy)
-    set_built(&t, v1, false).await;
-    let mut conn = t.state.pool.acquire().await.unwrap();
-    assert_eq!(replace_proxies(&mut conn).await.unwrap(), 1);
-    drop(conn);
-    assert_eq!(main_deck(&t, v1).await[0], (cards[0], false, Some(1)));
-}
-
-#[tokio::test]
-async fn replacing_a_proxy_by_hand_in_a_built_version() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    let (dm1, dm2) = (cards[0], cards[1]);
-    let (first, second) = (dm_proxy(&t).await, dm_proxy(&t).await);
-    put(&t, v1, &[first, second]).await;
-    set_built(&t, v1, true).await;
-    let v2 = version(&t, "v2", &[dm1]).await;
-    // a category of v1 on the first proxy
-    sqlx::query(
-        "INSERT INTO card_category (id, name, deck_version_id) VALUES (60, 'Boss', ?);
-         INSERT INTO card_category_assignment (category_id, card_id) VALUES (60, ?);",
-    )
-    .bind(v1)
-    .bind(first)
-    .execute(&t.state.pool)
-    .await
-    .unwrap();
-
-    // the loose copy first, with the proxy's category; the proxy is deleted
-    let (status, body) = replace(&t, v1, first).await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["card"]["id"], dm2);
-    assert_eq!(body["proxied_in"], json!([]));
-    assert_eq!(
-        t.scalar("SELECT card_id FROM card_category_assignment WHERE category_id = 60")
-            .await,
-        dm2
-    );
-    assert_eq!(
-        t.scalar(&format!("SELECT count(*) FROM card WHERE id = {first}"))
-            .await,
-        0
-    );
-
-    // then the copy of v2 (not built), which gets a proxy instead
-    let (status, body) = replace(&t, v1, second).await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["card"]["id"], dm1);
-    assert_eq!(body["proxied_in"], json!(["Test - v2"]));
-    assert_eq!(
-        main_deck(&t, v1).await,
-        vec![(dm2, false, Some(1)), (dm1, false, Some(1))]
-    );
-    let (proxy, is_proxy, data) = main_deck(&t, v2).await[0];
-    assert!(is_proxy && data == Some(1) && proxy != dm1);
-}
-
-#[tokio::test]
-async fn replacing_a_proxy_by_hand_needs_a_free_copy() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    put(&t, v1, &[cards[0], cards[1]]).await;
-    set_built(&t, v1, true).await;
-    let proxy = dm_proxy(&t).await;
-    let v2 = version(&t, "v2", &[proxy, cards[2]]).await;
-
-    // both copies are locked by v1
-    let (status, body) = replace(&t, v2, proxy).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(
-        body["error"],
-        "No free copy of Dark Magician in your collection."
-    );
-
-    // not a proxy, or not in this version
-    let (status, _) = replace(&t, v1, cards[0]).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = replace(&t, v1, proxy).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = replace(&t, 999, proxy).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-}
-
-#[tokio::test]
-async fn saving_a_built_version_takes_its_new_cards_from_the_others() {
-    let t = TestApp::new().await;
-    let (v1, cards) = t.deck_fixture().await;
-    let (dm1, dm2) = (cards[0], cards[1]);
-    put(&t, v1, &[dm1]).await;
-    set_built(&t, v1, true).await;
-    let v2 = version(&t, "v2", &[dm2]).await;
-
-    // dm2, used by v2, added to the built v1 from the reserve
-    let (status, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v1}"),
-            json!({ "main": [dm1, dm2] }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(
-        body["build_report"]["proxied_elsewhere"],
-        json!(["Magicien Sombre → Test - v2"])
-    );
-    assert_eq!(body["is_built"], true);
-    let (proxy, is_proxy, data) = main_deck(&t, v2).await[0];
-    assert!(is_proxy && data == Some(1) && proxy != dm2);
-
-    // saved again with nothing new: nothing taken, no report
-    let (status, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v1}"),
-            json!({ "main": [dm1, dm2] }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(body.get("build_report").is_none(), "{body}");
-
-    // a version that is not built still shares its cards
-    let v3 = version(&t, "v3", &[]).await;
-    let (status, body) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{v3}"),
-            json!({ "main": [proxy] }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(body.get("build_report").is_none());
-}
-
 /// Dark Magician plays the part of a card errata'd in 2016 ("New Pack"),
 /// printed before in "Metal Raiders"; the fixture's version plays the format
-/// "Edison" (cutoff 2010-03-01) with one proxy and one real copy coded
-/// `copy_code`. Nothing is asked to Yugipedia: its errata are cached.
+/// "Edison" (cutoff 2010-03-01) with 2 Dark Magicians: one owned copy coded
+/// `copy_code`, one missing. Nothing is asked to Yugipedia: its errata are
+/// cached.
 async fn errata_fixture(t: &TestApp, copy_code: &str) -> i64 {
     let (v1, cards) = t.deck_fixture().await;
-    t.exec(
-        r#"UPDATE card_data SET json_data = '{"name":"Dark Magician","card_sets":[
-               {"set_name":"Metal Raiders","set_code":"MRD-069","set_rarity":"Common"},
-               {"set_name":"New Pack","set_code":"NEW-EN001","set_rarity":"Rare"}]}' WHERE id = 1;
+    t.exec(&format!(
+        r#"UPDATE card_data SET json_data = '{{"name":"Dark Magician","card_sets":[
+               {{"set_name":"Metal Raiders","set_code":"MRD-069","set_rarity":"Common"}},
+               {{"set_name":"New Pack","set_code":"NEW-EN001","set_rarity":"Rare"}}]}}' WHERE id = 1;
            INSERT INTO ygo_set (name, code, tcg_date) VALUES
                ('Metal Raiders', 'MRD', '2002-06-26'), ('New Pack', 'NEW', '2016-01-29');
            INSERT INTO deck_format (id, name, version, cutoff) VALUES (1, 'Edison', 1, '2010-03-01');
            INSERT INTO yugipedia_errata (card_data_id, versions, checked_at) VALUES (1,
-               '[{"text":"Old text.","code":"MRD-069","set":"Metal Raiders","reprint_in":null},
-                 {"text":"New text.","code":"NEW-EN001","set":"New Pack","reprint_in":null}]',
+               '[{{"text":"Old text.","code":"MRD-069","set":"Metal Raiders","reprint_in":null}},
+                 {{"text":"New text.","code":"NEW-EN001","set":"New Pack","reprint_in":null}}]',
                date('now'));
-           UPDATE card SET is_proxy = 1 WHERE id = 1"#,
-    )
+           DELETE FROM unite WHERE card_id = {first};
+           DELETE FROM card WHERE id = {first};"#,
+        first = cards[0]
+    ))
     .await;
-    sqlx::query("UPDATE card SET code = ? WHERE id = 2")
+    sqlx::query("UPDATE card SET code = ? WHERE id = ?")
         .bind(copy_code)
+        .bind(cards[1])
         .execute(&t.state.pool)
         .await
         .unwrap();
-    put(t, v1, &[cards[0], cards[1]]).await;
+    t.set_main(v1, &[DM2]).await;
     t.exec(&format!(
         "UPDATE deck_version SET format_id = 1 WHERE id = {v1}"
     ))
@@ -683,9 +482,9 @@ async fn the_built_page_warns_about_errata_after_the_formats_cutoff() {
     let t = TestApp::new().await;
     errata_fixture(&t, "NEW-FR001").await;
 
-    let (status, page) = t.get("/decks/built").await;
+    let (status, page) = t.get("/decks/shopping").await;
     assert_eq!(status, StatusCode::OK, "{page}");
-    // the proxy and the owned copy with the new text, both to buy
+    // the missing one and the owned copy with the new text, both to buy
     assert!(page.contains("errata'd in New Pack"), "{page}");
     assert!(page.contains("buy Metal Raiders (MRD-069)"), "{page}");
     assert!(
@@ -709,16 +508,15 @@ async fn an_owned_copy_printed_with_the_right_text_is_not_missing() {
     let t = TestApp::new().await;
     errata_fixture(&t, "MRD-FR069").await;
 
-    let (_, page) = t.get("/decks/built").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(page.contains("errata'd in New Pack"), "{page}");
     assert!(!page.contains("Wrong text:"), "{page}");
     assert!(!page.contains("owned with the wrong text"), "{page}");
     assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
 
     // a copy whose set has no date is not judged either
-    t.exec("UPDATE card SET code = 'ZZZ-FR001' WHERE id = 2")
-        .await;
-    let (_, page) = t.get("/decks/built").await;
+    t.exec("UPDATE card SET code = 'ZZZ-FR001'").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(!page.contains("Wrong text:"), "{page}");
 }
 
@@ -729,7 +527,7 @@ async fn no_errata_warning_for_a_later_cutoff_or_no_cutoff() {
 
     // the format's cutoff is after the errata
     t.exec("UPDATE deck_format SET cutoff = '2020-01-01'").await;
-    let (_, page) = t.get("/decks/built").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(!page.contains('⚠'), "{page}");
     assert!(!page.contains("Wrong text:"), "{page}");
     assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
@@ -739,7 +537,7 @@ async fn no_errata_warning_for_a_later_cutoff_or_no_cutoff() {
         "UPDATE deck_version SET format_id = NULL WHERE id = {v1}"
     ))
     .await;
-    let (_, page) = t.get("/decks/built").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(!page.contains('⚠'), "{page}");
     assert!(!page.contains("Wrong text:"), "{page}");
 }
@@ -754,7 +552,7 @@ async fn a_ban_list_version_is_judged_at_the_ban_lists_date() {
         "UPDATE deck_version SET format_id = NULL, ban_list_id = 1 WHERE id = {v1}"
     ))
     .await;
-    let (_, page) = t.get("/decks/built").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(
         page.contains("ban list 01/03/2010: errata'd in New Pack"),
         "{page}"
@@ -764,7 +562,7 @@ async fn a_ban_list_version_is_judged_at_the_ban_lists_date() {
     // a list from after the errata: nothing to warn
     t.exec("UPDATE advanced_ban_list SET date = '2017-01-01'")
         .await;
-    let (_, page) = t.get("/decks/built").await;
+    let (_, page) = t.get("/decks/shopping").await;
     assert!(!page.contains('⚠'), "{page}");
 }
 
@@ -810,13 +608,13 @@ async fn the_built_page_says_when_errata_are_still_being_looked_up() {
     errata_fixture(&t, "NEW-FR001").await;
     t.exec("DELETE FROM yugipedia_errata").await;
 
-    let (status, page) = t.get("/decks/built").await;
+    let (status, page) = t.get("/decks/shopping").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(
         page.contains("Errata are being looked up on Yugipedia for 1 card(s)"),
         "{page}"
     );
     assert!(!page.contains('⚠'), "{page}");
-    // meanwhile the proxy is missing as before
+    // meanwhile the missing one is missing as before
     assert!(page.contains(">1 Dark Magician</textarea>"), "{page}");
 }

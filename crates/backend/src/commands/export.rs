@@ -114,6 +114,7 @@ mod tests {
             "/budget",
             "/decks/1/edit",
             "/decks/built",
+            "/decks/shopping",
             "/deck-builder/4",
             "/tournaments/1/edit",
             "/tournaments/add",

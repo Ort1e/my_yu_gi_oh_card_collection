@@ -40,7 +40,6 @@ pub struct CardValues {
     code: String,
     status: String,
     rarity: String,
-    is_proxy: bool,
 }
 
 #[derive(Template)]
@@ -238,7 +237,7 @@ pub async fn page(
 ) -> AppResult<EditCardPage> {
     let card = sqlx::query_as(
         "SELECT name, coalesce(en_name, '') AS en_name, coalesce(code, '') AS code,
-            coalesce(last_known_status, '') AS status, coalesce(rarity, '') AS rarity, is_proxy
+            coalesce(last_known_status, '') AS status, coalesce(rarity, '') AS rarity
          FROM card WHERE id = ?",
     )
     .bind(id)
@@ -332,7 +331,6 @@ pub async fn update(
                 code: form.text("code"),
                 status: form.text("status"),
                 rarity: form.text("rarity"),
-                is_proxy: form.checked("is_proxy"),
             },
             product: form.text("cardmarket_product"),
             errors: form.errors,
@@ -378,7 +376,6 @@ pub async fn update(
 
     sqlx::query(
         "UPDATE card SET name = ?, en_name = ?, code = ?, last_known_status = ?, rarity = ?,
-            is_proxy = ?,
             card_data_id = CASE WHEN ? THEN NULL ELSE card_data_id END,
             cardmarket_product_id = CASE WHEN ? THEN NULL ELSE ? END,
             cardmarket_product_manual = ?
@@ -389,7 +386,6 @@ pub async fn update(
     .bind(form.get("code"))
     .bind(status.map(yugioh_domain::card::CardStatus::code))
     .bind(rarity_label)
-    .bind(form.checked("is_proxy"))
     .bind(renamed)
     .bind(renamed)
     .bind(product_id)

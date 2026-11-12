@@ -367,7 +367,7 @@ script that uses what another one defines (like `findRarity` from
    sets' dates are ygoprodeck's.
 3. In the deck builder, **Ban list or format** → the format, **Save**: the
    problems show under it (too many copies, cards released after the
-   cutoff: greyed with "Out" on their tiles), and the reserve can keep only
+   cutoff: greyed with "Out" on their tiles), and the card search can keep only
    the legal cards. The read-only page of the version shows them too.
 4. The format's list changes after decks were built with it (a community
    update): **New version** on its page, then edit the copy. The decks
@@ -390,7 +390,7 @@ Every **Save** in the deck builder keeps the list in the deck's history
    deck page's History) compares it with the previous one, another list, or
    a version now.
 4. **Go back to an old list**: its page → **New version from this list**
-   (your free copies, proxies for the rest). Old versions you no longer
+   (its cards and counts; the collection says what you own). Old versions you no longer
    play can be deleted: their lists stay in the history.
 
 ## Fix a card's picture

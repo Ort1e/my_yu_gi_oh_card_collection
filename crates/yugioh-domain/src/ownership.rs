@@ -1,11 +1,16 @@
-//! Deck versions as **lists** (`docs/specs/deck-lists.md`): a version holds
+//! Deck versions as **lists** (migration 0027, `store::lists`): a version holds
 //! lines (a card and a count), not copies. Whether a line is owned is worked
 //! out from the collection; only a **built** version holds copies (and, for
 //! the cards it lacks, a "missing" mark).
 //!
-//! The owner's functions (stubs, `todo!()`): [`availability`], [`missing`],
-//! [`missing_for_all`], and `built_deck::plan_list_build`. Their tests are
-//! `#[ignore]`d until they are written: remove the `ignore` with the code.
+//! - [`availability`]: one card's copies seen from one list;
+//! - [`missing`] and [`missing_for_all`]: what one list, or several sharing
+//!   the same copies (the shopping list), lack;
+//! - [`condition_rank`]: which copies a built deck takes first
+//!   (`built_deck::plan_build`).
+//!
+//! Written by Claude on the owner's request (2026-11-09), like `format` and
+//! `errata`.
 
 use std::collections::HashMap;
 
@@ -84,19 +89,32 @@ pub fn availability(
     locks: &HashMap<CopyId, ListId>,
     list: ListId,
 ) -> Availability {
-    let _ = (copies, locks, list);
-    todo!("the owner's: count the copies (see the tests)")
+    let mut a = Availability::default();
+    for copy in copies.iter().filter(|c| !c.sold) {
+        a.owned += 1;
+        match locks.get(&copy.id) {
+            None => a.free += 1,
+            Some(&holder) if holder == list => a.here += 1,
+            Some(_) => a.elsewhere += 1,
+        }
+    }
+    a
 }
 
 /// The order in which copies are taken for a deck: best condition first
 /// (Mint, Near Mint, unknown, Excellent, Good, Poor), then the oldest copy
-/// (lowest id). Used by [`crate::built_deck::plan_list_build`].
+/// (lowest id). Used by [`crate::built_deck::plan_build`].
 ///
 /// Unknown sits with Near Mint: most copies bought as singles are, and a
 /// condition not noted is worth 1 (`condition_factor`).
 pub fn condition_rank(status: Option<CardStatus>) -> u8 {
-    let _ = status;
-    todo!("the owner's: the rank of a condition, 0 = best")
+    match status {
+        Some(CardStatus::Mint) => 0,
+        Some(CardStatus::NearMint) | None => 1,
+        Some(CardStatus::Excellent) => 2,
+        Some(CardStatus::Good) => 3,
+        Some(CardStatus::Poor) => 4,
+    }
 }
 
 /// A line short of copies: `count` more are needed.
@@ -115,8 +133,7 @@ pub struct MissingLine {
 /// order of `lines`; a name-only line (no card data) lacks its whole count;
 /// a line with enough copies is not in the answer.
 pub fn missing(lines: &[Line], free: &HashMap<CardDataId, usize>) -> Vec<MissingLine> {
-    let _ = (lines, free);
-    todo!("the owner's: see the tests")
+    take(lines, &mut free.clone())
 }
 
 /// The shopping list's rule: what several lists lack together, when they
@@ -134,8 +151,37 @@ pub fn missing_for_all(
     lists: &[(ListId, Vec<Line>)],
     owned: &HashMap<CardDataId, usize>,
 ) -> HashMap<ListId, Vec<MissingLine>> {
-    let _ = (lists, owned);
-    todo!("the owner's: see the tests")
+    let mut pool = owned.clone();
+    lists
+        .iter()
+        .map(|(list, lines)| (*list, take(lines, &mut pool)))
+        .collect()
+}
+
+/// The lines take their copies from `pool` in order (it keeps what is
+/// left); the answer is what they still lack.
+fn take(lines: &[Line], pool: &mut HashMap<CardDataId, usize>) -> Vec<MissingLine> {
+    let mut short = Vec::new();
+    for line in lines {
+        let wanted = line.count as usize;
+        let taken = match line.card_data_id.and_then(|id| pool.get_mut(&id)) {
+            Some(left) => {
+                let taken = wanted.min(*left);
+                *left -= taken;
+                taken
+            }
+            None => 0,
+        };
+        if taken < wanted {
+            short.push(MissingLine {
+                line: line.line_ref(),
+                card_data_id: line.card_data_id,
+                name: line.name.clone(),
+                count: (wanted - taken) as u32,
+            });
+        }
+    }
+    short
 }
 
 #[cfg(test)]
@@ -176,7 +222,6 @@ mod tests {
     // --- availability
 
     #[test]
-    #[ignore = "the owner's availability"]
     fn no_copy_is_nothing() {
         assert_eq!(
             availability(&[], &HashMap::new(), 1),
@@ -185,7 +230,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's availability"]
     fn unlocked_copies_are_free() {
         let copies = [copy(1, ASH, None, false), copy(2, ASH, None, false)];
         let a = availability(&copies, &HashMap::new(), 1);
@@ -201,7 +245,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's availability"]
     fn sold_copies_dont_count_even_locked() {
         let copies = [copy(1, ASH, None, true), copy(2, ASH, None, false)];
         let locks = HashMap::from([(1, 7)]);
@@ -218,7 +261,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's availability"]
     fn locks_here_and_elsewhere() {
         let copies = [
             copy(1, ASH, None, false),
@@ -242,7 +284,6 @@ mod tests {
     // --- condition_rank
 
     #[test]
-    #[ignore = "the owner's condition_rank"]
     fn best_condition_first() {
         use CardStatus::*;
         let order = [
@@ -262,7 +303,6 @@ mod tests {
     // --- missing
 
     #[test]
-    #[ignore = "the owner's missing"]
     fn enough_copies_lack_nothing() {
         let lines = [line(DeckZone::Main, 0, Some(ASH), 3)];
         assert_eq!(missing(&lines, &HashMap::from([(ASH, 3)])), vec![]);
@@ -270,7 +310,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's missing"]
     fn a_line_partly_owned() {
         let lines = [
             line(DeckZone::Main, 0, Some(ASH), 3),
@@ -281,7 +320,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's missing"]
     fn lines_of_one_card_share_its_copies_in_order() {
         // 2 in the main deck, 2 in the side: 3 owned fill the main first
         let lines = [
@@ -293,7 +331,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's missing"]
     fn a_name_only_line_lacks_everything() {
         let lines = [line(DeckZone::Extra, 0, None, 2)];
         assert_eq!(missing(&lines, &HashMap::new()), vec![short(&lines[0], 2)]);
@@ -302,7 +339,6 @@ mod tests {
     // --- missing_for_all
 
     #[test]
-    #[ignore = "the owner's missing_for_all"]
     fn lists_take_in_turn() {
         // the spec's example: 3 Ash in two decks, 1 owned: 2 + 3 to buy
         let a = vec![line(DeckZone::Main, 0, Some(ASH), 3)];
@@ -316,7 +352,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's missing_for_all"]
     fn the_first_list_is_served_first() {
         let a = vec![line(DeckZone::Main, 0, Some(ASH), 2)];
         let b = vec![line(DeckZone::Main, 0, Some(ASH), 2)];
@@ -327,7 +362,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the owner's missing_for_all"]
     fn every_list_has_an_entry() {
         let a = vec![line(DeckZone::Main, 0, Some(NIBIRU), 1)];
         let got = missing_for_all(&[(1, a), (2, vec![])], &HashMap::from([(NIBIRU, 1)]));

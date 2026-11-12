@@ -29,7 +29,6 @@ pub struct CardRow {
     pub code: Option<String>,
     pub last_known_status: Option<String>,
     pub rarity: Option<String>,
-    pub is_proxy: bool,
     pub card_data_id: Option<i64>,
     /// Its printing's own picture (`card.picture`, a Yugipedia file).
     pub picture_file: Option<String>,
@@ -45,7 +44,7 @@ impl CardRow {
     /// The columns to select from `card` (a `format!` of `MARKET_PRICE`).
     pub fn columns() -> String {
         format!(
-            "card.id, card.name, card.code, card.last_known_status, card.rarity, card.is_proxy, \
+            "card.id, card.name, card.code, card.last_known_status, card.rarity, \
              card.card_data_id, card.picture AS picture_file, \
              (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
               WHERE card_data.id = card.card_data_id) AS name_en, \
@@ -76,7 +75,7 @@ impl CardRow {
             tags,
             value: self.estimate().map(|e| e.to_string()).unwrap_or_default(),
             faded: self.is_sold,
-            proxy: self.is_proxy,
+            missing: false,
             ban: None,
         }
     }
@@ -164,7 +163,7 @@ pub struct DeckVersionRow {
     pub version_name: String,
     pub deck_id: Option<i64>,
     pub deck_name: Option<String>,
-    /// Locks its real cards (`yugioh_domain::built_deck`).
+    /// Holds copies (`store::lists`, `yugioh_domain::built_deck`).
     pub is_built: bool,
     pub deck_box: Option<String>,
     pub sleeves: Option<String>,

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Shopping list{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/collection.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Shopping list</h1>
+  <p class="back-link"><a href="/decks">← All decks</a> · <a href="/decks/built">Built decks</a></p>
+  <p>What the built decks, then the planned ones (the deck builder's Settings tab: Planned), still lack.
+    They share your collection: a copy you own once counts for one deck only, the built ones first.</p>
+  <p class="budget-left">{% match budget_left %}{% when Some with (left) %}Budget left this month: <strong>{{ left }} €</strong>{% when None %}No budget set{% endmatch %} · <a href="/budget">Budget</a></p>
+
+  {% if versions.is_empty() %}
+  <p>No built or planned deck yet.</p>
+  {% else %}
+  <div class="card-list">
+    {% for built in versions %}
+    <div class="card">
+      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}#to-buy">{{ built.version.full_name() }}</a>
+        {% if built.version.is_built %}<span class="built-badge">Built</span>{% else %}<span class="tag">Planned</span>{% endif %}</div>
+      <div class="card-meta-line">
+        <div>Cards: {{ built.cards }}</div>
+        {% if built.wrong_text > 0 %}<div>Wrong text: {{ built.wrong_text }}</div>{% endif %}
+      </div>
+      {% if built.missing.is_empty() %}
+      <p>Nothing missing: ready to play.</p>
+      {% else %}
+      <label class="pick-all"><input type="checkbox" class="want-deck" checked> All in the wants list</label>
+      <details class="deck-missing">
+        <summary>Missing: {{ built.missing_copies() }} cop{% if built.missing_copies() == 1 %}y{% else %}ies{% endif %}
+          ({{ built.missing.len() }} different card{% if built.missing.len() != 1 %}s{% endif %}),
+          about {{ built.cost() }} €{% if built.errata_cards() > 0 %},
+          <span class="errata-owned">{{ built.errata_cards() }} with an errata</span>{% endif %}</summary>
+        <div class="table-scroll">
+        <table class="numbers">
+          <thead><tr><th class="text">Card</th><th>Copies</th><th>Price (€)</th><th class="text">Errata</th><th class="text">Cardmarket</th></tr></thead>
+          <tbody>
+            {% for line in built.missing %}
+            <tr>
+              <td class="text"><label><input type="checkbox" class="want-pick" checked
+                data-label="{{ line.card.name }}" data-name="{{ line.card.english_name }}" data-count="{{ line.card.count }}" data-price="{{ line.price_attr() }}">
+                {{ line.card.name }}</label></td>
+              <td>{{ line.card.count }}</td>
+              <td>{% if let Some(total) = line.total() %}{{ total }}{% else %}—{% endif %}</td>
+              <td class="text">
+                {% if !line.card.wrong_text.is_empty() %}<span class="errata-owned">owned with the wrong text: {{ line.card.wrong_text.join(", ") }}</span>{% endif %}
+                {% if let Some(warning) = line.card.warning %}{% include "decks/errata_warning.html" %}{% endif %}
+              </td>
+              <td class="text"><a href="https://www.cardmarket.com/en/YuGiOh/Products/Search?searchString={{ line.card.english_name|urlencode }}" target="_blank" rel="noopener">Buy ↗</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <p><a href="/deck-builder/{{ built.version.id }}#to-buy">To buy tab: this deck's wants list ↗</a></p>
+      </details>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if errata_pending > 0 %}
+  <p class="errata-pending">Errata are being looked up on Yugipedia for {{ errata_pending }} card(s): reload in a minute.</p>
+  {% endif %}
+
+  {% if !shopping.is_empty() %}
+  <h2>Cardmarket wants list</h2>
+  <p>Every missing card of these decks, merged. Untick a card (or a whole deck) above to leave it out:
+    the list and the estimate follow.</p>
+  <p>{{ self.wants_note() }}</p>
+  <p class="wants-estimate">Estimated price: <strong id="wants-total">{{ estimate|money }}</strong> €
+    <span id="wants-unpriced">{% if unpriced > 0 %}({{ unpriced }} card(s) without a price){% endif %}</span>
+    <span class="cell-note">Cardmarket prices (the cheapest printing's, as of the last refresh), before shipping; the list asks for Good condition or better.</span></p>
+  <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
+  <p><button type="button" data-copy="wants-all">Copy</button>
+    <a class="btn btn-secondary" href="https://www.cardmarket.com/en/YuGiOh/Wants" target="_blank" rel="noopener">Open my Cardmarket wants lists ↗</a></p>
+  {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+<script src="/static/js/wants_list.js"></script>
+{% endblock %}

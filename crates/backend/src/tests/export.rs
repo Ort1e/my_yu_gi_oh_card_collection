@@ -11,9 +11,8 @@ async fn the_public_copy_holds_nothing_private() {
         "INSERT INTO seller (id, name, is_person) VALUES (1, 'Jeanne Privatename', 1);
          INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price)
              VALUES (1, 'purchase', '123.45', '2025-06-01', 1, '0.00');
-         INSERT INTO card (id, name, en_name, code, rarity, last_known_status, card_data_id, is_proxy)
-             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 'NM', 1, 0),
-                    (2, 'Kuriboh Proxy', 'kuriboh', 'MRD-FR071', NULL, 'NM', 2, 1);
+         INSERT INTO card (id, name, en_name, code, rarity, last_known_status, card_data_id)
+             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 'NM', 1);
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
          INSERT INTO deck (id, name) VALUES (1, 'Secret deck');
          INSERT INTO tournament (id, name, date, conclusion, notes)
@@ -27,13 +26,15 @@ async fn the_public_copy_holds_nothing_private() {
              (12, 3, 'Any version', 1), (14, 3, 'Hidden version', 0),
              (13, 1, 'Secret version', 0);
          UPDATE deck_version SET deck_box = 'secret box', sleeves = 'secret sleeves' WHERE id = 12;
-         INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
+         INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position) VALUES
+             (10, 'main', 1, 'Magicien Sombre', 1, 1), (11, 'main', 2, 'Kuriboh Draft', 1, 1),
+             (13, 'main', 2, 'Kuriboh Draft', 1, 1);
          INSERT INTO deck_snapshot (id, deck_id, version_id, created_at, name, tournament_id) VALUES
              (20, 2, 10, '2025-07-01 00:00:00', 'Played list', 1),
              (21, 2, 11, '2025-07-02 00:00:00', 'Draft list', NULL),
              (22, 1, 13, '2025-07-02 00:00:00', 'Secret list', NULL);
          INSERT INTO deck_snapshot_card (snapshot_id, zone, card_data_id, name, count, position) VALUES
-             (20, 'main', 1, 'Magicien Sombre', 1, 1), (21, 'main', 2, 'Kuriboh Proxy', 1, 1);
+             (20, 'main', 1, 'Magicien Sombre', 1, 1), (21, 'main', 2, 'Kuriboh Draft', 1, 1);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
                                    name_en, rarity, category, variants, json, fetched_at)
@@ -154,8 +155,8 @@ async fn the_public_copy_holds_nothing_private() {
         assert!(inside, "{link}: not in the copy");
     }
     // never: sellers, prices paid, lots, private decks and versions,
-    // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, proxies (but
-    // in a public deck), the deck builder, links to the app
+    // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, the
+    // cards of private decks, the deck builder, links to the app
     for private in [
         "Privatename",
         "123.45",
@@ -178,7 +179,7 @@ async fn the_public_copy_holds_nothing_private() {
         "wish note",
         "book note",
         "9780553573398",
-        "Kuriboh Proxy",
+        "Kuriboh Draft",
         "Hidden Diary",
         "Hidden Series",
         "Hidden Author",

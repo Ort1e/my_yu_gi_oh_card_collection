@@ -17,10 +17,9 @@ use yugioh_domain::card::sort_name;
 use yugioh_domain::deck_history::{diff, summary, Change, DeckZone, SnapshotList};
 use yugioh_domain::stats::{kind, CardKind};
 
-use super::api::{create_version_from_list, ListCard};
 use super::PUBLIC_VERSION;
-use crate::store::cards::Zone;
 use crate::store::db::{begin_write, Pool};
+use crate::store::lists;
 use crate::store::models::{picture_url, version_full_name};
 use crate::store::snapshots::{self, Snapshot};
 use crate::web::error::{bad_request, AppError, AppResult, OrNotFound};
@@ -377,7 +376,7 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
 }
 
 /// `POST /deck-snapshots/:id/branch`: a new version `version_name` of its
-/// deck with its cards (owned copies, else proxies), opened in the builder.
+/// deck with its list, opened in the builder.
 pub async fn branch(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -391,46 +390,16 @@ pub async fn branch(
         return bad_request("The version name can't be empty.");
     }
 
-    let mut conn = state.pool.acquire().await?;
-    let cards = snapshots::cards(&mut conn, id).await?;
-    let mut en_names: HashMap<i64, String> = HashMap::new();
-    for id in cards.entries.iter().filter_map(|e| e.card_data_id) {
-        let en: Option<String> = sqlx::query_scalar("SELECT en_name FROM card_data WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&mut *conn)
-            .await?;
-        if let Some(en) = en {
-            en_names.insert(id, en);
-        }
-    }
-    drop(conn);
-
-    let list = |zone: DeckZone| -> Vec<ListCard> {
-        cards
-            .zone(zone)
-            .flat_map(|e| {
-                let card = ListCard {
-                    card_data: e
-                        .card_data_id
-                        .and_then(|d| Some((d, en_names.get(&d)?.clone()))),
-                    name: e.name.clone(),
-                };
-                std::iter::repeat_with(move || ListCard {
-                    card_data: card.card_data.clone(),
-                    name: card.name.clone(),
-                })
-                .take(e.count as usize)
-            })
-            .collect()
-    };
-    let zones = [
-        (Zone::Main, list(DeckZone::Main)),
-        (Zone::Extra, list(DeckZone::Extra)),
-        (Zone::Side, list(DeckZone::Side)),
-    ];
-
     let mut tx = begin_write(&state.pool).await?;
-    let version_id = create_version_from_list(&mut tx, deck_id, name, zones).await?;
+    let cards = snapshots::cards(&mut tx, id).await?;
+    let version_id: i64 =
+        sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
+            .bind(deck_id)
+            .bind(name)
+            .execute(&mut *tx)
+            .await?
+            .last_insert_rowid();
+    lists::write_lines(&mut tx, version_id, &cards).await?;
     snapshots::record(&mut tx, version_id).await?;
     tx.commit().await?;
     tracing::info!(

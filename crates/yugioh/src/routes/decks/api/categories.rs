@@ -1,4 +1,5 @@
-//! Card categories of a deck version (plain or conditional) and their assignments.
+//! Card categories of a deck version (plain or conditional) and their
+//! assignments, by card (card data: every copy of it in the version).
 
 use std::collections::HashSet;
 
@@ -222,19 +223,20 @@ pub struct CardCategory {
     assigned: bool,
 }
 
-/// The version's categories, flagged with whether this card is in them.
+/// The version's categories, flagged with whether this card (card data) is
+/// in them.
 pub async fn card_categories(
     State(state): State<AppState>,
-    Path((id, card_id)): Path<(i64, i64)>,
+    Path((id, card_data_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<Vec<CardCategory>>> {
     Ok(Json(
         sqlx::query_as(
             "SELECT c.id, c.name, EXISTS (
                  SELECT 1 FROM card_category_assignment a
-                 WHERE a.category_id = c.id AND a.card_id = ?) AS assigned
+                 WHERE a.category_id = c.id AND a.card_data_id = ?) AS assigned
              FROM card_category c WHERE c.deck_version_id = ? ORDER BY c.id",
         )
-        .bind(card_id)
+        .bind(card_data_id)
         .bind(id)
         .fetch_all(&state.pool)
         .await?,
@@ -249,7 +251,7 @@ pub struct AssignInput {
 
 pub async fn assign_category(
     State(state): State<AppState>,
-    Path((id, card_id, category_id)): Path<(i64, i64, i64)>,
+    Path((id, card_data_id, category_id)): Path<(i64, i64, i64)>,
     Json(input): Json<AssignInput>,
 ) -> AppResult<StatusCode> {
     let mut conn = state.pool.acquire().await?;
@@ -260,22 +262,22 @@ pub async fn assign_category(
             .fetch_optional(&mut *conn)
             .await?;
     belongs.or_404()?;
-    exists(&mut conn, "card", card_id).await?;
+    exists(&mut conn, "card_data", card_data_id).await?;
 
     let sql = if input.assigned {
-        "INSERT INTO card_category_assignment (category_id, card_id) VALUES (?, ?)
+        "INSERT INTO card_category_assignment (category_id, card_data_id) VALUES (?, ?)
          ON CONFLICT DO NOTHING"
     } else {
-        "DELETE FROM card_category_assignment WHERE category_id = ? AND card_id = ?"
+        "DELETE FROM card_category_assignment WHERE category_id = ? AND card_data_id = ?"
     };
     sqlx::query(sql)
         .bind(category_id)
-        .bind(card_id)
+        .bind(card_data_id)
         .execute(&mut *conn)
         .await?;
     tracing::info!(
         version_id = id,
-        card_id,
+        card_data_id,
         category_id,
         assigned = input.assigned,
         "card category changed"

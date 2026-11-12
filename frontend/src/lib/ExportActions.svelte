@@ -4,20 +4,19 @@
     // they are on the screen, so unsaved changes are included.
     import { ydkFile, ydkeUrl } from '../deck';
     import { toast } from './toast';
-    import type { ApiCard } from '../api-types/ApiCard';
-    import type { DeckZones } from '../types';
+    import type { DeckZones, Tile } from '../types';
 
     export let zones: DeckZones;
     /** used for the .ydk file's name */
     export let name: string;
 
-    const VARIANTS: [string, (card: ApiCard) => boolean][] = [
-        ['with proxies', () => true],
-        ['without proxies', (c) => !c.is_proxy],
-        ['only proxies', (c) => c.is_proxy],
+    const VARIANTS: [string, (card: Tile) => boolean][] = [
+        ['all the cards', () => true],
+        ['owned only', (c) => !c.missing],
+        ['missing only', (c) => c.missing],
     ];
 
-    async function copy(label: string, keep: (card: ApiCard) => boolean) {
+    async function copy(label: string, keep: (card: Tile) => boolean) {
         try {
             await navigator.clipboard.writeText(ydkeUrl(zones, keep));
             toast.ok(`YDKE copied (${label})`);
@@ -26,7 +25,7 @@
         }
     }
 
-    function download(label: string, keep: (card: ApiCard) => boolean) {
+    function download(label: string, keep: (card: Tile) => boolean) {
         const { text, skipped } = ydkFile(zones, keep);
         const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
         const link = document.createElement('a');

@@ -219,7 +219,6 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
                 .rarity
                 .map(|r| r.label().to_string())
                 .unwrap_or_default(),
-            is_proxy: false,
             price: card.price.to_string(),
             quantity: String::new(),
         };

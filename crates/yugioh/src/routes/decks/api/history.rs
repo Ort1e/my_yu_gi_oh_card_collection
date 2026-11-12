@@ -11,6 +11,7 @@ use sqlx::SqliteConnection;
 use ts_rs::TS;
 use yugioh_domain::deck_history::{diff, DeckZone};
 
+use super::{input_list, CardInput};
 use crate::store::cards::Zone;
 use crate::store::db::begin_write;
 use crate::store::snapshots::{self, Snapshot};
@@ -36,15 +37,15 @@ pub async fn history(
     Ok(Json(snapshots::for_deck(&mut conn, deck_id, false).await?))
 }
 
-/// The zones on the screen (card ids), to compare with snapshot
+/// The zones on the screen (their tiles), to compare with snapshot
 /// `snapshot_id` of the same deck.
 #[derive(Debug, Deserialize, TS)]
 #[ts(export)]
 pub struct CompareInput {
     snapshot_id: i64,
-    main: Vec<i64>,
-    extra: Vec<i64>,
-    side: Vec<i64>,
+    main: Vec<CardInput>,
+    extra: Vec<CardInput>,
+    side: Vec<CardInput>,
 }
 
 /// A card whose count changed from the snapshot to the screen.
@@ -67,23 +68,19 @@ pub async fn compare(
     same_deck(&mut conn, id, input.snapshot_id).await?;
 
     let saved = snapshots::cards(&mut conn, input.snapshot_id).await?;
-    let screen = snapshots::cards_of_ids(
+    let screen = input_list(
         &mut conn,
         [
-            (DeckZone::Main, &input.main),
-            (DeckZone::Extra, &input.extra),
-            (DeckZone::Side, &input.side),
+            (DeckZone::Main, input.main.as_slice()),
+            (DeckZone::Extra, input.extra.as_slice()),
+            (DeckZone::Side, input.side.as_slice()),
         ],
     )
     .await?;
     let changes = diff(&saved, &screen)
         .into_iter()
         .map(|c| ApiChange {
-            zone: match c.zone {
-                DeckZone::Main => Zone::Main,
-                DeckZone::Extra => Zone::Extra,
-                DeckZone::Side => Zone::Side,
-            },
+            zone: Zone::of(c.zone),
             name: c.name,
             before: c.before,
             after: c.after,

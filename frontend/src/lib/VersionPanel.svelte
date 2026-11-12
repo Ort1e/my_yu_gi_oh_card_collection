@@ -1,6 +1,6 @@
 <script lang="ts">
     // The Settings tab, three blocks: Rules (ban list or format), Physical
-    // deck (built, deck box, sleeves), Sharing (public site). Rename, Export /
+    // deck (built or planned, deck box, sleeves), Sharing (public site). Rename, Export /
     // Play, the tournament and Delete are in the header's ⋯ menu.
     // The ban list or format is saved with the zones (Save in the header);
     // everything else saves at once, with a toast. Building changes the
@@ -37,8 +37,8 @@
         const sure = await askYes({
             title: build ? 'Build this version?' : 'Unbuild this version?',
             message: build
-                ? 'Its cards become its own: the ones shared with other decks become proxies there. It also goes on the public site (Sharing hides it).'
-                : 'Its cards go back to the collection. The proxies made in other decks stay until clean-cards puts the cards back.',
+                ? 'It takes your free copies of its cards (best condition first): they are out of the collection for the other decks. The cards you lack stay missing. It also goes on the public site (Sharing hides it).'
+                : 'Its copies go back to the collection.',
             confirmLabel: build ? 'Build' : 'Unbuild',
         });
 
@@ -51,23 +51,32 @@
 
             const report = updated.build_report;
 
-            if (report && report.proxied_here.length + report.proxied_elsewhere.length > 0) {
-                const lines: string[] = [];
+            if (report) {
+                const lines = [`${report.copies} of your copies are in it now.`];
 
-                if (report.proxied_here.length > 0) {
-                    lines.push('Already in another built deck, now proxies here:', ...report.proxied_here.map((l) => `• ${l}`), '');
-                }
+                if (report.missing > 0) lines.push(`${report.missing} missing: see the To buy tab.`);
 
-                if (report.proxied_elsewhere.length > 0) {
-                    lines.push('Now proxies in the other decks:', ...report.proxied_elsewhere.map((l) => `• ${l}`));
-                }
-
-                await inform({ title: build ? 'Version built' : 'Version unbuilt', lines });
+                await inform({ title: 'Version built', lines });
             } else {
                 toast.ok(build ? 'Built' : 'Unbuilt');
             }
         } catch (err) {
             toast.error(`Could not change the build: ${err.message}`);
+        }
+    }
+
+    async function togglePlanned(e: Event & { currentTarget: HTMLInputElement }) {
+        const planned = e.currentTarget.checked;
+
+        try {
+            const updated = await api.update({ is_planned: planned });
+
+            deck.is_planned = updated.is_planned;
+            deck = deck;
+            toast.ok(planned ? 'Planned: its missing cards are on the shopping list' : 'No longer planned');
+        } catch (err) {
+            e.currentTarget.checked = deck.is_planned;
+            toast.error(`Could not save it: ${err.message}`);
         }
     }
 
@@ -129,14 +138,21 @@
     <section>
         <h3>Physical deck</h3>
 
-        <label class="switch" title="A built version locks its real cards: they are out of the collection for the other decks">
+        <label class="switch" title="A built version holds copies of your collection: they are out of it for the other decks">
             <input type="checkbox" checked={deck.is_built} on:change={toggleBuilt} />
-            Built (locks its cards)
+            Built (holds its copies)
         </label>
         <span class="hint">
-            A built version's real cards are out of the collection for every other deck, which get proxies instead.
+            Building takes your free copies of its cards; the others decks never lose theirs, only built decks hold copies.
             Build or unbuild on the saved cards.
         </span>
+
+        {#if !deck.is_built}
+            <label class="switch" title="A deck you mean to build: its missing cards go on the shopping list">
+                <input type="checkbox" checked={deck.is_planned} on:change={togglePlanned} />
+                Planned (to build)
+            </label>
+        {/if}
 
         <div class="notes">
             <label>

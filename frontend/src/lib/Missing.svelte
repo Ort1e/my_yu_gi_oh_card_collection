@@ -1,11 +1,10 @@
 <script lang="ts">
-    // The To buy tab (was Missing): what is still missing to play the deck for real: its proxies, grouped,
+    // The To buy tab (was Missing): what is still missing to play the deck for real: the cards the collection lacks, grouped,
     // with the errata warnings, a link to buy each on Cardmarket, the
     // estimated cost and the Cardmarket wants list.
     import { createEventDispatcher } from 'svelte';
 
-    import { cardmarketUrl, euros, missingLines } from '../deck';
-    import type { ApiCard } from '../api-types/ApiCard';
+    import { ZONES, cardmarketUrl, euros, missingLines } from '../deck';
     import type { Check } from '../api-types/Check';
     import type { Zone } from '../api-types/Zone';
     import type { DeckZones } from '../types';
@@ -14,8 +13,10 @@
     export let zones: DeckZones;
     export let check: Check;
     export let dirty: boolean;
+    /** a built version: its empty slots can take free copies */
+    export let isBuilt: boolean;
 
-    const dispatch = createEventDispatcher<{ replace: ApiCard; add: { name: string; zone: Zone } }>();
+    const dispatch = createEventDispatcher<{ takeFree: null; add: { name: string; zone: Zone } }>();
 
     const ZONE_NAMES: Record<Zone, string> = { main: 'Main', extra: 'Extra', side: 'Side' };
 
@@ -24,6 +25,8 @@
 
     $: lines = missingLines(zones);
     $: missingCount = lines.reduce((sum, l) => sum + l.count, 0);
+    // a built version's slots without a copy though one is free
+    $: takeable = isBuilt && ZONES.some((z) => zones[z].some((c) => !c.missing && !c.copy));
     $: unpriced = lines.filter((l) => l.cost == null).reduce((sum, l) => sum + l.count, 0);
     $: cost = lines.reduce((sum, l) => sum + (l.cost ?? 0), 0);
 
@@ -62,18 +65,17 @@
                         <td>{line.card.name_en ?? line.card.name} <span class="hint">({ZONE_NAMES[line.zone]})</span></td>
                         <td class="price">{line.cost == null ? '—' : euros(line.cost)}</td>
                         <td><a href={cardmarketUrl(line.card)} target="_blank" rel="noopener">Buy ↗</a></td>
-                        <td>
-                            <button
-                                type="button"
-                                class="btn-small btn-secondary"
-                                title="Put an owned copy in place of a proxy"
-                                on:click={() => dispatch('replace', line.card)}>Use my copy</button
-                            >
-                        </td>
                     </tr>
                 {/each}
             </tbody>
         </table>
+    {/if}
+
+    {#if takeable}
+        <p>
+            You own copies not in this built deck yet.
+            <button type="button" class="btn-small" on:click={() => dispatch('takeFree', null)}>Take free copies</button>
+        </p>
     {/if}
 
     <form class="add" on:submit|preventDefault={add}>
@@ -118,10 +120,10 @@
         </p>
         <p class="hint">{check.wants_note}</p>
     {:else}
-        <p class="hint">No proxy: nothing to put in a wants list.</p>
+        <p class="hint">Nothing missing: nothing to put in a wants list.</p>
     {/if}
 
-    <p><a href="/decks/built">The shopping list over all the built decks</a></p>
+    <p><a href="/decks/shopping">The shopping list over all the built and planned decks</a></p>
 </div>
 
 <style>

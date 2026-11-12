@@ -4,7 +4,7 @@
     // them to the zones on the screen, "Name this save" to keep one, and
     // Rename for any of them (the only place lists are named: their page
     // links here).
-    import { frenchDate } from '../deck';
+    import { cardInputs, frenchDate } from '../deck';
     import type { DeckApi } from '../api';
     import type { ApiChange } from '../api-types/ApiChange';
     import type { DeckVersion } from '../api-types/DeckVersion';
@@ -33,7 +33,7 @@
 
     const when = (s: Snapshot): string => `${frenchDate(s.created_at.slice(0, 10))} ${s.created_at.slice(11, 16)}`;
 
-    const ids = (zone: Zone): number[] => zones[zone].map((c) => c.id);
+    const ids = (zone: Zone) => cardInputs(zones[zone]);
 
     async function load() {
         try {

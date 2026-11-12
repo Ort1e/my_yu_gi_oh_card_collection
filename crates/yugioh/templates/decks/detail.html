@@ -30,7 +30,7 @@
     <thead>
       <tr>
         <th class="text">Version</th><th>Main</th><th>Extra</th><th>Side</th>
-        {% if !common::export::public_copy() %}<th title="Proxies: the cards still to buy">Missing</th>{% endif %}
+        {% if !common::export::public_copy() %}<th title="The cards your collection lacks: to buy">Missing</th>{% endif %}
         <th class="text">Rules</th><th class="text">Tournament</th><th class="text"></th>
       </tr>
     </thead>
@@ -94,7 +94,7 @@
 
       <label for="ydke">YDKE (only to import one):</label>
       <textarea name="ydke" id="ydke" rows="3" placeholder="ydke://…">{{ ydke }}</textarea>
-      <small>Cards you own are used when there is a copy, the others become proxies. The new version opens in the deck builder.</small>
+      <small>Its cards and counts; the collection says which you own. The new version opens in the deck builder.</small>
     </fieldset>
     <input type="submit" value="Create the version">
   </form>

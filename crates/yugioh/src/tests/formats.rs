@@ -4,6 +4,7 @@
 use serde_json::json;
 
 use super::*;
+use crate::testing::{tiles, DM, KURIBOH};
 
 /// Konami's list of 2010-03-01 (Dark Magician limited, Kuriboh forbidden),
 /// two sets, the card data's sets: Dark Magician from 2002, Kuriboh 2012.
@@ -180,16 +181,16 @@ async fn a_format_from_a_konami_list_and_its_versions() {
 async fn a_deck_version_plays_a_format() {
     let t = TestApp::new().await;
     konami_list(&t).await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let format = edison(&t, "2010-03-01").await;
     let url = format!("/api/deck-versions/{version}");
 
-    // both Dark Magicians (limited), the Kuriboh proxy (2012, forbidden)
+    // both Dark Magicians (limited), a Kuriboh not owned (2012, forbidden)
     let (status, deck) = t
         .json(
             "PATCH",
             &url,
-            json!({ "main": [cards[0], cards[1]], "side": [cards[2]],
+            json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]), "side": tiles(&[(KURIBOH, "Kuriboh", 1)]),
                     "format_id": format, "ban_list_id": null }),
         )
         .await;
@@ -202,6 +203,8 @@ async fn a_deck_version_plays_a_format() {
     assert_eq!(deck["main"][0]["first_release"], "2002-03-08");
     assert_eq!(deck["side"][0]["first_release"], "2012-01-01");
 
+    // the missing Kuriboh is looked up for errata (a plain list holds no
+    // copy to judge: the Dark Magicians are not)
     let (status, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
@@ -210,7 +213,7 @@ async fn a_deck_version_plays_a_format() {
             "Dark Magician: 2 copies, 1 allowed",
             "Kuriboh: released on 01/01/2012, after the format's cutoff",
             "Kuriboh: forbidden (1 in the deck)",
-        ], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh",
+        ], "errata": [], "errata_pending": 1, "wants": "1 Kuriboh",
                 "wants_note": check["wants_note"] })
     );
 
@@ -259,7 +262,7 @@ async fn a_deck_version_plays_a_format() {
     let (_, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
     assert_eq!(
         check,
-        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 2, "wants": "1 Kuriboh",
+        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 1, "wants": "1 Kuriboh",
                 "wants_note": check["wants_note"] })
     );
 }

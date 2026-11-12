@@ -13,8 +13,8 @@ use yugioh_domain::ban_list::BanStatus;
 use yugioh_domain::format::{self, DeckCard, FormatRules, Problem};
 
 use super::card_data::{SETS_URL, YGOPRODECK};
-use super::cards::Zone;
 use super::db::{begin_write, push_ids, Pool};
+use super::lists;
 use crate::web::error::{AppError, AppResult};
 
 /// A format as stored.
@@ -44,11 +44,6 @@ impl FormatRow {
         })
     }
 }
-
-/// The English name a card is counted by: its card data's (`Dark Magician`),
-/// else what the copy says.
-const CARD_NAME: &str =
-    "coalesce(json_extract(card_data.json_data, '$.name'), card.en_name, card.name)";
 
 /// Download every set's TCG date (`cardsets.php`) into `ygo_set`. Network
 /// first, then one write transaction. Returns how many sets.
@@ -190,29 +185,28 @@ pub async fn version_problems(
         return Ok(None);
     };
 
-    let mut card_ids = Vec::new();
-    for zone in Zone::ALL {
-        card_ids.extend(zone.card_ids(conn, version_id).await?);
+    // one entry per copy: a card in two zones counts twice
+    let lines = lists::lines(conn, version_id).await?;
+    let ids: Vec<i64> = lines.iter().filter_map(|l| l.card_data_id).collect();
+    let mut names: HashMap<i64, String> = HashMap::new();
+    if !ids.is_empty() {
+        let mut qb = QueryBuilder::new(
+            "SELECT id, json_extract(json_data, '$.name') FROM card_data WHERE id IN ",
+        );
+        push_ids(&mut qb, ids);
+        let rows: Vec<(i64, Option<String>)> = qb.build_query_as().fetch_all(&mut *conn).await?;
+        names.extend(rows.into_iter().filter_map(|(id, name)| Some((id, name?))));
     }
-    let mut copies: Vec<(String, Option<i64>)> = Vec::new();
-    if !card_ids.is_empty() {
-        let mut qb = QueryBuilder::new(format!(
-            "SELECT card.id, {CARD_NAME}, card.card_data_id
-             FROM card LEFT JOIN card_data ON card_data.id = card.card_data_id WHERE card.id IN "
-        ));
-        push_ids(&mut qb, card_ids.iter().copied());
-        let rows: Vec<(i64, String, Option<i64>)> =
-            qb.build_query_as().fetch_all(&mut *conn).await?;
-        let by_id: HashMap<i64, (String, Option<i64>)> = rows
-            .into_iter()
-            .map(|(id, name, data)| (id, (name, data)))
-            .collect();
-        // one entry per copy: a card in two zones counts twice
-        copies = card_ids
-            .iter()
-            .filter_map(|id| by_id.get(id).cloned())
-            .collect();
-    }
+    let copies: Vec<(String, Option<i64>)> = lines
+        .iter()
+        .flat_map(|l| {
+            let name = l
+                .card_data_id
+                .and_then(|id| names.get(&id).cloned())
+                .unwrap_or_else(|| l.name.clone());
+            (0..l.count).map(move |_| (name.clone(), l.card_data_id))
+        })
+        .collect();
 
     let releases = first_releases(conn, copies.iter().filter_map(|(_, data)| *data)).await?;
     let deck: Vec<DeckCard> = copies

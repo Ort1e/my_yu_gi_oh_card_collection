@@ -4,14 +4,21 @@
 import type { ApiCard } from './api-types/ApiCard';
 import type { Zone } from './api-types/Zone';
 
+/**
+ * One copy of a card on the screen: the API's tile with an id of the
+ * builder's own (`deck.ts`, `tiles`), for selection and drag and drop. A line
+ * of 3 is 3 tiles; they are grouped back by card when saved.
+ */
+export type Tile = ApiCard & { id: number };
+
 /** Where a card can be: a deck zone, or the reserve's search results. */
 export type Place = Zone | 'reserve';
 
 /** Cards by zone, the reserve included. */
-export type Zones = Record<Place, ApiCard[]>;
+export type Zones = Record<Place, Tile[]>;
 
 /** The deck zones only (YDKE, the deck's price). */
-export type DeckZones = Record<Zone, ApiCard[]>;
+export type DeckZones = Record<Zone, Tile[]>;
 
 /**
  * What a version plays: `key` its ban list's id (`"12"`) or its format's

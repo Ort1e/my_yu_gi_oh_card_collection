@@ -4,14 +4,12 @@
 //! belongs to its deck and outlives its version. The important ones are
 //! named, or are the list played in a tournament ([`freeze`]).
 
-use std::collections::HashMap;
-
 use chrono::NaiveDateTime;
 use serde::Serialize;
-use sqlx::{FromRow, QueryBuilder, SqliteConnection};
+use sqlx::{FromRow, SqliteConnection};
 use ts_rs::TS;
 
-use crate::store::db::push_ids;
+use crate::store::lists;
 use yugioh_domain::deck_history::{
     coalesce, DeckZone, LastSnapshot, SaveAction, SnapshotEntry, SnapshotList,
 };
@@ -172,52 +170,7 @@ pub async fn version_cards(
     conn: &mut SqliteConnection,
     version_id: i64,
 ) -> sqlx::Result<SnapshotList> {
-    let mut copies: Vec<(DeckZone, Option<i64>, String)> = Vec::new();
-    for zone in DeckZone::ALL {
-        let table = match zone {
-            DeckZone::Main => "deck_version_main_deck",
-            DeckZone::Extra => "deck_version_extra_deck",
-            DeckZone::Side => "deck_version_side_deck",
-        };
-        let rows: Vec<(Option<i64>, String)> = sqlx::query_as(&format!(
-            "SELECT card.card_data_id, card.name FROM {table} z JOIN card ON card.id = z.card_id
-             WHERE z.deck_version_id = ? ORDER BY z.rowid"
-        ))
-        .bind(version_id)
-        .fetch_all(&mut *conn)
-        .await?;
-        copies.extend(rows.into_iter().map(|(id, name)| (zone, id, name)));
-    }
-    Ok(SnapshotList::from_cards(
-        copies.iter().map(|(z, id, name)| (*z, *id, name.as_str())),
-    ))
-}
-
-/// What these zones of card ids hold (the deck builder's unsaved zones),
-/// by card; unknown ids left out.
-pub async fn cards_of_ids(
-    conn: &mut SqliteConnection,
-    zones: [(DeckZone, &[i64]); 3],
-) -> sqlx::Result<SnapshotList> {
-    let all: Vec<i64> = zones
-        .iter()
-        .flat_map(|(_, ids)| ids.iter().copied())
-        .collect();
-    let mut known: HashMap<i64, (Option<i64>, String)> = HashMap::new();
-    if !all.is_empty() {
-        let mut qb = QueryBuilder::new("SELECT id, card_data_id, name FROM card WHERE id IN ");
-        push_ids(&mut qb, all);
-        let rows: Vec<(i64, Option<i64>, String)> =
-            qb.build_query_as().fetch_all(&mut *conn).await?;
-        known.extend(rows.into_iter().map(|(id, data, name)| (id, (data, name))));
-    }
-    Ok(SnapshotList::from_cards(zones.iter().flat_map(
-        |(zone, ids)| {
-            ids.iter()
-                .filter_map(|id| known.get(id))
-                .map(|(data, name)| (*zone, *data, name.as_str()))
-        },
-    )))
+    Ok(lists::as_list(&lists::lines(conn, version_id).await?))
 }
 
 fn now() -> NaiveDateTime {

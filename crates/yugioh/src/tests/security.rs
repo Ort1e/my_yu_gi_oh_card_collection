@@ -7,10 +7,11 @@ async fn names_cannot_inject_html() {
     let t = TestApp::new().await;
     let attack = "</script><script>alert(1)</script><img src=x onerror=alert(2)>";
     sqlx::query(
-        "INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES (1, ?1, 'x', 'LOB-FR005', 1, 0);
+        "INSERT INTO card (id, name, en_name, code, card_data_id) VALUES (1, ?1, 'x', 'LOB-FR005', 1);
          INSERT INTO deck (id, name) VALUES (1, ?1);
          INSERT INTO deck_version (id, deck_id, version_name) VALUES (1, 1, ?1);
-         INSERT INTO deck_version_main_deck (deck_version_id, card_id) VALUES (1, 1);",
+         INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position)
+             VALUES (1, 'main', 1, ?1, 1, 1);",
     )
     .bind(attack)
     .execute(&t.state.pool)
@@ -24,6 +25,7 @@ async fn names_cannot_inject_html() {
         "/cards/1",
         "/decks",
         "/decks/1",
+        "/deck-versions/1",
         "/collection/value",
     ] {
         let (status, body) = t.get(page).await;

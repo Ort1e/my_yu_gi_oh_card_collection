@@ -33,9 +33,9 @@ pub struct CardTile {
     pub value: String,
     /// Faded: sold.
     pub faded: bool,
-    /// A Yu-Gi-Oh! proxy (a stand-in, not owned): red border and "Proxy"
+    /// A Yu-Gi-Oh! deck's card the collection lacks: red border and "Missing"
     /// badge on the picture, as in the deck builder.
-    pub proxy: bool,
+    pub missing: bool,
     /// A Yu-Gi-Oh! card's status on a deck's ban list (`Banned`, `Limited`,
     /// `Semi-Limited`): a corner badge on the picture, as in the deck
     /// builder; `None` when unlimited or not asked.

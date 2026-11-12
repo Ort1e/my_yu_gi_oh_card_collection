@@ -41,9 +41,9 @@
     padding: 0.5rem 0.5rem 0;
 }
 
-/* A proxy (a stand-in, not owned): red border and badge, as in the deck
+/* A deck's missing card (not owned): red border and badge, as in the deck
    builder (frontend/src/lib/CardTile.svelte). */
-.card-tile.proxy {
+.card-tile.missing {
     border: 2px solid red;
     box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
 }
@@ -84,7 +84,7 @@
     font-weight: 700;
 }
 
-.card-tile-proxy {
+.card-tile-missing {
     position: absolute;
     bottom: 0.4rem;
     left: 0.9rem;

@@ -7,25 +7,24 @@
     import SimulationChart from './SimulationChart.svelte';
     import { draw, sortCards } from '../deck';
     import type { DeckApi } from '../api';
-    import type { ApiCard } from '../api-types/ApiCard';
     import type { ApiCategory } from '../api-types/ApiCategory';
     import type { ApiCondition } from '../api-types/ApiCondition';
     import type { CategoryStats } from '../api-types/CategoryStats';
     import type { SimulationResult } from '../api-types/SimulationResult';
-    import type { Rules } from '../types';
+    import type { Rules, Tile } from '../types';
 
     export let api: DeckApi;
-    export let main: ApiCard[];
+    export let main: Tile[];
     export let categories: ApiCategory[];
     export let rules: Rules | null = null;
     /** the last run (the Build tab's banner shows its headline) */
     export let result: SimulationResult | null = null;
 
-    const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: ApiCard }>();
+    const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: Tile }>();
 
     let handSize = 5;
     let simulations = 10000;
-    let hand: ApiCard[] = [];
+    let hand: Tile[] = [];
     let running = false;
 
     function testDraw() {
@@ -36,7 +35,7 @@
         running = true;
 
         try {
-            result = await api.simulate(Number(handSize), Number(simulations), main.map((c) => c.id));
+            result = await api.simulate(Number(handSize), Number(simulations), main.map((c) => c.card_data_id));
         } catch (e) {
             toast.error(`Simulation failed: ${e.message}`);
         } finally {

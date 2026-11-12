@@ -140,7 +140,7 @@
     </div>
 
     <div class="badges">
-        {#if deck.is_built}<span class="badge" title="Its real cards are locked, out of the collection for the other decks">Built</span>{/if}
+        {#if deck.is_built}<span class="badge" title="It holds copies of your collection: out of it for the other decks">Built</span>{/if}
         {#if deck.is_public || deck.tournament}<span class="badge" title="Shown on the public site">Public</span>{/if}
         {#if rulesLabel}<span class="badge rules">{rulesLabel}</span>{/if}
     </div>

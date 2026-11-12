@@ -29,7 +29,6 @@ impl CardRows for FormData {
                     code: field("code"),
                     status: field("status"),
                     rarity: field("rarity"),
-                    is_proxy: self.checked(&format!("cards-{i}-is_proxy")),
                     price: field("price"),
                     quantity: field("quantity"),
                 }
@@ -107,7 +106,6 @@ impl CardRows for FormData {
                     code: Some(row.code.clone()).filter(|c| !c.is_empty()),
                     status,
                     rarity,
-                    is_proxy: row.is_proxy,
                     price,
                     quantity,
                 });
@@ -126,7 +124,6 @@ pub struct CardRowValues {
     pub status: String,
     /// A rarity label (`Ultra Rare`), or empty.
     pub rarity: String,
-    pub is_proxy: bool,
     pub price: String,
     pub quantity: String,
 }
@@ -149,7 +146,6 @@ pub struct NewCards {
     pub code: Option<String>,
     pub status: Option<CardStatus>,
     pub rarity: Option<Rarity>,
-    pub is_proxy: bool,
     pub price: Option<Decimal>,
     pub quantity: u32,
 }
@@ -173,7 +169,6 @@ mod tests {
             ("cards-0-name", "Dark Magician"),
             ("cards-0-price", "1,50"),
             ("cards-0-status", "NM"),
-            ("cards-0-is_proxy", "on"),
             ("cards-3-name", "Kuriboh"),
             ("cards-3-en_name", "Kuriboh (Promo)"),
             ("cards-3-quantity", "3"),
@@ -186,7 +181,6 @@ mod tests {
         assert_eq!(cards[0].en_name, "dark magician");
         assert_eq!(cards[0].price, Some("1.50".parse().unwrap()));
         assert_eq!(cards[0].status, Some(CardStatus::NearMint));
-        assert!(cards[0].is_proxy);
         assert_eq!(cards[1].en_name, "kuriboh");
         assert_eq!(cards[1].quantity, 3);
     }

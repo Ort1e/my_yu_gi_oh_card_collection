@@ -52,6 +52,7 @@ pub fn router() -> Router<AppState> {
         .route("/lots/:id", get(lots::detail))
         .route("/decks", get(decks::list))
         .route("/decks/built", get(decks::built::page))
+        .route("/decks/shopping", get(decks::shopping::page))
         .route("/decks/:id", get(decks::detail))
         .route("/deck-versions/:id", get(decks::version::page))
         .route("/deck-snapshots/:id", get(decks::snapshots::page))
@@ -75,7 +76,7 @@ pub fn router() -> Router<AppState> {
             get(decks::api::categories),
         )
         .route(
-            "/api/deck-versions/:id/cards/:card_id/categories",
+            "/api/deck-versions/:id/cards/:card_data_id/categories",
             get(decks::api::card_categories),
         )
         .route(
@@ -193,16 +194,12 @@ pub fn write_router() -> Router<AppState> {
             post(decks::api::clone_version),
         )
         .route(
-            "/api/deck-versions/:id/proxies",
-            post(decks::api::add_proxy),
+            "/api/deck-versions/:id/lookup",
+            post(decks::api::lookup_card),
         )
         .route(
-            "/api/deck-versions/:id/proxies/:card_id",
-            delete(decks::api::delete_proxy),
-        )
-        .route(
-            "/api/deck-versions/:id/proxies/:card_id/replace",
-            post(decks::api::replace_proxy),
+            "/api/deck-versions/:id/take-free",
+            post(decks::api::take_free),
         )
         .route(
             "/api/deck-versions/:id/categories",
@@ -213,7 +210,7 @@ pub fn write_router() -> Router<AppState> {
             delete(decks::api::delete_category),
         )
         .route(
-            "/api/deck-versions/:id/cards/:card_id/categories/:category_id",
+            "/api/deck-versions/:id/cards/:card_data_id/categories/:category_id",
             put(decks::api::assign_category),
         )
         .route("/api/decks/:id/import-ydke", post(decks::api::import_ydke))

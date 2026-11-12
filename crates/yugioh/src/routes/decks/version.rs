@@ -4,6 +4,9 @@
 //! name ignoring case and accents (`yugioh_domain::card::sort_name`), so the
 //! copies of a card sit together whatever their language. The deck builder
 //! sorts the same way (`frontend/src/deck.ts`).
+//! A missing card (the collection lacks it) has the red border; a tile links
+//! to an owned copy's page (the slot's copy in a built deck); its value is
+//! the card's Cardmarket trend.
 //! Around the cards: the version's format or ban list (its own, else the
 //! latest one), named, with a badge on the restricted cards' tiles; its
 //! opening hands (the deck builder's Monte Carlo on its categories,
@@ -23,20 +26,19 @@ use askama::Template;
 use axum::extract::{Path, State};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use yugioh_domain::card::sort_name;
+use yugioh_domain::card::{sort_name, CardStatus};
 use yugioh_domain::monte_carlo;
 use yugioh_domain::stats::{kind, CardKind};
 
-use super::api::simulation_inputs;
+use super::api::{simulation_inputs, zone_tiles, ApiCard};
 use super::PUBLIC_VERSION;
 use crate::routes::tournaments::TournamentView;
-use crate::store::cards::Zone;
 use crate::store::db::Pool;
-use crate::store::models::{CardRow, DeckVersionRow};
+use crate::store::models::{other_name, DeckVersionRow};
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::filters;
 use crate::AppState;
-use common::web::tiles::CardTile;
+use common::web::tiles::{CardShape, CardTile};
 
 /// One zone of the version: "Main Deck" and its cards.
 pub struct ZoneCards {
@@ -220,52 +222,55 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         .into_iter()
         .filter_map(|(data_id, status)| Some((data_id, ban_label(&status)?)))
         .collect();
+    let mut conn = pool.acquire().await?;
+    let tiles = zone_tiles(&mut conn, id).await?;
+    drop(conn);
     let mut zones = Vec::new();
-    for (zone, name) in Zone::ALL
+    for (cards, name) in tiles
         .into_iter()
         .zip(["Main Deck", "Extra Deck", "Side Deck"])
     {
-        let rows: Vec<CardRow> = sqlx::query_as(&format!(
-            "SELECT {} FROM card JOIN {} zone ON zone.card_id = card.id
-             WHERE zone.deck_version_id = ?",
-            CardRow::columns(),
-            zone.table()
-        ))
-        .bind(id)
-        .fetch_all(pool)
-        .await?;
-        let types: HashMap<i64, Option<String>> = sqlx::query_as(&format!(
-            "SELECT card.id, card_data.card_type
-             FROM card JOIN {} zone ON zone.card_id = card.id
-             JOIN card_data ON card_data.id = card.card_data_id
-             WHERE zone.deck_version_id = ?",
-            zone.table()
-        ))
-        .bind(id)
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .collect();
-        let kind_of = |card: &CardRow| match types.get(&card.id) {
-            Some(Some(card_type)) => kind(card_type),
-            _ => CardKind::Other,
-        };
-        // (kind, English name, name shown, id): the same card's copies
+        // (kind, English name, name shown): the same card's copies
         // together, the French ones after the English ones
-        let mut cards: Vec<((CardKind, String, String, i64), CardRow)> = rows
+        let mut cards: Vec<((CardKind, String, String), ApiCard)> = cards
             .into_iter()
-            .map(|row| {
-                let english = sort_name(row.name_en.as_deref().unwrap_or(&row.name));
-                ((kind_of(&row), english, sort_name(&row.name), row.id), row)
+            .map(|card| {
+                let kind = card.card_type.as_deref().map_or(CardKind::Other, kind);
+                let english = sort_name(card.name_en.as_deref().unwrap_or(&card.name));
+                ((kind, english, sort_name(&card.name)), card)
             })
             .collect();
         cards.sort_by(|(a, _), (b, _)| a.cmp(b));
         let tiles = cards
             .iter()
             .map(|(_, card)| {
-                let mut tile = card.tile();
-                tile.ban = card.card_data_id.and_then(|d| statuses.get(&d).copied());
-                tile
+                let copy = card.copy.as_ref();
+                let status = copy
+                    .and_then(|c| c.status.as_deref())
+                    .and_then(CardStatus::from_code);
+                CardTile {
+                    href: card
+                        .sample_copy
+                        .map(|id| format!("/cards/{id}"))
+                        .unwrap_or_default(),
+                    shape: CardShape::YuGiOh,
+                    image: card.image.clone(),
+                    name: card.name.clone(),
+                    other_name: other_name(&card.name, card.name_en.as_deref())
+                        .unwrap_or_default()
+                        .to_string(),
+                    print: copy.and_then(|c| c.code.clone()).unwrap_or_default(),
+                    details: copy.and_then(|c| c.rarity.clone()).unwrap_or_default(),
+                    condition: status.map(|s| (s.code(), s.label())),
+                    tags: Vec::new(),
+                    value: card
+                        .cardmarket_trend
+                        .map(|t| t.to_string())
+                        .unwrap_or_default(),
+                    faded: false,
+                    missing: card.missing,
+                    ban: card.card_data_id.and_then(|d| statuses.get(&d).copied()),
+                }
             })
             .collect();
         zones.push(ZoneCards { name, tiles });

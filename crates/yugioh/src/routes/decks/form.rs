@@ -11,7 +11,6 @@ use yugioh_domain::ydke::YdkeDeck;
 
 use super::{api, Start};
 use crate::routes::tournaments::{deck_labels, label_names};
-use crate::store::cards::delete_orphan_proxies;
 use crate::store::db::{begin_write, exists};
 use crate::store::tournaments::set_deck_labels;
 use crate::web::error::{AppError, AppResult, OrNotFound};
@@ -140,8 +139,8 @@ pub async fn update(
     Ok(Redirect::to(&format!("/decks/{id}")).into_response())
 }
 
-/// Delete the deck with its versions (and their categories), then the proxy
-/// cards no other deck uses.
+/// Delete the deck with its versions (their lines, categories and a built
+/// one's copies cascade: those copies are free again).
 pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Redirect> {
     let mut tx = begin_write(&state.pool).await?;
     let deleted = sqlx::query("DELETE FROM deck WHERE id = ?")
@@ -152,9 +151,8 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     if deleted == 0 {
         return Err(AppError::NotFound);
     }
-    let proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     tx.commit().await?;
-    tracing::info!(deck_id = id, proxies_deleted, "deck deleted");
+    tracing::info!(deck_id = id, "deck deleted");
 
     Ok(Redirect::to("/decks"))
 }

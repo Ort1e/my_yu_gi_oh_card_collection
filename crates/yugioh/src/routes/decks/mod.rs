@@ -17,6 +17,7 @@
 pub mod api;
 pub mod built;
 pub mod form;
+pub mod shopping;
 pub mod snapshots;
 pub mod version;
 
@@ -26,6 +27,7 @@ use serde::Deserialize;
 use sqlx::Row;
 
 use crate::store::db::Pool;
+use crate::store::lists;
 use crate::store::models::version_full_name;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
@@ -151,7 +153,8 @@ pub struct VersionLine {
     main_count: i64,
     extra_count: i64,
     side_count: i64,
-    /// Cards still missing: the proxies in its zones.
+    /// Cards still missing: what the collection lacks (`lists::missing`).
+    #[sqlx(default)]
     proxies: i64,
     /// `Edison v2`, when it plays a format.
     format_label: Option<String>,
@@ -251,14 +254,12 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
     let versions = sqlx::query_as(&format!(
         "SELECT deck_version.id, deck_version.version_name, deck_version.is_built,
                 deck_version.is_public,
-                (SELECT count(*) FROM deck_version_main_deck WHERE deck_version_id = deck_version.id) AS main_count,
-                (SELECT count(*) FROM deck_version_extra_deck WHERE deck_version_id = deck_version.id) AS extra_count,
-                (SELECT count(*) FROM deck_version_side_deck WHERE deck_version_id = deck_version.id) AS side_count,
-                (SELECT count(*) FROM (
-                    SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = deck_version.id
-                    UNION ALL SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = deck_version.id
-                    UNION ALL SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = deck_version.id
-                 ) AS zone JOIN card ON card.id = zone.card_id WHERE card.is_proxy = 1) AS proxies,
+                (SELECT coalesce(sum(count), 0) FROM deck_version_card
+                 WHERE deck_version_id = deck_version.id AND zone = 'main') AS main_count,
+                (SELECT coalesce(sum(count), 0) FROM deck_version_card
+                 WHERE deck_version_id = deck_version.id AND zone = 'extra') AS extra_count,
+                (SELECT coalesce(sum(count), 0) FROM deck_version_card
+                 WHERE deck_version_id = deck_version.id AND zone = 'side') AS side_count,
                 (SELECT name || ' v' || version FROM deck_format
                  WHERE deck_format.id = deck_version.format_id) AS format_label,
                 (SELECT date FROM advanced_ban_list
@@ -279,6 +280,17 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
     .bind(id)
     .fetch_all(pool)
     .await?;
+    let mut versions: Vec<VersionLine> = versions;
+    let mut conn = pool.acquire().await?;
+    for version in &mut versions {
+        let lines = lists::lines(&mut conn, version.id).await?;
+        version.proxies = lists::missing(&mut conn, version.id, &lines)
+            .await?
+            .iter()
+            .map(|m| i64::from(m.count))
+            .sum();
+    }
+    drop(conn);
 
     let labels = crate::routes::tournaments::deck_labels(pool, id)
         .await?

@@ -5,6 +5,7 @@
 use serde_json::json;
 
 use super::*;
+use crate::testing::{tiles, DM, KURIBOH};
 
 async fn snapshots(t: &TestApp) -> i64 {
     t.scalar("SELECT count(*) FROM deck_snapshot").await
@@ -23,7 +24,7 @@ async fn cards_of(t: &TestApp, id: i64) -> String {
 #[tokio::test]
 async fn saving_the_zones_keeps_a_history() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{version}");
     assert_eq!(snapshots(&t).await, 0, "an empty new version has none");
 
@@ -31,7 +32,7 @@ async fn saving_the_zones_keeps_a_history() {
         .json(
             "PATCH",
             &uri,
-            json!({ "main": [cards[0], cards[1]], "side": [cards[2]] }),
+            json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]), "side": tiles(&[(KURIBOH, "Kuriboh", 1)]) }),
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
@@ -44,12 +45,21 @@ async fn saving_the_zones_keeps_a_history() {
     );
 
     // the same cards: nothing new
-    t.json("PATCH", &uri, json!({ "main": [cards[1], cards[0]] }))
-        .await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]) }),
+    )
+    .await;
     assert_eq!(snapshots(&t).await, 1);
 
     // changed in the same session: the automatic one follows
-    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 1)]) }),
+    )
+    .await;
     assert_eq!(snapshots(&t).await, 1);
     assert_eq!(
         cards_of(&t, first).await,
@@ -70,8 +80,12 @@ async fn saving_the_zones_keeps_a_history() {
         .as_deref(),
         Some("Before locals")
     );
-    t.json("PATCH", &uri, json!({ "main": [cards[0], cards[1]] }))
-        .await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]) }),
+    )
+    .await;
     assert_eq!(snapshots(&t).await, 2);
 
     // the deck's page lists them; the snapshot's page shows the changes
@@ -103,9 +117,14 @@ async fn saving_the_zones_keeps_a_history() {
 #[tokio::test]
 async fn only_automatic_ones_are_deleted() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{version}");
-    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 1)]) }),
+    )
+    .await;
     let id = t.scalar("SELECT id FROM deck_snapshot").await;
 
     let (status, _) = t
@@ -156,10 +175,14 @@ async fn only_automatic_ones_are_deleted() {
 #[tokio::test]
 async fn a_tournament_freezes_the_list_played() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{version}");
-    t.json("PATCH", &uri, json!({ "main": [cards[0], cards[1]] }))
-        .await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]) }),
+    )
+    .await;
 
     let v = version.to_string();
     let (status, location) = t
@@ -182,7 +205,7 @@ async fn a_tournament_freezes_the_list_played() {
     t.json(
         "PATCH",
         &uri,
-        json!({ "main": [cards[0]], "side": [cards[2]] }),
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 1)]), "side": tiles(&[(KURIBOH, "Kuriboh", 1)]) }),
     )
     .await;
     assert_eq!(cards_of(&t, frozen).await, "main:Magicien Sombre:2");
@@ -230,12 +253,12 @@ async fn a_tournament_freezes_the_list_played() {
 #[tokio::test]
 async fn a_saved_list_becomes_a_version_again() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{version}");
     t.json(
         "PATCH",
         &uri,
-        json!({ "main": [cards[0], cards[1]], "side": [cards[2]] }),
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]), "side": tiles(&[(KURIBOH, "Kuriboh", 1)]) }),
     )
     .await;
     let id = t.scalar("SELECT id FROM deck_snapshot").await;
@@ -251,19 +274,18 @@ async fn a_saved_list_becomes_a_version_again() {
         .scalar("SELECT id FROM deck_version WHERE version_name = 'v2'")
         .await;
     assert_eq!(location, format!("/deck-builder/{new}"));
-    // the owned copies (free: v1 isn't built), a new proxy for the proxy
+    // its lines: the 2 Dark Magicians, the Kuriboh
     assert_eq!(
         t.scalar(&format!(
-            "SELECT count(*) FROM deck_version_main_deck z JOIN card ON card.id = z.card_id
-             WHERE deck_version_id = {new} AND card.is_proxy = 0"
+            "SELECT sum(count) FROM deck_version_card WHERE deck_version_id = {new} AND zone = 'main'"
         ))
         .await,
         2
     );
     assert_eq!(
         t.scalar(&format!(
-            "SELECT count(*) FROM deck_version_side_deck z JOIN card ON card.id = z.card_id
-             WHERE deck_version_id = {new} AND card.is_proxy = 1"
+            "SELECT count(*) FROM deck_version_card
+             WHERE deck_version_id = {new} AND zone = 'side' AND card_data_id = 2"
         ))
         .await,
         1
@@ -289,9 +311,14 @@ async fn a_saved_list_becomes_a_version_again() {
 #[tokio::test]
 async fn the_builder_compares_the_screen_with_a_saved_list() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{version}");
-    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 1)]) }),
+    )
+    .await;
 
     let (status, list) = t.json("GET", &format!("{uri}/history"), json!(null)).await;
     assert_eq!(status, StatusCode::OK, "{list}");
@@ -305,7 +332,7 @@ async fn the_builder_compares_the_screen_with_a_saved_list() {
         .json(
             "POST",
             &format!("{uri}/compare"),
-            json!({ "snapshot_id": id, "main": [cards[0], cards[1]], "extra": [], "side": [cards[2]] }),
+            json!({ "snapshot_id": id, "main": tiles(&[(DM, "Magicien Sombre", 2)]), "extra": [], "side": tiles(&[(KURIBOH, "Kuriboh", 1)]) }),
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{changes}");

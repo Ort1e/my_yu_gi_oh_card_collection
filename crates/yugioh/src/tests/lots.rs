@@ -35,11 +35,6 @@ async fn create_lot_with_new_seller_and_cards() {
             .await,
         2
     );
-    assert_eq!(
-        t.scalar("SELECT is_proxy FROM card WHERE name = 'Kuriboh'")
-            .await,
-        1
-    );
 
     // card data is linked in the background
     for _ in 0..50 {

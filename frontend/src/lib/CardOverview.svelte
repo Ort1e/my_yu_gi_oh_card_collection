@@ -3,20 +3,22 @@
     import { createEventDispatcher } from 'svelte';
     import { banStatus, cardmarketUrl, englishName, euros, frenchDate, imageUrl, outOfFormat, trendOf } from '../deck';
     import type { DeckApi } from '../api';
-    import type { ApiCard } from '../api-types/ApiCard';
     import type { CardCategory } from '../api-types/CardCategory';
-    import type { Rules } from '../types';
+    import type { Rules, Tile } from '../types';
 
-    export let card: ApiCard | null;
+    export let card: Tile | null;
     export let rules: Rules | null = null;
     export let api: DeckApi;
     /** bumped by the parent when categories are added/removed */
     export let categoriesVersion = 0;
 
-    /** true for a proxy in a deck zone: it can be swapped for an owned copy */
-    export let canReplace = false;
+    /**
+     * The card is in a zone of a built version: a slot without a copy that
+     * a free copy can fill offers "Take free copies".
+     */
+    export let canTake = false;
 
-    const dispatch = createEventDispatcher<{ replaceProxy: ApiCard }>();
+    const dispatch = createEventDispatcher<{ takeFree: null }>();
 
     let categories: CardCategory[] | null = null;
     let error: string | null = null;
@@ -26,20 +28,23 @@
     $: assignedCount = categories?.filter((c) => c.assigned).length ?? 0;
 
     // `_version`: only there so a new categoriesVersion loads them again
-    async function load(cardId: number, _version: number) {
+    async function load(cardDataId: number | null, _version: number) {
         categories = null;
         error = null;
 
-        try {
-            const list = await api.cardCategories(cardId);
+        // a card known by its name only has no categories
+        if (cardDataId == null) return;
 
-            if (card?.id === cardId) categories = list;
+        try {
+            const list = await api.cardCategories(cardDataId);
+
+            if (card?.card_data_id === cardDataId) categories = list;
         } catch (e) {
             error = e.message;
         }
     }
 
-    $: if (card) load(card.id, categoriesVersion);
+    $: if (card) load(card.card_data_id, categoriesVersion);
 
     // only shown with a card
     async function toggle(category: CardCategory) {
@@ -49,7 +54,7 @@
         saving = new Set(saving).add(category.id);
 
         try {
-            await api.assignCategory(card!.id, category.id, assigned);
+            await api.assignCategory(card!.card_data_id!, category.id, assigned);
             category.assigned = assigned;
         } catch (e) {
             toast.error(`Could not change the category: ${e.message}`);
@@ -64,11 +69,22 @@
 {#if card}
     {#if imageUrl(card)}<img src={imageUrl(card)} alt={card.name} />{/if}
     <div class="overview-text">
-        <h4><a href="/cards/{card.id}" target="_blank" rel="noopener">{card.name}</a></h4>
+        <h4>
+            {#if card.sample_copy != null}
+                <a href="/cards/{card.sample_copy}" target="_blank" rel="noopener">{card.name}</a>
+            {:else}
+                {card.name}
+            {/if}
+        </h4>
         {#if englishName(card)}<p class="english-name">{englishName(card)}</p>{/if}
         <p>Type: {card.card_type || '—'}</p>
-        <p>Code: {card.code || '—'}</p>
-        <p>Price: {card.price ? `${card.price}€` : 'N/A'}</p>
+        <p>
+            In your collection: {card.owned}{#if card.owned > 0}, {card.free} free{#if card.here > 0}, {card.here} in this deck{/if}{/if}
+        </p>
+        {#if card.copy}
+            <p>This copy: {card.copy.code || 'no code'}{#if card.copy.status} · {card.copy.status}{/if}</p>
+        {/if}
+        <p>Price paid: {card.price ? `${card.price}€` : 'N/A'}</p>
         <p>
             <a href={cardmarketUrl(card)} target="_blank" rel="noopener">Cardmarket ↗</a>
             {#if trendOf(card) !== null}<span class="hint">trend {euros(trendOf(card) ?? 0)}</span>{/if}
@@ -78,15 +94,17 @@
             First TCG release: {card.first_release ? frenchDate(card.first_release) : 'unknown'}
             {#if outOfFormat(card, rules)}<strong class="out-of-format">· not in this format</strong>{/if}
         </p>
-        <p>Rarity: {#if card.rarity}<a href="/rarities?rarity={encodeURIComponent(card.rarity)}" target="_blank" rel="noopener">{card.rarity}</a>{:else}—{/if}</p>
+        {#if card.copy?.rarity}
+            <p>Rarity: <a href="/rarities?rarity={encodeURIComponent(card.copy.rarity)}" target="_blank" rel="noopener">{card.copy.rarity}</a></p>
+        {/if}
         <p>
-            Proxy: {card.is_proxy ? 'Yes' : 'No'}
-            {#if card.is_proxy && canReplace}
+            {card.missing ? 'Missing: to buy' : card.copy || !canTake ? 'Owned' : 'Owned, not in the deck yet'}
+            {#if canTake && !card.missing && !card.copy}
                 <button
                     type="button"
-                    class="replace-proxy"
-                    title="Put an owned copy of this card in place of the proxy"
-                    on:click={() => dispatch('replaceProxy', card)}>Use my copy</button
+                    class="take-free"
+                    title="Put your free copies in the deck's empty slots"
+                    on:click={() => dispatch('takeFree', null)}>Take free copies</button
                 >
             {/if}
         </p>
@@ -101,6 +119,8 @@
                 <p>Error loading categories: {error}</p>
             {:else if categories === null}
                 <p>Loading…</p>
+            {:else if card.card_data_id == null}
+                <p>A card known by its name only has no categories.</p>
             {:else if categories.length === 0}
                 <p>None in this deck yet: add them under "Test Draw".</p>
             {:else}
@@ -244,7 +264,7 @@
         pointer-events: none;
     }
 
-    .replace-proxy {
+    .take-free {
         margin-left: 8px;
         padding: 2px 10px;
         font-size: 0.85rem;

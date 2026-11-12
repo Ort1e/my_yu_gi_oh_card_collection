@@ -1,14 +1,13 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { deckApi, importYdke } from './api';
-    import { ZONES, euros, frenchDate, rulesFields, rulesKey, rulesOf, sortCards, zonePrice } from './deck';
-    import type { ApiCard } from './api-types/ApiCard';
+    import { ZONES, cardInputs, copyOf, euros, frenchDate, markMissing, rulesFields, rulesKey, rulesOf, sortCards, tiles, zonePrice } from './deck';
     import type { ApiCategory } from './api-types/ApiCategory';
     import type { Check } from './api-types/Check';
     import type { DeckVersion } from './api-types/DeckVersion';
     import type { SimulationResult } from './api-types/SimulationResult';
     import type { Zone } from './api-types/Zone';
-    import type { Move, Place, Zones } from './types';
+    import type { Move, Tile, Zones } from './types';
     import CardOverview from './lib/CardOverview.svelte';
     import DeckZone from './lib/DeckZone.svelte';
     import Dialog from './lib/Dialog.svelte';
@@ -20,7 +19,7 @@
     import Simulation from './lib/Simulation.svelte';
     import Toast from './lib/Toast.svelte';
     import VersionPanel from './lib/VersionPanel.svelte';
-    import { askText, askYes, inform } from './lib/dialog';
+    import { askText, askYes } from './lib/dialog';
     import { toast } from './lib/toast';
 
     export let deckVersionId: number;
@@ -42,7 +41,7 @@
     /** the version's problems in its format (`GET …/check`), for the panel */
     let check: Check = { format: null, problems: [], errata: [], errata_pending: 0, wants: '', wants_note: '' };
     let dirty = false;
-    let selected: ApiCard | null = null;
+    let selected: Tile | null = null;
     let categories: ApiCategory[] = [];
     let categoriesVersion = 0;
     /** the last test draw, for the Build tab's banner */
@@ -65,9 +64,9 @@
         deck = data;
         key = rulesKey(data);
         zones = {
-            main: sortCards(data.main),
-            extra: sortCards(data.extra),
-            side: sortCards(data.side),
+            main: sortCards(tiles(data.main)),
+            extra: sortCards(tiles(data.extra)),
+            side: sortCards(tiles(data.side)),
             reserve: zones.reserve,
         };
 
@@ -105,83 +104,58 @@
 
     // ---------- moving cards ----------
 
-    function take(zone: Place, cardId: number) {
-        const card = zones[zone].find((c) => c.id === cardId);
-        zones[zone] = zones[zone].filter((c) => c.id !== cardId);
-
-        return card;
-    }
-
-    async function deleteProxy(from: Place, card: ApiCard) {
-        try {
-            await api.deleteProxy(card.id);
-            take(from, card.id);
-            refreshCheck();
-
-            if (selected?.id === card.id) selected = null;
-        } catch (e) {
-            toast.error(`Could not delete the proxy: ${e.message}`);
-        }
+    /** The zones with `missing` worked out again (owned copies count in zone order). */
+    function remark() {
+        zones = { ...markMissing(zones), reserve: zones.reserve };
     }
 
     /** The deck zone (not the reserve) of `zones` holding `card`, or null. */
-    const zoneOf = (zones: Zones, card: ApiCard | null): Zone | null =>
+    const zoneOf = (zones: Zones, card: Tile | null): Zone | null =>
         card ? (['main', 'extra', 'side'] as Zone[]).find((z) => zones[z].some((c) => c.id === card.id)) ?? null : null;
 
     $: selectedZone = zoneOf(zones, selected);
 
-    // a proxy swapped for an owned copy (saved at once; the only way in a
-    // built version, whose proxies are never swapped automatically)
-    async function replaceProxy({ detail: proxy }: CustomEvent<ApiCard>) {
-        const zone = zoneOf(zones, proxy);
+    // a built version: its empty slots take the free copies (saved at once)
+    async function takeFree() {
+        if (dirty) {
+            toast.error('Save the deck first: the copies go to the saved cards.');
 
-        if (!zone) return;
+            return;
+        }
 
         try {
-            const { card, proxied_in } = await api.replaceProxy(proxy.id);
+            const { taken, missing } = await api.takeFree();
 
-            zones[zone] = sortCards(zones[zone].map((c) => (c.id === proxy.id ? card : c)));
-            zones.reserve = zones.reserve.filter((c) => c.id !== card.id);
-            selected = card;
-            categoriesVersion += 1;
-            refreshCheck();
-
-            if (proxied_in.length) {
-                await inform({
-                    title: 'Copy taken from other decks',
-                    lines: [`Copy taken from ${proxied_in.join(', ')}: a proxy of it is there now.`],
-                });
-            }
+            setDeck(await api.get());
+            selected = null;
+            toast.ok(`${taken} cop${taken === 1 ? 'y' : 'ies'} taken${missing > 0 ? `, ${missing} still to buy` : ''}`);
         } catch (e) {
-            toast.error(`Could not replace the proxy: ${e.message}`);
+            toast.error(`Could not take the copies: ${e.message}`);
         }
     }
 
-    async function move({ cardId, from, to }: Move) {
+    function move({ cardId, from, to }: Move) {
         if (from === to || !zones[from]) return;
 
         const card = zones[from].find((c) => c.id === cardId);
 
         if (!card) return;
 
-        if (to === 'reserve' || to === 'outside') {
-            if (from === 'reserve') return;
+        // a search result stays in the results: a new tile of it goes in
+        if (from === 'reserve') {
+            if (to === 'reserve' || to === 'outside') return;
 
-            if (card.is_proxy) {
-                // a proxy dragged out of the deck is deleted
-                if (await askYes({ title: 'Delete the proxy?', message: `Delete the proxy "${card.name}"?`, confirmLabel: 'Delete', danger: true })) {
-                    await deleteProxy(from, card);
-                }
+            zones[to] = sortCards([...zones[to], copyOf(card)]);
+        } else {
+            // out of the deck (to the results or anywhere else): gone
+            zones[from] = zones[from].filter((c) => c.id !== cardId);
 
-                return;
-            }
+            if (to !== 'reserve' && to !== 'outside') zones[to] = sortCards([...zones[to], card]);
 
-            if (to === 'outside') return;
+            if (selected?.id === cardId && (to === 'reserve' || to === 'outside')) selected = null;
         }
 
-        take(from, cardId);
-        zones[to] = sortCards([...zones[to], card]);
-
+        remark();
         dirty = true;
     }
 
@@ -192,21 +166,22 @@
         if (data) move({ ...JSON.parse(data), to: 'outside' });
     }
 
-    async function askProxy(zone: Zone) {
-        const name = await askText({ title: 'Add a missing card', message: 'Name of the card, as a proxy:', confirmLabel: 'Add' });
+    async function askMissing(zone: Zone) {
+        const name = await askText({ title: 'Add a card', message: 'Its English name (or any name, for a card ygoprodeck lacks):', confirmLabel: 'Add' });
 
-        if (name) await addProxy(name, zone);
+        if (name) await addMissing(name, zone);
     }
 
-    async function addProxy(name: string, zone: Zone) {
+    async function addMissing(name: string, zone: Zone) {
         try {
-            const card = await api.addProxy(name, zone);
+            const [card] = tiles([await api.lookup(name)]);
 
             zones[zone] = sortCards([...zones[zone], card]);
-            refreshCheck();
-            toast.ok(`${card.name} added as a proxy`);
+            remark();
+            dirty = true;
+            toast.ok(`${card.name} added: save to keep it`);
         } catch (e) {
-            toast.error(`Could not add the proxy: ${e.message}`);
+            toast.error(`Could not add the card: ${e.message}`);
         }
     }
 
@@ -215,25 +190,14 @@
     async function save() {
         try {
             const saved = await api.update({
-                main: zones.main.map((c) => c.id),
-                extra: zones.extra.map((c) => c.id),
-                side: zones.side.map((c) => c.id),
+                main: cardInputs(zones.main),
+                extra: cardInputs(zones.extra),
+                side: cardInputs(zones.side),
                 ...rulesFields(key),
             });
 
             setDeck(saved);
-
-            // a built deck takes its new cards from the other decks
-            const taken = saved.build_report?.proxied_elsewhere ?? [];
-
-            if (taken.length > 0) {
-                await inform({
-                    title: 'Deck saved',
-                    lines: ['Now proxies in the other decks:', ...taken.map((l) => `• ${l}`)],
-                });
-            } else {
-                toast.ok('Deck saved');
-            }
+            toast.ok('Deck saved');
         } catch (e) {
             toast.error(`Save failed: ${e.message}`);
         }
@@ -268,7 +232,7 @@
 
         const ydke = await askText({
             title: 'Paste a YDKE',
-            message: 'The cards become this version (cards you own are used, the others are proxies).',
+            message: 'Its cards and counts become this version (the collection says which you own).',
             input: 'multiline',
             placeholder: 'ydke://…',
             confirmLabel: 'Import',
@@ -299,7 +263,7 @@
         if (dirty) e.preventDefault();
     }
 
-    const select = ({ detail }: CustomEvent<ApiCard>) => (selected = detail);
+    const select = ({ detail }: CustomEvent<Tile>) => (selected = detail);
 
     $: total = zonePrice(zones.main) + zonePrice(zones.extra) + zonePrice(zones.side);
     $: rulesLabel = deck ? rulesLabelOf(deck, key) : null;
@@ -313,8 +277,7 @@
 
         return list ? `List of ${frenchDate(list.date)}` : null;
     }
-    $: missingCount = zones.main.concat(zones.extra, zones.side).filter((c) => c.is_proxy).length;
-    $: deckCardIds = new Set(ZONES.flatMap((z) => zones[z].map((c) => c.id)));
+    $: missingCount = ZONES.flatMap((z) => zones[z]).filter((c) => c.missing).length;
 </script>
 
 
@@ -352,7 +315,7 @@
 
                     {#if isEmpty}
                         <div class="empty">
-                            <p>Drop cards from your collection, or paste a YDKE.</p>
+                            <p>Drop cards from the search, or paste a YDKE.</p>
                             <button type="button" on:click={importIntoEmpty} disabled={deck.deck_id == null}>Paste a YDKE</button>
                         </div>
                     {/if}
@@ -361,7 +324,7 @@
                         <div class="area">
                             <div class="zone-head">
                                 <h3>{label} ({zones[zone].length}, {euros(zonePrice(zones[zone]))})</h3>
-                                <button type="button" class="btn-small btn-secondary" on:click={() => askProxy(zone)}>+ Missing card</button>
+                                <button type="button" class="btn-small btn-secondary" on:click={() => askMissing(zone)} title="A card by its name, owned or not">+ Card by name</button>
                             </div>
                             <DeckZone
                                 {zone}
@@ -369,10 +332,10 @@
                                 {rules}
                                 selectedId={selected?.id}
                                 on:move={({ detail }) => move(detail)}
-                                on:proxy={({ detail }) => askProxy(detail)}
+                                on:missing={({ detail }) => askMissing(detail)}
                                 on:select={select}
                             >
-                                <span slot="empty" class="hint">Drop cards here, right-click to add a missing card.</span>
+                                <span slot="empty" class="hint">Drop cards here, right-click to add a card by its name.</span>
                             </DeckZone>
                         </div>
                     {/each}
@@ -380,12 +343,11 @@
 
                 <aside class="side">
                     <div class="area">
-                        <h3>From my collection</h3>
+                        <h3>Add cards</h3>
                         <ReserveSearch
                             {api}
                             cardTypes={deck.card_types}
                             bind:cards={zones.reserve}
-                            {deckCardIds}
                             {rules}
                             selectedId={selected?.id}
                             on:move={({ detail }) => move(detail)}
@@ -399,8 +361,8 @@
                             {rules}
                             {api}
                             {categoriesVersion}
-                            canReplace={selectedZone !== null}
-                            on:replaceProxy={replaceProxy}
+                            canTake={deck.is_built && selectedZone !== null}
+                            on:takeFree={takeFree}
                         />
                     </div>
                 </aside>
@@ -411,8 +373,9 @@
                     {zones}
                     {check}
                     {dirty}
-                    on:replace={replaceProxy}
-                    on:add={({ detail }) => addProxy(detail.name, detail.zone)}
+                    isBuilt={deck.is_built}
+                    on:takeFree={takeFree}
+                    on:add={({ detail }) => addMissing(detail.name, detail.zone)}
                 />
             </div>
         {:else if tab === 'draw'}

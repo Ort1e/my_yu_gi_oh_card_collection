@@ -8,11 +8,14 @@ use chrono::NaiveDate;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde_json::json;
+use sqlx::QueryBuilder;
 use yugioh_domain::card::{CardStatus, Language};
+use yugioh_domain::deck_history::DeckZone;
 use yugioh_domain::valuation::{copy_value, history, lot_gain, Prices};
 
 use super::data::ValueData;
-use crate::store::db::Pool;
+use crate::store::db::{push_ids, Pool};
+use crate::store::lists;
 use crate::store::valuation::PurchaseLot;
 use crate::web::filters::french_date;
 
@@ -188,78 +191,102 @@ pub struct DeckLine {
     pub version: String,
     pub cards: usize,
     pub value: Decimal,
+    /// The cards the collection lacks.
     pub proxies: usize,
-    /// What the proxies' cards would cost (at market price).
+    /// What they would cost (at market price).
     pub proxies_value: Decimal,
 }
 
+/// A copy a deck plays, for its value.
 #[derive(sqlx::FromRow)]
-struct DeckCardRow {
-    id: i64,
-    name: String,
-    version: String,
-    is_proxy: bool,
+struct PlayedCopy {
     card_data_id: Option<i64>,
     cardmarket_product_id: Option<i64>,
-    status: Option<String>,
+    last_known_status: Option<String>,
     code: Option<String>,
 }
 
-/// The value of each deck's latest version: its real cards, and its proxies
-/// (what the missing cards would cost), most valuable first.
+/// The value of each deck's latest version, most valuable first: the
+/// copies it plays (a built version's, else the ones building it would take:
+/// `lists::playing_copies`) with their condition and language, the other
+/// owned cards at market price, and what the missing ones
+/// (`lists::missing`) would cost.
 pub async fn deck_values(pool: &Pool, prices: &Prices) -> sqlx::Result<Vec<DeckLine>> {
-    let rows: Vec<DeckCardRow> = sqlx::query_as(
-        "SELECT deck.id, deck.name, deck_version.version_name AS version, card.is_proxy,
-                card.card_data_id, card.cardmarket_product_id,
-                card.last_known_status AS status, card.code
-         FROM deck_version
-         JOIN deck ON deck.id = deck_version.deck_id
-         JOIN (SELECT deck_version_id, card_id FROM deck_version_main_deck
-               UNION ALL SELECT deck_version_id, card_id FROM deck_version_extra_deck
-               UNION ALL SELECT deck_version_id, card_id FROM deck_version_side_deck) AS zone
-           ON zone.deck_version_id = deck_version.id
-         JOIN card ON card.id = zone.card_id
+    let latest: Vec<(i64, bool, i64, String, String)> = sqlx::query_as(
+        "SELECT deck_version.id, deck_version.is_built, deck.id, deck.name, deck_version.version_name
+         FROM deck_version JOIN deck ON deck.id = deck_version.deck_id
          WHERE deck_version.id IN (SELECT max(id) FROM deck_version GROUP BY deck_id)
          ORDER BY deck.name, deck.id",
     )
     .fetch_all(pool)
     .await?;
 
+    let mut conn = pool.acquire().await?;
     let mut decks: Vec<DeckLine> = Vec::new();
-    for row in rows {
-        if decks.last().is_none_or(|deck| deck.id != row.id) {
-            decks.push(DeckLine {
-                id: row.id,
-                name: row.name,
-                version: row.version,
-                cards: 0,
-                value: Decimal::ZERO,
-                proxies: 0,
-                proxies_value: Decimal::ZERO,
-            });
-        }
-        let Some(deck) = decks.last_mut() else {
+    for (version_id, is_built, id, name, version) in latest {
+        let lines = lists::lines(&mut conn, version_id).await?;
+        if lines.is_empty() {
             continue;
-        };
-
-        let value = prices
-            .of(row.card_data_id, row.cardmarket_product_id)
-            .map(|price| {
-                copy_value(
-                    price,
-                    row.status.as_deref().and_then(CardStatus::from_code),
-                    row.code.as_deref().and_then(Language::of_code),
-                )
-            })
-            .unwrap_or_default();
-        if row.is_proxy {
-            deck.proxies += 1;
-            deck.proxies_value += value;
-        } else {
-            deck.cards += 1;
-            deck.value += value;
         }
+        let mut short: HashMap<(DeckZone, u32), u32> =
+            lists::missing(&mut conn, version_id, &lines)
+                .await?
+                .into_iter()
+                .map(|m| ((m.line.zone, m.line.position), m.count))
+                .collect();
+        let playing = lists::playing_copies(&mut conn, version_id, is_built).await?;
+        let mut copies: Vec<PlayedCopy> = Vec::new();
+        if !playing.is_empty() {
+            let mut qb = QueryBuilder::new(
+                "SELECT card_data_id, cardmarket_product_id, last_known_status, code
+                 FROM card WHERE id IN ",
+            );
+            push_ids(&mut qb, playing);
+            copies = qb.build_query_as().fetch_all(&mut *conn).await?;
+        }
+
+        let mut deck = DeckLine {
+            id,
+            name,
+            version,
+            cards: 0,
+            value: Decimal::ZERO,
+            proxies: short.values().map(|n| *n as usize).sum(),
+            proxies_value: Decimal::ZERO,
+        };
+        let mut played: HashMap<Option<i64>, usize> = HashMap::new();
+        for copy in &copies {
+            *played.entry(copy.card_data_id).or_default() += 1;
+            deck.cards += 1;
+            deck.value += prices
+                .of(copy.card_data_id, copy.cardmarket_product_id)
+                .map(|price| {
+                    copy_value(
+                        price,
+                        copy.last_known_status
+                            .as_deref()
+                            .and_then(CardStatus::from_code),
+                        copy.code.as_deref().and_then(Language::of_code),
+                    )
+                })
+                .unwrap_or_default();
+        }
+        // the rest of each card: owned (a built deck's copy not taken yet)
+        // at market price, else missing
+        for line in &lines {
+            let price = prices.of(line.card_data_id, None).unwrap_or_default();
+            let lacking = short.remove(&(line.zone, line.position)).unwrap_or(0) as usize;
+            let in_copies = played.entry(line.card_data_id).or_default();
+            let taken = (*in_copies).min(line.count as usize);
+            *in_copies -= taken;
+            let other = (line.count as usize - taken).saturating_sub(lacking);
+            deck.cards += other;
+            deck.value += price * Decimal::from(other);
+            deck.proxies_value += price * Decimal::from(lacking);
+        }
+        decks.push(deck);
     }
+    drop(conn);
 
     for deck in &mut decks {
         deck.value = deck.value.round_dp(2);

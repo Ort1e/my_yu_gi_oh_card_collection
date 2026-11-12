@@ -51,8 +51,8 @@ refund), its cards. **Lots → Add**:
 Cards forgotten or arrived later: the lot's page → **Add cards** (the same
 rows and quick add, on their own page; the lot page itself only reads).
 
-New cards are linked to ygoprodeck's card data in the background, and
-replace deck proxies they correspond to. **Sellers** lists who you bought
+New cards are linked to ygoprodeck's card data in the background; every
+deck that lists them sees them as owned at once. **Sellers** lists who you bought
 from, with what you spent.
 
 ### Budget
@@ -150,7 +150,7 @@ version, or a YDKE).
 
 ### The deck builder
 `/deck-builder/:id` does **all the editing**. It is where the two worlds meet:
-it uses the collection (copies owned, proxies, built decks that lock cards)
+it uses the collection (the copies you own, the ones built decks hold)
 and plans competitive play (the next tournament, what to buy). Five tabs
 (kept in the address: `#build`, `#to-buy`, `#draw`, `#history`,
 `#settings`):
@@ -158,10 +158,10 @@ and plans competitive play (the next tournament, what to buy). Five tabs
 | Tab | For |
 |---|---|
 | **Build** | the zones (main, extra, side), drag and drop, the collection search, categories, the format banner. **Save** is sticky in the header |
-| **To buy** (was Missing) | the proxies (missing cards) with Cardmarket link and price, the cost, errata warnings, "Use my copy", this version's Cardmarket wants list |
+| **To buy** (was Missing) | the missing cards (not owned, or owned but held by another built deck) with Cardmarket link and price, the cost, errata warnings, "Take free copies" (a built deck), this version's Cardmarket wants list |
 | **Test draw** | Monte Carlo opening hands on the zones as they are now |
 | **History** | the deck's saved lists, what changed, *Name this save*, *Rename* (the only place lists are named) |
-| **Settings** | three blocks: **Rules** (ban list or format), **Physical deck** (built, deck box, sleeves), **Sharing** (public) |
+| **Settings** | three blocks: **Rules** (ban list or format), **Physical deck** (built or planned, deck box, sleeves), **Sharing** (public) |
 
 The header carries the owned/missing counts, this month's budget left, a
 *Played at …* link when a list of the deck was played, and a **⋯** menu:
@@ -170,34 +170,48 @@ YGOPRODeck), *+ Tournament with this version*, Delete.
 
 Two paths through the builder:
 
+A version is a **list**: cards and counts. Whether you own them is worked
+out from the collection; only a **built** version holds copies.
+
 **"What do I own for this deck?"**
-1. Search the collection (the *reserve*) and add copies you own.
-2. Cards you don't own are added as **proxies** ("+ Missing card", by name).
-3. *Settings → Physical deck → Built* **builds** the deck: its real cards are
-   locked (out of the collection for every other version); the cards another
-   built deck holds become proxies here.
-4. When you buy a card for a proxy, *Use my copy* (To buy tab) swaps it by
-   hand (built versions are never swapped automatically).
+1. Search (*Add cards*): your cards, and by name the other cards the app
+   knows, each with how many you own and how many are free. Drop one in a
+   zone as many times as you play it. A card nobody has seen yet:
+   *+ Card by name* (ygoprodeck looks it up).
+2. The tiles you can't cover with your copies are **missing** (red). Two
+   plain lists may count on the same copies.
+3. *Settings → Physical deck → Built* **builds** the deck: it takes your free
+   copies (best condition first), out of the collection for every other
+   deck; what you lack stays missing. The other decks lose nothing they
+   hold (only built decks hold copies).
+4. A card bought later is free, not in the built deck yet: *Take free
+   copies* (To buy tab, or the selected card) puts it in. Saving the built
+   deck does it too.
 
 **"Prepare the next tournament"**
 1. *Settings → Rules*: pick the **format** (Edison…) or a ban list; the
    builder warns about forbidden cards and out-of-format ones.
 2. Test the hands in *Test draw*.
-3. *To buy*: the missing cards and their cost, against the budget left; copy
-   the Cardmarket wants list to place the order; the lot you buy replaces the
-   proxies.
+3. *Settings → Physical deck → Planned*: the deck goes on the **shopping
+   list** (`/decks/shopping`) with the built ones. *To buy*: its missing
+   cards and their cost, against the budget left; copy the Cardmarket wants
+   list to place the order; the cards you buy are owned at once.
 4. *History* keeps every save; *Name this save* marks the list you will play.
 5. After the event, *+ Tournament with this version* (see below).
 
 ### Built decks
 `/decks/built`: the decks you physically built. One card per deck (box,
-sleeves, counts, and a folded list of what is missing with its price, errata
-warnings and a Buy link), then the Cardmarket wants list of all the decks
-together with an **estimated price**. Untick a card, or a whole deck, and the
-list and the estimate follow (copy it from there). A version's own list is in
-the builder's *To buy* tab. The value of each deck is at the bottom. A
-*Shopping list* page of its own is planned (see
-[specs/deck-lists.md](specs/deck-lists.md)).
+sleeves, its cards and the copies it holds, how many are missing), then the
+value of each deck.
+
+### Shopping list
+`/decks/shopping` (Decks menu): what the built decks, then the planned ones,
+still lack. They share the collection: a copy you own once counts for one
+deck only, built decks first. One card per deck (a folded list of what is
+missing with its price, errata warnings and a Buy link), then the Cardmarket
+wants list of all of it with an **estimated price**, and this month's budget
+left. Untick a card, or a whole deck, and the list and the estimate follow
+(copy it from there). A version's own list is in the builder's *To buy* tab.
 
 ### Formats
 `/formats`: the rules a deck is played under (a Konami ban list copied, with

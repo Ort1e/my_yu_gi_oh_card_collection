@@ -22,7 +22,7 @@ use crate::AppState;
 use common::web::tiles::{CardTile, View};
 
 /// Card search filters (Django: `CardFilterSerializer` / `filter_cards_queryset`).
-/// `proxy` and `sold` take "true" / "false"; anything else means "all".
+/// `sold` takes "true" / "false"; anything else means "all".
 #[derive(Debug, Default, Deserialize)]
 pub struct CardFilter {
     pub name: Option<String>,
@@ -31,7 +31,6 @@ pub struct CardFilter {
     /// A rarity label, matched exactly.
     pub rarity: Option<String>,
     pub card_type: Option<String>,
-    pub proxy: Option<String>,
     pub sold: Option<String>,
     /// `grid` (default), `table`: [`View`].
     pub view: Option<String>,
@@ -59,9 +58,6 @@ impl CardFilter {
         }
         if let Some(rarity) = Self::text(&self.rarity) {
             qb.push(" AND card.rarity = ").push_bind(rarity.to_string());
-        }
-        if let Some(proxy) = Self::flag(&self.proxy) {
-            qb.push(" AND card.is_proxy = ").push_bind(proxy);
         }
         if let Some(name) = Self::text(&self.name) {
             let pattern = like_pattern(name);
@@ -98,7 +94,6 @@ impl CardFilter {
             ("status", self.status.as_deref()),
             ("rarity", self.rarity.as_deref()),
             ("card_type", self.card_type.as_deref()),
-            ("proxy", self.proxy.as_deref()),
             ("sold", self.sold.as_deref()),
         ])
     }
@@ -154,7 +149,6 @@ pub async fn list(
     let public = common::export::public_copy();
     if public {
         // the cards owned only
-        filter.proxy = Some("false".into());
         filter.sold = Some("false".into());
     }
 
@@ -216,9 +210,10 @@ pub struct CardDetail {
 pub struct CardDeck {
     id: i64,
     name: String,
-    /// How many of its versions hold the copy.
+    /// How many of its versions list the card (or hold this copy).
     versions: i64,
-    /// One of them is built: the copy is locked in it.
+    /// A built version of it holds this very copy: out of the collection
+    /// for the other decks.
     built: bool,
 }
 
@@ -302,12 +297,12 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     };
 
     let decks: Vec<CardDeck> = sqlx::query_as(
-        "SELECT deck.id, deck.name, COUNT(*) AS versions, MAX(v.is_built) AS built
+        "SELECT deck.id, deck.name, COUNT(*) AS versions,
+                MAX(v.id IN (SELECT deck_version_id FROM deck_version_copy WHERE card_id = ?1)) AS built
          FROM deck_version v JOIN deck ON deck.id = v.deck_id
-         WHERE v.id IN (
-             SELECT deck_version_id FROM deck_version_main_deck WHERE card_id = ?1
-             UNION SELECT deck_version_id FROM deck_version_extra_deck WHERE card_id = ?1
-             UNION SELECT deck_version_id FROM deck_version_side_deck WHERE card_id = ?1)
+         WHERE v.id IN (SELECT deck_version_id FROM deck_version_copy WHERE card_id = ?1)
+            OR v.id IN (SELECT deck_version_id FROM deck_version_card
+                        WHERE card_data_id = (SELECT card_data_id FROM card WHERE id = ?1))
          GROUP BY deck.id ORDER BY deck.name COLLATE NOCASE",
     )
     .bind(id)

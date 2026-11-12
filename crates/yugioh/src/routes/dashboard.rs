@@ -43,7 +43,7 @@ const VALUE_CHANGE_DAYS: i64 = 28;
 pub async fn index(State(state): State<AppState>) -> AppResult<Dashboard> {
     let pool = &state.pool;
     let owned = sqlx::query_scalar(&format!(
-        "SELECT count(*) FROM card WHERE card.is_proxy = 0 AND NOT {SOLD_EXISTS}"
+        "SELECT count(*) FROM card WHERE NOT {SOLD_EXISTS}"
     ))
     .fetch_one(pool)
     .await?;

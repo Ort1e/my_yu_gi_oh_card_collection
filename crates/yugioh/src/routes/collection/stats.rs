@@ -70,7 +70,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<StatsPage> {
     let pool = &state.pool;
     let data = ValueData::load(pool).await?;
     let cards: Vec<CardRow> = sqlx::query_as(&format!(
-        "SELECT {} FROM card WHERE card.is_proxy = 0 AND NOT {SOLD_EXISTS}
+        "SELECT {} FROM card WHERE NOT {SOLD_EXISTS}
          ORDER BY card.en_name, card.id",
         CardRow::columns()
     ))

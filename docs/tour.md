@@ -19,7 +19,7 @@ The app has four goals, and the tour follows them after the foundations:
    [the collection value](#the-collection-value),
    [the advent calendar](#the-advent-calendar).
 3. **Competitive play** (goal 2), where the deck builder links the collection
-   (copies owned, proxies, locks) to the tournaments (what to buy, which list
+   (copies owned, the ones built decks hold) to the tournaments (what to buy, which list
    was played): [the deck builder](#the-deck-builder)
    (`frontend/src/App.svelte`, `crates/yugioh/src/routes/decks/api/`),
    [built decks](#built-decks), [a deck's history](#a-decks-history),
@@ -99,7 +99,7 @@ bars, the shared partials), so its templates extend those by name.
 | Django templates | askama templates in `crates/<collection>/templates/<area>/`, nearly identical syntax |
 | `forms.py` | `common::web::forms` (`FormData`) + validation in each `routes/<area>/form.rs` |
 | DRF API + serializers | `routes/decks/api/` + `#[derive(Serialize)]` structs |
-| `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
+| `signals.py` | explicit code in the handler (e.g. the categories of a card removed from a deck) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
 | Django auth | `common::web::auth`: one password per user (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`), signed cookie |
@@ -218,7 +218,8 @@ Things to notice:
 - after the commit, `spawn_link_cards` starts a **background task** that
   links the new cards to their ygoprodeck `card_data` (fetching unknown
   names from the API), puts their names in the language of their code, then
-  swaps deck proxies for the new owned copies. The redirect doesn't wait
+  looks up their printing's picture (the decks need nothing: a list sees a
+  new copy as owned at once). The redirect doesn't wait
   for it (see [Talking to ygoprodeck](#talking-to-ygoprodeck)).
 
 ### The shipment PDF flow
@@ -367,10 +368,10 @@ had. (The first deployment let the public copy download them, ~600 at
 once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
 never called by them.
 
-### Errata (`/decks/built`)
+### Errata (`/decks/shopping`)
 
 A card's text can change after a format's cutoff (Edison…): a printing
-bought for a proxy then has the wrong text. Yugipedia's
+bought for a missing card then has the wrong text. Yugipedia's
 `Card Errata:<name>` page lists the versions of the text in its
 `== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
 first carried it); `yugioh_domain::errata` parses it, dates each version by
@@ -427,7 +428,7 @@ terms; the price guide files are its open download.
 - a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
   × language (non-English 0.9), totals rounded to the cent;
 - a copy counts on date D when its purchase lot (not cancelled) is dated on
-  or before D and it has no sale lot by D; proxies never count;
+  or before D and it has no sale lot by D;
 - the **gain/loss uses the lot prices** (`lot.price`, shipping included,
   less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
   migration 0016; the budget counts the same cost in the lot's month):
@@ -506,20 +507,25 @@ bundle. The app then only talks JSON to `/api/*`:
 | `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
 | `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
 | `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, collection search (`ReserveSearch`), To buy tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, card search (`ReserveSearch`), To buy tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `lookup.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
 
 The builder does **all the editing**, and it is where the collection meets
-competitive play: it reads the collection (copies owned, proxies, built decks
-that lock cards) and plans the next tournament (the format, what to buy, the
+competitive play: it reads the collection (copies owned, the ones built
+decks hold) and plans the next tournament (the format, what to buy, the
 list played). Five tabs kept in `location.hash` (`#build`, `#to-buy`,
 `#draw`, `#history`, `#settings`; `#missing` still opens To buy, so old links
 work):
 
-- **Build**: the zones, the format banner, "+ Missing card" (a proxy by
-  name), the collection search and the selected card.
-- **To buy** (was Missing): the proxies with a Cardmarket link and trend
-  price, the cost, the errata warnings, "Use my copy", the version's
-  Cardmarket wants list (`Check.wants`, from `built::version_wants_list`).
+- **Build**: the zones (one tile per copy: the API sends a line of 3 as 3
+  tiles, `ApiCard`, the builder gives each an id of its own, `types.ts`
+  `Tile`, and sends them back as `CardInput`s the server groups into lines),
+  the format banner, "+ Card by name" (`…/lookup`), the card search
+  (`…/reserve`: owned cards, and by name the known ones, with their counts)
+  and the selected card.
+- **To buy** (was Missing): the missing tiles with a Cardmarket link and
+  trend price, the cost, the errata warnings, "Take free copies" (a built
+  version), the version's Cardmarket wants list (`Check.wants`, from
+  `shopping::version_wants_list`).
 - **Test draw**: the Monte Carlo, run on the zones as they are now (`main` in
   the request; without it, the saved deck).
 - **History**: the deck's saved lists (`…/history`), what changed from one to
@@ -539,7 +545,7 @@ be imported, `ydkToYdke`), "+ Tournament with this version"
 Moving cards between zones and changing the format only change the app's
 local state until the sticky **Save** (or Discard) in the header
 (`PATCH /api/deck-versions/:id` with the three zones). Everything else
-(proxies, categories, the tournament, settings) is saved at once, with a
+(categories, take free copies, the tournament, settings) is saved at once, with a
 small toast. Errors come back as
 `{"error": "…"}` with a 4xx status, and `api.ts` turns them into exceptions
 the app shows to you.
@@ -551,7 +557,8 @@ the app shows to you.
 `i64` as `number`). They are committed, and the CI fails when they are
 stale, so a field renamed in Rust shows up as an error in `npm run check`
 rather than as `undefined` in the page. `src/types.ts` holds the builder's
-own types (the zones with the reserve, the rules played, the drag data).
+own types (the tiles, the zones with the search results, the rules played,
+the drag data).
 
 **The page scripts** (`static/js/`) stay plain JavaScript, served as they
 are; `npm run check` also checks them from their JSDoc comments
@@ -561,57 +568,61 @@ share at runtime declared in `frontend/static-globals.d.ts`).
 During frontend work, `npm run dev` serves the app with hot reload on
 `:5173` and forwards `/api` to the backend on `:3000`.
 
-## Built decks
+## Deck lists and built decks
 
-A deck version can be **built** (`deck_version.is_built`, migration 0010):
-the physical deck exists, so its real (non-proxy) cards are **locked**, out
-of the collection for every other version. In this app a proxy already means
-"a card I don't have for this deck", so nothing else is needed to see what is
-missing.
+Since migration 0027 a deck version is a **list** (`deck_version_card`: card
+data, else a name for a card not linked yet, a count, a position), the shape
+of the snapshots. Whether a line is owned is worked out from the collection
+(`store/lists.rs`, the rules in `yugioh_domain::ownership`): a card's copies
+(not sold) are *owned*; the ones a built version holds are *here* (that
+version) or *elsewhere*; the rest are *free*. A list's tiles of a card beyond
+`free + here`, in zone order, are **missing** (`ownership::missing`); the
+builder works the same rule out again as you edit (`deck.ts` `markMissing`).
+There are no proxy `card` rows any more (`card.is_proxy` stays 0 until a
+migration drops it).
 
-- **Building** (`PATCH /api/deck-versions/:id` with `{"is_built": true}`,
-  `decks/api/version.rs`): `yugioh_domain::built_deck::plan_build` says which cards
-  change; each of the version's cards shared with other versions becomes a
-  proxy there (`store::cards::proxy_copy` + `swap_card`, categories moved),
-  except the cards another built version already holds: first built, first
-  served, those become proxies here. The answer carries a `build_report`
-  the deck builder shows.
-- **Saving a built version's zones** runs the same building step again: a
-  card added from the reserve that other versions use becomes a proxy in
-  them, and the save answer carries a `build_report` too. So a real card of
-  a built version is never in another version.
-- **Unbuilding** only clears the flag. The proxies made in other versions
-  stay; `clean-cards` puts the owned cards back (`replace_proxies`), in
-  those versions and in the unbuilt one.
-- **Locked cards** (`store::cards::locked_elsewhere(version_id)`, a subquery)
-  are skipped by the reserve, the YDKE import and `clean-cards`; saving zones
-  with one is refused with a 400 naming the card and the built deck (only a
-  stale page can send one). A copy of a built version gets proxies for them.
-- **A built version's proxies are swapped by hand only.** The automatic
-  swap (`replace_proxies`, after a new lot and in `clean-cards`) skips built
-  versions: the physical deck changes only when you decide. In the deck
-  builder, a selected proxy has a "Use my copy" button (`POST
-  /api/deck-versions/:id/proxies/:card_id/replace`, `decks/api/proxies.rs`):
-  it takes a `store::cards::free_copy` (a copy in no deck first), and if that
-  copy was in other versions, they get a proxy of it, as building does.
+- **Built** (`deck_version.is_built`, 0010): the physical deck exists, so the
+  version holds copies (`deck_version_copy`: one slot per copy of a line,
+  `card_id` NULL = missing; a unique index keeps a copy in one built version).
+  Building (`PATCH` `{"is_built": true}`) runs `lists::assign_copies`: each
+  line keeps the copies it held, its other slots take free copies
+  (`built_deck::plan_build`: best condition first, then the oldest), the
+  rest stay empty; the answer's `build_report` says how many. **Other
+  versions are never touched.** Saving a built version's zones runs it again
+  (a line removed frees its copies); unbuilding frees them all.
+- A copy bought later is free but not in the built deck: "Take free copies"
+  (`POST …/take-free`, `decks/api/lookup.rs`) or the next save fills the
+  empty slots. A built deck changes only when you act on it.
+- **Planned** (`deck_version.is_planned`): a plain version you mean to build;
+  building clears it.
 - Each version can note its **deck box** and **sleeves** (free text).
-- `/decks/built` (`routes/decks/built.rs`): each built version with its missing cards (folded, priced from
-  the latest Cardmarket price of the card data, ticked in or out by
-  `static/js/wants_list.js`), and the shopping list of all of them, also as a
-  **Cardmarket wants list** (one `1 Card name` line per card, by English name
-  from the card data; `static/js/wants_list.js` copies it). Language and
+- `/decks/built` (`routes/decks/built.rs`): each built version (box, sleeves,
+  cards, copies held, missing count) and every deck's value
+  (`collection::deck_values`: the copies it plays, `lists::playing_copies`:
+  a built version's, else the ones building it would take, with their
+  condition and language; the missing cards at market price).
+- `/decks/shopping` (`routes/decks/shopping.rs`): the built then the planned
+  versions, which take the collection's copies in turn
+  (`ownership::missing_for_all`: two planned decks playing 3 of a card you own
+  once need 5); each one's missing cards (folded, priced from the latest
+  Cardmarket price of the card data, ticked in or out by
+  `static/js/wants_list.js`) with the errata warnings (`store::errata`), the
+  budget left, and all of it as a **Cardmarket wants list** (one `1 Card
+  name` line per card, by English name from the card data). Language and
   condition can't be in the text: the page reminds to set them on the list
-  after the import (`built::WANTS_NOTE`, also sent to the builder as
-  `Check.wants_note`: one text). A version's own list exists only in the
-  builder's To buy tab (`built::version_wants_list`); each version card here
-  links to it (`#to-buy`). Build and unbuild in the builder's Settings tab.
+  after the import (`shopping::WANTS_NOTE`, also sent to the builder as
+  `Check.wants_note`: one text). A version's own list is in the builder's To
+  buy tab (`shopping::version_wants_list`, the version alone).
+- Categories are given to a card of a version (`card_category_assignment.
+  card_data_id`), so to all its copies; the Monte Carlo draws a card data id
+  per copy.
 
 ## A deck's history
 
 Each time a version's zones are saved (the builder's Save, a copy, a YDKE
 import, a new version from a saved list), `store::snapshots::record` writes
 a **snapshot**: what the zones hold by card (card data, else the name of a
-card not linked yet) and count, never the copies: no proxy, no lock, a few
+card not linked yet) and count, like the version's lines: a few
 rows (`deck_snapshot`, `deck_snapshot_card`). The rules are in
 `yugioh_domain::deck_history`: `coalesce` skips a save with the same cards,
 and replaces the version's last snapshot when it is an automatic one less
@@ -636,8 +647,7 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
   `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes
   since the previous list of its version, or `?vs=<id>` / `?vs=version:<id>`
   (that version now); public, delete, and "New version from this list"
-  (`api::create_version_from_list`, shared with the YDKE import: owned free
-  copies, else proxies).
+  (its list written as the new version's lines).
 - **Public**: a snapshot when ticked or a tournament's
   (`snapshots::PUBLIC_SNAPSHOT`), compared with the previous public one; a
   deck when one of its versions or snapshots is.
@@ -994,8 +1004,7 @@ the EU site's JSON, then the US site's pages for the dates still missing, a
 fallback for when the EU JSON lags behind; the US index only links the current
 list, so `--date 2026-10-19` fetches one not linked yet, and a US page whose table
 is still the previous list's is skipped)
-and `clean-cards` (normalise names, relink card data, swap proxies for owned
-copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
+and `clean-cards` (normalise names, relink card data, rarity from `(V.x - …)` names, names in the
 language of their code, rarity from the card data when the code was printed in
 one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
@@ -1058,7 +1067,7 @@ card's lot, price paid and decks, the Pokémon copies' price paid, notes,
 certificate and opening, the wishlist's maximum prices, verdicts and
 notes, a book's ISBN and notes, a deck's buttons and deck builder, the
 tournaments' buttons, filter and old notes. The card list shows the cards owned only
-(no proxy, not sold). A page added to the copy is a path in `START` or
+(not sold). A page added to the copy is a path in `START` or
 `public()`, and a look at its template for anything private.
 
 The folder is emptied at each export, and refused if it isn't an earlier
@@ -1078,8 +1087,7 @@ when it is new.
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
 summary line in the log), and the actions that make a cleanup necessary do
-their part themselves (saving deck zones deletes unused proxies, saving new
-cards links, translates and swaps proxies).
+their part themselves (saving new cards links and translates them).
 
 ## Tests
 

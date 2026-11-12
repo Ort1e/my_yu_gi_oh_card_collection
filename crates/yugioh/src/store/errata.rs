@@ -1,6 +1,6 @@
 //! Errata of the cards of a deck version (`yugioh_domain::errata`): which
-//! of its proxies, and of its owned copies, have another text than the one
-//! in force when the version's format or ban list applied. Used by
+//! of its missing cards, and of a built version's copies, have another text
+//! than the one in force when the version's format or ban list applied. Used by
 //! `/decks/built` and the deck builder's `…/check`.
 //!
 //! The cutoff of a version is its format's, else its ban list's date (the
@@ -18,9 +18,11 @@ use sqlx::QueryBuilder;
 use yugioh_domain::errata::{self, Errata, SetDates, TextVersion};
 
 use super::db::{push_ids, Pool};
+use super::lists;
 use super::yugipedia::{cached_errata, spawn_errata};
 use crate::web::error::{AppError, AppResult};
 use crate::AppState;
+use yugioh_domain::ownership::MissingLine;
 
 /// Printings offered at most in a warning (the card data can list dozens).
 const SHOWN_PRINTINGS: usize = 8;
@@ -84,27 +86,85 @@ pub async fn contexts(pool: &Pool, version_ids: &[i64]) -> AppResult<HashMap<i64
     Ok(found)
 }
 
-/// A card of a version as the errata need it.
-#[derive(Debug, sqlx::FromRow)]
+/// A card of a version as the errata need it: a built version's copy, or a
+/// missing one (to buy).
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CardRef {
     pub card_data_id: Option<i64>,
     pub name: String,
+    /// The copy's code (`''` for a missing one).
     pub code: String,
-    /// Groups the copies of a card (`en_name`, else the name).
+    /// Groups the copies of a card (its card data's `en_name`, else the name).
     pub key: String,
     /// The English name as written on the card data (`en_name` is lowercase).
     pub english_name: String,
-    pub is_proxy: bool,
+    pub missing: bool,
 }
 
-impl CardRef {
-    /// Columns of a [`CardRef`] for a query over `card` and `card_data`.
-    pub const COLUMNS: &'static str = "card.card_data_id, card.name,
-            coalesce(card.code, '') AS code,
-            coalesce(card.en_name, card.name) AS key,
-            coalesce(json_extract(card_data.json_data, '$.name'), card.en_name, card.name)
-                AS english_name,
-            card.is_proxy";
+/// A version's cards for the errata: a built version's copies, then a card
+/// per missing copy (`lists::missing`); a plain version's owned cards have
+/// no copy to judge.
+pub async fn version_cards(
+    conn: &mut sqlx::SqliteConnection,
+    version_id: i64,
+) -> sqlx::Result<Vec<CardRef>> {
+    let lines = lists::lines(conn, version_id).await?;
+    let short = lists::missing(conn, version_id, &lines).await?;
+    version_cards_missing(conn, version_id, short).await
+}
+
+/// [`version_cards`] with the missing copies given (the shopping list's,
+/// `ownership::missing_for_all`).
+pub async fn version_cards_missing(
+    conn: &mut sqlx::SqliteConnection,
+    version_id: i64,
+    short: Vec<MissingLine>,
+) -> sqlx::Result<Vec<CardRef>> {
+    let mut cards: Vec<CardRef> = sqlx::query_as(
+        "SELECT card.card_data_id, card.name, coalesce(card.code, '') AS code,
+                coalesce(card_data.en_name, card.en_name, card.name) AS key,
+                coalesce(json_extract(card_data.json_data, '$.name'), card.en_name, card.name)
+                    AS english_name,
+                0 AS missing
+         FROM deck_version_copy JOIN card ON card.id = deck_version_copy.card_id
+         LEFT JOIN card_data ON card_data.id = card.card_data_id
+         WHERE deck_version_copy.deck_version_id = ?
+         ORDER BY card.name",
+    )
+    .bind(version_id)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let ids: Vec<i64> = short.iter().filter_map(|m| m.card_data_id).collect();
+    let mut names: HashMap<i64, (String, String)> = HashMap::new();
+    if !ids.is_empty() {
+        let mut qb = QueryBuilder::new(
+            "SELECT id, en_name, coalesce(json_extract(json_data, '$.name'), en_name)
+             FROM card_data WHERE id IN ",
+        );
+        push_ids(&mut qb, ids);
+        let rows: Vec<(i64, String, String)> = qb.build_query_as().fetch_all(&mut *conn).await?;
+        names.extend(
+            rows.into_iter()
+                .map(|(id, key, english)| (id, (key, english))),
+        );
+    }
+    for m in short {
+        let (key, english_name) = m
+            .card_data_id
+            .and_then(|id| names.get(&id).cloned())
+            .unwrap_or_else(|| (m.name.to_lowercase(), m.name.clone()));
+        let card = CardRef {
+            card_data_id: m.card_data_id,
+            name: m.name,
+            code: String::new(),
+            key,
+            english_name,
+            missing: true,
+        };
+        cards.extend(std::iter::repeat_n(card, m.count as usize));
+    }
+    Ok(cards)
 }
 
 /// A card whose text was errata'd after the context's cutoff: buying the
@@ -125,15 +185,15 @@ pub struct ErrataWarning {
     pub new_text: String,
 }
 
-/// A card missing from a version: its proxies, plus its real copies with
-/// the wrong text.
+/// A card missing from a version: its missing copies, plus a built
+/// version's copies with the wrong text.
 #[derive(Debug, serde::Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MissingCard {
     pub name: String,
     /// The name Cardmarket knows the card by.
     pub english_name: String,
-    /// Proxies and wrong-text copies together.
+    /// Missing and wrong-text copies together.
     pub count: usize,
     /// The codes of the owned copies with the wrong text.
     pub wrong_text: Vec<String>,
@@ -149,7 +209,7 @@ pub struct Verdicts {
     pub pending: usize,
 }
 
-/// The proxies and the wrong-text copies of a version, by card key.
+/// The missing and the wrong-text copies of a version, by card key.
 pub struct Missing {
     pub lines: BTreeMap<String, MissingCard>,
     /// Real copies with the wrong text.
@@ -179,11 +239,12 @@ impl Verdicts {
                 .map(|(name, code, date)| (name, code, date.and_then(|d| d.parse().ok()))),
         );
 
-        // the cards to look up: proxies, and the copies whose set has a date
+        // the cards to look up: the missing ones, and the copies whose set
+        // has a date
         let wanted: BTreeSet<i64> = cards
             .iter()
             .filter_map(|(_, c)| Some((c, c.card_data_id?)))
-            .filter(|(c, _)| c.is_proxy || dates.of_code(&c.code).is_some())
+            .filter(|(c, _)| c.missing || dates.of_code(&c.code).is_some())
             .map(|(_, id)| id)
             .collect();
         let mut known: HashMap<i64, Vec<TextVersion>> = HashMap::new();
@@ -233,7 +294,7 @@ impl Verdicts {
         self.found.get(&(context.label.clone(), card.card_data_id?))
     }
 
-    /// The missing cards among a version's cards: its proxies and the owned
+    /// The missing cards among a version's cards: the missing ones and the
     /// copies whose printing has another text than the one in force.
     pub fn missing<'a>(
         &self,
@@ -244,11 +305,11 @@ impl Verdicts {
         let mut wrong_text = 0;
         for card in cards {
             let judged = context.and_then(|c| self.of(c, card));
-            let wrong = !card.is_proxy
+            let wrong = !card.missing
                 && judged.is_some_and(|(errata, _)| {
                     errata::copy_is_right(&card.code, &self.dates, errata) == Some(false)
                 });
-            if !card.is_proxy && !wrong {
+            if !card.missing && !wrong {
                 continue;
             }
 

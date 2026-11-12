@@ -2,7 +2,8 @@
 
 export type SimulationInput = { hand_size: number, simulations: number, 
 /**
- * The Main Deck to draw from (card ids), saved or not; without it the
- * saved Main Deck is used.
+ * The Main Deck to draw from (its tiles: card data ids, one per copy;
+ * `null` for a card known by its name only), saved or not; without it
+ * the saved Main Deck is used.
  */
-main?: Array<number>, };
+main?: Array<number | null>, };

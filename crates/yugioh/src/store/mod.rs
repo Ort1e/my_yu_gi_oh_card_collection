@@ -7,6 +7,7 @@ pub mod card_data;
 pub mod cards;
 pub mod errata;
 pub mod formats;
+pub mod lists;
 pub mod models;
 pub mod prices;
 pub mod shipment_files;

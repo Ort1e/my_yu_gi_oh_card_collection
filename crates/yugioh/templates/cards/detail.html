@@ -21,7 +21,7 @@
   <div class="card">
     <div class="card-title">{{ card.name }}</div>
     {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
-    <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}{% if card.is_proxy %} · <strong>Proxy</strong>{% endif %}{% if card.is_sold %} · <strong>Sold</strong>{% endif %}</div>
+    <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}{% if card.is_sold %} · <strong>Sold</strong>{% endif %}</div>
     {% match card.rarity %}{% when Some with (rarity) %}
     <div class="card-subtitle">Rarity: <a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a></div>
     {% when None %}{% endmatch %}
@@ -85,12 +85,12 @@
   {% for deck in decks %}
   <a href="/decks/{{ deck.id }}" class="card-link">
     <div class="card">
-      <div class="card-title">{{ deck.name }}{% if deck.built %} <span class="built-badge" title="In a built version: locked there, out of the collection for the other decks">Built</span>{% endif %}</div>
-      <div class="card-meta-line"><div>In {{ deck.versions }} version{% if deck.versions > 1 %}s{% endif %}</div></div>
+      <div class="card-title">{{ deck.name }}{% if deck.built %} <span class="built-badge" title="Held by a built version: out of the collection for the other decks">Built</span>{% endif %}</div>
+      <div class="card-meta-line"><div>In the list of {{ deck.versions }} version{% if deck.versions > 1 %}s{% endif %}</div></div>
     </div>
   </a>
   {% else %}
-    <p>No deck uses this copy.</p>
+    <p>No deck lists this card.</p>
   {% endfor %}
 </div>
 {% endif %}

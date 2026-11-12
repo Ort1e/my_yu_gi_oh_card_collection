@@ -11,8 +11,9 @@
 <div class="inside-container">
   <h1>Built decks</h1>
   <p class="back-link"><a href="/decks">← All decks</a></p>
-  <p>A built version locks its real cards: they belong to it alone, out of the collection for the other decks.
-    Build or unbuild a version in the deck builder's Settings tab. Its proxies are the cards still missing to play it for real.</p>
+  <p>A built version holds copies of your collection: they are its own, out of the collection for the other decks.
+    Build or unbuild a version in the deck builder's Settings tab: building it takes your free copies (best condition first); the cards you lack are missing.
+    What they are and what they cost: <a href="/decks/shopping">the shopping list</a>.</p>
 
   {% if versions.is_empty() %}
   <p>No built deck yet.</p>
@@ -20,77 +21,26 @@
   <div class="card-list">
     {% for built in versions %}
     <div class="card">
-      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}#to-buy">{{ built.version.full_name() }}</a></div>
+      <div class="card-title"><a href="/deck-builder/{{ built.version.id }}">{{ built.version.full_name() }}</a></div>
       <div class="card-meta-line">
         <div>Deck box: {{ built.version.deck_box.as_deref().unwrap_or("—") }}</div>
         <div>Sleeves: {{ built.version.sleeves.as_deref().unwrap_or("—") }}</div>
-        <div>Cards: {{ built.cards }}</div>
-        <div>Proxies: {{ built.proxies }}</div>
-        {% if built.wrong_text > 0 %}<div>Wrong text: {{ built.wrong_text }}</div>{% endif %}
+        <div>Cards: {{ built.cards }} ({{ built.held }} of your copies)</div>
+        <div>{% if built.missing > 0 %}<a href="/deck-builder/{{ built.version.id }}#to-buy">To buy: {{ built.missing }}</a>{% else %}Nothing missing: ready to play{% endif %}</div>
       </div>
-      {% if built.missing.is_empty() %}
-      <p>Nothing missing: ready to play.</p>
-      {% else %}
-      <label class="pick-all"><input type="checkbox" class="want-deck" checked> All in the wants list</label>
-      <details class="deck-missing">
-        <summary>Missing: {{ built.missing_copies() }} cop{% if built.missing_copies() == 1 %}y{% else %}ies{% endif %}
-          ({{ built.missing.len() }} different card{% if built.missing.len() != 1 %}s{% endif %}),
-          about {{ built.cost() }} €{% if built.errata_cards() > 0 %},
-          <span class="errata-owned">{{ built.errata_cards() }} with an errata</span>{% endif %}</summary>
-        <div class="table-scroll">
-        <table class="numbers">
-          <thead><tr><th class="text">Card</th><th>Copies</th><th>Price (€)</th><th class="text">Errata</th><th class="text">Cardmarket</th></tr></thead>
-          <tbody>
-            {% for line in built.missing %}
-            <tr>
-              <td class="text"><label><input type="checkbox" class="want-pick" checked
-                data-label="{{ line.card.name }}" data-name="{{ line.card.english_name }}" data-count="{{ line.card.count }}" data-price="{{ line.price_attr() }}">
-                {{ line.card.name }}</label></td>
-              <td>{{ line.card.count }}</td>
-              <td>{% if let Some(total) = line.total() %}{{ total }}{% else %}—{% endif %}</td>
-              <td class="text">
-                {% if !line.card.wrong_text.is_empty() %}<span class="errata-owned">owned with the wrong text: {{ line.card.wrong_text.join(", ") }}</span>{% endif %}
-                {% if let Some(warning) = line.card.warning %}{% include "decks/errata_warning.html" %}{% endif %}
-              </td>
-              <td class="text"><a href="https://www.cardmarket.com/en/YuGiOh/Products/Search?searchString={{ line.card.english_name|urlencode }}" target="_blank" rel="noopener">Buy ↗</a></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        </div>
-        <p><a href="/deck-builder/{{ built.version.id }}#to-buy">To buy tab: this deck's wants list ↗</a></p>
-      </details>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
-
-  {% if errata_pending > 0 %}
-  <p class="errata-pending">Errata are being looked up on Yugipedia for {{ errata_pending }} card(s): reload in a minute.</p>
-  {% endif %}
-
-  {% if !shopping.is_empty() %}
-  <h2>Cardmarket wants list</h2>
-  <p>Every missing card of every built deck, merged. Untick a card (or a whole deck) above to leave it out:
-    the list and the estimate follow.</p>
-  <p>{{ self.wants_note() }}</p>
-  <p class="wants-estimate">Estimated price: <strong id="wants-total">{{ estimate|money }}</strong> €
-    <span id="wants-unpriced">{% if unpriced > 0 %}({{ unpriced }} card(s) without a price){% endif %}</span>
-    <span class="cell-note">Cardmarket prices (the cheapest printing's, as of the last refresh), before shipping; the list asks for Good condition or better.</span></p>
-  <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
-  <p><button type="button" data-copy="wants-all">Copy</button>
-    <a class="btn btn-secondary" href="https://www.cardmarket.com/en/YuGiOh/Wants" target="_blank" rel="noopener">Open my Cardmarket wants lists ↗</a></p>
-  {% endif %}
   {% endif %}
 
   {% if !decks.is_empty() %}
   <h2>Value of the decks</h2>
-  <p class="value-note">Each deck's latest version, built or not, at market prices. Proxies: what the missing cards would cost.
+  <p class="value-note">Each deck's latest version, built or not, at market prices. Missing: what the cards you lack would cost.
     The whole collection's value is on <a href="/collection/value">its own page</a>.</p>
   <div class="table-scroll">
   <table class="numbers sortable">
     <thead>
-      <tr><th data-sort="text">Deck</th><th class="phone-hide" data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th class="phone-hide" data-sort="number">Proxies</th><th data-sort="number">Proxies (€)</th></tr>
+      <tr><th data-sort="text">Deck</th><th class="phone-hide" data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th class="phone-hide" data-sort="number">Missing</th><th data-sort="number">Missing (€)</th></tr>
     </thead>
     <tbody>
       {% for deck in decks %}
@@ -114,5 +64,4 @@
 
 {% block extra_js %}
 <script src="/static/js/tables.js"></script>
-<script src="/static/js/wants_list.js"></script>
 {% endblock %}

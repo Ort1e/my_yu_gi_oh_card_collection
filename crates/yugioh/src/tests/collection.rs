@@ -3,22 +3,25 @@
 
 use super::*;
 
-/// `deck_fixture` (2 Dark Magicians LOB-FR005 NM at 2.25 in a 10.50 lot, a
-/// Kuriboh proxy) with both cards in the deck, and two price refreshes.
+/// `deck_fixture` (2 Dark Magicians LOB-FR005 NM at 2.25 in a 10.50 lot,
+/// Kuriboh not owned) with a Dark Magician and a Kuriboh in the deck, and
+/// two price refreshes.
 async fn priced_fixture(t: &TestApp) -> Vec<i64> {
     let (version, cards) = t.deck_fixture().await;
-    sqlx::query(
-        "INSERT INTO deck_version_main_deck (deck_version_id, card_id) VALUES (?1, ?2), (?1, ?3);
-         INSERT INTO card_price (card_data_id, date, cardmarket_price, tcgplayer_price) VALUES
+    t.set_main(
+        version,
+        &[
+            (crate::testing::DM, "Magicien Sombre", 1),
+            (crate::testing::KURIBOH, "Kuriboh", 1),
+        ],
+    )
+    .await;
+    t.exec(
+        "INSERT INTO card_price (card_data_id, date, cardmarket_price, tcgplayer_price) VALUES
              (1, '2026-09-01', '4.00', '5.00'), (1, '2026-10-01', '6.00', '7.00'),
              (2, '2026-09-01', '0.10', NULL), (2, '2026-10-01', '1.00', NULL);",
     )
-    .bind(version)
-    .bind(cards[0])
-    .bind(cards[2])
-    .execute(&t.state.pool)
-    .await
-    .unwrap();
+    .await;
     cards
 }
 
@@ -44,7 +47,7 @@ async fn values_the_collection_from_lot_prices() {
     let (status, body) = t.get("/collection/value").await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert!(body.contains("Market prices of 01/10/2026"), "{body}");
-    // 2 French NM copies at 6.00 × 0.9; the proxy isn't owned
+    // 2 French NM copies at 6.00 × 0.9; Kuriboh isn't owned
     assert!(body.contains("10.80 €"), "{body}");
     assert!(body.contains("2 copies"), "{body}");
     // gain: value − the lot's price (10.50)
@@ -56,7 +59,7 @@ async fn values_the_collection_from_lot_prices() {
     assert!(body.contains("(+140.0%)"), "{body}");
     // nothing lost
     assert!(body.contains("No copy is worth less"), "{body}");
-    // Dark Magician moved +50%; Kuriboh more, but it's only a proxy
+    // Dark Magician moved +50%; Kuriboh more, but it isn't owned
     assert!(body.contains(">+50.0%</td>"), "{body}");
     assert!(!body.contains("+900.0%"), "{body}");
     // the decks' values moved to the built decks page; the sections fold
@@ -65,7 +68,7 @@ async fn values_the_collection_from_lot_prices() {
     assert!(body.contains("<details class=\"value-fold\""), "{body}");
     assert!(body.contains(r#""value":[7.2,10.8]"#), "{body}");
 
-    // the deck: one real card (5.40), the proxy would cost 1.00
+    // the deck: one owned card (its copy: 5.40), the missing one would cost 1.00
     let (status, page) = t.get("/decks/built").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains("Value of the decks"), "{page}");
@@ -212,7 +215,7 @@ async fn the_statistics_show_the_cards_owned_without_what_they_cost() {
 
     let (status, body) = t.get("/collection/stats").await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    // the 2 Dark Magicians at 5.40, not the proxy
+    // the 2 Dark Magicians at 5.40
     let totals = &body[..body.find("By rarity").unwrap()];
     assert!(
         totals.contains(r#"<div class="value-amount">2</div>"#),
