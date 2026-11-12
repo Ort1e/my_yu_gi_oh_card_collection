@@ -4,9 +4,11 @@ import type { MissingCard } from "./MissingCard";
 /**
  * The answer of [`check_version`]: `{"format": "Edison v2", "problems":
  * ["Raigeki: 2 copies, 1 allowed"], "errata": [...], "errata_pending": 0}`;
- * `format` null and no problem without a format. `errata`: the proxies and
- * owned copies whose text was errata'd after the cutoff of the format or
- * the ban list (`store::errata`); `errata_pending`: cards still being
- * looked up on Yugipedia.
+ * `format` null and no problem without a format. `errata`: the missing
+ * cards and the built version's copies whose text was errata'd after the
+ * cutoff of the format or the ban list (`store::errata`); `errata_pending`:
+ * cards still being looked up on Yugipedia. `wants`: the Cardmarket wants
+ * list of the version's missing cards, one `count name` per line (empty: none); `wants_note`:
+ * what to do with it (shared with `/decks/built`).
  */
-export type Check = { format: string | null, problems: Array<string>, errata: Array<MissingCard>, errata_pending: number, };
+export type Check = { format: string | null, problems: Array<string>, errata: Array<MissingCard>, errata_pending: number, wants: string, wants_note: string, };

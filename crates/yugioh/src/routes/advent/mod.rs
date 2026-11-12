@@ -119,7 +119,7 @@ impl Calendar for Cards {
             Some(lot) => {
                 sqlx::query_as(
                     "SELECT card.id, card.name, card.code FROM unite JOIN card ON card.id = unite.card_id
-                     WHERE unite.lot_id = ? AND card.is_proxy = 0
+                     WHERE unite.lot_id = ?
                        AND card.id NOT IN (SELECT card_id FROM advent_calendar_entry)
                      ORDER BY card.code, card.id",
                 )
@@ -168,15 +168,14 @@ async fn find_card(conn: &mut SqliteConnection, text: &str) -> AppResult<Result<
         let Ok(id) = id.trim().parse::<i64>() else {
             return Ok(Err(format!("\"{text}\" is not a card id (#1794).")));
         };
-        let found: Option<i64> =
-            sqlx::query_scalar("SELECT id FROM card WHERE id = ? AND is_proxy = 0")
-                .bind(id)
-                .fetch_optional(&mut *conn)
-                .await?;
+        let found: Option<i64> = sqlx::query_scalar("SELECT id FROM card WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&mut *conn)
+            .await?;
         return Ok(found.ok_or(format!("there is no card #{id} in the collection.")));
     }
     let found: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM card WHERE upper(code) = upper(?) AND is_proxy = 0
+        "SELECT id FROM card WHERE upper(code) = upper(?)
          ORDER BY id IN (SELECT card_id FROM advent_calendar_entry), id LIMIT 1",
     )
     .bind(text)

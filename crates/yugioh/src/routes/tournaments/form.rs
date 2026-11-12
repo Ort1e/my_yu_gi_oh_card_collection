@@ -16,7 +16,11 @@ use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 use super::data::{self, RoundView, Which};
 use crate::store::db::{begin_write, Pool};
 use crate::store::models::version_full_name;
-use crate::store::tournaments::{self, GameFields, Results, RoundFields, TournamentHead};
+use crate::store::snapshots;
+use crate::store::tournaments::{self, GameFields, Played, Results, RoundFields, TournamentHead};
+
+/// The "Deck list played" value that keeps the list already linked.
+const KEEP: &str = "keep";
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
@@ -97,6 +101,11 @@ pub struct RoundValues {
 impl RoundValues {
     fn number(&self) -> String {
         shown_number(&self.index)
+    }
+
+    /// A result and its games noted: the form folds the games.
+    fn is_finished(&self) -> bool {
+        !self.result.is_empty() && !self.games.is_empty()
     }
 
     fn is_blank(&self) -> bool {
@@ -207,7 +216,11 @@ impl TournamentValues {
             name: t.name.clone(),
             date: t.date.clone(),
             location: t.location.clone().unwrap_or_default(),
-            version_id: text(t.version_id),
+            version_id: if t.snapshot_id.is_some() {
+                KEEP.to_string()
+            } else {
+                String::new()
+            },
             placement: text(t.placement),
             players: text(t.players),
             is_team: t.is_team,
@@ -396,15 +409,21 @@ async fn read_form(
 ) -> AppResult<Option<(TournamentHead, Results)>> {
     let name = form.required("name", "Name");
     let date = form.required_date("date", "Date");
-    let version_id = form.id("version_id", "Deck version played");
-    if let Some(version) = version_id {
+    let played = match form.get("version_id") {
+        None => Played::NotNoted,
+        Some(KEEP) => Played::Keep,
+        Some(_) => form
+            .id("version_id", "Deck list played")
+            .map_or(Played::NotNoted, Played::Version),
+    };
+    if let Played::Version(version) = played {
         let known: Option<i64> = sqlx::query_scalar("SELECT id FROM deck_version WHERE id = ?")
             .bind(version)
             .fetch_optional(pool)
             .await?;
         if known.is_none() {
             form.errors
-                .push("Deck version played: this version doesn't exist any more.".into());
+                .push("Deck list played: this version doesn't exist any more.".into());
         }
     }
     let placement = form.number("placement", "Placement", 1..=100_000);
@@ -435,7 +454,7 @@ async fn read_form(
             name,
             date,
             location: form.get("location").map(str::to_string),
-            version_id,
+            played,
         },
         Results {
             placement,
@@ -482,6 +501,8 @@ pub struct FormPage {
     errors: Vec<String>,
     values: TournamentValues,
     versions: Vec<VersionChoice>,
+    /// The list already linked: "Deck - name (dd/mm/yyyy)".
+    frozen: Option<String>,
     label_names: Vec<String>,
     /// The old free-text notes, shown beside the form while not empty.
     notes: String,
@@ -505,9 +526,23 @@ impl FormPage {
             }
             None => String::new(),
         };
+        let frozen = match id {
+            Some(id) => {
+                let mut conn = pool.acquire().await?;
+                snapshots::of_tournament(&mut conn, id).await?.map(|s| {
+                    format!(
+                        "{} ({})",
+                        s.title(),
+                        crate::web::filters::french_date(s.date())
+                    )
+                })
+            }
+            None => None,
+        };
         Ok(FormPage {
             id,
             errors,
+            frozen,
             versions: version_choices(pool, &values.version_id).await?,
             label_names: data::label_names(pool).await?,
             values,

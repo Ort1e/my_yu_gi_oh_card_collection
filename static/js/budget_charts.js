@@ -1,5 +1,5 @@
-// Charts of the dashboard (templates/dashboard.html). The data is in the
-// `#charts-data` JSON block, built by routes/dashboard.rs.
+// Charts of the budget page (templates/budget/overview.html). The data is in
+// the `#charts-data` JSON block, built by routes/budget/mod.rs.
 
 const charts = JSON.parse(/** @type {string} */ (/** @type {HTMLElement} */ (document.getElementById('charts-data')).textContent));
 

@@ -3,6 +3,7 @@
 {% block title %}my yu-gi-oh card{% endblock %}
 
 {% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
   <link rel="stylesheet" href="/static/css/collection.css">
 {% endblock %}
 
@@ -11,6 +12,11 @@
   <h1>My Yu-Gi-Oh Card Collection</h1>
 
   <div class="value-tiles">
+    <a class="value-tile" href="/cards">
+      <div class="value-label">Cards owned</div>
+      <div class="value-amount">{{ owned }}</div>
+      <div class="value-detail">not sold</div>
+    </a>
     <a class="value-tile" href="/collection/value">
       <div class="value-label">Collection value (market estimate)</div>
       {% match value %}
@@ -26,61 +32,28 @@
       <div class="value-detail">No price yet: the first refresh runs within a day.</div>
       {% endmatch %}
     </a>
+    <a class="value-tile" href="/budget">
+      <div class="value-label">Budget this month</div>
+      {% match budget_left %}
+      {% when Some with (left) %}
+      <div class="value-amount">{{ left }} €</div>
+      <div class="value-detail">{% if left.0.is_sign_negative() %}<span class="value-down">over the budget</span>{% else %}left to spend{% endif %}</div>
+      {% when None %}
+      <div class="value-detail">No budget set yet.</div>
+      {% endmatch %}
+    </a>
   </div>
 
-  <h2>Recent Recap</h2>
-  <div class="table-scroll">
-  <table class="numbers">
-    <thead>
-      <tr>
-        <th>Category</th>
-        {% for entry in recap %}<th>{{ entry.month_str() }}</th>{% endfor %}
-        <th>Total previsional</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <th>Spent (€)</th>
-        {% for entry in recap %}<td>{{ entry.spent|money }}</td>{% endfor %}
-        <td>{{ totals.total_spent|money }}</td>
-      </tr>
-      <tr>
-        <th>Shipping (€)</th>
-        {% for entry in recap %}<td>{{ entry.shipping_cost|money }}</td>{% endfor %}
-        <td>{{ totals.total_shipping_cost|money }}</td>
-      </tr>
-      <tr>
-        <th>Budget (€)</th>
-        {% for entry in recap %}<td>{{ entry.budget|money }}</td>{% endfor %}
-        <td>{{ totals.total_budget|money }}</td>
-      </tr>
-      <tr>
-        <th>Debt (€)</th>
-        {% for entry in recap %}
-        <td class="debt-{{ entry.debt|debt_color(available_debt) }}">{{ entry.debt|money }}</td>
-        {% endfor %}
-        <td class="debt-{{ totals.total_debt|debt_color(available_debt) }}">{{ totals.total_debt|money }}</td>
-      </tr>
-      <tr>
-        <th>Shipping %</th>
-        {% for entry in recap %}<td>{{ entry.shipping_percent|money }}%</td>{% endfor %}
-        <td>{{ totals.total_shipping_percent|money }}%</td>
-      </tr>
-      <tr>
-        <th>Sold (€)</th>
-        {% for entry in recap %}<td>{{ entry.selling_revenue|money }}</td>{% endfor %}
-        <td>{{ totals.total_selling_revenue|money }}</td>
-      </tr>
-    </tbody>
-  </table>
+  <h2>Last lots</h2>
+  {% if lots.is_empty() %}
+  <p>No lot yet.</p>
+  {% else %}
+  <div class="card-list">
+    {% for lot in lots %}
+    {% include "partials/lot_item.html" %}
+    {% endfor %}
   </div>
-  <canvas id="combined_chart" width="400" height="200"></canvas>
-  <canvas id="card_cost_chart" width="400" height="200"></canvas>
+  <p><a href="/lots">All the lots →</a></p>
+  {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script id="charts-data" type="application/json">{{ charts|safe }}</script>
-<script src="/static/js/dashboard.js"></script>
 {% endblock %}

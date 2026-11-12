@@ -14,7 +14,7 @@
       <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
       {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
       {% if !common::export::public_copy() %}
-      {% if has_tournaments %}<div><a href="/tournaments?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
+      {% if has_tournaments %}<div><a href="/tournaments/stats?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
       {% endif %}
     </div>
     {% if !common::export::public_copy() %}
@@ -25,18 +25,76 @@
   </div>
 
   <h2 class="card-title">Versions</h2>
-  {% for version in versions %}
-    {% include "partials/deck_version_item.html" %}
-  {% endfor %}
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr>
+        <th class="text">Version</th><th>Main</th><th>Extra</th><th>Side</th>
+        {% if !common::export::public_copy() %}<th title="The cards your collection lacks: to buy">Missing</th>{% endif %}
+        <th class="text">Rules</th><th class="text">Tournament</th><th class="text"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for version in versions %}
+      <tr>
+        <td class="text">
+          {% if common::export::public_copy() %}<a href="/deck-versions/{{ version.id }}">{{ version.version_name }}</a>{% else %}<a href="/deck-builder/{{ version.id }}">{{ version.version_name }}</a>{% endif %}
+          {% if version.is_built %}<span class="built-badge" title="Built: its cards are locked, out of the collection for the other decks">Built</span>{% endif %}
+          {% if version.on_public_site() && !common::export::public_copy() %}<span class="built-badge" title="Shown on the public site">Public</span>{% endif %}
+        </td>
+        <td>{{ version.main_count }}</td><td>{{ version.extra_count }}</td><td>{{ version.side_count }}</td>
+        {% if !common::export::public_copy() %}
+        <td>{% if version.proxies > 0 %}<a href="/deck-builder/{{ version.id }}#to-buy">{{ version.proxies }}</a>{% else %}0{% endif %}</td>
+        {% endif %}
+        <td class="text">{% match version.format_label %}{% when Some with (label) %}{{ label }}{% when None %}{% match version.ban_list_date %}{% when Some with (date) %}List of {{ date|date }}{% when None %}—{% endmatch %}{% endmatch %}</td>
+        <td class="text">{% match version.tournament_id %}{% when Some with (tournament_id) %}<a href="/tournaments/{{ tournament_id }}">{{ version.tournament_name.as_deref().unwrap_or("") }}</a>{% when None %}—{% endmatch %}</td>
+        <td class="text"><a href="/deck-versions/{{ version.id }}">View</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if !history.is_empty() %}
+  <h2 class="card-title" id="history">History</h2>
+  <p class="hint">Each save of a version's cards is kept here{% if !common::export::public_copy() %} (an automatic one is replaced by the next save within 30 minutes); name a list on its page to keep it{% endif %}. Changes: since the previous list of the same version.</p>
+  {% let kept = self.kept_history() %}
+  {% if !kept.is_empty() %}
+  {% let lines = kept %}
+  {% include "partials/deck_history.html" %}
+  {% endif %}
+  {% if !common::export::public_copy() %}
+  {% let automatic = self.automatic_history() %}
+  {% if !automatic.is_empty() %}
+  <details class="deck-history-automatic">
+    <summary>{{ automatic.len() }} automatic save{% if automatic.len() > 1 %}s{% endif %}</summary>
+    {% let lines = automatic %}
+    {% include "partials/deck_history.html" %}
+  </details>
+  {% endif %}
+  {% endif %}
+  {% endif %}
 
   {% if !common::export::public_copy() %}
   <form method="post" action="/decks/{{ deck.id }}/versions">
     <fieldset>
-      <legend>New empty version</legend>
+      <legend>New version</legend>
       {% include "partials/form_errors.html" %}
       <label for="version_name">Version name:</label>
-      <input type="text" name="version_name" id="version_name" maxlength="100" required>
-      <small>To start from an existing version, use "Clone" in the deck builder.</small>
+      <input type="text" name="version_name" id="version_name" maxlength="100" value="{{ version_name }}" required>
+
+      <label for="start">Start from:</label>
+      <select name="start" id="start">
+        <option value="empty"{% if self.starts_with("empty") %} selected{% endif %}>An empty version</option>
+        {% for version in versions %}
+        <option value="copy:{{ version.id }}"{% if self.starts_with(format!("copy:{}", version.id).as_str()) %} selected{% endif %}>A copy of {{ version.version_name }}</option>
+        {% endfor %}
+        <option value="ydke"{% if self.starts_with("ydke") %} selected{% endif %}>A YDKE to import</option>
+      </select>
+
+      <label for="ydke">YDKE (only to import one):</label>
+      <textarea name="ydke" id="ydke" rows="3" placeholder="ydke://…">{{ ydke }}</textarea>
+      <small>Its cards and counts; the collection says which you own. The new version opens in the deck builder.</small>
     </fieldset>
     <input type="submit" value="Create the version">
   </form>

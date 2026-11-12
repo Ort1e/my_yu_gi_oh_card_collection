@@ -15,33 +15,13 @@
     <a href="/tournaments/labels" class="btn btn-secondary">Deck labels</a>
   </div>
 
-  <form method="get" action="/tournaments" class="tournament-filter">
-    <div class="field-row">
-      <div>
-        <label for="since">Since:</label>
-        <input type="date" name="since" id="since" value="{{ since }}">
-      </div>
-      <div class="wide">
-        <label for="deck">Deck:</label>
-        <select name="deck" id="deck">
-          <option value="">All decks</option>
-          {% for deck in decks %}
-          <option value="{{ deck.id }}" {% if deck.selected %}selected{% endif %}>{{ deck.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="filter-buttons">
-        <input type="submit" value="Filter">
-        {% if filtered %}<a href="/tournaments" class="btn btn-secondary">Clear</a>{% endif %}
-      </div>
-    </div>
-    <small>The list and the stats below both follow the filter (the meta moves: stats since a date are the useful ones).</small>
-  </form>
+  {% include "tournaments/filter.html" %}
   {% endif %}
 
   {% if rows.is_empty() %}
   <p>No tournament {% if filtered %}for this filter{% else %}yet{% endif %}.</p>
   {% else %}
+  <p><a href="{{ stats_href }}">Win rates and matchups{% if filtered %} for this filter{% endif %} →</a></p>
   <div class="table-scroll">
   <table class="numbers sortable">
     <thead><tr><th data-sort="text">Date</th><th class="text" data-sort="text">Tournament</th><th class="text phone-hide" data-sort="text">Location</th><th class="text" data-sort="text">Deck played</th><th>Rounds</th><th data-sort="number">Placement</th></tr></thead>
@@ -51,7 +31,7 @@
         <td data-sort-value="{{ row.date }}">{{ row.date|date }}</td>
         <td class="text"><a href="/tournaments/{{ row.id }}">{{ row.name }}</a>{% if row.is_team %} <span class="badge">Team</span>{% endif %}</td>
         <td class="text phone-hide">{{ row.location }}</td>
-        <td class="text">{% match row.version_id %}{% when Some with (v) %}<a href="/deck-versions/{{ v }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
+        <td class="text">{% match row.snapshot_id %}{% when Some with (s) %}<a href="/deck-snapshots/{{ s }}">{{ row.version_name }}</a>{% when None %}—{% endmatch %}</td>
         <td>{{ row.record }}</td>
         <td data-sort-value="{{ row.placement_rank }}">{{ row.placement }}</td>
       </tr>
@@ -60,31 +40,6 @@
   </table>
   </div>
 
-  <h2>Stats</h2>
-  <p class="hint">Wins-losses (draws third for games), and the win rate without the draws.
-    A win by forfeit is a win, a double loss a loss; byes are left out{% if byes > 0 %} ({{ byes }} here){% endif %}.</p>
-  <div class="stats-grid">
-    {% for section in sections %}
-    {% if !section.lines.is_empty() %}
-    <section class="stats-section">
-      <h3>{{ section.title }}</h3>
-      <table class="numbers sortable">
-        <thead><tr><th data-sort="text">{{ section.what }}</th><th data-sort="number">{{ section.counted }}</th><th>W-L</th><th data-sort="number">Win rate</th></tr></thead>
-        <tbody>
-          {% for line in section.lines %}
-          <tr>
-            <td>{% match line.href %}{% when Some with (href) %}<a href="{{ href }}">{{ line.name }}</a>{% when None %}{{ line.name }}{% endmatch %}</td>
-            <td>{{ line.rounds }}</td>
-            <td>{{ line.record }}</td>
-            <td>{{ line.rate }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
-    {% endif %}
-    {% endfor %}
-  </div>
   {% endif %}
 </div>
 {% endblock %}

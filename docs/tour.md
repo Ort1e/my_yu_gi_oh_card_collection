@@ -1,23 +1,38 @@
 # A tour of the code
 
-This is the reading guide for the Rust version of the app. It assumes you
-know the Django version (and the collection itself) well, and shows where
-everything went. For step-by-step changes, see [recipes.md](recipes.md).
+This is the reading guide for the code. What the app does, page by page, is
+in the [user guide](guide.md); for step-by-step changes, see
+[recipes.md](recipes.md).
 
-Suggested reading order, about an hour with the code open next to it:
+The app has four goals, and the tour follows them after the foundations:
 
-1. [The big picture](#the-big-picture) (this file)
-2. [Following a page request](#following-a-page-request): `crates/yugioh/src/routes/sellers/mod.rs`
-3. [Following a form](#following-a-form): `crates/yugioh/src/routes/sellers/form.rs`, then `lots/form/add.rs`
-4. [The database](#the-database): `migrations/0002_ygo_schema.sql`, `crates/common/src/db.rs`
-5. [The domain crates](#the-domain-crates): `crates/yugioh-domain/src/lib.rs` and one module, e.g. `ydke.rs`
-6. [The deck builder](#the-deck-builder): `frontend/src/App.svelte` and `crates/yugioh/src/routes/decks/api/`
-7. [Talking to ygoprodeck](#talking-to-ygoprodeck): `crates/yugioh/src/store/card_data/`
-8. [Tests](#tests): `crates/*/src/tests/`
-9. [The books](#the-books): `crates/books/`, a second, smaller collection
-10. [The Pokémon cards](#the-pokémon-cards): `crates/pokemon/`, a third one, with prices
-11. [What the collections share](#what-the-collections-share): `crates/common/`, `crates/advent/`
-12. [Where it runs](#where-it-runs): the NAS, the public copy, `deploy/`
+1. **The foundations**: [the big picture](#the-big-picture),
+   [a page request](#following-a-page-request)
+   (`crates/yugioh/src/routes/sellers/mod.rs`),
+   [a form](#following-a-form) (`routes/sellers/form.rs`, then
+   `lots/form/add.rs`), [the database](#the-database)
+   (`migrations/0002_ygo_schema.sql`, `crates/common/src/db.rs`),
+   [the domain crates](#the-domain-crates) (`crates/yugioh-domain/src/lib.rs`
+   and one module, e.g. `ydke.rs`).
+2. **The card collection** (goal 1): [ygoprodeck](#talking-to-ygoprodeck)
+   (`crates/yugioh/src/store/card_data/`), [pictures](#a-printings-picture-yugipedia),
+   [the collection value](#the-collection-value),
+   [the advent calendar](#the-advent-calendar).
+3. **Competitive play** (goal 2), where the deck builder links the collection
+   (copies owned, the ones built decks hold) to the tournaments (what to buy, which list
+   was played): [the deck builder](#the-deck-builder)
+   (`frontend/src/App.svelte`, `crates/yugioh/src/routes/decks/api/`),
+   [built decks](#built-decks), [a deck's history](#a-decks-history),
+   [a version's page](#a-deck-versions-page), [formats](#formats),
+   [tournaments](#tournaments).
+4. **The public copy** (goal 3): [where it runs](#where-it-runs): the NAS, the
+   export, `deploy/`.
+5. **The books** (goal 4): [the books](#the-books) (`crates/books/`), and the
+   third collection, [the Pokémon cards](#the-pokémon-cards) (`crates/pokemon/`).
+6. **Across them**: [what the collections share](#what-the-collections-share)
+   (`crates/common/`, `crates/advent/`), [the login](#login),
+   [maintenance commands](#maintenance-commands), [tests](#tests)
+   (`crates/*/src/tests/`).
 
 ## The big picture
 
@@ -60,7 +75,7 @@ The Cargo workspace (`crates/*` and `importer`):
 | `crates/common/` | What every collection uses: state, web plumbing, DB, photos, base templates, the test harness | settings, base templates |
 | `crates/yugioh-domain/` | Pure Yu-Gi-Oh! business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
 | `crates/books-domain/`, `crates/pokemon-domain/` | The other collections' pure logic | (none) |
-| `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors | |
+| `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors, Cardmarket's price guide file (`cardmarket`) | |
 | `importer/` | One-off Django `dumpdata` loader, used for the cutover | `loaddata` |
 
 Dependencies only go down: a collection uses its domain crate, `common`
@@ -84,7 +99,7 @@ bars, the shared partials), so its templates extend those by name.
 | Django templates | askama templates in `crates/<collection>/templates/<area>/`, nearly identical syntax |
 | `forms.py` | `common::web::forms` (`FormData`) + validation in each `routes/<area>/form.rs` |
 | DRF API + serializers | `routes/decks/api/` + `#[derive(Serialize)]` structs |
-| `signals.py` | explicit code in the handler (e.g. `delete_orphan_proxies`) |
+| `signals.py` | explicit code in the handler (e.g. the categories of a card removed from a deck) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
 | Django auth | `common::web::auth`: one password per user (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`), signed cookie |
@@ -203,7 +218,8 @@ Things to notice:
 - after the commit, `spawn_link_cards` starts a **background task** that
   links the new cards to their ygoprodeck `card_data` (fetching unknown
   names from the API), puts their names in the language of their code, then
-  swaps deck proxies for the new owned copies. The redirect doesn't wait
+  looks up their printing's picture (the decks need nothing: a list sees a
+  new copy as owned at once). The redirect doesn't wait
   for it (see [Talking to ygoprodeck](#talking-to-ygoprodeck)).
 
 ### The shipment PDF flow
@@ -278,7 +294,7 @@ factors, which `yugioh-domain` re-exports as `card::CardStatus` and
 |---|---|
 | `card` | name normalisation (`normalize_card_name`, `clean_card_name`), `CardStatus` (from `common-domain`) |
 | `lot` | `LotType`, shipping cost |
-| `budget` | monthly recap (`recap`, `BudgetTotals`, `available_debt`) for `/budget` and the dashboard |
+| `budget` | monthly recap (`recap`, `BudgetTotals`, `available_debt`) for `/budget` and the dashboard's budget tile |
 | `ydke` | `YdkeDeck::parse` / `to_url` |
 | `monte_carlo` | opening-hand simulation, conditional categories included |
 | `cardmarket` | shipment text → `Shipment` (dates, total, seller, card lines) |
@@ -293,170 +309,158 @@ errors). That is the place to look when the Rust version behaves
 differently from what you remember. Unit tests sit at the bottom of each
 file (`#[cfg(test)] mod tests`).
 
-## The deck builder
+## Talking to ygoprodeck
 
-A Svelte 4 app in TypeScript in `frontend/`, built by Vite into `static/deck-builder/`
-(`bundle.js`, `bundle.css`; the types are only checked, by `npm run check`, and
-stripped from the bundle). The page `/deck-builder/:id`
-(`templates/decks/builder.html`) is just a `<div id="app">` that loads the
-bundle. The app then only talks JSON to `/api/*`:
+All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
+are in `crates/yugioh/src/store/card_data/` (the client in `mod.rs`, then
+`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
+second and blocks the IP for an hour above that: `YGOPRODECK.wait()` (a
+`common::http::Throttle`) keeps every call of the server 60 ms apart, and
+what can be remembered is.
 
-| Frontend | Backend |
-|---|---|
-| `src/main.ts`: mounts `App` with the version id | |
-| `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
-| `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
-| `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
-| `src/lib/*.svelte`: zone, card tile, card overview, reserve search, YDKE toolbar, version panel, simulation, tournament; each with its CSS | `reserve.rs`, `proxies.rs`, `categories.rs`, `simulation.rs`, `tournament.rs`, `ydke_import.rs` |
+| What | Call | Remembered in |
+|---|---|---|
+| a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
+| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
+| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
+| a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
+| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
+| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
 
-Moving cards between zones only changes the app's local state until
-**Save** (`PATCH /api/deck-versions/:id` with the three zones). Proxies,
-categories and the tournament are saved immediately. Errors come back as
-`{"error": "…"}` with a 4xx status, and `api.ts` turns them into exceptions
-the app shows to you.
+Two rules: call ygoprodeck **before** opening a write transaction (the calls
+write through the pool), and only through these functions. Tests never call
+it: `TestApp` pre-inserts the card data they need (and translations, in
+`card_translation`). The shapes ygoprodeck answers are reshaped in pure
+functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
+rarity names), which are unit-tested on small synthetic JSON.
 
-**The JSON's types come from Rust.** The API's structs (`ApiCard`,
-`DeckVersion`, the inputs like `VersionUpdate`…) derive `ts_rs::TS` with
-`#[ts(export)]`: `cargo test` writes one TypeScript file per struct into
-`frontend/src/api-types/` (settings in `.cargo/config.toml`: that folder,
-`i64` as `number`). They are committed, and the CI fails when they are
-stale, so a field renamed in Rust shows up as an error in `npm run check`
-rather than as `undefined` in the page. `src/types.ts` holds the builder's
-own types (the zones with the reserve, the rules played, the drag data).
+## A printing's picture: Yugipedia
 
-**The page scripts** (`static/js/`) stay plain JavaScript, served as they
-are; `npm run check` also checks them from their JSDoc comments
-(`frontend/tsconfig.static.json`, each script in its own scope, what they
-share at runtime declared in `frontend/static-globals.d.ts`).
-
-During frontend work, `npm run dev` serves the app with hot reload on
-`:5173` and forwards `/api` to the backend on `:3000`.
-
-## Built decks
-
-A deck version can be **built** (`deck_version.is_built`, migration 0010):
-the physical deck exists, so its real (non-proxy) cards are **locked**, out
-of the collection for every other version. In this app a proxy already means
-"a card I don't have for this deck", so nothing else is needed to see what is
-missing.
-
-- **Building** (`PATCH /api/deck-versions/:id` with `{"is_built": true}`,
-  `decks/api/version.rs`): `yugioh_domain::built_deck::plan_build` says which cards
-  change; each of the version's cards shared with other versions becomes a
-  proxy there (`store::cards::proxy_copy` + `swap_card`, categories moved),
-  except the cards another built version already holds: first built, first
-  served, those become proxies here. The answer carries a `build_report`
-  the deck builder shows.
-- **Saving a built version's zones** runs the same building step again: a
-  card added from the reserve that other versions use becomes a proxy in
-  them, and the save answer carries a `build_report` too. So a real card of
-  a built version is never in another version.
-- **Unbuilding** only clears the flag. The proxies made in other versions
-  stay; `clean-cards` puts the owned cards back (`replace_proxies`), in
-  those versions and in the unbuilt one.
-- **Locked cards** (`store::cards::locked_elsewhere(version_id)`, a subquery)
-  are skipped by the reserve, the YDKE import and `clean-cards`; saving zones
-  with one is refused with a 400 naming the card and the built deck (only a
-  stale page can send one). A copy of a built version gets proxies for them.
-- **A built version's proxies are swapped by hand only.** The automatic
-  swap (`replace_proxies`, after a new lot and in `clean-cards`) skips built
-  versions: the physical deck changes only when you decide. In the deck
-  builder, a selected proxy has a "Use my copy" button (`POST
-  /api/deck-versions/:id/proxies/:card_id/replace`, `decks/api/proxies.rs`):
-  it takes a `store::cards::free_copy` (a copy in no deck first), and if that
-  copy was in other versions, they get a proxy of it, as building does.
-- Each version can note its **deck box** and **sleeves** (free text).
-- `/decks/built` (`routes/decks/built.rs`): each built version, what it still
-  misses (its proxies), and the shopping list of all of them, also as a
-  **Cardmarket wants list** (one `1 Card name` line per card, by English name
-  from the card data; `static/js/wants_list.js` copies it). Language and
-  condition can't be in the text: the page reminds to set them on the list
-  after the import. Any version's page (`/deck-versions/:id`, built or not,
-  not in the public copy) has the same list of its own proxies
-  (`built::version_wants_list`).
-
-## A deck version's page
-
-`/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
-`static/css/decks.css`) shows a version read-only, for the app and the
-public copy: its zones as the card grid (by kind, then English name), and
-around them:
-
-- **the format** it plays (its problems there: `store::formats::version_problems`,
-  and the format's list for the badges), else **the ban list**: the
-  version's own (chosen in the deck builder), else the latest one; the
-  restricted cards in a table, and a corner badge on their tiles
-  (`CardTile::ban`, `X`/`1`/`2` as in the builder). A ban list doesn't
-  judge the deck (no "too many copies" check), a format does;
-- **the opening hands**: the deck builder's Monte Carlo on the version's
-  categories (`decks/api/simulation.rs::inputs`, `yugioh_domain::monte_carlo`),
-  10,000 hands of 5 cards (going first) and of 6 (second), seeded by the
-  version's id so the public copy doesn't change from one night to the
-  next; the share of hands with at least one card of each category, and
-  their average number;
-- **the tournament** it was played in, round by round
-  (`tournaments::TournamentView`, the same `tournaments/rounds.html` as the
-  tournament's page).
-
-## Formats
-
-A **format** (Edison, Goat…: `deck_format`, migration 0022) is a way to
-play with its own card pool (the cards released in the TCG up to its
-**cutoff**) and its own list of forbidden and limited cards
-(`deck_format_entry`). A deck version plays a Konami ban list **or** a
-format (`deck_version.format_id`; the save refuses both).
+ygoprodeck has one picture per artwork, in English: a French copy, an
+Extended Art or an alternate art shows the wrong one. Yugipedia has a
+picture of each printing, named after it
+(`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
+Extended Art). A copy can take one: `card.picture` (migration 0019), served
+by `/card-picture/:name` (one address per picture, so the public copy keeps
+it once for all the copies of a printing; downloaded once, kept as a JPEG in
+`media/card_pictures/`); without it, the copy shows ygoprodeck's picture
+(`store::models::picture_url`, used by the grid, the card page, the advent
+doors and the deck builder's `ApiCard.image`).
 
 | Piece | Where |
 |---|---|
-| the rules: a card's first release (the earliest TCG date of its sets), a deck's problems (`check`: released after the cutoff or never in the TCG, more copies than allowed, counted by English name across main, extra and side) | `yugioh-domain/src/format.rs` |
-| the sets' TCG dates (`ygo_set`, ygoprodeck's `cardsets.php`; with the weekly prices, and once when there are none); first releases, a format's rules, a version's problems; create from a Konami list (copied), new version (a copy) | `yugioh/src/store/formats.rs` |
-| `/formats` (list), `/formats/:id` (its list: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
-| deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.ts` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
+| reading a file name, the files of a copy's printing, the one to take without asking | `yugioh_domain::printing_picture` (`parse`, `candidates`, `automatic`) |
+| the card galleries (MediaWiki API, `Card Gallery:<name>`, 500 files a page), one request a second (`YUGIPEDIA` throttle), cached in `yugipedia_gallery` for 30 days | `yugioh/src/store/yugipedia.rs` |
+| the automatic pictures: copies with an automatic picture get their printing's when there is one artwork for it (`find_pictures`) | new cards at the end of their linking (`card_data/linking.rs`), a new code or rarity (`spawn_find_pictures`), the whole collection by hand (`find-pictures`, `commands/find_pictures.rs`: once for the cards added before, then now and then for the scans Yugipedia adds later) |
+| the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
 
-**A change of the list on a format already played**: make a new version
-(button on its page). The decks keep the version they play; v1 stays as it
-was. A version can still be edited (a mistake to fix).
+A new code, rarity or name puts an automatic picture back to ygoprodeck's
+and looks for the new printing's.
 
-## Tournaments
+The pictures come straight from Yugipedia's media server
+(`ms.yugipedia.com/<h>/<hh>/<name>`, `hh` from the md5 of the name: one
+request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
+Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
+and tried again. The automatic pass downloads a picture **before** giving
+it to a copy, so a page or the public copy never asks Yugipedia; and
+`/card-picture/:name` answers ygoprodeck's picture when its own can't be
+had (hundreds at once would be refused). Tests insert `yugipedia_gallery` rows: Yugipedia is
+never called by them.
 
-`/tournaments` (`routes/tournaments/`, `templates/tournaments/`,
-`static/css/tournaments.css`): every tournament with its record and
-placement, then the stats, both following the filter (`?since=`, `?deck=`).
-A tournament has numbered **rounds** (`tournament_round`: opponent's deck as
-written, its labels, die, result, team result, comment), each with any number
-of **games** (`tournament_game`: won, lost, draw (replayed, so more than 3
-games) or unfinished (cut by time), first/second, comment). The version
-played is still `deck_version.tournament_id`, one version at most; a copy of
-a version (`clone`) doesn't take it.
+### Errata (`/decks/shopping`)
 
-- **Labels** (`deck_label`): archetype/engine names, one table for your decks
-  (`deck_deck_label`, on the deck edit page) and the opponents' rounds
-  (`tournament_round_label`). Typed comma-separated with suggestions
-  (`yugioh_domain::tournament::split_labels`), matched case-insensitively, created on
-  the way, deleted when unused; `/tournaments/labels` renames and merges.
-- **Writes** (`store/tournaments.rs`): `insert`/`update` replace the rounds
-  (`set_results`), shared by the form and `import-tournament-notes`.
-- **The form** (`routes/tournaments/form.rs`, `static/js/tournament_form.js`):
-  rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
-  blank rows skipped, numbered in order. The edit page shows the old free
-  `notes` beside the form until "Clear the old notes".
-- **Stats** (`yugioh_domain::tournament::stats`): rounds (forfeit = win,
-  double loss = loss, byes apart), games (draws and unfinished out of the
-  rate), by version, by your deck's labels, matchups, die, first/second.
-  `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
-- **Deck builder**: the tournament panel is a summary with links to these
-  pages (`decks/api/tournament.rs`).
-- **Public**: the list, the stats and each tournament are in the public copy,
-  without the buttons, the filter (it needs the server), the labels page
-  and the old `notes`. The version played shows the tournament too.
+A card's text can change after a format's cutoff (Edison…): a printing
+bought for a missing card then has the wrong text. Yugipedia's
+`Card Errata:<name>` page lists the versions of the text in its
+`== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
+first carried it); `yugioh_domain::errata` parses it, dates each version by
+its set (`ygo_set`, by code then by name; a reprint product's date wins) and
+tells which one was in force at the cutoff and when the next one came. A
+printing is right when it came out between the two. `store/yugipedia.rs`
+fetches and caches it (`yugipedia_errata`, 90 days: errata are rare) **in the background**
+(`spawn_errata`): the page shows what is cached, starts the lookups for the
+rest and says "reload in a minute". It warns on any text change, old and new
+text folded so the owner judges; the Cardmarket wants lists carry names
+only, the expansion is picked by hand. Owned copies coded in a set printed
+outside the window count as missing too ("wrong text"); a copy whose set has
+no date isn't judged. The cutoff is the version's format's, else its ban list's date
+(`store/errata.rs`, shared with the deck builder: the version panel lists the
+same cards from `GET /api/deck-versions/:id/check`); a version with neither has
+none: no warning.
+
+## The collection value
+
+`/collection/value` (`routes/collection/mod.rs`: the summary tiles and the chart
+open, the top copies, losses, price moves and lots in folded `<details>`), a tile
+on the dashboard, and a "Market" line on card pages. The value of each deck
+(`sections::deck_values`) is the last section of `/decks/built`;
+`/collection/stats` sends to the value page for the chart and the movers, and
+keeps them only in the public copy, which has no value page (it would show what
+was paid). Two price sources, both refreshed weekly
+by `refresh-prices`:
+
+- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
+  `yugioh_domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
+  MB) downloaded into memory, a price **per printing**. Only what the
+  collection needs is kept (migration 0009): the products named like our
+  card data, each set code's expansion, the price history of the linked
+  products. The files are never saved. They have no set code and no rarity,
+  so each copy is linked to its product by a guess: the set code's
+  expansion is the one holding most of the set's card names (ygoprodeck),
+  twins (OCG version, reprint) told apart by the date they were added; then
+  the product with the card's name there, by rarity rank against price rank
+  when there are several. About 80% of the copies get one; the rest, or a
+  wrong guess, are set on the card's edit page ("Cardmarket product",
+  `card.cardmarket_product_manual = 1`, kept by the refreshes). Its price
+  (the trend, else the 30-day average) covers every language and edition.
+- **ygoprodeck** (`card_price`): one price per card name, the cheapest
+  printing's, an estimate usually too low for old or high rarity copies.
+  Used for the copies without a product. The `card_prices` copy inside
+  `card_data.json_data` is never used: it dates from when the card was
+  linked.
+
+Cardmarket's API takes no new users and scraping its site is against its
+terms; the price guide files are its open download.
+
+`yugioh_domain::valuation` does the sums:
+- a copy's price: its product's (`Prices::of`), else its card name's;
+- a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
+  × language (non-English 0.9), totals rounded to the cent;
+- a copy counts on date D when its purchase lot (not cancelled) is dated on
+  or before D and it has no sale lot by D;
+- the **gain/loss uses the lot prices** (`lot.price`, shipping included,
+  less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
+  migration 0016; the budget counts the same cost in the lot's month):
+  value of the copies owned + sale lots − purchase lots, up to D. Unite
+  prices can't do it: many lots were bought as a whole, without a price per
+  card;
+- beside it, the copies that do have a unite price are compared card by
+  card (value against that price, no shipping share);
+- each purchase lot against its **full price** (`lot_gain`): the value of
+  its cards still owned, plus what its sold cards brought (their price in
+  the sale lot), minus `lot.price` (non-card items included); the lots
+  without cards (sleeves, boxes) are left out;
+- price moves: since the previous refresh and over 3 months, cards owned
+  now, moves under 0.50 € left out (one line per price, the same source on
+  both dates).
+
+The lists show estimates too: each card on `/cards` (its picture tile, and
+the table view) and on a lot's page
+(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
+the card's latest price, its product's else its name's), and each purchase
+lot the value of its cards still owned (`fill_lot_estimates`).
+
+The page loads every row (`store::valuation::owned_copies`, `lots`,
+`prices_by_date`) and computes in Rust: money is never summed in SQL. The
+chart is `static/js/collection_value.js`; the card page's price line is an
+SVG drawn by the server (`cards::sparkline`).
 
 ## The advent calendar
 
 `/advent-calendar/:year` (`static/js/advent_calendar.js`,
 `static/css/advent.css`): 24 doors that open on the photo and the card of
 the day. The tables `advent_calendar` (one per year) and
-`advent_calendar_entry` (day, card, photo) come from Django, which had no
-page for them. The photos are in `media/advent_calendar_photos/<year>/`
+`advent_calendar_entry` (day, card, photo) hold them. The photos are in `media/advent_calendar_photos/<year>/`
 (upright, 1600 px, metadata stripped; the full-size originals in
 `originals/`). They show handwritten notes, so the pages and the photos are
 behind the login.
@@ -486,6 +490,277 @@ A card calendar can have its own lot (`advent_calendar.lot_id`, migration
 0006, "Create its lot" on the edit page, `POST /advent-calendar/:year/lot`,
 in the yugioh crate): its cards are added on the usual lot page, then
 suggested in the day fields; the lot page links back to the calendar.
+
+## The deck builder
+
+A Svelte 4 app in TypeScript in `frontend/`, built by Vite into `static/deck-builder/`
+(`bundle.js`, `bundle.css`; the types are only checked, by `npm run check`, and
+stripped from the bundle). The page `/deck-builder/:id`
+(`templates/decks/builder.html`) is just a `<div id="app">` that loads the
+bundle. The app then only talks JSON to `/api/*`:
+
+| Frontend | Backend |
+|---|---|
+| `src/main.ts`: mounts `App` with the version id | |
+| `src/App.svelte`: state of the zones, drag & drop, save | `decks/api/version.rs`: load, save, delete, copy |
+| `src/api.ts`: one function per endpoint, typed with `src/api-types/` | `crates/yugioh/src/routes/decks/api/`: one handler per endpoint, one file per group (`ApiCard` in `mod.rs`) |
+| `src/deck.ts`: pure helpers (sorting, prices, YDKE URL, the ban list or format played: `rulesOf`, `banStatus`, `outOfFormat`) | |
+| `src/lib/*.svelte`: header (version switcher, Save/Discard, Export / Play menu), format banner, zone, card tile, card overview, card search (`ReserveSearch`), To buy tab, History tab, settings (`VersionPanel`), simulation, new-version dialog, `Dialog` + `Toast` (no `prompt`/`alert`/`confirm`); each with its CSS | `reserve.rs`, `lookup.rs`, `categories.rs`, `simulation.rs`, `history.rs`, `ydke_import.rs` |
+
+The builder does **all the editing**, and it is where the collection meets
+competitive play: it reads the collection (copies owned, the ones built
+decks hold) and plans the next tournament (the format, what to buy, the
+list played). Five tabs kept in `location.hash` (`#build`, `#to-buy`,
+`#draw`, `#history`, `#settings`; `#missing` still opens To buy):
+
+- **Build**: the zones (one tile per copy: the API sends a line of 3 as 3
+  tiles, `ApiCard`, the builder gives each an id of its own, `types.ts`
+  `Tile`, and sends them back as `CardInput`s the server groups into lines),
+  the format banner, "+ Card by name" (`…/lookup`), the card search
+  (`…/reserve`: owned cards, and by name the known ones, with their counts)
+  and the selected card.
+- **To buy**: the missing tiles with a Cardmarket link and
+  trend price, the cost, the errata warnings, "Take free copies" (a built
+  version), the version's Cardmarket wants list (`Check.wants`, from
+  `shopping::version_wants_list`).
+- **Test draw**: the Monte Carlo, run on the zones as they are now (`main` in
+  the request; without it, the saved deck).
+- **History**: the deck's saved lists (`…/history`), what changed from one to
+  the zones on the screen (`…/compare`, the diff done in Rust), and "Name this
+  save" (`PATCH` `snapshot_name`).
+- **Settings**, three blocks: *Rules* (ban list or format), *Physical deck*
+  (built, deck box, sleeves), *Sharing* (public, `PATCH` `is_public`).
+
+The header holds the rest: the owned/missing counts and this month's budget
+left (`budget_left` in the version's GET, from `yugioh_domain::budget`), a
+"Played at …" link when a list of the deck was played in a tournament, and
+the ⋯ menu: Rename, Export / Play (copy a YDKE, download a `.ydk`
+(`deck.ts` `ydkFile`), links to DuelingBook and YGOPRODeck; a `.ydk` can also
+be imported, `ydkToYdke`), "+ Tournament with this version"
+(`/tournaments/add?version=`) and Delete. Each action lives in one place only.
+
+Moving cards between zones and changing the format only change the app's
+local state until the sticky **Save** (or Discard) in the header
+(`PATCH /api/deck-versions/:id` with the three zones). Everything else
+(categories, take free copies, the tournament, settings) is saved at once, with a
+small toast. Errors come back as
+`{"error": "…"}` with a 4xx status, and `api.ts` turns them into exceptions
+the app shows to you.
+
+**The JSON's types come from Rust.** The API's structs (`ApiCard`,
+`DeckVersion`, the inputs like `VersionUpdate`…) derive `ts_rs::TS` with
+`#[ts(export)]`: `cargo test` writes one TypeScript file per struct into
+`frontend/src/api-types/` (settings in `.cargo/config.toml`: that folder,
+`i64` as `number`). They are committed, and the CI fails when they are
+stale, so a field renamed in Rust shows up as an error in `npm run check`
+rather than as `undefined` in the page. `src/types.ts` holds the builder's
+own types (the tiles, the zones with the search results, the rules played,
+the drag data).
+
+**The page scripts** (`static/js/`) stay plain JavaScript, served as they
+are; `npm run check` also checks them from their JSDoc comments
+(`frontend/tsconfig.static.json`, each script in its own scope, what they
+share at runtime declared in `frontend/static-globals.d.ts`).
+
+During frontend work, `npm run dev` serves the app with hot reload on
+`:5173` and forwards `/api` to the backend on `:3000`.
+
+## Deck lists and built decks
+
+Since migration 0027 a deck version is a **list** (`deck_version_card`: card
+data, else a name for a card not linked yet, a count, a position), the shape
+of the snapshots. Whether a line is owned is worked out from the collection
+(`store/lists.rs`, the rules in `yugioh_domain::ownership`): a card's copies
+(not sold) are *owned*; the ones a built version holds are *here* (that
+version) or *elsewhere*; the rest are *free*. A list's tiles of a card beyond
+`free + here`, in zone order, are **missing** (`ownership::missing`); the
+builder works the same rule out again as you edit (`deck.ts` `markMissing`).
+There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
+(a migration will drop it).
+
+- **Built** (`deck_version.is_built`, 0010): the physical deck exists, so the
+  version holds copies (`deck_version_copy`: one slot per copy of a line,
+  `card_id` NULL = missing; a unique index keeps a copy in one built version).
+  Building (`PATCH` `{"is_built": true}`) runs `lists::assign_copies`: each
+  line keeps the copies it held, its other slots take free copies
+  (`built_deck::plan_build`: best condition first, then the oldest), the
+  rest stay empty; the answer's `build_report` says how many. **Other
+  versions are never touched.** Saving a built version's zones runs it again
+  (a line removed frees its copies); unbuilding frees them all.
+- A copy bought later is free but not in the built deck: "Take free copies"
+  (`POST …/take-free`, `decks/api/lookup.rs`) or the next save fills the
+  empty slots. A built deck changes only when you act on it.
+- **Planned** (`deck_version.is_planned`): a plain version you mean to build;
+  building clears it.
+- Each version can note its **deck box** and **sleeves** (free text).
+- `/decks/built` (`routes/decks/built.rs`): each built version (box, sleeves,
+  cards, copies held, missing count) and every deck's value
+  (`collection::deck_values`: the copies it plays, `lists::playing_copies`:
+  a built version's, else the ones building it would take, with their
+  condition and language; the missing cards at market price).
+- `/decks/shopping` (`routes/decks/shopping.rs`): the built then the planned
+  versions, which take the collection's copies in turn
+  (`ownership::missing_for_all`: two planned decks playing 3 of a card you own
+  once need 5); each one's missing cards (folded, priced from the latest
+  Cardmarket price of the card data, ticked in or out by
+  `static/js/wants_list.js`) with the errata warnings (`store::errata`), the
+  budget left, and all of it as a **Cardmarket wants list** (one `1 Card
+  name` line per card, by English name from the card data). Language and
+  condition can't be in the text: the page reminds to set them on the list
+  after the import (`shopping::WANTS_NOTE`, also sent to the builder as
+  `Check.wants_note`: one text). A version's own list is in the builder's To
+  buy tab (`shopping::version_wants_list`, the version alone).
+- Categories are given to a card of a version (`card_category_assignment.
+  card_data_id`), so to all its copies; the Monte Carlo draws a card data id
+  per copy.
+
+## A deck's history
+
+Each time a version's zones are saved (the builder's Save, a copy, a YDKE
+import, a new version from a saved list), `store::snapshots::record` writes
+a **snapshot**: what the zones hold by card (card data, else the name of a
+card not linked yet) and count, like the version's lines: a few
+rows (`deck_snapshot`, `deck_snapshot_card`). The rules are in
+`yugioh_domain::deck_history`: `coalesce` skips a save with the same cards,
+and replaces the version's last snapshot when it is an automatic one less
+than 30 minutes old (`SESSION`: a building session gives one snapshot);
+`diff` gives the changes, by zone, added first.
+
+- A snapshot belongs to the **deck** (`version_id` SET NULL): deleting a
+  version keeps its history, so versions can be few (one per idea, not one
+  per state).
+- **Kept** ones (`Snapshot::kept`): named (only in the builder's History tab:
+  "Name this save", or Rename on a row, `api::name_snapshot`; its page
+  shows the name and links there), a tournament's, or public. Only an automatic one can be
+  deleted.
+- **A tournament's list** (`deck_snapshot.tournament_id`, one per
+  tournament): the form freezes the chosen version's list when it saves
+  (`snapshots::freeze`); editing the tournament afterwards offers "Keep the
+  list saved" (the default) or a version's list again. The version keeps
+  changing; the list played doesn't. `deck_version.tournament_id` (0011) is a dead
+  column, always NULL.
+- **Pages** (`routes/decks/snapshots.rs`): the History table of the deck's
+  page (`partials/deck_history.html`; automatic ones folded), and
+  `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes
+  since the previous list of its version, or `?vs=<id>` / `?vs=version:<id>`
+  (that version now); public, delete, and "New version from this list"
+  (its list written as the new version's lines).
+- **Public**: a snapshot when ticked or a tournament's
+  (`snapshots::PUBLIC_SNAPSHOT`), compared with the previous public one; a
+  deck when one of its versions or snapshots is.
+
+## A deck version's page
+
+`/deck-versions/:id` (`routes/decks/version.rs`, `templates/decks/version.html`,
+`static/css/decks.css`) shows a version **read-only**, for the app and the
+public copy (in the app, one "Edit in the builder" button; the public
+toggle moved to the builder's Settings, the wants list to its To buy tab): its zones as the card grid (by kind, then English name), and
+around them:
+
+- **the format** it plays, else **the ban list**: the version's own
+  (chosen in the deck builder), else the latest one; named in the header,
+  and a corner badge on the restricted cards' tiles (`CardTile::ban`,
+  `X`/`1`/`2` as in the builder). The format's problems are said in the
+  builder only (`…/check`);
+- **the opening hands**: the deck builder's Monte Carlo on the version's
+  categories (`decks/api/simulation.rs::inputs`, `yugioh_domain::monte_carlo`),
+  10,000 hands of 5 cards (going first) and of 6 (second), seeded by the
+  version's id so the public copy doesn't change from one night to the
+  next; the share of hands with at least one card of each category, and
+  their average number;
+- **the tournament** it was last played in: a link in the header ("Played
+  at …", its record, the list played); the rounds stay on the tournament's
+  page.
+
+## Formats
+
+A **format** (Edison, Goat…: `deck_format`, migration 0022) is a way to
+play with its own card pool (the cards released in the TCG up to its
+**cutoff**) and its own list of forbidden and limited cards
+(`deck_format_entry`). A deck version plays a Konami ban list **or** a
+format (`deck_version.format_id`; the save refuses both).
+
+| Piece | Where |
+|---|---|
+| the rules: a card's first release (the earliest TCG date of its sets), a deck's problems (`check`: released after the cutoff or never in the TCG, more copies than allowed, counted by English name across main, extra and side) | `yugioh-domain/src/format.rs` |
+| the sets' TCG dates (`ygo_set`, ygoprodeck's `cardsets.php`; with the weekly prices, and once when there are none); first releases, a format's rules, a version's problems; create from a Konami list (copied), new version (a copy) | `yugioh/src/store/formats.rs` |
+| `/formats` (list), `/formats/:id` (read: its rules, versions, the decks playing it, its list), `/formats/:id/edit` (`FormatEditPage`, the same data: add a card by English name, change a status, take one off; name, cutoff, notes; new version; delete while unused), `/formats/add` (cutoff = a date, or the date of a set) | `yugioh/src/routes/formats/`, `templates/formats/` |
+| deck builder: one selector "Ban list or format" (keys `"12"` / `"f3"`: `deck.ts` `rulesOf`, `rulesKey`, `rulesFields`), the formats' statuses in each card's `ban` (`"f<id>"`) and its `first_release`, tiles out of the pool greyed with "Out", the reserve's "Legal in this format only", the problems under the selector (`GET /api/deck-versions/:id/check`, as saved) | `frontend/src/`, `decks/api/version.rs` |
+
+**A change of the list on a format already played**: make a new version
+(button on its page). The decks keep the version they play; v1 stays as it
+was. A version can still be edited (a mistake to fix).
+
+## Tournaments
+
+`/tournaments` (`routes/tournaments/`, `templates/tournaments/`,
+`static/css/tournaments.css`): every tournament with its record and
+placement, and `/tournaments/stats` (`stats.rs`, `stats.html`) the stats;
+both follow the same filter (`?since=`, `?deck=`, `filter.html`) and link to
+each other keeping it.
+A tournament has numbered **rounds** (`tournament_round`: opponent's deck as
+written, its labels, die, result, team result, comment), each with any number
+of **games** (`tournament_game`: won, lost, draw (replayed, so more than 3
+games) or unfinished (cut by time), first/second, comment). The list
+played is a snapshot of the deck's history (`deck_snapshot.tournament_id`,
+frozen when the form is saved: "A deck's history"); the stats "by version"
+group the lists by the version they were taken from.
+
+- **Labels** (`deck_label`): archetype/engine names, one table for your decks
+  (`deck_deck_label`, on the deck edit page) and the opponents' rounds
+  (`tournament_round_label`). Typed comma-separated with suggestions
+  (`yugioh_domain::tournament::split_labels`), matched case-insensitively, created on
+  the way, deleted when unused; `/tournaments/labels` renames and merges.
+- **Writes** (`store/tournaments.rs`): `insert`/`update` replace the rounds
+  (`set_results`), shared by the form and `import-tournament-notes`.
+- **The form** (`routes/tournaments/form.rs`, `static/js/tournament_form.js`):
+  rows `rounds-<i>-…` and `rounds-<i>-games-<j>-…` (`FormData::indices`),
+  blank rows skipped, numbered in order. Its parts: the event, the list
+  played, the rounds, the conclusion, then a sticky Save (`.sticky-save`);
+  a round with a result and games folds them (`RoundValues::is_finished`,
+  `<details class="round-games">`). The edit page shows the old free
+  `notes` beside the form until "Clear the old notes".
+- **Stats** (`yugioh_domain::tournament::stats`): rounds (forfeit = win,
+  double loss = loss, byes apart), games (draws and unfinished out of the
+  rate), by version, by your deck's labels, matchups, die, first/second.
+  `routes/tournaments/data.rs` turns the rows into `RoundRecord`s.
+- **Deck builder**: the header shows a "Played at …" link (`deck.tournament`, a summary from
+  `decks/api/tournament.rs`) and "+ Tournament with this version" in its ⋯ menu.
+- **Public**: the list, the stats page (unfiltered: the copy keeps no filter) and each tournament are in the public copy,
+  without the buttons, the filter (it needs the server), the labels page
+  and the old `notes`. The list played is public with it; the version it
+  was taken from shows the tournament and links to that list.
+
+## Where it runs
+
+```
+ computers, phones (home Wi-Fi)                  anyone
+        │ http://192.168.1.202:3000              │ https://<domain>/collection/
+        ▼                                        ▼
+ ┌──────────────── NAS ─────────────────┐   OVH free hosting
+ │ /apps/collection       the app        │   (static files only:
+ │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
+ │ /Data500/…-backups     nightly copies  │    small pictures, ~20 MB)
+ │ nightly: backup, export + upload,     │
+ │          update of the app            │
+ └───────────────────────────────────────┘
+        ▲ the computer: pulls the latest copy into the data submodule
+          (deploy/pc/pull-backup.sh)
+```
+
+- **The app** runs on the NAS (a ReadyNAS on Debian 8) as a systemd
+  service, for the home network only, every page behind the login
+  (`PUBLIC_READS=0`).
+- **Its build** comes from the CI: the job `nas-build` makes one static
+  binary (musl, for any x86-64 processor) with the deck builder and the
+  stylesheets, on pull requests into `main` and pushes to it;
+  `nas-release` publishes it as the release `nas-latest` once every check
+  is green. The NAS downloads it every morning (`fetch-release`), backs up,
+  replaces and restarts, and goes back to the previous version if the new
+  one doesn't answer.
+- **The public copy** (`export-public`) is uploaded over SFTP to the OVH
+  hosting, changed files only.
+- The scripts and the step-by-step guide: [deploy/README.md](../deploy/README.md).
 
 ## The books
 
@@ -527,9 +802,9 @@ sends the photo **to the NAS**, which reads the barcode (`books::barcode`:
 `common::photos::grey` decodes a JPEG straight at 1/2, 1/4 or 1/8 of its
 size, then `rxing`, a Rust ZXing, tries 1600 and 800 px, as taken and
 turned a quarter turn). Plain HTTP on the home network can't use the live
-camera (browsers keep it to HTTPS), hence the photo. It used to be read in
-the browser: a whole camera photo took more memory than a phone had. On the
-NAS it takes 2 to 3 s and 60 MB (measured 2026-10-30; decoded whole, a
+camera (browsers keep it to HTTPS), hence the photo. It is read on the NAS,
+not in the browser: a whole camera photo took more memory than a phone had.
+On the NAS it takes 2 to 3 s and 60 MB (measured 2026-10-30; decoded whole, a
 50 MP photo took 8 s and 300 MB).
 
 Like ygoprodeck: the lookup happens **before** any write transaction, and
@@ -562,7 +837,7 @@ instead, like the Yu-Gi-Oh! cards); wishes can be.
 | the collection (the shared picture grid or a table, filters, value), a copy | `src/routes/mod.rs` |
 | add one copy, edit (and sell) | `src/routes/form.rs` |
 | a booster opening: numbers → preview → save | `src/routes/booster.rs` |
-| the wishlist | `src/routes/wishlist.rs` |
+| the wishlist, and its booster suggestions | `src/routes/wishlist.rs`, `src/store/boosters.rs`, `pokemon_domain::booster` |
 | the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `src/routes/api.rs` |
 | pictures, downloaded once into `media/pokemon_card_images/` (`common::media`) | `src/routes/images.rs` |
 | the rarity and variant guide | `src/routes/rarities.rs`, `static/js/pokemon_rarities.js` (drawn by `rarity_guide.js`) |
@@ -585,6 +860,14 @@ species' French and English names by its Pokédex number. The Pokémon TCG API
 | a name search | `GET /v2/{lang}/cards?name=` (Pocket cards left out) | not stored |
 | a picture | `{image}/high.webp` | `media/pokemon_card_images/` |
 | prices, weekly | the card again | `pokemon_price` |
+
+The boosters' prices come from **Cardmarket's catalogue** instead (game 6,
+the same downloadable files as the Yu-Gi-Oh! price guide, read in memory,
+weekly, `pokemon/src/store/boosters.rs`): a card's TCGdex data names its
+Cardmarket product, the singles list its expansion
+(`pokemon_card.cardmarket_expansion`), the non-singles list that
+expansion's booster, the price guide its price (`pokemon_booster`, migration
+0028). One price over every language: the files don't split them.
 
 Its filters match "contains, ignoring the case" (`eq:` is exact but
 case-sensitive), so the code keeps the exact matches; a card is only found
@@ -660,6 +943,25 @@ has the same per row (`static/js/pokemon_booster.js`). The guide
 (`/pokemon/rarities`) is data in `static/js/pokemon_rarities.js`, like the
 Yu-Gi-Oh! one, drawn by the same `static/js/rarity_guide.js`.
 
+## What the collections share
+
+Besides the plumbing (`common::web`, `common::db`), these were written once
+for every collection:
+
+| What | Where | Used by |
+|---|---|---|
+| the picture grid of cards: `CardTile` (the whole picture in its collection's proportions, `CardShape`; the name on two lines, the other name, the print, the details; at the bottom the condition badge, tags and value; faded when sold), every tile of a page the same size with its lines in the same places; and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
+| the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
+| the advent calendars | the `advent` crate | cards, books |
+| the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
+| one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
+| "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
+| a picture downloaded once into `media/`, and the ones no card uses deleted (`clean-pictures`, daily) | `common::media::fetch_once`, `picture`, `remove_unused` | `/card-image/:id`, `/pokemon/card-image/…` |
+| a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
+| background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
+| card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
+| photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
+
 ## Login
 
 `common::web::auth`: with a password set, every collection's `write` and
@@ -707,8 +1009,7 @@ the EU site's JSON, then the US site's pages for the dates still missing, a
 fallback for when the EU JSON lags behind; the US index only links the current
 list, so `--date 2026-10-19` fetches one not linked yet, and a US page whose table
 is still the previous list's is skipped)
-and `clean-cards` (normalise names, relink card data, swap proxies for owned
-copies, delete unused proxies, rarity from `(V.x - …)` names, names in the
+and `clean-cards` (normalise names, relink card data, rarity from `(V.x - …)` names, names in the
 language of their code, rarity from the card data when the code was printed in
 one rarity only). Both accept `--dry-run`: they run in a transaction
 that is rolled back.
@@ -721,7 +1022,8 @@ is skipped, so it is safe to run twice.
 `refresh-prices` fetches today's market price of every card data
 (`yugioh/src/store/prices/ygoprodeck.rs`, batches of 100 ids) into `card_price`, then
 Cardmarket's price guide (`store/prices/cardmarket.rs`, links and prices), then the
-Pokémon cards owned or wished from TCGdex (`pokemon/src/store/prices.rs`); the server
+Pokémon cards owned or wished from TCGdex (`pokemon/src/store/prices.rs`) and their
+boosters from Cardmarket (`pokemon/src/store/boosters.rs`); the server
 does it weekly by itself (`backend/src/commands/prices.rs::spawn_weekly`,
 `common::schedule::when_due`: checked every 6 hours, runs when the last
 Yu-Gi-Oh! refresh is 7 days old; the Pokémon refresh follows it, since it
@@ -745,7 +1047,7 @@ runs. They are **the app's own pages**, saved as files:
    it for its pages like a browser, inside `common::export::public_copy()`
    (a tokio task-local, true only there);
 2. it starts from `START` (`/cards`, `/collection/stats`, `/decks`,
-   `/tournaments`, `/rarities`, `/pokemon`, the wishlist and guide,
+   `/tournaments`, `/tournaments/stats`, `/rarities`, `/pokemon`, the wishlist and guide,
    `/books`, authors, series) and follows the links, **only** to the
    addresses `public()` accepts: those, a card's, a deck's, a deck
    version's, a tournament's, a copy's, a book's, an author's or a series'
@@ -771,7 +1073,7 @@ card's lot, price paid and decks, the Pokémon copies' price paid, notes,
 certificate and opening, the wishlist's maximum prices, verdicts and
 notes, a book's ISBN and notes, a deck's buttons and deck builder, the
 tournaments' buttons, filter and old notes. The card list shows the cards owned only
-(no proxy, not sold). A page added to the copy is a path in `START` or
+(not sold). A page added to the copy is a path in `START` or
 `public()`, and a look at its template for anything private.
 
 The folder is emptied at each export, and refused if it isn't an earlier
@@ -791,200 +1093,7 @@ when it is new.
 You rarely need `clean-cards` by hand: the server runs it in the background
 5 minutes after it starts, then once a day (`clean_cards::spawn_daily`, `common::schedule::every`, one
 summary line in the log), and the actions that make a cleanup necessary do
-their part themselves (saving deck zones deletes unused proxies, saving new
-cards links, translates and swaps proxies).
-
-## Talking to ygoprodeck
-
-All the calls to the [ygoprodeck API](https://ygoprodeck.com/api-guide/)
-are in `crates/yugioh/src/store/card_data/` (the client in `mod.rs`, then
-`translations.rs`, `sets.rs`, `linking.rs`) and `store/prices/`. It allows about 20 requests per
-second and blocks the IP for an hour above that: `YGOPRODECK.wait()` (a
-`common::http::Throttle`) keeps every call of the server 60 ms apart, and
-what can be remembered is.
-
-| What | Call | Remembered in |
-|---|---|---|
-| a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
-| its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
-| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart); its French names also go to `card_translation` |
-| a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
-| a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
-| market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
-
-Two rules: call ygoprodeck **before** opening a write transaction (the calls
-write through the pool), and only through these functions. Tests never call
-it: `TestApp` pre-inserts the card data they need (and translations, in
-`card_translation`). The shapes ygoprodeck answers are reshaped in pure
-functions in `yugioh-domain` (`card_set`, `rarity::Rarity::from_label` for its
-rarity names), which are unit-tested on small synthetic JSON.
-
-## A printing's picture: Yugipedia
-
-ygoprodeck has one picture per artwork, in English: a French copy, an
-Extended Art or an alternate art shows the wrong one. Yugipedia has a
-picture of each printing, named after it
-(`WitnessoftheAncient-CORI-FR-UR-1E-EA.png`: set, language, rarity, edition,
-Extended Art). A copy can take one: `card.picture` (migration 0019), served
-by `/card-picture/:name` (one address per picture, so the public copy keeps
-it once for all the copies of a printing; downloaded once, kept as a JPEG in
-`media/card_pictures/`); without it, the copy shows ygoprodeck's picture
-(`store::models::picture_url`, used by the grid, the card page, the advent
-doors and the deck builder's `ApiCard.image`).
-
-| Piece | Where |
-|---|---|
-| reading a file name, the files of a copy's printing, the one to take without asking | `yugioh_domain::printing_picture` (`parse`, `candidates`, `automatic`) |
-| the card galleries (MediaWiki API, `Card Gallery:<name>`, 500 files a page), one request a second (`YUGIPEDIA` throttle), cached in `yugipedia_gallery` for 30 days | `yugioh/src/store/yugipedia.rs` |
-| the automatic pictures: copies with an automatic picture get their printing's when there is one artwork for it (`find_pictures`) | new cards at the end of their linking (`card_data/linking.rs`), a new code or rarity (`spawn_find_pictures`), the whole collection by hand (`find-pictures`, `commands/find_pictures.rs`: once for the cards added before, then now and then for the scans Yugipedia adds later) |
-| the choice by hand: automatic, ygoprodeck's, or one of the printing's pictures, for one copy or all the copies alike (`picture_manual` = 1: the pass leaves it) | the card's edit page (`routes/cards/form.rs`, thumbnails by `/cards/:id/pictures/:n`) |
-
-A new code, rarity or name puts an automatic picture back to ygoprodeck's
-and looks for the new printing's.
-
-The pictures come straight from Yugipedia's media server
-(`ms.yugipedia.com/<h>/<hh>/<name>`, `hh` from the md5 of the name: one
-request), one every 2 seconds (`PICTURES`); above that it answers 429 Too
-Many Requests, so a 429 is waited for (its `Retry-After`, at most a minute)
-and tried again. The automatic pass downloads a picture **before** giving
-it to a copy, so a page or the public copy never asks Yugipedia; and
-`/card-picture/:name` answers ygoprodeck's picture when its own can't be
-had. (The first deployment let the public copy download them, ~600 at
-once: Yugipedia refused most.) Tests insert `yugipedia_gallery` rows: Yugipedia is
-never called by them.
-
-### Errata (`/decks/built`)
-
-A card's text can change after a format's cutoff (Edison…): a printing
-bought for a proxy then has the wrong text. Yugipedia's
-`Card Errata:<name>` page lists the versions of the text in its
-`== English ==` `{{Errata table}}` (`loreN` text, `capN` the printing that
-first carried it); `yugioh_domain::errata` parses it, dates each version by
-its set (`ygo_set`, by code then by name; a reprint product's date wins) and
-tells which one was in force at the cutoff and when the next one came. A
-printing is right when it came out between the two. `store/yugipedia.rs`
-fetches and caches it (`yugipedia_errata`, 90 days: errata are rare) **in the background**
-(`spawn_errata`): the page shows what is cached, starts the lookups for the
-rest and says "reload in a minute". It warns on any text change, old and new
-text folded so the owner judges; the Cardmarket wants lists carry names
-only, the expansion is picked by hand. Owned copies coded in a set printed
-outside the window count as missing too ("wrong text"); a copy whose set has
-no date isn't judged. The cutoff is the version's format's, else its ban list's date
-(`store/errata.rs`, shared with the deck builder: the version panel lists the
-same cards from `GET /api/deck-versions/:id/check`); a version with neither has
-none: no warning.
-
-## The collection value
-
-`/collection/value` (`routes/collection/mod.rs`), a tile on the dashboard,
-and a "Market" line on card pages. Two price sources, both refreshed weekly
-by `refresh-prices`:
-
-- **Cardmarket's price guide** (`store/prices/cardmarket.rs`,
-  `yugioh_domain::cardmarket_catalog`): two public JSON files (products, prices; ~30
-  MB) downloaded into memory, a price **per printing**. Only what the
-  collection needs is kept (migration 0009): the products named like our
-  card data, each set code's expansion, the price history of the linked
-  products. The files are never saved. They have no set code and no rarity,
-  so each copy is linked to its product by a guess: the set code's
-  expansion is the one holding most of the set's card names (ygoprodeck),
-  twins (OCG version, reprint) told apart by the date they were added; then
-  the product with the card's name there, by rarity rank against price rank
-  when there are several. About 80% of the copies get one; the rest, or a
-  wrong guess, are set on the card's edit page ("Cardmarket product",
-  `card.cardmarket_product_manual = 1`, kept by the refreshes). Its price
-  (the trend, else the 30-day average) covers every language and edition.
-- **ygoprodeck** (`card_price`): one price per card name, the cheapest
-  printing's, an estimate usually too low for old or high rarity copies.
-  Used for the copies without a product. The `card_prices` copy inside
-  `card_data.json_data` is never used: it dates from when the card was
-  linked.
-
-Cardmarket's API takes no new users and scraping its site is against its
-terms; the price guide files are its open download.
-
-`yugioh_domain::valuation` does the sums:
-- a copy's price: its product's (`Prices::of`), else its card name's;
-- a copy's value: price × condition (MT/NM/unknown 1, EX 0.8, G 0.6, P 0.4)
-  × language (non-English 0.9), totals rounded to the cent;
-- a copy counts on date D when its purchase lot (not cancelled) is dated on
-  or before D and it has no sale lot by D; proxies never count;
-- the **gain/loss uses the lot prices** (`lot.price`, shipping included,
-  less its `refund`: what the seller gave back, e.g. Dateacard's shipping,
-  migration 0016; the budget counts the same cost in the lot's month):
-  value of the copies owned + sale lots − purchase lots, up to D. Unite
-  prices can't do it: many lots were bought as a whole, without a price per
-  card;
-- beside it, the copies that do have a unite price are compared card by
-  card (value against that price, no shipping share);
-- each purchase lot against its **full price** (`lot_gain`): the value of
-  its cards still owned, plus what its sold cards brought (their price in
-  the sale lot), minus `lot.price` (non-card items included); the lots
-  without cards (sleeves, boxes) are left out;
-- price moves: since the previous refresh and over 3 months, cards owned
-  now, moves under 0.50 € left out (one line per price, the same source on
-  both dates).
-
-The lists show estimates too: each card on `/cards` (its picture tile, and
-the table view) and on a lot's page
-(`CardRow::estimate`, from the `valuation::MARKET_PRICE` SQL expression:
-the card's latest price, its product's else its name's), and each purchase
-lot the value of its cards still owned (`fill_lot_estimates`).
-
-The page loads every row (`store::valuation::owned_copies`, `lots`,
-`prices_by_date`) and computes in Rust: money is never summed in SQL. The
-chart is `static/js/collection_value.js`; the card page's price line is an
-SVG drawn by the server (`cards::sparkline`).
-
-## What the collections share
-
-Besides the plumbing (`common::web`, `common::db`), these were written once
-for every collection:
-
-| What | Where | Used by |
-|---|---|---|
-| the picture grid of cards: `CardTile` (the whole picture in its collection's proportions, `CardShape`; the name on two lines, the other name, the print, the details; at the bottom the condition badge, tags and value; faded when sold), every tile of a page the same size with its lines in the same places; and `View`, grid or `?view=table` (24 or 100 a page, the other view's link) | `common::web::tiles`, `common/templates/partials/card_grid.html`, `static/css/tiles.css` | `/cards`, `/pokemon`, a booster opening |
-| the list page: title with counts, a `summary` line, items, pagination, filter popup | `common/templates/list_base.html` | every list |
-| the advent calendars | the `advent` crate | cards, books |
-| the rarity guide's boxes, and the one asked for | `static/js/rarity_guide.js` (`data-guide`) | `/rarities`, `/pokemon/rarities` |
-| one request at a time per outside service, spaced | `common::http::Throttle` | ygoprodeck, TCGdex, the Pokémon TCG API, the book catalogues |
-| "asked again after N days" | `common::db::is_fresh` | translations, Cardmarket expansions, ISBN lookups, Pokémon cards and sets |
-| a picture downloaded once into `media/`, and the ones no card uses deleted (`clean-pictures`, daily) | `common::media::fetch_once`, `picture`, `remove_unused` | `/card-image/:id`, `/pokemon/card-image/…` |
-| a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
-| background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
-| card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
-| photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
-
-## Where it runs
-
-```
- computers, phones (home Wi-Fi)                  anyone
-        │ http://192.168.1.202:3000              │ https://<domain>/collection/
-        ▼                                        ▼
- ┌──────────────── NAS ─────────────────┐   OVH free hosting
- │ /apps/collection       the app        │   (static files only:
- │ /Data1To/collection    live data      │ ─► the cards, wishlist and books,
- │ /Data500/…-backups     nightly copies  │    small pictures, ~20 MB)
- │ nightly: backup, export + upload,     │
- │          update of the app            │
- └───────────────────────────────────────┘
-        ▲ the computer: pulls the latest copy into the data submodule
-          (deploy/pc/pull-backup.sh)
-```
-
-- **The app** runs on the NAS (a ReadyNAS on Debian 8) as a systemd
-  service, for the home network only, every page behind the login
-  (`PUBLIC_READS=0`).
-- **Its build** comes from the CI: the job `nas-build` makes one static
-  binary (musl, for any x86-64 processor) with the deck builder and the
-  stylesheets, on pull requests into `main` and pushes to it;
-  `nas-release` publishes it as the release `nas-latest` once every check
-  is green. The NAS downloads it every morning (`fetch-release`), backs up,
-  replaces and restarts, and goes back to the previous version if the new
-  one doesn't answer.
-- **The public copy** (`export-public`) is uploaded over SFTP to the OVH
-  hosting, changed files only.
-- The scripts and the step-by-step guide: [deploy/README.md](../deploy/README.md).
+their part themselves (saving new cards links and translates them).
 
 ## Tests
 

@@ -54,13 +54,17 @@ async fn adding_a_tournament_with_rounds_games_and_labels() {
     assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
     assert_eq!(location, "/tournaments/1");
 
+    // the list played, saved by the form
     assert_eq!(
-        t.scalar("SELECT tournament_id FROM deck_version WHERE id = 1")
+        t.scalar("SELECT version_id FROM deck_snapshot WHERE tournament_id = 1")
             .await,
-        1
+        v
     );
-    // the deck played: its read-only page, from the tournament and the list
-    let link = format!(r#"href="/deck-versions/{v}""#);
+    let snapshot = t
+        .scalar("SELECT id FROM deck_snapshot WHERE tournament_id = 1")
+        .await;
+    // linked from the tournament and the list
+    let link = format!(r#"href="/deck-snapshots/{snapshot}""#);
     assert!(t.get("/tournaments/1").await.1.contains(&link));
     assert!(t.get("/tournaments").await.1.contains(&link));
     assert_eq!(
@@ -101,6 +105,8 @@ async fn adding_a_tournament_with_rounds_games_and_labels() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("Locals"));
     assert!(page.contains("Test - v1"));
+    let (status, page) = t.get("/tournaments/stats").await;
+    assert_eq!(status, StatusCode::OK);
     assert!(page.contains("Matchups"));
 }
 
@@ -114,6 +120,25 @@ async fn editing_replaces_the_rounds() {
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("value=\"mitsu/K9\""));
     assert!(page.contains("value=\"K9, Mitsurugi\""));
+    // in sections, Save in sight; the lost round's games folded, the bye's
+    // (no game) open
+    for text in [
+        "<legend>The event</legend>",
+        "<legend>The list played</legend>",
+        r#"<h2 class="form-section">The rounds</h2>"#,
+        r#"<div class="sticky-save">"#,
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
+    assert_eq!(
+        page.matches(r#"<details class="round-games" >"#).count(),
+        1,
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"<details class="round-games" open>"#),
+        "{page}"
+    );
 
     // only the bye left, the team event unticked: the labels go too
     let (status, location) = t
@@ -133,10 +158,10 @@ async fn editing_replaces_the_rounds() {
     assert_eq!(t.scalar("SELECT count(*) FROM tournament_game").await, 0);
     assert_eq!(t.scalar("SELECT count(*) FROM deck_label").await, 0);
     assert_eq!(
-        t.scalar("SELECT count(*) FROM deck_version WHERE tournament_id IS NOT NULL")
+        t.scalar("SELECT count(*) FROM deck_snapshot WHERE tournament_id IS NOT NULL")
             .await,
         0,
-        "the version is no longer the one played"
+        "no list played any more"
     );
 }
 
@@ -267,7 +292,7 @@ async fn labels_are_renamed_and_merged() {
     assert_eq!(status, StatusCode::SEE_OTHER);
     let (_, page) = t.get("/decks/1").await;
     assert!(page.contains("Labels: Mitsurugi, Orcustrated"), "{page}");
-    assert!(page.contains("/tournaments?deck=1"));
+    assert!(page.contains("/tournaments/stats?deck=1"));
     let (_, page) = t.get("/decks/1/edit").await;
     assert!(page.contains("value=\"Mitsurugi, Orcustrated\""));
 }
@@ -290,6 +315,26 @@ async fn the_list_filters_and_the_old_notes() {
     assert!(page.contains("Locals") && !page.contains("Regionals"));
     let (_, page) = t.get("/tournaments?deck=1&since=nonsense").await;
     assert!(page.contains("Locals") && !page.contains("Regionals"));
+
+    // the list has no stats any more: they are on their own page, which
+    // follows the same filter
+    let (_, page) = t.get("/tournaments").await;
+    assert!(!page.contains("By deck version"), "{page}");
+    assert!(page.contains("/tournaments/stats\""), "{page}");
+    let (_, page) = t.get("/tournaments?since=2026-01-01&deck=1").await;
+    assert!(
+        page.contains("/tournaments/stats?since=2026-01-01&amp;deck=1"),
+        "{page}"
+    );
+    let (status, page) = t.get("/tournaments/stats").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains("By deck version") && page.contains("Overall"),
+        "{page}"
+    );
+    assert!(page.contains("action=\"/tournaments/stats\""), "{page}");
+    let (_, page) = t.get("/tournaments/stats?deck=1&since=nonsense").await;
+    assert!(page.contains("By deck version"), "{page}");
 
     let (_, page) = t.get("/tournaments/2").await;
     assert!(page.contains("Old notes") && page.contains("vs DDD 1/2"));

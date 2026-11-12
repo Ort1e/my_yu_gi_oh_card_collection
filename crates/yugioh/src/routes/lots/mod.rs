@@ -6,10 +6,9 @@ use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
 use crate::routes::cards::like_pattern;
-use crate::store::db::{Money, Pool};
+use crate::store::db::Money;
 use crate::store::models::{other_name, LotRow};
 use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
-use crate::web::card_rows::CardRowValues;
 use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
@@ -215,41 +214,12 @@ pub struct LotDetail {
     rarities: Vec<RarityCount>,
     total_price: Money,
     total_estimate: Money,
-    /// "Add cards" form: errors and card rows of the last submission (at
-    /// least one row).
-    errors: Vec<String>,
-    rows: Vec<CardRowValues>,
     /// The advent calendar whose lot this is, if any.
     calendar_year: Option<i64>,
 }
 
-impl LotDetail {
-    fn blank_row(&self) -> CardRowValues {
-        CardRowValues::default()
-    }
-
-    fn statuses(&self) -> [yugioh_domain::card::CardStatus; 5] {
-        yugioh_domain::card::CardStatus::ALL
-    }
-
-    fn rarities(&self) -> [yugioh_domain::rarity::Rarity; 34] {
-        yugioh_domain::rarity::Rarity::ALL
-    }
-}
-
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
-    load_detail(&state.pool, id, Vec::new(), Vec::new()).await
-}
-
-pub async fn load_detail(
-    pool: &Pool,
-    id: i64,
-    errors: Vec<String>,
-    mut rows: Vec<CardRowValues>,
-) -> AppResult<LotDetail> {
-    if rows.is_empty() {
-        rows.push(CardRowValues::default());
-    }
+    let pool = &state.pool;
     let mut lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
         .bind(id)
         .fetch_optional(pool)
@@ -302,8 +272,6 @@ pub async fn load_detail(
         rarities,
         total_price,
         total_estimate,
-        errors,
-        rows,
         calendar_year,
     })
 }

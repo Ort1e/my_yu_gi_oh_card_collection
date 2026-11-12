@@ -5,7 +5,6 @@
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
   <link rel="stylesheet" href="/static/css/tiles.css">
-  <link rel="stylesheet" href="/static/css/tournaments.css">
   <link rel="stylesheet" href="/static/css/decks.css">
 {% endblock %}
 
@@ -17,75 +16,36 @@
   <div class="card-title">{{ version.full_name() }}{% if version.is_built %} <span class="built-badge" title="Built: its cards are locked, out of the collection for the other decks">Built</span>{% endif %}</div>
   <div class="card-meta-line">
     {% for zone in zones %}<div>{{ zone.name }}: {{ zone.tiles.len() }}</div>{% endfor %}
+    {% if !common::export::public_copy() %}
     {% match version.deck_box %}{% when Some with (deck_box) %}<div>Deck box: {{ deck_box }}</div>{% when None %}{% endmatch %}
     {% match version.sleeves %}{% when Some with (sleeves) %}<div>Sleeves: {{ sleeves }}</div>{% when None %}{% endmatch %}
-    {% match played %}{% when Some with (played) %}<div>Played at <a href="#tournament" class="on-card">{{ played.name }}</a> ({{ played.date|date }}{% if !played.record.is_empty() %}, {{ played.record }}{% endif %})</div>{% when None %}{% endmatch %}
+    {% endif %}
+    {% match ban_list %}{% when Some with (ban_list) %}{% match ban_list.format %}{% when Some with ((format_id, label)) %}<div>Format: {% if common::export::public_copy() %}{{ label }}{% else %}<a href="/formats/{{ format_id }}" class="on-card">{{ label }}</a>{% endif %}</div>{% when None %}<div>Ban list: {{ ban_list.date|date }}{% if !ban_list.chosen %} (the latest){% endif %}</div>{% endmatch %}{% when None %}{% endmatch %}
+    {% match played %}{% when Some with (played) %}<div>Played at <a href="/tournaments/{{ played.id }}" class="on-card">{{ played.name }}</a> ({{ played.date|date }}{% if !played.record.is_empty() %}, {{ played.record }}{% endif %}){% match played.snapshot_id %}{% when Some with (s) %}: <a href="/deck-snapshots/{{ s }}" class="on-card">the list played</a>{% when None %}{% endmatch %}</div>{% when None %}{% endmatch %}
   </div>
   {% if !common::export::public_copy() %}
   <div class="button-row">
-    <a href="/deck-builder/{{ version.id }}" class="btn">Open in the deck builder</a>
-    {% if version.played %}
-    <span>On the public site: played in a tournament.</span>
-    {% else %}
-    <form method="post" action="/deck-versions/{{ version.id }}/public" class="inline">
-      <input type="hidden" name="is_public" value="{% if version.is_public %}0{% else %}1{% endif %}">
-      <button type="submit" class="btn-secondary">{% if version.is_public %}Hide from the public site{% else %}Show on the public site{% endif %}</button>
-    </form>
-    {% endif %}
+    <a href="/deck-builder/{{ version.id }}" class="btn">Edit in the builder</a>
   </div>
   {% endif %}
 </div>
 
-{% if !hands.is_empty() || ban_list.is_some() %}
+{% if !hands.is_empty() %}
 <div class="deck-panels">
-  {% if !hands.is_empty() %}
-  <section class="deck-panel">
-    <h2>Opening hands</h2>
-    <p class="hint">Hands with at least one card of each category, going first (5 cards) and second (6), over 10,000 hands drawn at random.</p>
-    <div class="table-scroll">
-    <table class="numbers">
-      <thead><tr><th class="text">Category</th><th>Cards</th><th>First</th><th>Second</th><th title="Cards of it in a 5-card hand, on average">Average</th></tr></thead>
-      <tbody>
-        {% for line in hands %}
-        <tr><td class="text">{{ line.name }}</td><td>{{ line.cards }}</td><td>{{ line.first }}</td><td>{{ line.second }}</td><td>{{ line.average }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  </section>
-  {% endif %}
-  {% match ban_list %}{% when Some with (ban_list) %}
-  <section class="deck-panel">
-    {% match ban_list.format %}{% when Some with ((format_id, label, cutoff)) %}
-    <h2>Format</h2>
-    <p class="hint">{% if common::export::public_copy() %}{{ label }}{% else %}<a href="/formats/{{ format_id }}">{{ label }}</a>{% endif %}: the cards released in the TCG up to {{ cutoff|date }}, and its own list.</p>
-    {% if ban_list.problems.is_empty() %}
-    <p class="format-ok">✓ Every card fits the format.</p>
-    {% else %}
-    <ul class="format-problems">
-      {% for problem in ban_list.problems %}<li>{{ problem }}</li>{% endfor %}
-    </ul>
-    {% endif %}
-    {% when None %}
-    <h2>Ban list</h2>
-    <p class="hint">The list of {{ ban_list.date|date }}{% if !ban_list.chosen %} (the latest: none chosen for this version){% endif %}.</p>
-    {% endmatch %}
-    {% if ban_list.cards.is_empty() %}
-    <p>No card of this version is restricted on it.</p>
-    {% else %}
-    <div class="table-scroll">
-    <table class="numbers">
-      <thead><tr><th class="text">Card</th><th class="text">Status</th><th>Copies</th></tr></thead>
-      <tbody>
-        {% for (status, name, copies) in ban_list.cards %}
-        <tr><td class="text">{{ name }}</td><td class="text"><span class="ban-status" data-ban="{{ status }}">{{ status }}</span></td><td>{{ copies }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-    {% endif %}
-  </section>
-  {% when None %}{% endmatch %}
+<section class="deck-panel">
+  <h2>Opening hands</h2>
+  <p class="hint">Hands with at least one card of each category, going first (5 cards) and second (6), over 10,000 hands drawn at random.</p>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead><tr><th class="text">Category</th><th>Cards</th><th>First</th><th>Second</th><th title="Cards of it in a 5-card hand, on average">Average</th></tr></thead>
+    <tbody>
+      {% for line in hands %}
+      <tr><td class="text">{{ line.name }}</td><td>{{ line.cards }}</td><td>{{ line.first }}</td><td>{{ line.second }}</td><td>{{ line.average }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
 </div>
 {% endif %}
 
@@ -100,35 +60,9 @@
 <p>No card in this version yet.</p>
 {% endif %}
 
-{% if !wants.is_empty() && !common::export::public_copy() %}
-<details class="wants-list">
-  <summary>Cardmarket wants list (the proxies)</summary>
-  <p class="hint">Paste it into a Cardmarket Yu-Gi-Oh! wants list, then set <strong>Language: English, French</strong> and <strong>Min. condition: Good</strong> on its cards.</p>
-  <textarea id="wants-version" class="wants-text" rows="{{ self.wants_rows() }}" readonly>{{ wants }}</textarea>
-  <p><button type="button" data-copy="wants-version">Copy</button></p>
-</details>
-{% endif %}
-
-{% match played %}{% when Some with (played) %}
-<section id="tournament" class="deck-tournament">
-  <h2>Played at <a href="/tournaments/{{ played.id }}">{{ played.name }}</a>{% if played.is_team %} <span class="badge">Team</span>{% endif %}</h2>
-  <div class="tournament-head">
-    <div>{{ played.date|date }}{% if !played.location.is_empty() %}, {{ played.location }}{% endif %}</div>
-    {% if !played.record.is_empty() %}<div>Rounds: {{ played.record }}</div>{% endif %}
-    {% if !played.placement.is_empty() %}<div>Placement: {{ played.placement }}</div>{% endif %}
-  </div>
-  {% let rounds = played.rounds.as_slice() %}
-  {% include "tournaments/rounds.html" %}
-  {% if !played.conclusion.is_empty() %}
-  <h3>Conclusion</h3>
-  <p class="multiline">{{ played.conclusion }}</p>
-  {% endif %}
-</section>
-{% when None %}{% endmatch %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="/static/js/card_preview.js"></script>
-{% if !common::export::public_copy() %}<script src="/static/js/wants_list.js"></script>{% endif %}
 {% endblock %}

@@ -4,14 +4,16 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/collection.css">
 {% endblock %}
 
 {% block content %}
 <div class="inside-container">
   <h1>Built decks</h1>
   <p class="back-link"><a href="/decks">← All decks</a></p>
-  <p>A built version locks its real cards: they belong to it alone, out of the collection for the other decks.
-    Build or unbuild a version in the deck builder (version panel). Its proxies are the cards still missing to play it for real.</p>
+  <p>A built version holds copies of your collection: they are its own, out of the collection for the other decks.
+    Build or unbuild a version in the deck builder's Settings tab: building it takes your free copies (best condition first); the cards you lack are missing.
+    What they are and what they cost: <a href="/decks/shopping">the shopping list</a>.</p>
 
   {% if versions.is_empty() %}
   <p>No built deck yet.</p>
@@ -23,66 +25,43 @@
       <div class="card-meta-line">
         <div>Deck box: {{ built.version.deck_box.as_deref().unwrap_or("—") }}</div>
         <div>Sleeves: {{ built.version.sleeves.as_deref().unwrap_or("—") }}</div>
-        <div>Cards: {{ built.cards }}</div>
-        <div>Proxies: {{ built.proxies }}</div>
-        {% if built.wrong_text > 0 %}<div>Wrong text: {{ built.wrong_text }}</div>{% endif %}
+        <div>Cards: {{ built.cards }} ({{ built.held }} of your copies)</div>
+        <div>{% if built.missing > 0 %}<a href="/deck-builder/{{ built.version.id }}#to-buy">To buy: {{ built.missing }}</a>{% else %}Nothing missing: ready to play{% endif %}</div>
       </div>
-      {% if built.missing.is_empty() %}
-      <p>Nothing missing: ready to play.</p>
-      {% else %}
-      <p>Missing:</p>
-      <ul class="missing-cards">
-        {% for card in built.missing %}
-        <li>{{ card.count }} × {{ card.name }}
-          {% if !card.wrong_text.is_empty() %}<span class="errata-owned">(owned with the wrong text: {{ card.wrong_text.join(", ") }})</span>{% endif %}
-          {% if let Some(warning) = card.warning %}{% include "decks/errata_warning.html" %}{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-      <details class="wants-list">
-        <summary>Cardmarket wants list</summary>
-        <textarea id="wants-{{ built.version.id }}" class="wants-text" rows="{{ built.missing.len() + 1 }}" readonly>{{ built.wants_list() }}</textarea>
-        <p><button type="button" data-copy="wants-{{ built.version.id }}">Copy</button></p>
-      </details>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
-
-  {% if errata_pending > 0 %}
-  <p class="errata-pending">Errata are being looked up on Yugipedia for {{ errata_pending }} card(s): reload in a minute.</p>
   {% endif %}
 
-  <h2>Shopping list</h2>
-  {% if shopping.is_empty() %}
-  <p>Nothing to buy: every built deck is complete.</p>
-  {% else %}
+  {% if !decks.is_empty() %}
+  <h2>Value of the decks</h2>
+  <p class="value-note">Each deck's latest version, built or not, at market prices. Missing: what the cards you lack would cost.
+    The whole collection's value is on <a href="/collection/value">its own page</a>.</p>
   <div class="table-scroll">
   <table class="numbers sortable">
-    <thead><tr><th data-sort="text">Card</th><th data-sort="number">Count</th><th class="text" data-sort="text">For</th><th class="text">Right printing</th></tr></thead>
+    <thead>
+      <tr><th data-sort="text">Deck</th><th class="phone-hide" data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th class="phone-hide" data-sort="number">Missing</th><th data-sort="number">Missing (€)</th></tr>
+    </thead>
     <tbody>
-      {% for line in shopping %}
-      <tr><td>{{ line.name }}</td><td>{{ line.count }}</td><td class="text">{{ line.decks }}</td><td class="text">
-        {% if line.wrong_text > 0 %}<span class="errata-owned">{{ line.wrong_text }} replace owned copies with the wrong text</span>{% endif %}
-        {% for warning in line.warnings %}{% include "decks/errata_warning.html" %}{% endfor %}
-      </td></tr>
+      {% for deck in decks %}
+      <tr>
+        <td>
+          <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
+          <div class="cell-note">{{ deck.version }}</div>
+        </td>
+        <td class="phone-hide">{{ deck.cards }}</td>
+        <td>{{ deck.value|money }}</td>
+        <td class="phone-hide">{{ deck.proxies }}</td>
+        <td>{{ deck.proxies_value|money }}</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
-
-  <h2>Cardmarket wants list</h2>
-  <p>Paste this into a Cardmarket Yu-Gi-Oh! wants list (Wants → import a decklist). Language and condition can't be
-    in the text: after the import, set <strong>Language: English, French</strong> and
-    <strong>Min. condition: Good</strong> on the list's cards.</p>
-  <textarea id="wants-all" class="wants-text" rows="{{ shopping.len() + 1 }}" readonly>{{ self.wants_list() }}</textarea>
-  <p><button type="button" data-copy="wants-all">Copy</button></p>
-  {% endif %}
   {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="/static/js/tables.js"></script>
-<script src="/static/js/wants_list.js"></script>
 {% endblock %}

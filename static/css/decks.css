@@ -1,7 +1,7 @@
 /*
- * A deck version's read-only page (templates/decks/version.html): the
- * opening hands and ban list (or format) panels above the cards, the
- * tournament below. Then the formats' pages (templates/formats/).
+ * A deck version's read-only page (templates/decks/version.html) and a
+ * saved list's (snapshot.html): the panels above the cards. Then the
+ * formats' pages (templates/formats/).
  */
 
 .deck-panels {
@@ -19,25 +19,6 @@
     width: 100%;
 }
 
-.deck-tournament {
-    margin-top: 2rem;
-}
-
-/* A version's problems in its format. */
-.format-ok {
-    color: #1b7a3d;
-    font-weight: bold;
-}
-
-.format-problems {
-    margin: 0 0 1rem;
-    padding-left: 1.2rem;
-    color: #a12a2a;
-}
-
-.format-problems li {
-    margin-bottom: 0.25rem;
-}
 
 /* ---------- formats (templates/formats/) ---------- */
 

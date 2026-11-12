@@ -15,14 +15,16 @@ let nextRound = Number(rounds.dataset.next);
 
 // ---------- numbers ----------
 
-/** "Round 1", "Round 2"… and in each round "Game 1", "Game 2"…, in page order. */
+/** "Round 1", "Round 2"… and in each round "Game 1", "Game 2"…, in page order, and each round's games count. */
 function renumber() {
     rounds.querySelectorAll('.round').forEach((round, i) => {
-        /** @type {Element} */ (round.querySelector('.round-number')).textContent = /** @type {any} */ (i + 1);
+        /** @type {Element} */ (round.querySelector('.round-number')).textContent = String(i + 1);
 
-        round.querySelectorAll('.game-number').forEach((number, j) => {
+        const numbers = round.querySelectorAll('.game-number');
+        numbers.forEach((number, j) => {
             number.textContent = `Game ${j + 1}`;
         });
+        /** @type {Element} */ (round.querySelector('.games-count')).textContent = String(numbers.length);
     });
 }
 

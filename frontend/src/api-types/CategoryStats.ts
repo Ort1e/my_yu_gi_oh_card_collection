@@ -2,7 +2,7 @@
 
 export type CategoryStats = { category_id: number, name: string, 
 /**
- * Number of main-deck cards assigned to this category.
+ * Number of main-deck copies assigned to this category.
  */
 cards_in_deck: number, 
 /**

@@ -1,19 +1,17 @@
 <script lang="ts">
-    // The reserve: a search among the owned cards that are not in the deck.
-    // The results are a drop zone; moves in and out of it are done by
-    // App.svelte, which shares `cards` with this component.
+    // The card search: the owned cards, and by name the other cards the app
+    // knows, each with what the collection holds of it. A result dropped in a
+    // zone adds a copy of it (the result stays); App.svelte does the moves
+    // and shares `cards` with this component.
     import DeckZone from './DeckZone.svelte';
-    import { banStatus, outOfFormat, sortCards } from '../deck';
+    import { banStatus, outOfFormat, sortCards, tiles } from '../deck';
     import type { DeckApi } from '../api';
-    import type { ApiCard } from '../api-types/ApiCard';
-    import type { Rules } from '../types';
+    import type { Rules, Tile } from '../types';
 
     export let api: DeckApi;
     export let cardTypes: string[];
     /** the search results */
-    export let cards: ApiCard[];
-    /** ids of the cards in the deck zones (saved or not), left out of the results */
-    export let deckCardIds: Set<number>;
+    export let cards: Tile[];
     export let rules: Rules | null = null;
     export let selectedId: number | null | undefined = null;
 
@@ -54,8 +52,7 @@
 
             if (id !== searchId) return; // a newer search started
 
-            // cards moved into the deck but not saved yet are still in the results
-            cards = sortCards(found.filter((c) => !deckCardIds.has(c.id)));
+            cards = sortCards(tiles(found));
             message = 'No card found.';
         } catch (e) {
             message = `Search failed: ${e.message}`;

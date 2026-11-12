@@ -1,0 +1,22 @@
+{# A deck's history lines (routes::decks::snapshots::HistoryLine): set `lines` before including. #}
+<div class="table-scroll">
+<table class="numbers">
+  <thead>
+    <tr>
+      <th class="text">Saved</th><th class="text">List</th><th class="text">Version</th>
+      <th>Main</th><th>Extra</th><th>Side</th><th class="text">Changes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for line in lines %}
+    <tr>
+      <td class="text">{{ line.snapshot.date()|date }} {{ line.snapshot.time() }}</td>
+      <td class="text"><a href="/deck-snapshots/{{ line.snapshot.id }}">{{ line.snapshot.title() }}</a>{% if line.snapshot.tournament_id.is_some() %} 🏆{% endif %}{% if line.snapshot.is_public && !common::export::public_copy() %} <span class="built-badge" title="Shown on the public site">Public</span>{% endif %}</td>
+      <td class="text">{{ line.snapshot.version_name.as_deref().unwrap_or("—") }}</td>
+      <td>{{ line.snapshot.main }}</td><td>{{ line.snapshot.extra }}</td><td>{{ line.snapshot.side }}</td>
+      <td class="text">{{ line.changes_text() }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>

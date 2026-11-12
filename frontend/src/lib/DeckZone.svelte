@@ -1,16 +1,15 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
     import CardTile from './CardTile.svelte';
-    import type { ApiCard } from '../api-types/ApiCard';
     import type { Zone } from '../api-types/Zone';
-    import type { DragData, Move, Place, Rules } from '../types';
+    import type { DragData, Move, Place, Rules, Tile } from '../types';
 
     export let zone: Place;
-    export let cards: ApiCard[];
+    export let cards: Tile[];
     export let rules: Rules | null = null;
     export let selectedId: number | null | undefined = null;
 
-    const dispatch = createEventDispatcher<{ move: Move; proxy: Zone; select: ApiCard }>();
+    const dispatch = createEventDispatcher<{ move: Move; missing: Zone; select: Tile }>();
     let over = false;
 
     function drop(e: DragEvent) {
@@ -27,7 +26,7 @@
         if (zone === 'reserve') return;
 
         e.preventDefault();
-        dispatch('proxy', zone);
+        dispatch('missing', zone);
     }
 </script>
 

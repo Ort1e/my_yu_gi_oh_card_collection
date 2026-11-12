@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{{ self.full_title() }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/tiles.css">
+  <link rel="stylesheet" href="/static/css/decks.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<p class="back-link"><a href="/decks/{{ snapshot.deck_id }}#history">← Back to the deck</a></p>
+
+<div class="card wide-card">
+  <div class="card-title">{{ self.full_title() }}
+    {% if snapshot.name.is_none() && snapshot.tournament_id.is_none() %} <span class="built-badge" title="Saved automatically when the version was saved">Automatic</span>{% endif %}
+    {% if snapshot.shown_publicly() && !common::export::public_copy() %} <span class="built-badge" title="Shown on the public site">Public</span>{% endif %}
+  </div>
+  <div class="card-meta-line">
+    <div>Saved: {{ snapshot.date()|date }} {{ snapshot.time() }}</div>
+    {% match snapshot.version_id %}{% when Some with (v) %}<div>From the version: {% if version_shown %}<a href="/deck-versions/{{ v }}" class="on-card">{{ snapshot.version_name.as_deref().unwrap_or("") }}</a>{% else %}{{ snapshot.version_name.as_deref().unwrap_or("") }}{% endif %}</div>{% when None %}<div>From a version since deleted</div>{% endmatch %}
+    {% match snapshot.tournament_id %}{% when Some with (t) %}<div>🏆 Played at <a href="/tournaments/{{ t }}" class="on-card">{{ snapshot.tournament_name.as_deref().unwrap_or("") }}</a> ({{ snapshot.tournament_date.as_deref().unwrap_or("")|date }})</div>{% when None %}{% endmatch %}
+    {% for zone in zones %}<div>{{ zone.name }}: {{ zone.count }}</div>{% endfor %}
+  </div>
+</div>
+
+<section class="deck-panel snapshot-changes">
+  <h2>Changes</h2>
+  {% if !common::export::public_copy() %}
+  <form method="get" action="/deck-snapshots/{{ snapshot.id }}" class="inline-form">
+    <label for="vs">Compare with:</label>
+    <select name="vs" id="vs">
+      {% for choice in choices %}<option value="{{ choice.value }}"{% if choice.selected %} selected{% endif %}>{{ choice.label }}</option>{% endfor %}
+    </select>
+    <input type="submit" value="Compare">
+  </form>
+  {% endif %}
+  {% match compared %}{% when Some with (compared) %}
+  {% if changes.is_empty() %}
+  <p class="hint">The same cards as {{ compared }}.</p>
+  {% else %}
+  <p class="hint">From {% if self.compared_is_version() %}this list to {{ compared }}{% else %}{{ compared }} to this list{% endif %}:</p>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead><tr><th class="text">Zone</th><th>Change</th><th class="text">Card</th><th>Copies</th></tr></thead>
+    <tbody>
+      {% for change in changes %}
+      <tr class="{% if change.added %}change-added{% else %}change-removed{% endif %}"><td class="text">{{ change.zone }}</td><td>{{ change.delta }}</td><td class="text">{{ change.name }}</td><td>{{ change.counts }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% when None %}
+  <p class="hint">The first list saved: nothing to compare with.</p>
+  {% endmatch %}
+</section>
+
+{% for zone in zones %}
+{% if !zone.tiles.is_empty() %}
+<h2>{{ zone.name }} ({{ zone.count }})</h2>
+{% let tiles = zone.tiles() %}
+{% include "partials/card_grid.html" %}
+{% endif %}
+{% endfor %}
+
+{% if !common::export::public_copy() %}
+<div class="deck-panels">
+  <section class="deck-panel">
+    <h2>Name</h2>
+    <p>{% match snapshot.name %}{% when Some with (name) %}Named “{{ name }}”: it is kept.{% when None %}Not named: an automatic list, replaced by the next save within 30 minutes.{% endmatch %}
+    {% match rename_href %}{% when Some with (href) %}<a href="{{ href }}">Name it in the deck builder (History)</a>{% when None %}{% endmatch %}</p>
+    <form method="post" action="/deck-snapshots/{{ snapshot.id }}/public">
+      <label><input type="checkbox" name="public"{% if snapshot.is_public %} checked{% endif %}> Show it on the public site{% if snapshot.tournament_id.is_some() %} (a tournament's list is shown anyway){% endif %}</label>
+      <input type="submit" value="Save">
+    </form>
+  </section>
+  <section class="deck-panel">
+    <h2>New version from this list</h2>
+    <form method="post" action="/deck-snapshots/{{ snapshot.id }}/branch">
+      <label for="version_name">Version name:</label>
+      <input type="text" name="version_name" id="version_name" maxlength="100" required>
+      <small>Its cards and counts; the collection says which you own. It opens in the deck builder.</small>
+      <input type="submit" value="Create the version">
+    </form>
+  </section>
+</div>
+
+{% if !snapshot.kept() %}
+<details class="danger-zone">
+  <summary>Delete this saved list…</summary>
+  <p>Only an automatic one can be deleted; its version and cards stay.</p>
+  <form method="post" action="/deck-snapshots/{{ snapshot.id }}/delete" data-confirm="Delete this saved list?">
+    <button type="submit" class="btn-danger">Delete this saved list</button>
+  </form>
+</details>
+{% endif %}
+{% endif %}
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@ use axum::Form;
 use chrono::NaiveDate;
 use yugioh_domain::ban_list::BanStatus;
 
-use super::format_page;
+use super::edit_page;
 use crate::store::card_data;
 use crate::store::db::{begin_write, Pool};
 use crate::store::formats::{self, ensure_set_dates};
@@ -154,7 +154,7 @@ pub async fn update(
     let name = form.required("name", "Name");
     let cutoff = form.required_date("cutoff", "Cutoff");
     let (Some(name), Some(cutoff), true) = (name, cutoff, form.errors.is_empty()) else {
-        return Ok(format_page(pool, id, form.errors).await?.into_response());
+        return Ok(edit_page(pool, id, form.errors).await?.into_response());
     };
 
     let mut tx = begin_write(pool).await?;
@@ -172,7 +172,7 @@ pub async fn update(
         Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
             drop(tx);
             let error = format!("\"{name}\" already has a version with this number.");
-            return Ok(format_page(pool, id, vec![error]).await?.into_response());
+            return Ok(edit_page(pool, id, vec![error]).await?.into_response());
         }
         Err(e) => return Err(e.into()),
     }
@@ -197,13 +197,13 @@ pub async fn add_card(
         form.errors.push("Status: choose one.".into());
     }
     let (Some(name), Some(status), true) = (name, status, form.errors.is_empty()) else {
-        return Ok(format_page(pool, id, form.errors).await?.into_response());
+        return Ok(edit_page(pool, id, form.errors).await?.into_response());
     };
 
     // the network before the write transaction
     let Some(card_data_id) = card_data::get_or_fetch(pool, &state.http, &name).await? else {
         let error = format!("No card named \"{name}\" (its English name, as on ygoprodeck).");
-        return Ok(format_page(pool, id, vec![error]).await?.into_response());
+        return Ok(edit_page(pool, id, vec![error]).await?.into_response());
     };
     let mut tx = begin_write(pool).await?;
     crate::store::db::exists(&mut tx, "deck_format", id).await?;
@@ -219,7 +219,7 @@ pub async fn add_card(
     tx.commit().await?;
     tracing::info!(format_id = id, card_data_id, "format list: card added");
 
-    Ok(Redirect::to(&format!("/formats/{id}#list")).into_response())
+    Ok(Redirect::to(&format!("/formats/{id}/edit#list")).into_response())
 }
 
 /// `POST /formats/:id/cards/:card_data_id` (`status`; empty: off the list,
@@ -253,7 +253,7 @@ pub async fn set_status(
         Some(None) => {
             drop(tx);
             let error = "Status: invalid choice.".to_string();
-            return Ok(format_page(&state.pool, id, vec![error])
+            return Ok(edit_page(&state.pool, id, vec![error])
                 .await?
                 .into_response());
         }
@@ -266,7 +266,7 @@ pub async fn set_status(
         "format list: status changed"
     );
 
-    Ok(Redirect::to(&format!("/formats/{id}#list")).into_response())
+    Ok(Redirect::to(&format!("/formats/{id}/edit#list")).into_response())
 }
 
 /// `POST /formats/:id/new-version`: a copy numbered after the last one;
@@ -285,7 +285,7 @@ pub async fn new_version(
         "format: new version"
     );
 
-    Ok(Redirect::to(&format!("/formats/{new_id}")).into_response())
+    Ok(Redirect::to(&format!("/formats/{new_id}/edit")).into_response())
 }
 
 /// `POST /formats/:id/delete`: refused while a deck version plays it.
@@ -304,7 +304,7 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
             if used == 1 { "s" } else { "" },
             if used == 1 { "it" } else { "them" },
         );
-        return Ok(format_page(&state.pool, id, vec![error])
+        return Ok(edit_page(&state.pool, id, vec![error])
             .await?
             .into_response());
     }

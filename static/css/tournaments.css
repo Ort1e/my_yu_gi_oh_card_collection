@@ -182,6 +182,28 @@
     margin-bottom: 1rem;
 }
 
+/* the form's parts: the event, the list played, the rounds, the conclusion */
+h2.form-section {
+    margin: 0 0 0.75rem;
+}
+
+/* a finished round's games, folded */
+.round-games > summary {
+    cursor: pointer;
+    font-weight: bold;
+    margin: 0.5rem 0;
+}
+
+/* "Save" stays in sight at the bottom of the screen in a long form */
+.sticky-save {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.6rem 0;
+    background-color: var(--bg-color);
+    box-shadow: 0 -1px 0 var(--border-color);
+}
+
 .team-only {
     display: none;
 }

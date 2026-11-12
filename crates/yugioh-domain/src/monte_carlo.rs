@@ -48,7 +48,7 @@ pub struct SimulationResult {
 pub struct CategoryStats {
     pub category_id: i64,
     pub name: String,
-    /// Number of main-deck cards assigned to this category.
+    /// Number of main-deck copies assigned to this category.
     pub cards_in_deck: u32,
     /// Total hits over all simulations.
     pub occurrences: u32,
@@ -56,8 +56,10 @@ pub struct CategoryStats {
     pub per_hand: BTreeMap<u32, u32>,
 }
 
-/// `assignments` are `(card_id, category_id)` pairs; ones whose category is
-/// not in `categories` are ignored. Results keep the order of `categories`.
+/// `main_deck` holds a card once per copy (a card data id, repeated);
+/// `assignments` are `(card, category_id)` pairs, a card's categories for all
+/// its copies; ones whose category is not in `categories`, or whose card is
+/// not in the deck, are ignored. Results keep the order of `categories`.
 pub fn simulate(
     main_deck: &[i64],
     categories: &[Category],
@@ -73,15 +75,20 @@ pub fn simulate(
         .collect();
 
     let mut card_categories: HashMap<i64, Vec<usize>> = HashMap::new();
-    let mut cards_in_deck = vec![0u32; categories.len()];
     for &(card_id, category_id) in assignments {
         if let Some(&i) = index.get(&category_id) {
             card_categories.entry(card_id).or_default().push(i);
-            cards_in_deck[i] += 1;
         }
     }
     let no_categories = Vec::new();
     let categories_of = |card: i64| card_categories.get(&card).unwrap_or(&no_categories);
+    // every copy counts: a card is in the deck as many times as its copies
+    let mut cards_in_deck = vec![0u32; categories.len()];
+    for &card in main_deck {
+        for &i in categories_of(card) {
+            cards_in_deck[i] += 1;
+        }
+    }
 
     let mut occurrences = vec![0u32; categories.len()];
     let mut per_hand: Vec<BTreeMap<u32, u32>> = vec![BTreeMap::new(); categories.len()];
@@ -141,6 +148,23 @@ mod tests {
     use super::*;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+
+    #[test]
+    fn copies_of_a_card_count_each() {
+        // 3 copies of card 1 (a starter), 1 of card 2; card 9 is not in the deck
+        let deck = [1, 1, 1, 2];
+        let cats = [category(10, "starter")];
+        let r = simulate(
+            &deck,
+            &cats,
+            &[(1, 10), (9, 10)],
+            4,
+            10,
+            &mut StdRng::seed_from_u64(1),
+        );
+        assert_eq!(r.categories[0].cards_in_deck, 3);
+        assert_eq!(r.categories[0].occurrences, 30);
+    }
 
     fn category(id: i64, name: &str) -> Category {
         Category {

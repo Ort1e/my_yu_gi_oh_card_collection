@@ -4,6 +4,7 @@
 use serde_json::json;
 
 use super::*;
+use crate::testing::{tiles, DM, KURIBOH};
 
 /// Konami's list of 2010-03-01 (Dark Magician limited, Kuriboh forbidden),
 /// two sets, the card data's sets: Dark Magician from 2002, Kuriboh 2012.
@@ -85,6 +86,20 @@ async fn a_format_from_a_konami_list_and_its_versions() {
     }
     // Kuriboh (2012) is listed but out of the pool anyway
     assert!(page.contains(r#"class="format-out""#), "{page}");
+    // a read page: the forms are on the edit page
+    assert!(page.contains(r#"href="/formats/1/edit""#), "{page}");
+    assert!(!page.contains("<form"), "{page}");
+    let (status, page) = t.get("/formats/1/edit").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    for text in [
+        r#"action="/formats/1/edit""#,
+        r#"action="/formats/1/cards""#,
+        r#"action="/formats/1/new-version""#,
+        r#"action="/formats/1/delete""#,
+        r#"<option value="Dark Magician">"#,
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
 
     // a second format of that name, a set without a date: refused
     let (status, page) = t
@@ -120,7 +135,7 @@ async fn a_format_from_a_konami_list_and_its_versions() {
     let (status, location) = t.post("/formats/1/new-version", &[]).await;
     assert_eq!(
         (status, location.as_str()),
-        (StatusCode::SEE_OTHER, "/formats/2")
+        (StatusCode::SEE_OTHER, "/formats/2/edit")
     );
     t.post("/formats/2/cards/1", &[("status", "Banned")]).await;
     let status_in = |format: i64| {
@@ -166,16 +181,16 @@ async fn a_format_from_a_konami_list_and_its_versions() {
 async fn a_deck_version_plays_a_format() {
     let t = TestApp::new().await;
     konami_list(&t).await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     let format = edison(&t, "2010-03-01").await;
     let url = format!("/api/deck-versions/{version}");
 
-    // both Dark Magicians (limited), the Kuriboh proxy (2012, forbidden)
+    // both Dark Magicians (limited), a Kuriboh not owned (2012, forbidden)
     let (status, deck) = t
         .json(
             "PATCH",
             &url,
-            json!({ "main": [cards[0], cards[1]], "side": [cards[2]],
+            json!({ "main": tiles(&[(DM, "Magicien Sombre", 2)]), "side": tiles(&[(KURIBOH, "Kuriboh", 1)]),
                     "format_id": format, "ban_list_id": null }),
         )
         .await;
@@ -188,6 +203,8 @@ async fn a_deck_version_plays_a_format() {
     assert_eq!(deck["main"][0]["first_release"], "2002-03-08");
     assert_eq!(deck["side"][0]["first_release"], "2012-01-01");
 
+    // the missing Kuriboh is looked up for errata (a plain list holds no
+    // copy to judge: the Dark Magicians are not)
     let (status, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
@@ -196,7 +213,8 @@ async fn a_deck_version_plays_a_format() {
             "Dark Magician: 2 copies, 1 allowed",
             "Kuriboh: released on 01/01/2012, after the format's cutoff",
             "Kuriboh: forbidden (1 in the deck)",
-        ], "errata": [], "errata_pending": 2 })
+        ], "errata": [], "errata_pending": 1, "wants": "1 Kuriboh",
+                "wants_note": check["wants_note"] })
     );
 
     // a ban list and a format: refused, nothing changed
@@ -210,15 +228,12 @@ async fn a_deck_version_plays_a_format() {
         format
     );
 
-    // the read-only page: the format, its problems, the list's badges
+    // the read-only page names the format (its problems are the builder's)
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    for text in [
-        "<h2>Format</h2>",
-        r#"<a href="/formats/1">Edison v1</a>"#,
-        "Dark Magician: 2 copies, 1 allowed",
-    ] {
-        assert!(page.contains(text), "{text}: {page}");
-    }
+    assert!(
+        page.contains(r#"Format: <a href="/formats/1" class="on-card">Edison v1</a>"#),
+        "{page}"
+    );
 
     // a copy keeps the format; the format can't be deleted while played
     let (status, _) = t
@@ -247,7 +262,8 @@ async fn a_deck_version_plays_a_format() {
     let (_, check) = t.json("GET", &format!("{url}/check"), json!(null)).await;
     assert_eq!(
         check,
-        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 2 })
+        json!({ "format": null, "problems": [], "errata": [], "errata_pending": 1, "wants": "1 Kuriboh",
+                "wants_note": check["wants_note"] })
     );
 }
 
@@ -262,6 +278,7 @@ async fn reading_formats_is_public_changing_them_needs_the_login() {
         assert_eq!(t.get(page).await.0, StatusCode::OK, "{page}");
     }
     assert_eq!(t.get("/formats/add").await.0, StatusCode::SEE_OTHER);
+    assert_eq!(t.get("/formats/1/edit").await.0, StatusCode::SEE_OTHER);
     for (url, form) in [
         (
             "/formats/add",

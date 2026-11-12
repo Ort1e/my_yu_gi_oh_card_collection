@@ -12,7 +12,7 @@
   <h1>{{ tournament.name }}{% if tournament.is_team %} <span class="badge">Team</span>{% endif %}</h1>
   <div class="tournament-head">
     <div>{{ tournament.date|date }}{% if !tournament.location.is_empty() %}, {{ tournament.location }}{% endif %}</div>
-    <div>Deck played: {% match tournament.version_id %}{% when Some with (v) %}<a href="/deck-versions/{{ v }}">{{ tournament.version_name }}</a>{% when None %}not noted{% endmatch %}</div>
+    <div>Deck played: {% match tournament.snapshot_id %}{% when Some with (s) %}<a href="/deck-snapshots/{{ s }}">{{ tournament.version_name }}</a>{% when None %}not noted{% endmatch %}</div>
     {% if !tournament.record.is_empty() %}<div>Rounds: {{ tournament.record }}</div>{% endif %}
     {% if !tournament.placement.is_empty() %}<div>Placement: {{ tournament.placement }}</div>{% endif %}
   </div>

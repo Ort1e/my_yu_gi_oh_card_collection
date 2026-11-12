@@ -4,42 +4,41 @@
 //! name ignoring case and accents (`yugioh_domain::card::sort_name`), so the
 //! copies of a card sit together whatever their language. The deck builder
 //! sorts the same way (`frontend/src/deck.ts`).
-//! Around the cards: the version's format (its problems there, its list)
-//! or ban list (its own, else the latest one: the restricted cards and a
-//! badge on their tiles), its opening hands (the
-//! deck builder's Monte Carlo on its categories, `yugioh_domain::monte_carlo`,
-//! going first and second) and the tournament it was played in, round by
-//! round.
-//! The deck builder (`/deck-builder/:id`) is a button away in the app; the
+//! A missing card (the collection lacks it) has the red border; a tile links
+//! to an owned copy's page (the slot's copy in a built deck); its value is
+//! the card's Cardmarket trend.
+//! Around the cards: the version's format or ban list (its own, else the
+//! latest one), named, with a badge on the restricted cards' tiles; its
+//! opening hands (the deck builder's Monte Carlo on its categories,
+//! `yugioh_domain::monte_carlo`, going first and second); and a link to the
+//! last tournament it was played in. The rest is said once elsewhere: the
+//! format's problems and the wants list in the builder's tabs, the rounds on
+//! the tournament's page.
+//! The page is only the read-only view: all the editing is in the deck builder
+//! (`/deck-builder/:id`, a button away in the app), which also shows or hides
+//! the version on the public site (`is_public`, the `PATCH` of its API). The
 //! public copy shows only the versions on the public site (`PUBLIC_VERSION`),
-//! without the buttons. `POST /deck-versions/:id/public` shows or hides a
-//! version there.
+//! without the button.
 
 use std::collections::{BTreeMap, HashMap};
 
 use askama::Template;
 use axum::extract::{Path, State};
-use axum::response::Redirect;
-use axum::Form;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use yugioh_domain::card::sort_name;
+use yugioh_domain::card::{sort_name, CardStatus};
 use yugioh_domain::monte_carlo;
 use yugioh_domain::stats::{kind, CardKind};
 
-use super::api::simulation_inputs;
-use super::built::version_wants_list;
+use super::api::{simulation_inputs, zone_tiles, ApiCard};
 use super::PUBLIC_VERSION;
 use crate::routes::tournaments::TournamentView;
-use crate::store::cards::Zone;
-use crate::store::db::{begin_write, Pool};
-use crate::store::formats;
-use crate::store::models::{CardRow, DeckVersionRow};
+use crate::store::db::Pool;
+use crate::store::models::{other_name, DeckVersionRow};
 use crate::web::error::{AppError, AppResult, OrNotFound};
 use crate::web::filters;
-use crate::web::forms::{FormData, Pairs};
 use crate::AppState;
-use common::web::tiles::CardTile;
+use common::web::tiles::{CardShape, CardTile};
 
 /// One zone of the version: "Main Deck" and its cards.
 pub struct ZoneCards {
@@ -59,11 +58,8 @@ pub struct BanList {
     date: String,
     /// Chosen in the deck builder (not the latest one by default).
     chosen: bool,
-    /// The version's restricted cards: status, English name, copies.
-    cards: Vec<(&'static str, String, usize)>,
-    /// The format played: `(id, "Edison v2", cutoff)`, its problems.
-    format: Option<(i64, String, String)>,
-    problems: Vec<String>,
+    /// The format played: `(id, "Edison v2")`.
+    format: Option<(i64, String)>,
 }
 
 /// The opening hands of one category: the share of hands with at least one
@@ -89,9 +85,6 @@ pub struct VersionPage {
     ban_list: Option<BanList>,
     hands: Vec<HandLine>,
     played: Option<TournamentView>,
-    /// The Cardmarket wants list of the version's proxies (empty: none; not
-    /// built in the public copy).
-    wants: String,
 }
 
 impl VersionPage {
@@ -99,10 +92,6 @@ impl VersionPage {
         self.version
             .deck_id
             .map_or("/decks".to_string(), |id| format!("/decks/{id}"))
-    }
-
-    fn wants_rows(&self) -> usize {
-        self.wants.lines().count() + 1
     }
 
     fn no_card(&self) -> bool {
@@ -117,15 +106,17 @@ fn ban_label(status: &str) -> Option<&'static str> {
         .find(|label| *label == status)
 }
 
-/// The format a version plays, `(id, label, cutoff, its problems)`.
-async fn format(pool: &Pool, id: i64) -> AppResult<Option<(i64, String, String, Vec<String>)>> {
-    let mut conn = pool.acquire().await?;
-    Ok(formats::version_problems(&mut conn, id)
-        .await?
-        .map(|(format, problems)| {
-            let problems = problems.iter().map(|p| p.message()).collect();
-            (format.id, format.label(), format.cutoff, problems)
-        }))
+/// The format a version plays, `(id, label)`.
+async fn format(pool: &Pool, id: i64) -> AppResult<Option<(i64, String)>> {
+    let format: Option<(i64, String, i64)> = sqlx::query_as(
+        "SELECT deck_format.id, deck_format.name, deck_format.version FROM deck_format
+         JOIN deck_version ON deck_version.format_id = deck_format.id
+         WHERE deck_version.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(format.map(|(format_id, name, version)| (format_id, format!("{name} v{version}"))))
 }
 
 /// The ban list the page follows, `(id, date, chosen)`: the version's, else
@@ -231,69 +222,69 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         .into_iter()
         .filter_map(|(data_id, status)| Some((data_id, ban_label(&status)?)))
         .collect();
-    // status, English name → copies in the version
-    let mut restricted: BTreeMap<(&'static str, String), usize> = BTreeMap::new();
-
+    let mut conn = pool.acquire().await?;
+    let tiles = zone_tiles(&mut conn, id).await?;
+    drop(conn);
     let mut zones = Vec::new();
-    for (zone, name) in Zone::ALL
+    for (cards, name) in tiles
         .into_iter()
         .zip(["Main Deck", "Extra Deck", "Side Deck"])
     {
-        let rows: Vec<CardRow> = sqlx::query_as(&format!(
-            "SELECT {} FROM card JOIN {} zone ON zone.card_id = card.id
-             WHERE zone.deck_version_id = ?",
-            CardRow::columns(),
-            zone.table()
-        ))
-        .bind(id)
-        .fetch_all(pool)
-        .await?;
-        let types: HashMap<i64, Option<String>> = sqlx::query_as(&format!(
-            "SELECT card.id, card_data.card_type
-             FROM card JOIN {} zone ON zone.card_id = card.id
-             JOIN card_data ON card_data.id = card.card_data_id
-             WHERE zone.deck_version_id = ?",
-            zone.table()
-        ))
-        .bind(id)
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .collect();
-        let kind_of = |card: &CardRow| match types.get(&card.id) {
-            Some(Some(card_type)) => kind(card_type),
-            _ => CardKind::Other,
-        };
-        // (kind, English name, name shown, id): the same card's copies
+        // (kind, English name, name shown): the same card's copies
         // together, the French ones after the English ones
-        let mut cards: Vec<((CardKind, String, String, i64), CardRow)> = rows
+        let mut cards: Vec<((CardKind, String, String), ApiCard)> = cards
             .into_iter()
-            .map(|row| {
-                let english = sort_name(row.name_en.as_deref().unwrap_or(&row.name));
-                ((kind_of(&row), english, sort_name(&row.name), row.id), row)
+            .map(|card| {
+                let kind = card.card_type.as_deref().map_or(CardKind::Other, kind);
+                let english = sort_name(card.name_en.as_deref().unwrap_or(&card.name));
+                ((kind, english, sort_name(&card.name)), card)
             })
             .collect();
         cards.sort_by(|(a, _), (b, _)| a.cmp(b));
         let tiles = cards
             .iter()
             .map(|(_, card)| {
-                let mut tile = card.tile();
-                tile.ban = card.card_data_id.and_then(|d| statuses.get(&d).copied());
-                if let Some(status) = tile.ban {
-                    let english = card.name_en.clone().unwrap_or_else(|| card.name.clone());
-                    *restricted.entry((status, english)).or_default() += 1;
+                let copy = card.copy.as_ref();
+                let status = copy
+                    .and_then(|c| c.status.as_deref())
+                    .and_then(CardStatus::from_code);
+                CardTile {
+                    href: card
+                        .sample_copy
+                        .map(|id| format!("/cards/{id}"))
+                        .unwrap_or_default(),
+                    shape: CardShape::YuGiOh,
+                    image: card.image.clone(),
+                    name: card.name.clone(),
+                    other_name: other_name(&card.name, card.name_en.as_deref())
+                        .unwrap_or_default()
+                        .to_string(),
+                    print: copy.and_then(|c| c.code.clone()).unwrap_or_default(),
+                    details: copy.and_then(|c| c.rarity.clone()).unwrap_or_default(),
+                    condition: status.map(|s| (s.code(), s.label())),
+                    tags: Vec::new(),
+                    value: card
+                        .cardmarket_trend
+                        .map(|t| t.to_string())
+                        .unwrap_or_default(),
+                    faded: false,
+                    missing: card.missing,
+                    ban: card.card_data_id.and_then(|d| statuses.get(&d).copied()),
                 }
-                tile
             })
             .collect();
         zones.push(ZoneCards { name, tiles });
     }
 
-    let tournament_id: Option<i64> =
-        sqlx::query_scalar("SELECT tournament_id FROM deck_version WHERE id = ?")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
+    // the last tournament played with a list taken from this version
+    let tournament_id: Option<i64> = sqlx::query_scalar(
+        "SELECT tournament_id FROM deck_snapshot
+         WHERE version_id = ? AND tournament_id IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
     let played = match tournament_id {
         Some(tournament_id) => TournamentView::load(pool, tournament_id).await?,
         None => None,
@@ -302,58 +293,19 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
     Ok(VersionPage {
         version,
         zones,
-        ban_list: {
-            let cards = restricted
-                .into_iter()
-                .map(|((status, name), copies)| (status, name, copies))
-                .collect();
-            match format {
-                Some((format_id, label, cutoff, problems)) => Some(BanList {
-                    date: String::new(),
-                    chosen: true,
-                    cards,
-                    format: Some((format_id, label, cutoff)),
-                    problems,
-                }),
-                None => ban.map(|(_, date, chosen)| BanList {
-                    date,
-                    chosen,
-                    cards,
-                    format: None,
-                    problems: Vec::new(),
-                }),
-            }
+        ban_list: match format {
+            Some(format) => Some(BanList {
+                date: String::new(),
+                chosen: true,
+                format: Some(format),
+            }),
+            None => ban.map(|(_, date, chosen)| BanList {
+                date,
+                chosen,
+                format: None,
+            }),
         },
         hands: hands(pool, id).await?,
         played,
-        wants: if public {
-            String::new()
-        } else {
-            version_wants_list(pool, id).await?
-        },
     })
-}
-
-/// Show the version on the public site (`is_public=1`) or hide it (`0`); one
-/// played in a tournament is shown anyway.
-pub async fn set_public(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Form(pairs): Form<Pairs>,
-) -> AppResult<Redirect> {
-    let is_public = FormData::new(pairs).get("is_public") == Some("1");
-    let mut tx = begin_write(&state.pool).await?;
-    let updated = sqlx::query("UPDATE deck_version SET is_public = ? WHERE id = ?")
-        .bind(is_public)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-    if updated == 0 {
-        return Err(AppError::NotFound);
-    }
-    tx.commit().await?;
-    tracing::info!(version_id = id, is_public, "deck version shown or hidden");
-
-    Ok(Redirect::to(&format!("/deck-versions/{id}")))
 }

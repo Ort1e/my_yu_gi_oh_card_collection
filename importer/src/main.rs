@@ -1,5 +1,6 @@
 //! One-off importer: reads a Django `dumpdata` JSON export and inserts it
-//! into the sqlx-managed SQLite schema (migrations/0002_ygo_schema.sql).
+//! into the sqlx-managed SQLite schema (migrations/0002_ygo_schema.sql;
+//! deck versions as lists since 0027).
 //! Used once for the cutover from Django; `data/app.db` is the live data since.
 //!
 //! Usage:
@@ -113,6 +114,16 @@ async fn import(pool: &SqlitePool, records: &[Record]) -> Result<()> {
             apply_card_conditional_category(&mut tx, r).await?;
         }
     }
+
+    // the proxies were only in decks (migration 0027): gone, unless in a
+    // lot or a calendar
+    sqlx::query(
+        "DELETE FROM card WHERE is_proxy = 1
+           AND id NOT IN (SELECT card_id FROM unite)
+           AND id NOT IN (SELECT card_id FROM advent_calendar_entry WHERE card_id IS NOT NULL)",
+    )
+    .execute(&mut *tx)
+    .await?;
 
     tx.commit().await?;
     Ok(())
@@ -233,26 +244,45 @@ async fn insert_deck_version(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     .execute(&mut **tx)
     .await?;
 
-    for card_id in get_i64_array(f, "main_deck") {
-        sqlx::query("INSERT INTO deck_version_main_deck (deck_version_id, card_id) VALUES (?, ?)")
+    // a deck version is a list (migration 0027): each zone's cards grouped
+    // by card data (by name when not linked), in the order of their first
+    // copy; Django had no built decks, so no copies
+    for (zone, field) in [
+        ("main", "main_deck"),
+        ("extra", "extra_deck"),
+        ("side", "side_deck"),
+    ] {
+        // (card data, name, count)
+        let mut lines: Vec<(Option<i64>, String, i64)> = Vec::new();
+        for card_id in get_i64_array(f, field) {
+            let (card_data_id, name): (Option<i64>, String) =
+                sqlx::query_as("SELECT card_data_id, name FROM card WHERE id = ?")
+                    .bind(card_id)
+                    .fetch_one(&mut **tx)
+                    .await?;
+            let same = |l: &&mut (Option<i64>, String, i64)| match card_data_id {
+                Some(_) => l.0 == card_data_id,
+                None => l.0.is_none() && l.1 == name,
+            };
+            match lines.iter_mut().find(same) {
+                Some(line) => line.2 += 1,
+                None => lines.push((card_data_id, name, 1)),
+            }
+        }
+        for (position, (card_data_id, name, count)) in lines.into_iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position)
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
             .bind(r.pk)
-            .bind(card_id)
+            .bind(zone)
+            .bind(card_data_id)
+            .bind(name)
+            .bind(count)
+            .bind(position as i64 + 1)
             .execute(&mut **tx)
             .await?;
-    }
-    for card_id in get_i64_array(f, "extra_deck") {
-        sqlx::query("INSERT INTO deck_version_extra_deck (deck_version_id, card_id) VALUES (?, ?)")
-            .bind(r.pk)
-            .bind(card_id)
-            .execute(&mut **tx)
-            .await?;
-    }
-    for card_id in get_i64_array(f, "side_deck") {
-        sqlx::query("INSERT INTO deck_version_side_deck (deck_version_id, card_id) VALUES (?, ?)")
-            .bind(r.pk)
-            .bind(card_id)
-            .execute(&mut **tx)
-            .await?;
+        }
     }
     Ok(())
 }
@@ -384,12 +414,16 @@ async fn apply_card_conditional_category(tx: &mut Tx<'_>, r: &Record) -> Result<
 
 async fn insert_card_category_assignment(tx: &mut Tx<'_>, r: &Record) -> Result<()> {
     let f = &r.fields;
-    sqlx::query("INSERT INTO card_category_assignment (id, category_id, card_id) VALUES (?, ?, ?)")
-        .bind(r.pk)
-        .bind(get_i64(f, "category"))
-        .bind(get_i64(f, "card"))
-        .execute(&mut **tx)
-        .await?;
+    // by card (card data) since migration 0027; a card not linked loses it
+    sqlx::query(
+        "INSERT OR IGNORE INTO card_category_assignment (id, category_id, card_data_id)
+         SELECT ?, ?, card_data_id FROM card WHERE id = ? AND card_data_id IS NOT NULL",
+    )
+    .bind(r.pk)
+    .bind(get_i64(f, "category"))
+    .bind(get_i64(f, "card"))
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 

@@ -72,9 +72,8 @@ async fn links_the_copies_to_their_printing() {
     let report = refresh(&t, date(2026, 10, 19)).await;
     assert_eq!(report.products, 3, "Raigeki isn't one of our cards");
     assert_eq!((report.sets_checked, report.sets_found), (1, 1));
-    // the 2 Dark Magicians (LOB-FR005) to the LOB product, not the OCG one;
-    // the Kuriboh proxy has no code
-    assert_eq!((report.linked, report.unlinked), (2, 1));
+    // the 2 Dark Magicians (LOB-FR005) to the LOB product, not the OCG one
+    assert_eq!((report.linked, report.unlinked), (2, 0));
     assert_eq!(report.prices, 1);
     assert_eq!(
         t.scalar(&format!(
@@ -112,7 +111,7 @@ async fn a_product_chosen_by_hand_is_kept() {
 
     refresh(&t, date(2026, 10, 19)).await;
     let linked: Vec<(i64, i64)> =
-        sqlx::query_as("SELECT id, cardmarket_product_id FROM card WHERE is_proxy = 0 ORDER BY id")
+        sqlx::query_as("SELECT id, cardmarket_product_id FROM card ORDER BY id")
             .fetch_all(&t.state.pool)
             .await
             .unwrap();

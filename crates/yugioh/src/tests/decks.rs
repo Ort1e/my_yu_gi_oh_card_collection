@@ -1,7 +1,11 @@
 //! Decks: list sorts, creation, edition, a version's cards, versions,
 //! deletion.
 
+use serde_json::json;
+use yugioh_domain::ydke::YdkeDeck;
+
 use super::*;
+use crate::testing::{tiles, DM, KURIBOH};
 
 #[tokio::test]
 async fn deck_list_sorts() {
@@ -9,8 +13,10 @@ async fn deck_list_sorts() {
     sqlx::query(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Old', '2025-09-21'), (2, 'New', '2026-02-08');
          INSERT INTO deck (id, name) VALUES (1, 'Played long ago'), (2, 'Played lately'), (3, 'Never played');
-         INSERT INTO deck_version (deck_id, version_name, tournament_id) VALUES
-             (1, 'v1', 1), (2, 'v1', NULL), (2, 'v2', 2), (3, 'v1', NULL);",
+         INSERT INTO deck_version (id, deck_id, version_name) VALUES
+             (1, 1, 'v1'), (2, 2, 'v1'), (3, 2, 'v2'), (4, 3, 'v1');
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id) VALUES
+             (1, 1, '2025-09-21 00:00:00', 1), (2, 3, '2026-02-08 00:00:00', 2);",
     )
     .execute(&t.state.pool)
     .await
@@ -123,25 +129,16 @@ async fn deck_edit_versions_and_delete() {
         StatusCode::NOT_FOUND
     );
 
-    // a proxy only used by this deck goes with it; owned cards stay
-    let mut conn = t.state.pool.acquire().await.unwrap();
-    let proxy = crate::store::cards::new_proxy(&mut conn, "Exodia", None)
-        .await
-        .unwrap();
-    drop(conn);
-    sqlx::query("INSERT INTO deck_version_main_deck VALUES (?, ?)")
-        .bind(version)
-        .bind(proxy)
-        .execute(&t.state.pool)
-        .await
-        .unwrap();
+    // its lines go with it; the cards stay
+    t.set_main(version, &[(DM, "Magicien Sombre", 2)]).await;
     let cards = t.scalar("SELECT count(*) FROM card").await;
 
     let (status, location) = t.post(&format!("/decks/{deck}/delete"), &[]).await;
     assert_eq!(status, StatusCode::SEE_OTHER);
     assert_eq!(location, "/decks");
     assert_eq!(t.scalar("SELECT count(*) FROM deck_version").await, 0);
-    assert_eq!(t.scalar("SELECT count(*) FROM card").await, cards - 1);
+    assert_eq!(t.scalar("SELECT count(*) FROM card").await, cards);
+    assert_eq!(t.scalar("SELECT count(*) FROM deck_version_card").await, 0);
     assert_eq!(
         t.post(&format!("/decks/{deck}/delete"), &[]).await.0,
         StatusCode::NOT_FOUND
@@ -152,13 +149,19 @@ async fn deck_edit_versions_and_delete() {
 async fn a_version_shows_its_cards_by_zone() {
     let t = TestApp::new().await;
     let (version, cards) = t.deck_fixture().await;
-    t.exec(&format!(
+    t.patch(
+        version,
+        json!({
+            "main": tiles(&[(DM, "Magicien Sombre", 2)]),
+            "side": tiles(&[(KURIBOH, "Kuriboh", 1)]),
+        }),
+    )
+    .await;
+    t.exec(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
-         UPDATE deck_version SET tournament_id = 1, deck_box = 'red box';
-         INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
-         INSERT INTO deck_version_side_deck VALUES ({version}, {});",
-        cards[0], cards[1], cards[2]
-    ))
+         UPDATE deck_version SET deck_box = 'red box';
+         UPDATE deck_snapshot SET created_at = '2026-02-08 00:00:00', tournament_id = 1;",
+    )
     .await;
 
     // the deck's page links to it
@@ -179,32 +182,45 @@ async fn a_version_shows_its_cards_by_zone() {
     assert!(page.contains(r#"href="/tournaments/1""#));
     assert!(page.contains(&format!(r#"href="/deck-builder/{version}""#)));
     assert_eq!(page.matches(r#"class="card-tile yugioh"#).count(), 3);
-    // the proxy, in the side deck after the main deck's cards
+    // the missing Kuriboh, in the side deck after the main deck's cards
     let side = &page[page.find("Side Deck (1)").unwrap()..];
     assert!(side.contains("Kuriboh"), "{side}");
-    assert!(side.contains(r#"class="card-tile yugioh proxy""#), "{side}");
-    assert!(side.contains(r#"<span class="card-tile-proxy">Proxy</span>"#));
-    assert_eq!(page.matches("card-tile-proxy").count(), 1, "the proxy only");
+    assert!(
+        side.contains(r#"class="card-tile yugioh missing""#),
+        "{side}"
+    );
+    assert!(side.contains(r#"<span class="card-tile-missing">Missing</span>"#));
+    assert_eq!(
+        page.matches("card-tile-missing").count(),
+        1,
+        "the missing one only"
+    );
+    // an owned card links to a copy
+    assert!(
+        page.contains(&format!(r#"href="/cards/{}""#, cards[0])),
+        "{page}"
+    );
 
     assert_eq!(t.get("/deck-versions/999").await.0, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
-async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
+async fn a_version_names_its_ban_list_shows_opening_hands_and_links_its_tournament() {
     let t = TestApp::new().await;
-    let (version, cards) = t.deck_fixture().await;
+    let (version, _) = t.deck_fixture().await;
     t.exec(&format!(
         "INSERT INTO advanced_ban_list (id, date) VALUES (1, '2026-01-01'), (2, '2026-04-01');
          INSERT INTO ban_list_entry (ban_list_id, card_data_id, status) VALUES (2, 1, 'Limited');
-         INSERT INTO deck_version_main_deck VALUES ({version}, {}), ({version}, {});
+         INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position)
+             VALUES ({version}, 'main', 1, 'Magicien Sombre', 2, 1);
          INSERT INTO card_category (id, name, deck_version_id) VALUES (1, 'Starter', {version});
-         INSERT INTO card_category_assignment (category_id, card_id) VALUES (1, {});
+         INSERT INTO card_category_assignment (category_id, card_data_id) VALUES (1, 1);
          INSERT INTO tournament (id, name, date, conclusion) VALUES (1, 'Locals', '2026-02-08', 'Fun deck');
          INSERT INTO tournament_round (id, tournament_id, number, result, opponent_deck, comment)
              VALUES (1, 1, 1, 'win', 'Yummy', 'quick round');
          INSERT INTO tournament_game (round_id, number, result, comment) VALUES (1, 1, 'won', 'god hand');
-         UPDATE deck_version SET tournament_id = 1;",
-        cards[0], cards[1], cards[0]
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+             SELECT deck_id, id, '2026-02-08 00:00:00', 1 FROM deck_version;"
     ))
     .await;
     let page = || async { t.get(&format!("/deck-versions/{version}")).await.1 };
@@ -212,7 +228,7 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     // no list chosen: the latest one, its badges on the tiles
     let shown = page().await;
     assert!(
-        shown.contains("The list of 01/04/2026 (the latest"),
+        shown.contains("Ban list: 01/04/2026 (the latest)"),
         "{shown}"
     );
     assert_eq!(
@@ -221,7 +237,6 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
             .count(),
         2
     );
-    assert!(shown.contains(r#"<td class="text">Magicien Sombre</td><td class="text"><span class="ban-status" data-ban="Limited">Limited</span></td><td>2</td>"#), "{shown}");
 
     // the version's own list
     t.exec(&format!(
@@ -229,29 +244,27 @@ async fn a_version_shows_its_ban_list_opening_hands_and_tournament() {
     ))
     .await;
     let shown = page().await;
-    assert!(shown.contains("The list of 01/01/2026."), "{shown}");
-    assert!(shown.contains("No card of this version is restricted on it."));
+    assert!(shown.contains("Ban list: 01/01/2026</div>"), "{shown}");
     assert!(!shown.contains("card-tile-ban"));
 
-    // 1 Starter of 2 cards: always in a 2-card hand (the whole deck), once on average
+    // a Starter twice: always in a 2-card hand (the whole deck), twice on average
     assert!(shown.contains("Opening hands"));
     assert!(
         shown.contains(
-            r#"<td class="text">Starter</td><td>1</td><td>100%</td><td>100%</td><td>1.0</td>"#
+            r#"<td class="text">Starter</td><td>2</td><td>100%</td><td>100%</td><td>2.0</td>"#
         ),
         "{shown}"
     );
 
-    // the tournament, round by round
-    assert!(shown.contains(r##"href="#tournament""##));
-    for text in [
-        "Played at <a href=\"/tournaments/1\">Locals</a>",
-        "Yummy",
-        "quick round",
-        "god hand",
-        "Fun deck",
-    ] {
-        assert!(shown.contains(text), "{text}: {shown}");
+    // the tournament: a link to its page, its rounds stay there
+    assert!(
+        shown.contains(
+            r#"Played at <a href="/tournaments/1" class="on-card">Locals</a> (08/02/2026, 1-0)"#
+        ),
+        "{shown}"
+    );
+    for text in ["Yummy", "quick round", "god hand", "Fun deck"] {
+        assert!(!shown.contains(text), "{text}: {shown}");
     }
 }
 
@@ -262,41 +275,47 @@ async fn a_version_is_shown_on_the_public_site_by_hand_or_by_a_tournament() {
     let deck = t.scalar("SELECT id FROM deck").await;
     let is_public = || t.scalar("SELECT is_public FROM deck_version");
 
+    // the read-only page has no button: the deck builder does it
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("Show on the public site"), "{page}");
+    assert!(!page.contains("Show on the public site"), "{page}");
+    assert!(page.contains("Edit in the builder"), "{page}");
     let (_, page) = t.get(&format!("/decks/{deck}")).await;
     assert!(!page.contains(r#"title="Shown on the public site""#));
 
-    let path = format!("/deck-versions/{version}/public");
-    let (status, location) = t.post(&path, &[("is_public", "1")]).await;
-    assert_eq!(status, StatusCode::SEE_OTHER);
-    assert_eq!(location, format!("/deck-versions/{version}"));
+    let uri = format!("/api/deck-versions/{version}");
+    let (status, saved) = t.json("PATCH", &uri, json!({ "is_public": true })).await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    assert_eq!(saved["is_public"], true);
     assert_eq!(is_public().await, 1);
-    let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("Hide from the public site"), "{page}");
     let (_, page) = t.get(&format!("/decks/{deck}")).await;
     assert!(
         page.contains(r#"title="Shown on the public site""#),
         "{page}"
     );
 
-    t.post(&path, &[("is_public", "0")]).await;
+    t.json("PATCH", &uri, json!({ "is_public": false })).await;
     assert_eq!(is_public().await, 0);
+
+    // the old form route is gone
     assert_eq!(
-        t.post("/deck-versions/999/public", &[("is_public", "1")])
-            .await
-            .0,
+        t.post(
+            &format!("/deck-versions/{version}/public"),
+            &[("is_public", "1")]
+        )
+        .await
+        .0,
         StatusCode::NOT_FOUND
     );
 
-    // played in a tournament: shown anyway, no button
+    // played in a tournament: its saved list is public, not the version
     t.exec(
         "INSERT INTO tournament (id, name, date) VALUES (1, 'Locals', '2026-02-08');
-         UPDATE deck_version SET tournament_id = 1;",
+         INSERT INTO deck_snapshot (deck_id, version_id, created_at, tournament_id)
+             SELECT deck_id, id, '2026-02-08 00:00:00', 1 FROM deck_version;",
     )
     .await;
+    assert_eq!(is_public().await, 0);
     let (_, page) = t.get(&format!("/deck-versions/{version}")).await;
-    assert!(page.contains("On the public site: played in a tournament."));
     assert!(!page.contains("Show on the public site"));
 }
 
@@ -309,11 +328,10 @@ async fn a_version_sorts_by_kind_then_english_name() {
          UPDATE card_data SET json_data = '{{\"name\": \"Kuriboh\"}}' WHERE id = 2;
          INSERT INTO card_data (id, en_name, ygopro_id, card_type, json_data)
              VALUES (3, 'pot of greed', 55144522, 'Spell Card', '{{\"name\": \"Pot of Greed\"}}');
-         INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES
-             (10, 'Pot de Cupidité', 'pot of greed', 'LOB-FR119', 3, 0),
-             (11, 'Dark Magician', 'dark magician', 'LOB-EN005', 1, 0);
-         INSERT INTO deck_version_main_deck (deck_version_id, card_id)
-             SELECT {version}, id FROM card;"
+         INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position) VALUES
+             ({version}, 'main', 3, 'Pot de Cupidité', 1, 1),
+             ({version}, 'main', 2, 'Kuriboh', 1, 2),
+             ({version}, 'main', 1, 'Magicien Sombre', 2, 3);"
     ))
     .await;
 
@@ -325,16 +343,138 @@ async fn a_version_sorts_by_kind_then_english_name() {
             &name[..name.find('"').unwrap()]
         })
         .collect();
-    // the monsters by English name (the French Dark Magicians with the
-    // English one), then the spell
+    // the monsters by English name (Dark Magician, named in French, first),
+    // then the spell
     assert_eq!(
         names,
         [
-            "Dark Magician",
             "Magicien Sombre",
             "Magicien Sombre",
             "Kuriboh",
             "Pot de Cupidité"
         ]
+    );
+}
+
+#[tokio::test]
+async fn a_new_version_starts_empty_as_a_copy_or_from_a_ydke() {
+    let t = TestApp::new().await;
+    let (version, _) = t.deck_fixture().await;
+    let deck = t.scalar("SELECT id FROM deck").await;
+    let path = format!("/decks/{deck}/versions");
+    t.set_main(version, &[(DM, "Magicien Sombre", 1)]).await;
+
+    // a copy of a version of the deck: the same cards
+    let (status, location) = t
+        .post(
+            &path,
+            &[
+                ("version_name", "copy"),
+                ("start", &format!("copy:{version}")),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let copy = t
+        .scalar("SELECT id FROM deck_version WHERE version_name = 'copy'")
+        .await;
+    assert_eq!(location, format!("/deck-builder/{copy}"));
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT sum(count) FROM deck_version_card WHERE deck_version_id = {copy}"
+        ))
+        .await,
+        1
+    );
+
+    // not a version of this deck
+    let (status, page) = t
+        .post(&path, &[("version_name", "x"), ("start", "copy:999")])
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("not one of this deck"), "{page}");
+
+    // a YDKE: its cards
+    let ydke = YdkeDeck {
+        main: vec![46986414],
+        extra: vec![],
+        side: vec![],
+    }
+    .to_url();
+    let (status, location) = t
+        .post(
+            &path,
+            &[
+                ("version_name", "imported"),
+                ("start", "ydke"),
+                ("ydke", &ydke),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
+    let imported = t
+        .scalar("SELECT id FROM deck_version WHERE version_name = 'imported'")
+        .await;
+    assert_eq!(location, format!("/deck-builder/{imported}"));
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT sum(count) FROM deck_version_card WHERE deck_version_id = {imported}"
+        ))
+        .await,
+        1
+    );
+
+    // a YDKE start without a (readable) YDKE re-renders the form
+    for text in ["", "nonsense"] {
+        let (status, page) = t
+            .post(
+                &path,
+                &[("version_name", "bad"), ("start", "ydke"), ("ydke", text)],
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            page.contains(r#"name="version_name""#) && page.contains("YDKE"),
+            "{page}"
+        );
+    }
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM deck_version WHERE version_name = 'bad'")
+            .await,
+        0
+    );
+
+    // the table of versions
+    let (_, page) = t.get(&format!("/decks/{deck}")).await;
+    assert!(page.contains(&format!("/deck-builder/{copy}")), "{page}");
+    assert!(
+        page.contains("List of") || page.contains("<td class=\"text\">—</td>"),
+        "{page}"
+    );
+}
+
+#[tokio::test]
+async fn the_card_page_lists_the_decks_not_the_versions() {
+    let t = TestApp::new().await;
+    let (version, cards) = t.deck_fixture().await;
+    let uri = format!("/api/deck-versions/{version}");
+    t.json(
+        "PATCH",
+        &uri,
+        json!({ "main": tiles(&[(DM, "Magicien Sombre", 1)]) }),
+    )
+    .await;
+    t.json("POST", &format!("{uri}/clone"), json!({ "name": "v2" }))
+        .await;
+
+    let (_, page) = t.get(&format!("/cards/{}", cards[0])).await;
+    assert!(page.contains("/decks/1\""), "{page}");
+    assert!(page.contains("In the list of 2 versions"), "{page}");
+    assert!(!page.contains("/deck-versions/"), "{page}");
+
+    let (_, page) = t.get(&format!("/cards/{}", cards[1])).await;
+    assert!(
+        page.contains("In the list of 2 versions"),
+        "every copy of the card: {page}"
     );
 }

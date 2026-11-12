@@ -70,29 +70,15 @@ pub async fn refresh(
     dry_run: bool,
 ) -> AppResult<Report> {
     let bad = |what: &str, e: serde_json::Error| AppError::Internal(format!("{what}: {e}"));
-    let products =
-        parse_products(&download(http, PRODUCTS_URL).await?).map_err(|e| bad("products", e))?;
-    let prices =
-        parse_prices(&download(http, PRICES_URL).await?).map_err(|e| bad("price guide", e))?;
+    let products = parse_products(&common::http::download(http, PRODUCTS_URL).await?)
+        .map_err(|e| bad("products", e))?;
+    let prices = parse_prices(&common::http::download(http, PRICES_URL).await?)
+        .map_err(|e| bad("price guide", e))?;
 
     let prefixes = sets_to_look_up(pool, today).await?;
     let sets = fetch_set_infos(http, &prefixes).await?;
 
     Ok(apply(pool, today, &products, &prices, &sets, dry_run).await?)
-}
-
-async fn download(http: &reqwest::Client, url: &str) -> AppResult<Vec<u8>> {
-    let internal = |e: reqwest::Error| AppError::Internal(format!("Cardmarket {url}: {e}"));
-    let bytes = http
-        .get(url)
-        .send()
-        .await
-        .and_then(reqwest::Response::error_for_status)
-        .map_err(internal)?
-        .bytes()
-        .await
-        .map_err(internal)?;
-    Ok(bytes.to_vec())
 }
 
 /// The set codes of our cards without an expansion: never looked up, or not

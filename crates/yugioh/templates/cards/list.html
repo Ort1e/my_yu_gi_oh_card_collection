@@ -20,7 +20,6 @@
           <th data-sort="text" class="text">Code</th>
           <th data-sort="text" class="text">Rarity</th>
           <th data-sort="text" class="text">Status</th>
-          <th data-sort="text" class="text">Proxy</th>
           <th data-sort="number" title="Market price × condition and language: an estimate">Estimate (€)</th>
         </tr>
       </thead>
@@ -31,7 +30,6 @@
           <td class="text">{{ card.code.as_deref().unwrap_or("") }}</td>
           <td class="text">{{ card.rarity.as_deref().unwrap_or("") }}</td>
           <td class="text">{% match card.status() %}{% when Some with (status) %}{{ status.label() }}{% when None %}{% endmatch %}</td>
-          <td class="text">{{ card.is_proxy|yes_no }}</td>
           <td>{% match card.estimate() %}{% when Some with (estimate) %}{{ estimate }}{% when None %}{% endmatch %}</td>
         </tr>
         {% endfor %}
@@ -84,13 +82,6 @@
         {% for card_type in card_types %}
         <option value="{{ card_type }}" {% if self.selected(filter.card_type, card_type) %}selected{% endif %}>{{ card_type }}</option>
         {% endfor %}
-      </select>
-
-      <label for="proxy">Proxy:</label>
-      <select name="proxy" id="proxy">
-        <option value="" {% if self.selected(filter.proxy, "") %}selected{% endif %}>All cards</option>
-        <option value="true" {% if self.selected(filter.proxy, "true") %}selected{% endif %}>Only proxy</option>
-        <option value="false" {% if self.selected(filter.proxy, "false") %}selected{% endif %}>No proxy</option>
       </select>
 
       <label for="sold">Sold:</label>

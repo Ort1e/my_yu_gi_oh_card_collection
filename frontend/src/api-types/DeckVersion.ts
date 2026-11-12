@@ -11,12 +11,26 @@ export type DeckVersion = { id: number, deck_id: number | null, deck_name: strin
 /**
  * The format it plays instead of a ban list (never both).
  */
-format_id: number | null, is_built: boolean, deck_box: string | null, sleeves: string | null, 
+format_id: number | null, is_built: boolean, 
 /**
- * What building the version did, only in the answer to building it or
- * to saving a built version's zones when cards were taken elsewhere.
+ * A plain version the owner means to build: its missing cards are on
+ * the shopping list (`/decks/shopping`).
  */
-build_report?: BuildReport, tournament: Tournament | null, main: Array<ApiCard>, extra: Array<ApiCard>, side: Array<ApiCard>, ydke: Ydke, 
+is_planned: boolean, 
+/**
+ * Shown on the public site by hand (a version played in a tournament is
+ * shown anyway).
+ */
+is_public: boolean, deck_box: string | null, sleeves: string | null, 
+/**
+ * What building the version did, only in the answer to building it.
+ */
+build_report?: BuildReport, tournament: Tournament | null, 
+/**
+ * What is left of this month's budget (negative when over it), for the
+ * builder's header; `None` when no budget was ever set.
+ */
+budget_left: string | null, main: Array<ApiCard>, extra: Array<ApiCard>, side: Array<ApiCard>, ydke: Ydke, 
 /**
  * Other versions of the same deck, for the version switcher.
  */

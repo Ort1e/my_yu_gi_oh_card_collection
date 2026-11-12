@@ -1,0 +1,23 @@
+{# The since/deck filter of the tournament list and its stats (`filter_action` = the page). #}
+  <form method="get" action="{{ self.filter_action() }}" class="tournament-filter">
+    <div class="field-row">
+      <div>
+        <label for="since">Since:</label>
+        <input type="date" name="since" id="since" value="{{ since }}">
+      </div>
+      <div class="wide">
+        <label for="deck">Deck:</label>
+        <select name="deck" id="deck">
+          <option value="">All decks</option>
+          {% for deck in decks %}
+          <option value="{{ deck.id }}" {% if deck.selected %}selected{% endif %}>{{ deck.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-buttons">
+        <input type="submit" value="Filter">
+        {% if filtered %}<a href="{{ self.filter_action() }}" class="btn btn-secondary">Clear</a>{% endif %}
+      </div>
+    </div>
+    <small>The list and the stats follow the same filter (the meta moves: stats since a date are the useful ones).</small>
+  </form>

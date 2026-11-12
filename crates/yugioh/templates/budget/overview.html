@@ -47,5 +47,15 @@
     </tbody>
   </table>
   </div>
+  <h2>Spending and cards bought</h2>
+  <canvas id="combined_chart" width="400" height="200"></canvas>
+  <h2>Cards by unit price</h2>
+  <canvas id="card_cost_chart" width="400" height="200"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script id="charts-data" type="application/json">{{ charts|safe }}</script>
+<script src="/static/js/budget_charts.js"></script>
 {% endblock %}

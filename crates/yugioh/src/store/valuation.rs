@@ -58,7 +58,7 @@ pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
          JOIN lot ON lot.id = unite.lot_id
          JOIN card ON card.id = unite.card_id
          LEFT JOIN sale ON sale.card_id = card.id AND sale.nth = 1
-         WHERE lot.lot_type = 'purchase' AND lot.is_cancelled = 0 AND card.is_proxy = 0
+         WHERE lot.lot_type = 'purchase' AND lot.is_cancelled = 0
          ORDER BY card.id",
     )
     .fetch_all(pool)
@@ -139,7 +139,7 @@ pub async fn fill_lot_estimates(pool: &Pool, lots: &mut [LotRow]) -> sqlx::Resul
         "SELECT unite.lot_id, card.last_known_status AS status, card.code,
                 {MARKET_PRICE} AS market_price
          FROM unite JOIN card ON card.id = unite.card_id
-         WHERE card.is_proxy = 0 AND NOT {SOLD_EXISTS} AND unite.lot_id IN ("
+         WHERE NOT {SOLD_EXISTS} AND unite.lot_id IN ("
     ));
     let mut ids_list = query.separated(", ");
     for id in ids {

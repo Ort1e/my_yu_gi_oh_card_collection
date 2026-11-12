@@ -11,22 +11,30 @@ async fn the_public_copy_holds_nothing_private() {
         "INSERT INTO seller (id, name, is_person) VALUES (1, 'Jeanne Privatename', 1);
          INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price)
              VALUES (1, 'purchase', '123.45', '2025-06-01', 1, '0.00');
-         INSERT INTO card (id, name, en_name, code, rarity, last_known_status, card_data_id, is_proxy)
-             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 'NM', 1, 0),
-                    (2, 'Kuriboh Proxy', 'kuriboh', 'MRD-FR071', NULL, 'NM', 2, 1);
+         INSERT INTO card (id, name, en_name, code, rarity, last_known_status, card_data_id)
+             VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 'NM', 1);
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
          INSERT INTO deck (id, name) VALUES (1, 'Secret deck');
          INSERT INTO tournament (id, name, date, conclusion, notes)
              VALUES (1, 'Rennes local', '2025-07-01', 'Fun deck', 'old tournament note');
          INSERT INTO tournament_round (tournament_id, number, result, comment)
              VALUES (1, 1, 'win', 'quick round');
-         -- public: a version played in a tournament, a version shown by hand
+         -- public: the list played in a tournament, a version shown by hand
          INSERT INTO deck (id, name) VALUES (2, 'Played deck'), (3, 'Ticked deck');
-         INSERT INTO deck_version (id, deck_id, version_name, tournament_id, is_public) VALUES
-             (10, 2, 'Played version', 1, 0), (11, 2, 'Draft version', NULL, 0),
-             (12, 3, 'Any version', NULL, 1), (14, 3, 'Hidden version', NULL, 0),
-             (13, 1, 'Secret version', NULL, 0);
-         INSERT INTO deck_version_main_deck VALUES (10, 1), (11, 2), (13, 2);
+         INSERT INTO deck_version (id, deck_id, version_name, is_public) VALUES
+             (10, 2, 'Played version', 0), (11, 2, 'Draft version', 0),
+             (12, 3, 'Any version', 1), (14, 3, 'Hidden version', 0),
+             (13, 1, 'Secret version', 0);
+         UPDATE deck_version SET deck_box = 'secret box', sleeves = 'secret sleeves' WHERE id = 12;
+         INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position) VALUES
+             (10, 'main', 1, 'Magicien Sombre', 1, 1), (11, 'main', 2, 'Kuriboh Draft', 1, 1),
+             (13, 'main', 2, 'Kuriboh Draft', 1, 1);
+         INSERT INTO deck_snapshot (id, deck_id, version_id, created_at, name, tournament_id) VALUES
+             (20, 2, 10, '2025-07-01 00:00:00', 'Played list', 1),
+             (21, 2, 11, '2025-07-02 00:00:00', 'Draft list', NULL),
+             (22, 1, 13, '2025-07-02 00:00:00', 'Secret list', NULL);
+         INSERT INTO deck_snapshot_card (snapshot_id, zone, card_data_id, name, count, position) VALUES
+             (20, 'main', 1, 'Magicien Sombre', 1, 1), (21, 'main', 2, 'Kuriboh Draft', 1, 1);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
                                    name_en, rarity, category, variants, json, fetched_at)
@@ -79,10 +87,11 @@ async fn the_public_copy_holds_nothing_private() {
         "books-random.html",
         "decks.html",
         "decks-2.html",
-        "deck-versions-10.html",
+        "deck-snapshots-20.html",
         "deck-versions-12.html",
         "tournaments.html",
         "tournaments-1.html",
+        "tournaments-stats.html",
         "img/card-image-1.webp",
         "static/css/style.css",
         "static/js/card_preview.js",
@@ -92,6 +101,9 @@ async fn the_public_copy_holds_nothing_private() {
         assert!(out.join(page).exists(), "{page} is missing");
     }
     for page in [
+        "deck-versions-10.html",
+        "deck-snapshots-21.html",
+        "deck-snapshots-22.html",
         "books-2.html",
         "books-series-1.html",
         "books-authors-1.html",
@@ -113,7 +125,7 @@ async fn the_public_copy_holds_nothing_private() {
         "Assassin&#x27;s Apprentice",
         "Collection statistics",
         "Played deck",
-        "Played version",
+        "Played list",
         "Ticked deck",
         "Any version",
         "Rennes local",
@@ -127,6 +139,12 @@ async fn the_public_copy_holds_nothing_private() {
     ] {
         assert!(pages.contains(shown), "{shown} is missing");
     }
+    // the statistics keep the most valuable cards in the copy, which has no
+    // Value page to send them to
+    let stats = std::fs::read_to_string(out.join("collection-stats.html")).unwrap();
+    assert!(stats.contains("The most valuable"), "{stats}");
+    assert!(!stats.contains("/collection/value"), "{stats}");
+
     // a page of the copy links only to the copy's files
     for (i, _) in pages.match_indices("href=\"") {
         let link = &pages[i + 6..];
@@ -137,8 +155,8 @@ async fn the_public_copy_holds_nothing_private() {
         assert!(inside, "{link}: not in the copy");
     }
     // never: sellers, prices paid, lots, private decks and versions,
-    // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, proxies (but
-    // in a public deck), the deck builder, links to the app
+    // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, the
+    // cards of private decks, the deck builder, links to the app
     for private in [
         "Privatename",
         "123.45",
@@ -149,15 +167,19 @@ async fn the_public_copy_holds_nothing_private() {
         "Secret deck",
         "Secret version",
         "Draft version",
+        "Draft list",
+        "Secret list",
         "Hidden version",
         "deck-builder",
         "old tournament note",
         "Deck labels",
         "secret note",
+        "secret box",
+        "secret sleeves",
         "wish note",
         "book note",
         "9780553573398",
-        "Kuriboh Proxy",
+        "Kuriboh Draft",
         "Hidden Diary",
         "Hidden Series",
         "Hidden Author",
@@ -171,6 +193,10 @@ async fn the_public_copy_holds_nothing_private() {
         "src=\"/",
         "Edit",
         "your max",
+        "wants list",
+        "Show on the public site",
+        "cardmarket.com",
+        "name=\"version_name\"",
     ] {
         assert!(!pages.contains(private), "{private} is in the public copy");
     }

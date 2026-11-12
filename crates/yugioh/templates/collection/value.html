@@ -48,22 +48,27 @@
 
   <canvas id="value_chart" width="400" height="160"></canvas>
 
-  <h2>Most valuable copies</h2>
+  <details class="value-fold" open>
+  <summary><h2>Most valuable copies</h2></summary>
   {% let lines = self.top_lines() %}
   {% include "partials/copy_values_table.html" %}
   <p class="value-note">Paid: the card's price in its lot, without shipping; "—" when the lot was bought as a whole.</p>
+  </details>
 
-  <h2>Biggest losses</h2>
+  <details class="value-fold">
+  <summary><h2>Biggest losses</h2></summary>
   {% if losses.is_empty() %}
   <p>No copy is worth less than its price in its lot.</p>
   {% else %}
   {% let lines = self.loss_lines() %}
   {% include "partials/copy_values_table.html" %}
   {% endif %}
+  </details>
 
   {% include "partials/price_moves.html" %}
 
-  <h2>Gain / loss by lot</h2>
+  <details class="value-fold">
+  <summary><h2>Gain / loss by lot</h2></summary>
   <p class="value-note">Each purchase lot against its full price (shipping included): the value today of its cards
     still owned, plus what its sold cards brought (their price in the sale lot), minus the lot's price.
     Lots without cards (sleeves, boxes…) are left out. The 10 first of each list.</p>
@@ -86,30 +91,10 @@
   {% let lots = self.lots_by_loss() %}
   {% include "partials/lot_gains_table.html" %}
   {% endif %}
+  </details>
 
-  <h2>By deck</h2>
-  <p class="value-note">Each deck's latest version. Proxies: what the missing cards would cost.</p>
-  <div class="table-scroll">
-  <table class="numbers sortable">
-    <thead>
-      <tr><th data-sort="text">Deck</th><th class="phone-hide" data-sort="number">Cards</th><th data-sort="number">Value (€)</th><th class="phone-hide" data-sort="number">Proxies</th><th data-sort="number">Proxies (€)</th></tr>
-    </thead>
-    <tbody>
-      {% for deck in decks %}
-      <tr>
-        <td>
-          <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
-          <div class="cell-note">{{ deck.version }}</div>
-        </td>
-        <td class="phone-hide">{{ deck.cards }}</td>
-        <td>{{ deck.value|money }}</td>
-        <td class="phone-hide">{{ deck.proxies }}</td>
-        <td>{{ deck.proxies_value|money }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
+  <p class="value-note">The value of each deck is on <a href="/decks/built">Built decks</a>; the collection counted by rarity,
+    set, language… on <a href="/collection/stats">Statistics</a>.</p>
   {% endmatch %}
 </div>
 {% endblock %}

@@ -1,0 +1,4 @@
+<li>
+  <strong>{{ booster.name }}</strong> · {% if booster.price.is_empty() %}no price{% else %}{{ booster.price }} €{% endif %} · {{ booster.wished }} wished {% if booster.wished == 1 %}card{% else %}cards{% endif %}
+  {% if !booster.sets.is_empty() %}<div class="hint">{{ booster.sets }}</div>{% endif %}
+</li>

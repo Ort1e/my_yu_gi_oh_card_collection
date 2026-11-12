@@ -11,7 +11,6 @@
       <label for="cards-{{ i }}-en_name">English name:</label>
       <input type="text" name="cards-{{ i }}-en_name" id="cards-{{ i }}-en_name" value="{{ row.en_name }}" maxlength="255" placeholder="defaults to the name">
     </div>
-    <label class="switch"><input type="checkbox" name="cards-{{ i }}-is_proxy" {% if row.is_proxy %}checked{% endif %}> Proxy</label>
   </div>
 
   <div class="field-row">

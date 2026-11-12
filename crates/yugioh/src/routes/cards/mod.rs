@@ -12,7 +12,7 @@ use yugioh_domain::valuation::copy_value;
 
 use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
-use crate::store::models::{CardRow, DeckVersionRow, LotRow};
+use crate::store::models::{CardRow, LotRow};
 use crate::store::prices::history::card_history;
 use crate::store::valuation::fill_lot_estimates;
 use crate::web::error::{AppResult, OrNotFound};
@@ -22,7 +22,7 @@ use crate::AppState;
 use common::web::tiles::{CardTile, View};
 
 /// Card search filters (Django: `CardFilterSerializer` / `filter_cards_queryset`).
-/// `proxy` and `sold` take "true" / "false"; anything else means "all".
+/// `sold` takes "true" / "false"; anything else means "all".
 #[derive(Debug, Default, Deserialize)]
 pub struct CardFilter {
     pub name: Option<String>,
@@ -31,7 +31,6 @@ pub struct CardFilter {
     /// A rarity label, matched exactly.
     pub rarity: Option<String>,
     pub card_type: Option<String>,
-    pub proxy: Option<String>,
     pub sold: Option<String>,
     /// `grid` (default), `table`: [`View`].
     pub view: Option<String>,
@@ -59,9 +58,6 @@ impl CardFilter {
         }
         if let Some(rarity) = Self::text(&self.rarity) {
             qb.push(" AND card.rarity = ").push_bind(rarity.to_string());
-        }
-        if let Some(proxy) = Self::flag(&self.proxy) {
-            qb.push(" AND card.is_proxy = ").push_bind(proxy);
         }
         if let Some(name) = Self::text(&self.name) {
             let pattern = like_pattern(name);
@@ -98,7 +94,6 @@ impl CardFilter {
             ("status", self.status.as_deref()),
             ("rarity", self.rarity.as_deref()),
             ("card_type", self.card_type.as_deref()),
-            ("proxy", self.proxy.as_deref()),
             ("sold", self.sold.as_deref()),
         ])
     }
@@ -154,7 +149,6 @@ pub async fn list(
     let public = common::export::public_copy();
     if public {
         // the cards owned only
-        filter.proxy = Some("false".into());
         filter.sold = Some("false".into());
     }
 
@@ -202,11 +196,25 @@ pub struct CardDetail {
     /// The lot the card came from (its first unite) and its price there.
     lot: Option<LotRow>,
     price: Option<Money>,
-    versions: Vec<DeckVersionRow>,
+    /// The decks with this copy in one of their versions (the versions
+    /// are on the deck's page).
+    decks: Vec<CardDeck>,
     /// `None` before the card's first price refresh.
     market: Option<MarketPrice>,
     /// What the card says (`None` before its card data is linked).
     text: Option<text::CardText>,
+}
+
+/// A deck using the copy.
+#[derive(sqlx::FromRow)]
+pub struct CardDeck {
+    id: i64,
+    name: String,
+    /// How many of its versions list the card (or hold this copy).
+    versions: i64,
+    /// A built version of it holds this very copy: out of the collection
+    /// for the other decks.
+    built: bool,
 }
 
 /// The card's market price (`card_price`) and what this copy is worth.
@@ -288,14 +296,15 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         None => (None, None),
     };
 
-    let versions = sqlx::query_as(&format!(
-        "{} WHERE deck_version.id IN (
-            SELECT deck_version_id FROM deck_version_main_deck WHERE card_id = ?1
-            UNION SELECT deck_version_id FROM deck_version_extra_deck WHERE card_id = ?1
-            UNION SELECT deck_version_id FROM deck_version_side_deck WHERE card_id = ?1)
-         ORDER BY deck_version.id",
-        DeckVersionRow::SELECT
-    ))
+    let decks: Vec<CardDeck> = sqlx::query_as(
+        "SELECT deck.id, deck.name, COUNT(*) AS versions,
+                MAX(v.id IN (SELECT deck_version_id FROM deck_version_copy WHERE card_id = ?1)) AS built
+         FROM deck_version v JOIN deck ON deck.id = v.deck_id
+         WHERE v.id IN (SELECT deck_version_id FROM deck_version_copy WHERE card_id = ?1)
+            OR v.id IN (SELECT deck_version_id FROM deck_version_card
+                        WHERE card_data_id = (SELECT card_data_id FROM card WHERE id = ?1))
+         GROUP BY deck.id ORDER BY deck.name COLLATE NOCASE",
+    )
     .bind(id)
     .fetch_all(pool)
     .await?;
@@ -317,7 +326,7 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         card,
         lot,
         price,
-        versions,
+        decks,
         market,
         text,
     })

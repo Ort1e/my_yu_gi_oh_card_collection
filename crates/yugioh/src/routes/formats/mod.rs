@@ -1,11 +1,13 @@
 //! `/formats`: the formats (Edison, Goat…) a deck version can play instead
-//! of a Konami ban list: their list, and a format's page with its own list
-//! of forbidden and limited cards (`store::formats`, the rules:
-//! `yugioh_domain::format`). `form.rs` creates and changes them.
+//! of a Konami ban list: their list, and a format's read page with its own
+//! list of forbidden and limited cards (`store::formats`, the rules:
+//! `yugioh_domain::format`). `form.rs` creates and changes them, on
+//! `/formats/:id/edit` (the same data, `FormatEditPage`).
 
 pub mod form;
 
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use askama::Template;
 use axum::extract::{Path, State};
@@ -87,8 +89,22 @@ pub struct FormatPage {
     used_by: Vec<(i64, String)>,
     /// Every version of this name: `(id, version, this one)`, newest first.
     versions: Vec<(i64, i64, bool)>,
-    /// The card names known, for the "add a card" field.
+    /// The card names known, for the "add a card" field (the edit page's).
     card_names: Vec<String>,
+}
+
+/// `/formats/:id/edit`: the read page's data, its fields read through
+/// `Deref` by the template.
+#[derive(Template)]
+#[template(path = "formats/edit.html")]
+pub struct FormatEditPage(FormatPage);
+
+impl Deref for FormatEditPage {
+    type Target = FormatPage;
+
+    fn deref(&self) -> &FormatPage {
+        &self.0
+    }
 }
 
 impl FormatPage {
@@ -101,10 +117,21 @@ impl FormatPage {
     }
 }
 
-pub(crate) async fn format_page(
+/// The edit page of format `id`, with these errors at the top.
+pub(crate) async fn edit_page(
     pool: &Pool,
     id: i64,
     errors: Vec<String>,
+) -> AppResult<FormatEditPage> {
+    Ok(FormatEditPage(format_page(pool, id, errors, true).await?))
+}
+
+/// Format `id`'s page data; the card names only for the edit page.
+async fn format_page(
+    pool: &Pool,
+    id: i64,
+    errors: Vec<String>,
+    edit: bool,
 ) -> AppResult<FormatPage> {
     let format: FormatRow = sqlx::query_as(&format!("{} WHERE id = ?", FormatRow::SELECT))
         .bind(id)
@@ -166,12 +193,16 @@ pub(crate) async fn format_page(
     .bind(&format.name)
     .fetch_all(pool)
     .await?;
-    let card_names = sqlx::query_scalar(
-        "SELECT DISTINCT coalesce(json_extract(json_data, '$.name'), en_name) AS name
-         FROM card_data ORDER BY name COLLATE NOCASE",
-    )
-    .fetch_all(pool)
-    .await?;
+    let card_names = if edit {
+        sqlx::query_scalar(
+            "SELECT DISTINCT coalesce(json_extract(json_data, '$.name'), en_name) AS name
+             FROM card_data ORDER BY name COLLATE NOCASE",
+        )
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
 
     Ok(FormatPage {
         format,
@@ -186,5 +217,10 @@ pub(crate) async fn format_page(
 
 /// `GET /formats/:id`.
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<FormatPage> {
-    format_page(&state.pool, id, Vec::new()).await
+    format_page(&state.pool, id, Vec::new(), false).await
+}
+
+/// `GET /formats/:id/edit`.
+pub async fn edit(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<FormatEditPage> {
+    edit_page(&state.pool, id, Vec::new()).await
 }

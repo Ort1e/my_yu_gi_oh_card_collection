@@ -1,83 +1,177 @@
-//! The deck builder JSON API.
+//! The deck builder JSON API: versions as lists (`store::lists`).
 
 use super::*;
+use crate::testing::{tiles, DM, KURIBOH};
 use serde_json::json;
 
+/// `(missing, card data)` of each tile of a zone.
+fn zone(deck: &serde_json::Value, zone: &str) -> Vec<(bool, i64)> {
+    deck[zone]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            (
+                c["missing"].as_bool().unwrap(),
+                c["card_data_id"].as_i64().unwrap_or(0),
+            )
+        })
+        .collect()
+}
+
 #[tokio::test]
-async fn deck_version_zones_and_reserve() {
+async fn a_version_is_a_list_and_the_collection_says_what_is_owned() {
     let t = TestApp::new().await;
-    let (v, cards) = t.deck_fixture().await;
+    let (v, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{v}");
 
     let (status, deck) = t.json("GET", &uri, json!(null)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(deck["main"], json!([]));
     assert_eq!(deck["versions"].as_array().unwrap().len(), 1);
-    assert_eq!(deck["ydke"]["with_proxies"], "ydke://!!!");
+    assert_eq!(deck["ydke"]["all"], "ydke://!!!");
+    assert_eq!(deck["budget_left"], json!(null), "no budget set yet");
+    assert_eq!(deck["is_planned"], false);
 
-    // reserve: owned, non-proxy cards only
-    let (_, reserve) = t
+    // a budget for this month: what is left of it shows in the header
+    let month = crate::store::db::today().format("%Y-%m-01").to_string();
+    t.exec(&format!(
+        "INSERT INTO monthly_budget (month, amount) VALUES ('{month}', '30.00')"
+    ))
+    .await;
+    let (_, deck) = t.json("GET", &uri, json!(null)).await;
+    assert!(deck["budget_left"].is_string(), "{deck}");
+
+    // the search: a card owned twice, a card known but not owned
+    let (_, found) = t
         .json(
             "POST",
             &format!("{uri}/reserve"),
             json!({ "name": "magician" }),
         )
         .await;
-    assert_eq!(reserve.as_array().unwrap().len(), 2);
-    let (_, reserve) = t
+    assert_eq!(found.as_array().unwrap().len(), 1, "{found}");
+    assert_eq!(found[0]["card_data_id"], 1);
+    assert_eq!(found[0]["name"], "Magicien Sombre");
+    assert_eq!(
+        (found[0]["owned"].clone(), found[0]["free"].clone()),
+        (json!(2), json!(2))
+    );
+    assert_eq!(found[0]["missing"], false);
+    let (_, found) = t
         .json(
             "POST",
             &format!("{uri}/reserve"),
             json!({ "name": "kuriboh" }),
         )
         .await;
-    assert_eq!(reserve, json!([]), "proxies are not in the reserve");
-
-    let (status, deck) = t
-        .json(
-            "PATCH",
-            &uri,
-            json!({ "main": [cards[0]], "side": [cards[2]], "ban_list_id": null }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{deck}");
-    assert_eq!(deck["main"][0]["id"], cards[0]);
-    assert_eq!(deck["main"][0]["price"], "2.25");
-    assert_eq!(deck["side"][0]["is_proxy"], true);
-    let ydke =
-        yugioh_domain::ydke::YdkeDeck::parse(deck["ydke"]["without_proxies"].as_str().unwrap())
-            .unwrap();
-    assert_eq!(ydke.main, vec![46986414]);
-    assert!(ydke.side.is_empty());
-
-    let (_, reserve) = t
+    assert_eq!(found[0]["card_data_id"], 2, "{found}");
+    assert_eq!(found[0]["missing"], true);
+    let (_, found) = t
         .json(
             "POST",
             &format!("{uri}/reserve"),
-            json!({ "name": "magician" }),
+            json!({ "code": "LOB-FR" }),
         )
         .await;
     assert_eq!(
-        reserve.as_array().unwrap().len(),
+        found.as_array().unwrap().len(),
         1,
-        "cards in the deck leave the reserve"
+        "by code: the owned ones"
     );
 
-    let (status, error) = t.json("PATCH", &uri, json!({ "main": [999999] })).await;
+    // 3 Dark Magicians (2 owned) and a Kuriboh
+    let deck = t
+        .patch(
+            v,
+            json!({
+                "main": tiles(&[(DM, "Magicien Sombre", 3)]),
+                "side": tiles(&[(KURIBOH, "Kuriboh", 1)]),
+                "ban_list_id": null,
+            }),
+        )
+        .await;
+    assert_eq!(zone(&deck, "main"), vec![(false, 1), (false, 1), (true, 1)]);
+    assert_eq!(zone(&deck, "side"), vec![(true, 2)]);
+    assert_eq!(deck["main"][0]["price"], "2.25");
+    assert_eq!(deck["main"][2]["price"], json!(null));
+    assert_eq!(
+        deck["main"][0]["copy"],
+        json!(null),
+        "a plain list holds no copy"
+    );
+    assert!(deck["main"][0]["sample_copy"].is_i64());
+    let owned =
+        yugioh_domain::ydke::YdkeDeck::parse(deck["ydke"]["owned"].as_str().unwrap()).unwrap();
+    assert_eq!(owned.main, vec![46986414, 46986414]);
+    assert!(owned.side.is_empty());
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT count(*) FROM deck_version_card WHERE deck_version_id = {v}"
+        ))
+        .await,
+        2,
+        "one line per card"
+    );
+    assert_eq!(t.scalar("SELECT count(*) FROM deck_version_copy").await, 0);
+
+    let (status, error) = t
+        .json(
+            "PATCH",
+            &uri,
+            json!({ "main": [{ "card_data_id": 999999, "name": "x" }] }),
+        )
+        .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(error["error"].as_str().unwrap().contains("don't exist"));
 
-    let (_, deck) = t.json("PATCH", &uri, json!({ "version_name": "v2" })).await;
+    let deck = t.patch(v, json!({ "version_name": "v2" })).await;
     assert_eq!(deck["version_name"], "v2");
-    assert_eq!(deck["main"][0]["id"], cards[0], "zones untouched");
+    assert_eq!(deck["main"].as_array().unwrap().len(), 3, "zones untouched");
+
+    // only the Main Deck sent: the others keep their lines
+    let deck = t.set_main(v, &[(DM, "Magicien Sombre", 1)]).await;
+    assert_eq!(zone(&deck, "side"), vec![(true, 2)]);
+}
+
+#[tokio::test]
+async fn a_copy_bought_is_owned_at_once_in_every_list() {
+    let t = TestApp::new().await;
+    let (v, _) = t.deck_fixture().await;
+    let deck = t.set_main(v, &[(KURIBOH, "Kuriboh", 1)]).await;
+    assert_eq!(zone(&deck, "main"), vec![(true, 2)]);
+
+    t.exec("INSERT INTO card (name, en_name, card_data_id) VALUES ('Kuriboh', 'kuriboh', 2)")
+        .await;
+    let (_, deck) = t
+        .json("GET", &format!("/api/deck-versions/{v}"), json!(null))
+        .await;
+    assert_eq!(zone(&deck, "main"), vec![(false, 2)]);
+
+    // two plain lists may count on the same copy
+    let (_, other) = t
+        .json(
+            "POST",
+            &format!("/api/deck-versions/{v}/clone"),
+            json!({ "name": "v2" }),
+        )
+        .await;
+    let (_, deck) = t
+        .json(
+            "GET",
+            &format!("/api/deck-versions/{}", other["id"]),
+            json!(null),
+        )
+        .await;
+    assert_eq!(zone(&deck, "main"), vec![(false, 2)]);
 }
 
 #[tokio::test]
 async fn categories_and_monte_carlo() {
     let t = TestApp::new().await;
-    let (v, cards) = t.deck_fixture().await;
+    let (v, _) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{v}");
-    t.json("PATCH", &uri, json!({ "main": [cards[0], cards[1]] }))
+    t.set_main(v, &[(DM, "Magicien Sombre", 2), (KURIBOH, "Kuriboh", 1)])
         .await;
 
     let (status, cat) = t
@@ -89,27 +183,26 @@ async fn categories_and_monte_carlo() {
         .await;
     assert_eq!(status, StatusCode::CREATED);
     let cat_id = cat["id"].as_i64().unwrap();
-    for card in &cards[..2] {
-        let (status, _) = t
-            .json(
-                "PUT",
-                &format!("{uri}/cards/{card}/categories/{cat_id}"),
-                json!({ "assigned": true }),
-            )
-            .await;
-        assert_eq!(status, StatusCode::NO_CONTENT);
-    }
-    let (_, list) = t
+    // a category is given to a card (its card data): all its copies
+    let (status, _) = t
         .json(
-            "GET",
-            &format!("{uri}/cards/{}/categories", cards[0]),
-            json!(null),
+            "PUT",
+            &format!("{uri}/cards/1/categories/{cat_id}"),
+            json!({ "assigned": true }),
         )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, list) = t
+        .json("GET", &format!("{uri}/cards/1/categories"), json!(null))
         .await;
     assert_eq!(
         list,
         json!([{ "id": cat_id, "name": "starter", "assigned": true }])
     );
+    let (_, list) = t
+        .json("GET", &format!("{uri}/cards/2/categories"), json!(null))
+        .await;
+    assert_eq!(list[0]["assigned"], false);
 
     let (status, result) = t
         .json(
@@ -119,10 +212,10 @@ async fn categories_and_monte_carlo() {
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{result}");
-    assert_eq!(result["categories"][0]["cards_in_deck"], 2);
+    assert_eq!(result["categories"][0]["cards_in_deck"], 2, "two copies");
     assert_eq!(
         result["categories"][0]["occurrences"], 200,
-        "the whole 2-card deck is drawn"
+        "the whole 3-card deck is drawn"
     );
     let (status, _) = t
         .json(
@@ -133,14 +226,40 @@ async fn categories_and_monte_carlo() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
-    // removing a card from the deck drops its assignments
-    t.json("PATCH", &uri, json!({ "main": [cards[0]] })).await;
+    // on the zones as they are on the screen, saved or not: one copy, and
+    // a card known by its name only
+    let (status, result) = t
+        .json(
+            "POST",
+            &format!("{uri}/monte-carlo"),
+            json!({ "hand_size": 5, "simulations": 100, "main": [1, null] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(result["categories"][0]["cards_in_deck"], 1);
+    let (status, _) = t
+        .json(
+            "POST",
+            &format!("{uri}/monte-carlo"),
+            json!({ "hand_size": 5, "simulations": 100, "main": [999_999] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // a card taken out of the deck loses its assignments
+    t.set_main(v, &[(KURIBOH, "Kuriboh", 1)]).await;
     assert_eq!(
         t.scalar("SELECT count(*) FROM card_category_assignment")
             .await,
-        1
+        0
     );
-
+    t.set_main(v, &[(DM, "Magicien Sombre", 1)]).await;
+    t.json(
+        "PUT",
+        &format!("{uri}/cards/1/categories/{cat_id}"),
+        json!({ "assigned": true }),
+    )
+    .await;
     let (status, _) = t
         .json("DELETE", &format!("{uri}/categories/{cat_id}"), json!(null))
         .await;
@@ -199,25 +318,44 @@ async fn conditional_categories() {
 }
 
 #[tokio::test]
-async fn proxies_clone_and_delete() {
+async fn missing_cards_clone_and_delete() {
     let t = TestApp::new().await;
     let (v, cards) = t.deck_fixture().await;
     let uri = format!("/api/deck-versions/{v}");
-    // the Kuriboh proxy belongs to a lot
-    t.json("PATCH", &uri, json!({ "main": [cards[0], cards[2]] }))
-        .await;
+    t.set_main(v, &[(DM, "Magicien Sombre", 1)]).await;
 
-    let (status, proxy) = t
+    // "+ Missing card": a tile of a card known by its name, nothing saved
+    let (status, tile) = t
         .json(
             "POST",
-            &format!("{uri}/proxies"),
-            json!({ "name": "Dark Magician", "zone": "extra" }),
+            &format!("{uri}/lookup"),
+            json!({ "name": "Kuriboh" }),
         )
         .await;
-    assert_eq!(status, StatusCode::CREATED, "{proxy}");
-    assert_eq!(proxy["is_proxy"], true);
-    assert_eq!(proxy["card_data_id"], 1);
-    let proxy_id = proxy["id"].as_i64().unwrap();
+    assert_eq!(status, StatusCode::OK, "{tile}");
+    assert_eq!(tile["card_data_id"], 2);
+    assert_eq!(tile["missing"], true);
+    let (status, _) = t
+        .json("POST", &format!("{uri}/lookup"), json!({ "name": " " }))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        t.scalar(&format!(
+            "SELECT count(*) FROM deck_version_card WHERE deck_version_id = {v}"
+        ))
+        .await,
+        1
+    );
+
+    // a name-only card (not in ygoprodeck) is never owned
+    let deck = t
+        .patch(
+            v,
+            json!({ "extra": [{ "card_data_id": null, "name": "Some Fan Card" }] }),
+        )
+        .await;
+    assert_eq!(zone(&deck, "extra"), vec![(true, 0)]);
+    assert_eq!(deck["extra"][0]["name"], "Some Fan Card");
 
     let (status, clone) = t
         .json("POST", &format!("{uri}/clone"), json!({ "name": "v2" }))
@@ -230,47 +368,25 @@ async fn proxies_clone_and_delete() {
             json!(null),
         )
         .await;
-    assert_eq!(cloned["main"][0]["id"], cards[0], "real cards are shared");
-    assert_ne!(cloned["extra"][0]["id"], proxy_id, "proxies are duplicated");
+    assert_eq!(zone(&cloned, "main"), vec![(false, 1)]);
+    assert_eq!(cloned["extra"][0]["name"], "Some Fan Card");
     assert_eq!(cloned["versions"].as_array().unwrap().len(), 2);
-
-    let (status, _) = t
-        .json("DELETE", &format!("{uri}/proxies/{proxy_id}"), json!(null))
-        .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    assert_eq!(
-        t.scalar(&format!("SELECT count(*) FROM card WHERE id = {proxy_id}"))
-            .await,
-        0
-    );
-    let (status, _) = t
-        .json(
-            "DELETE",
-            &format!("{uri}/proxies/{}", cards[0]),
-            json!(null),
-        )
-        .await;
-    assert_eq!(
-        status,
-        StatusCode::BAD_REQUEST,
-        "owned cards can't be deleted"
-    );
 
     let (status, deleted) = t.json("DELETE", &uri, json!(null)).await;
     assert_eq!(status, StatusCode::OK);
     assert!(deleted["deck_id"].is_i64());
     assert_eq!(
+        t.json("GET", &uri, json!(null)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
         t.scalar(&format!(
             "SELECT count(*) FROM card WHERE id = {}",
-            cards[2]
+            cards[0]
         ))
         .await,
         1,
-        "a proxy bought in a lot is kept"
-    );
-    assert_eq!(
-        t.json("GET", &uri, json!(null)).await.0,
-        StatusCode::NOT_FOUND
+        "the cards stay in the collection"
     );
 }
 
@@ -301,21 +417,20 @@ async fn ydke_import() {
             json!(null),
         )
         .await;
-    let proxies: Vec<bool> = deck["main"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| c["is_proxy"].as_bool().unwrap())
-        .collect();
     assert_eq!(
-        proxies.iter().filter(|p| !**p).count(),
-        2,
-        "both owned copies are reused"
+        zone(&deck, "main"),
+        vec![(false, 1), (false, 1), (true, 1)],
+        "the 2 owned copies count"
     );
-    assert_eq!(proxies.len(), 3);
+    assert_eq!(zone(&deck, "side"), vec![(true, 2)]);
     assert_eq!(
-        deck["side"][0]["is_proxy"], true,
-        "the owned Kuriboh is a proxy, so a new proxy is made"
+        t.scalar(&format!(
+            "SELECT count FROM deck_version_card WHERE deck_version_id = {} AND zone = 'main'",
+            created["id"]
+        ))
+        .await,
+        3,
+        "one line of 3"
     );
 
     let (status, error) = t
@@ -327,83 +442,4 @@ async fn ydke_import() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(error["error"], "Invalid YDKE URL");
-}
-
-#[tokio::test]
-async fn saving_zones_deletes_unused_proxies() {
-    let t = TestApp::new().await;
-    let (version, _) = t.deck_fixture().await;
-    // no owned Kuriboh: only saving the zones can remove this proxy
-    let (status, proxy) = t
-        .json(
-            "POST",
-            &format!("/api/deck-versions/{version}/proxies"),
-            json!({ "name": "Kuriboh", "zone": "main" }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::CREATED);
-    let proxy = proxy["id"].as_i64().unwrap();
-
-    let (status, _) = t
-        .json(
-            "PATCH",
-            &format!("/api/deck-versions/{version}"),
-            json!({ "main": [] }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(
-        t.scalar(&format!("SELECT count(*) FROM card WHERE id = {proxy}"))
-            .await,
-        0
-    );
-}
-
-#[tokio::test]
-async fn new_cards_replace_deck_proxies_in_the_background() {
-    let t = TestApp::new().await;
-    let (version, _) = t.deck_fixture().await;
-    let (status, _) = t
-        .json(
-            "POST",
-            &format!("/api/deck-versions/{version}/proxies"),
-            json!({ "name": "Dark Magician", "zone": "main" }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::CREATED);
-    // by name, not by id: SQLite reuses the id of a deleted card
-    let proxies_in_main = format!(
-        "SELECT count(*) FROM deck_version_main_deck m JOIN card ON card.id = m.card_id
-         WHERE m.deck_version_id = {version} AND card.is_proxy = 1 AND card.card_data_id = 1"
-    );
-    assert_eq!(t.scalar(&proxies_in_main).await, 1);
-
-    // saving new cards runs the background task: link, translate, then
-    // replace the proxy by an owned Dark Magician and delete it
-    t.post("/lots/add", LOT).await;
-    for _ in 0..100 {
-        if t.scalar(&proxies_in_main).await == 0 {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
-    assert_eq!(t.scalar(&proxies_in_main).await, 0, "proxy replaced");
-    assert_eq!(
-        t.scalar(&format!(
-            "SELECT count(*) FROM deck_version_main_deck m JOIN card ON card.id = m.card_id
-             WHERE m.deck_version_id = {version} AND card.is_proxy = 0 AND card.card_data_id = 1"
-        ))
-        .await,
-        1,
-        "by an owned copy"
-    );
-    assert_eq!(
-        t.scalar(
-            "SELECT count(*) FROM card WHERE is_proxy = 1 AND card_data_id = 1
-             AND id NOT IN (SELECT card_id FROM unite)"
-        )
-        .await,
-        0,
-        "the unused proxy is deleted"
-    );
 }

@@ -33,7 +33,7 @@
 {# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
 <details class="danger-zone">
   <summary>Delete this deck…</summary>
-  <p>Its versions go with it; its cards stay in the collection (its proxies are deleted).</p>
+  <p>Its versions go with it; its cards stay in the collection.</p>
   <form method="post" action="/decks/{{ id }}/delete" data-confirm="Delete this deck and all its versions?">
     <button type="submit" class="btn-danger">Delete this deck</button>
   </form>

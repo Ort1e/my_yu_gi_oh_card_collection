@@ -1,12 +1,54 @@
 // Pure helpers for cards and zones.
 
 import type { ApiCard } from './api-types/ApiCard';
+import type { CardInput } from './api-types/CardInput';
 import type { DeckVersion } from './api-types/DeckVersion';
 import type { VersionUpdate } from './api-types/VersionUpdate';
 import type { Zone } from './api-types/Zone';
-import type { BanStatus, DeckZones, Rules } from './types';
+import type { BanStatus, DeckZones, Rules, Tile } from './types';
 
 export const ZONES: Zone[] = ['main', 'extra', 'side'];
+
+let lastId = 0;
+
+/** The API's tiles, each with a new id of the builder's own. */
+export function tiles(cards: ApiCard[]): Tile[] {
+    return cards.map((card) => ({ ...card, id: ++lastId }));
+}
+
+/** Another tile of the same card (a search result dropped in a zone). */
+export const copyOf = (tile: Tile): Tile => ({ ...tile, id: ++lastId, copy: null });
+
+/** What makes two tiles the same card: its card data, else its name. */
+const cardKey = (card: ApiCard) => (card.card_data_id != null ? `#${card.card_data_id}` : `name:${card.name}`);
+
+/**
+ * The tiles of the zones with `missing` worked out again, as the server
+ * does (`ownership::missing`): a card's tiles beyond the copies the version
+ * can count on (`free + here`), in zone order (main, extra, side).
+ */
+export function markMissing(zones: DeckZones): DeckZones {
+    const used = new Map<string, number>();
+    const marked = {} as DeckZones;
+
+    for (const zone of ZONES) {
+        marked[zone] = zones[zone].map((card) => {
+            if (card.card_data_id == null) return { ...card, missing: true };
+
+            const key = cardKey(card);
+            const n = (used.get(key) ?? 0) + 1;
+            used.set(key, n);
+
+            return { ...card, missing: n > card.free + card.here };
+        });
+    }
+
+    return marked;
+}
+
+/** A zone as the API takes it: a card per tile (grouped into lines there). */
+export const cardInputs = (cards: Tile[]): CardInput[] =>
+    cards.map((c) => ({ card_data_id: c.card_data_id, name: c.name }) satisfies CardInput);
 
 /**
  * The kind of a card from its type, as `yugioh_domain::stats::kind`: 0
@@ -39,8 +81,8 @@ export function sortName(name: string | null): string {
  * name ignoring case and accents (the copies of a card together, whatever
  * their language), then the name shown, then the id.
  */
-export function sortCards(cards: ApiCard[]): ApiCard[] {
-    const key = (c: ApiCard): [number, string, string, number] => [
+export function sortCards(cards: Tile[]): Tile[] {
+    const key = (c: Tile): [number, string, string, number] => [
         kindRank(c.card_type),
         sortName(c.name_en || c.name),
         sortName(c.name),
@@ -127,22 +169,118 @@ export function draw<T>(cards: T[], n: number): T[] {
     return a.slice(0, Math.min(n, a.length));
 }
 
+/** One YDKE part: base64 of the ids as little-endian u32. */
+function ydkePart(ids: number[]): string {
+    const bytes = new Uint8Array(ids.length * 4);
+    const view = new DataView(bytes.buffer);
+
+    ids.forEach((id, i) => view.setUint32(i * 4, id, true));
+
+    return btoa(String.fromCharCode(...bytes));
+}
+
+/** The passcodes (`ygopro_id`) of the cards kept; those without one are left out. */
+function passcodes(cards: Tile[], keep: (card: Tile) => boolean): number[] {
+    return cards.filter((c) => keep(c) && c.ygopro_id != null).map((c) => c.ygopro_id as number);
+}
+
 /** YDKE URL of the zones: base64 of the ygopro ids as little-endian u32. */
-export function ydkeUrl(zones: DeckZones, keep: (card: ApiCard) => boolean = () => true): string {
-    const part = (cards: ApiCard[]) => {
-        const ids = cards
-            .filter((c) => keep(c) && c.ygopro_id != null)
-            .map((c) => c.ygopro_id as number);
+export function ydkeUrl(zones: DeckZones, keep: (card: Tile) => boolean = () => true): string {
+    const parts = ZONES.map((zone) => ydkePart(passcodes(zones[zone], keep)));
 
-        const bytes = new Uint8Array(ids.length * 4);
-        const view = new DataView(bytes.buffer);
+    return `ydke://${parts.join('!')}!`;
+}
 
-        ids.forEach((id, i) => view.setUint32(i * 4, id, true));
+/**
+ * The deck as a `.ydk` file (`#main`, `#extra`, `!side`, one passcode per
+ * line: DuelingBook, EDOPro, YGO Omega read it). `skipped`: the cards left
+ * out for want of a passcode.
+ */
+export function ydkFile(
+    zones: DeckZones,
+    keep: (card: Tile) => boolean = () => true,
+): { text: string; skipped: number } {
+    const kept = ZONES.map((zone) => zones[zone].filter(keep));
+    const [main, extra, side] = kept.map((cards) => passcodes(cards, () => true));
+    const skipped = kept.reduce((sum, cards) => sum + cards.length, 0) - (main.length + extra.length + side.length);
 
-        return btoa(String.fromCharCode(...bytes));
-    };
+    const lines = ['#created by the deck builder', '#main', ...main, '#extra', ...extra, '!side', ...side];
 
-    return `ydke://${part(zones.main)}!${part(zones.extra)}!${part(zones.side)}!`;
+    return { text: `${lines.join('\n')}\n`, skipped };
+}
+
+/**
+ * The YDKE URL of a `.ydk` file's text, or null when it holds no card.
+ * Lines before `#main` (comments) are ignored.
+ */
+export function ydkToYdke(text: string): string | null {
+    const sections: Record<'main' | 'extra' | 'side', number[]> = { main: [], extra: [], side: [] };
+    let current: keyof typeof sections | null = null;
+
+    for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim().toLowerCase();
+
+        if (line === '#main') current = 'main';
+        else if (line === '#extra') current = 'extra';
+        else if (line === '!side') current = 'side';
+        else if (current && /^\d+$/.test(line)) sections[current].push(Number(line));
+    }
+
+    const total = sections.main.length + sections.extra.length + sections.side.length;
+
+    if (total === 0) return null;
+
+    return `ydke://${ydkePart(sections.main)}!${ydkePart(sections.extra)}!${ydkePart(sections.side)}!`;
+}
+
+/**
+ * Where to buy a card on Cardmarket: its search with the English name. (A
+ * product address by `idProduct` could not be checked: Cardmarket refuses
+ * automated requests, so the linked product is only used for the price.)
+ */
+export function cardmarketUrl(card: ApiCard): string {
+    const name = card.name_en ?? card.name;
+
+    return `https://www.cardmarket.com/en/YuGiOh/Products/Search?searchString=${encodeURIComponent(name)}`;
+}
+
+/** A Cardmarket trend price as a number, null when the card has none. */
+export function trendOf(card: ApiCard): number | null {
+    return card.cardmarket_trend == null ? null : Number(card.cardmarket_trend);
+}
+
+/** One line of the To buy tab: a card's missing copies in a zone. */
+export type MissingLine = {
+    /** its first missing tile */
+    card: Tile;
+    zone: Zone;
+    count: number;
+    /** the trend price of all its copies, null without a price */
+    cost: number | null;
+};
+
+/** The missing tiles of the zones grouped by card and zone, by name. */
+export function missingLines(zones: DeckZones): MissingLine[] {
+    const lines = new Map<string, MissingLine>();
+
+    for (const zone of ZONES) {
+        for (const card of zones[zone]) {
+            if (!card.missing) continue;
+
+            const key = `${zone}|${cardKey(card)}`;
+            const trend = trendOf(card);
+            const line = lines.get(key);
+
+            if (line) {
+                line.count += 1;
+                line.cost = trend == null ? line.cost : (line.cost ?? 0) + trend;
+            } else {
+                lines.set(key, { card, zone, count: 1, cost: trend });
+            }
+        }
+    }
+
+    return [...lines.values()].sort((a, b) => sortName(a.card.name_en || a.card.name).localeCompare(sortName(b.card.name_en || b.card.name)));
 }
 
 /** "1st", "2nd", "3rd", "4th", "11th", "21st"… (domain::tournament::ordinal). */

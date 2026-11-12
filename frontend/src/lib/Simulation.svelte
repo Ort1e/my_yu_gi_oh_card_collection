@@ -1,30 +1,30 @@
 <script lang="ts">
+    import { toast } from './toast';
+    import { askYes } from './dialog';
     import { createEventDispatcher } from 'svelte';
     import CardTile from './CardTile.svelte';
     import CategoryForm from './CategoryForm.svelte';
     import SimulationChart from './SimulationChart.svelte';
     import { draw, sortCards } from '../deck';
     import type { DeckApi } from '../api';
-    import type { ApiCard } from '../api-types/ApiCard';
     import type { ApiCategory } from '../api-types/ApiCategory';
     import type { ApiCondition } from '../api-types/ApiCondition';
     import type { CategoryStats } from '../api-types/CategoryStats';
     import type { SimulationResult } from '../api-types/SimulationResult';
-    import type { Rules } from '../types';
+    import type { Rules, Tile } from '../types';
 
     export let api: DeckApi;
-    export let main: ApiCard[];
+    export let main: Tile[];
     export let categories: ApiCategory[];
     export let rules: Rules | null = null;
-    /** the deck has unsaved changes (the simulation runs on the saved deck) */
-    export let dirty = false;
+    /** the last run (the Build tab's banner shows its headline) */
+    export let result: SimulationResult | null = null;
 
-    const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: ApiCard }>();
+    const dispatch = createEventDispatcher<{ categories: ApiCategory[]; select: Tile }>();
 
     let handSize = 5;
     let simulations = 10000;
-    let hand: ApiCard[] = [];
-    let result: SimulationResult | null = null;
+    let hand: Tile[] = [];
     let running = false;
 
     function testDraw() {
@@ -35,9 +35,9 @@
         running = true;
 
         try {
-            result = await api.simulate(Number(handSize), Number(simulations));
+            result = await api.simulate(Number(handSize), Number(simulations), main.map((c) => c.card_data_id));
         } catch (e) {
-            alert(`Simulation failed: ${e.message}`);
+            toast.error(`Simulation failed: ${e.message}`);
         } finally {
             running = false;
         }
@@ -49,19 +49,26 @@
         try {
             dispatch('categories', await api.categories());
         } catch (e) {
-            alert(`Could not reload the categories: ${e.message}`);
+            toast.error(`Could not reload the categories: ${e.message}`);
         }
     }
 
     async function removeCategory(category: ApiCategory) {
-        if (!confirm(`Delete the category "${category.name}"? Conditional categories using it are deleted too.`)) return;
+        const sure = await askYes({
+            title: 'Delete the category?',
+            message: `Delete the category "${category.name}"? Conditional categories using it are deleted too.`,
+            confirmLabel: 'Delete',
+            danger: true,
+        });
+
+        if (!sure) return;
 
         try {
             await api.deleteCategory(category.id);
             result = null;
             await reloadCategories();
         } catch (e) {
-            alert(`Could not delete the category: ${e.message}`);
+            toast.error(`Could not delete the category: ${e.message}`);
         }
     }
 
@@ -87,7 +94,6 @@
 <div class="controls">
     <button type="button" on:click={run} disabled={running}>{running ? 'Running…' : 'Run Simulation'}</button>
     <label>Simulations <input type="number" bind:value={simulations} min="1" max="1000000" /></label>
-    {#if dirty}<span class="warning">Unsaved changes: the simulation uses the saved deck.</span>{/if}
 </div>
 
 <div class="dropzone">

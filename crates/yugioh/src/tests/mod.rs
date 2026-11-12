@@ -13,6 +13,7 @@ mod formats;
 mod lots;
 mod rarity;
 mod security;
+mod snapshots;
 mod tournaments;
 
 use std::ops::Deref;
@@ -48,9 +49,32 @@ impl TestApp {
         TestApp(t)
     }
 
-    /// A deck with one version, a lot with 2 owned Dark Magicians and a
-    /// Kuriboh proxy: (version id, [dm1, dm2, kuriboh]).
+    /// A deck with one empty version, a lot with 2 owned Dark Magicians
+    /// (Kuriboh not owned): (version id, [dm1, dm2]).
     pub(crate) async fn deck_fixture(&self) -> (i64, Vec<i64>) {
         crate::testing::deck_fixture(self).await
+    }
+
+    /// Save version `v`'s Main Deck: `(card data, name, copies)`; the answer
+    /// (asserted 200).
+    pub(crate) async fn set_main(
+        &self,
+        v: i64,
+        cards: &[(Option<i64>, &str, usize)],
+    ) -> serde_json::Value {
+        self.patch(
+            v,
+            serde_json::json!({ "main": crate::testing::tiles(cards) }),
+        )
+        .await
+    }
+
+    /// `PATCH /api/deck-versions/:v` with `body`; the answer (asserted 200).
+    pub(crate) async fn patch(&self, v: i64, body: serde_json::Value) -> serde_json::Value {
+        let (status, answer) = self
+            .json("PATCH", &format!("/api/deck-versions/{v}"), body)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        answer
     }
 }

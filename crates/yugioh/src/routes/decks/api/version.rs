@@ -1,32 +1,27 @@
 //! Load, save, delete and copy a deck version, and build it.
 //!
-//! A built version (`is_built`, `yugioh_domain::built_deck`) locks its real cards:
-//! building one turns its cards shared with other versions into proxies
-//! there, saving zones with a card locked by another built version is
-//! refused, saving a built version's zones takes its new cards from the
-//! other versions (they get proxies, like building), and a copy gets proxies
-//! for the locked cards.
-
-use std::collections::{HashMap, HashSet};
+//! A version is a list of lines (`store::lists`); only a built version holds
+//! copies (`is_built`, `store::lists::assign_copies`): building it gives its
+//! lines free copies, best condition first, the rest are missing; saving its
+//! lines keeps the copies of the cards still listed and gives the new slots
+//! free copies; unbuilding frees them. Other versions are never touched.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Deserializer, Serialize};
-use sqlx::QueryBuilder;
-use yugioh_domain::built_deck::plan_build;
+use yugioh_domain::deck_history::DeckZone;
 use yugioh_domain::ydke::YdkeDeck;
 
 use super::tournament::Tournament;
-use super::{load_cards, ApiCard, Created};
+use super::{input_list, version_tiles, ApiCard, CardInput, Created};
 use crate::routes::cards::card_types;
-use crate::store::cards::{
-    delete_orphan_proxies, locked_elsewhere, proxy_copy, swap_card, Zone, IN_VERSION,
-};
-use crate::store::db::push_ids;
-use crate::store::db::{begin_write, exists, row_exists, Pool};
+use crate::routes::decks::shopping::{version_wants_list, WANTS_NOTE};
+use crate::store::db::{begin_write, exists, row_exists, Money, Pool};
 use crate::store::errata::{self, CardRef, Context, MissingCard, Verdicts};
 use crate::store::formats;
+use crate::store::lists::{self, LISTED_IN_VERSION};
+use crate::store::snapshots;
 use crate::web::error::{bad_request, non_blank, required, AppResult, OrNotFound};
 use crate::AppState;
 use ts_rs::TS;
@@ -34,9 +29,11 @@ use ts_rs::TS;
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct Ydke {
-    with_proxies: String,
-    without_proxies: String,
-    only_proxies: String,
+    all: String,
+    /// The owned cards only.
+    owned: String,
+    /// The missing cards only.
+    missing: String,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -50,14 +47,23 @@ pub struct DeckVersion {
     /// The format it plays instead of a ban list (never both).
     format_id: Option<i64>,
     is_built: bool,
+    /// A plain version the owner means to build: its missing cards are on
+    /// the shopping list (`/decks/shopping`).
+    is_planned: bool,
+    /// Shown on the public site by hand (a version played in a tournament is
+    /// shown anyway).
+    is_public: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
-    /// What building the version did, only in the answer to building it or
-    /// to saving a built version's zones when cards were taken elsewhere.
+    /// What building the version did, only in the answer to building it.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     build_report: Option<BuildReport>,
     tournament: Option<Tournament>,
+    /// What is left of this month's budget (negative when over it), for the
+    /// builder's header; `None` when no budget was ever set.
+    #[ts(type = "string | null")]
+    budget_left: Option<Money>,
     main: Vec<ApiCard>,
     extra: Vec<ApiCard>,
     side: Vec<ApiCard>,
@@ -69,13 +75,12 @@ pub struct DeckVersion {
     card_types: Vec<String>,
 }
 
-/// Lines for the deck builder: `"Raigeki (in Deck X - v2)"`,
-/// `"Ash Blossom & Joyous Spring → Deck Y - v1, Deck Z - test"`.
+/// What building a version did: copies put in it, slots left missing.
 #[derive(Debug, Default, Serialize, TS)]
 #[ts(export)]
 pub struct BuildReport {
-    proxied_here: Vec<String>,
-    proxied_elsewhere: Vec<String>,
+    copies: usize,
+    missing: usize,
 }
 
 #[derive(sqlx::FromRow)]
@@ -87,6 +92,8 @@ struct VersionHead {
     format_id: Option<i64>,
     tournament_id: Option<i64>,
     is_built: bool,
+    is_planned: bool,
+    is_public: bool,
     deck_box: Option<String>,
     sleeves: Option<String>,
 }
@@ -132,9 +139,9 @@ fn ydke(main: &[ApiCard], extra: &[ApiCard], side: &[ApiCard]) -> Ydke {
         .to_url()
     };
     Ydke {
-        with_proxies: url(&|_| true),
-        without_proxies: url(&|c| !c.is_proxy),
-        only_proxies: url(&|c| c.is_proxy),
+        all: url(&|_| true),
+        owned: url(&|c| !c.missing),
+        missing: url(&|c| c.missing),
     }
 }
 
@@ -142,8 +149,11 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
     let mut conn = pool.acquire().await?;
     let head: VersionHead = sqlx::query_as(
         "SELECT deck_version.deck_id, deck.name AS deck_name, deck_version.version_name,
-                deck_version.ban_list_id, deck_version.format_id, deck_version.tournament_id,
-                deck_version.is_built,
+                deck_version.ban_list_id, deck_version.format_id,
+                (SELECT tournament_id FROM deck_snapshot
+                 WHERE version_id = deck_version.id AND tournament_id IS NOT NULL
+                 ORDER BY created_at DESC LIMIT 1) AS tournament_id,
+                deck_version.is_built, deck_version.is_planned, deck_version.is_public,
                 deck_version.deck_box, deck_version.sleeves
          FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
          WHERE deck_version.id = ?",
@@ -159,12 +169,7 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         None => None,
     };
 
-    let main_ids = Zone::Main.card_ids(&mut conn, id).await?;
-    let extra_ids = Zone::Extra.card_ids(&mut conn, id).await?;
-    let side_ids = Zone::Side.card_ids(&mut conn, id).await?;
-    let main = load_cards(&mut conn, &main_ids).await?;
-    let extra = load_cards(&mut conn, &extra_ids).await?;
-    let side = load_cards(&mut conn, &side_ids).await?;
+    let [main, extra, side] = version_tiles(&mut conn, id).await?;
 
     let versions = sqlx::query_as(
         "SELECT id, version_name FROM deck_version
@@ -193,10 +198,13 @@ async fn load_version(pool: &Pool, id: i64) -> AppResult<DeckVersion> {
         ban_list_id: head.ban_list_id,
         format_id: head.format_id,
         is_built: head.is_built,
+        is_planned: head.is_planned,
+        is_public: head.is_public,
         deck_box: head.deck_box,
         sleeves: head.sleeves,
         build_report: None,
         tournament,
+        budget_left: crate::routes::budget::left_this_month(pool).await?,
         ydke: ydke(&main, &extra, &side),
         main,
         extra,
@@ -226,179 +234,47 @@ fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
 #[ts(export, optional_fields)]
 pub struct VersionUpdate {
     version_name: Option<String>,
-    main: Option<Vec<i64>>,
-    extra: Option<Vec<i64>>,
-    side: Option<Vec<i64>>,
+    /// The zones' tiles, one per copy (grouped into lines by card).
+    main: Option<Vec<CardInput>>,
+    extra: Option<Vec<CardInput>>,
+    side: Option<Vec<CardInput>>,
     #[serde(default, deserialize_with = "present")]
     ban_list_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "present")]
     format_id: Option<Option<i64>>,
     is_built: Option<bool>,
+    /// Planned (a plain version only; building it clears it).
+    is_planned: Option<bool>,
+    /// Show the version on the public site, or hide it.
+    is_public: Option<bool>,
     /// Present and `null` or blank: cleared.
     #[serde(default, deserialize_with = "present")]
     deck_box: Option<Option<String>>,
     #[serde(default, deserialize_with = "present")]
     sleeves: Option<Option<String>>,
+    /// "Name this save": the name of the snapshot of the version's cards
+    /// once saved (`store::snapshots::name_current`).
+    snapshot_name: Option<String>,
 }
 
-/// The cards of `card_ids` locked by a built version other than
-/// `version_id`: (card id, card name, "Deck - version" holding it).
-async fn locked_holders(
-    conn: &mut sqlx::SqliteConnection,
-    version_id: i64,
-    card_ids: &[i64],
-) -> sqlx::Result<Vec<(i64, String, String)>> {
-    if card_ids.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let mut qb = QueryBuilder::new(
-        "SELECT card.id, card.name,
-                coalesce(deck.name, 'No Deck') || ' - ' || deck_version.version_name
-         FROM (SELECT deck_version_id, card_id FROM deck_version_main_deck
-               UNION ALL SELECT deck_version_id, card_id FROM deck_version_extra_deck
-               UNION ALL SELECT deck_version_id, card_id FROM deck_version_side_deck) AS zone
-         JOIN deck_version ON deck_version.id = zone.deck_version_id
-         LEFT JOIN deck ON deck.id = deck_version.deck_id
-         JOIN card ON card.id = zone.card_id
-         WHERE deck_version.is_built = 1 AND card.is_proxy = 0 AND deck_version.id != ",
-    );
-    qb.push_bind(version_id).push(" AND card.id IN ");
-    push_ids(&mut qb, card_ids.iter().copied());
-    qb.push(" ORDER BY card.name, card.id");
-    qb.build_query_as().fetch_all(&mut *conn).await
-}
-
-/// "A", "A and B", "A, B and C".
-fn and_list(items: &[String]) -> String {
-    match items {
-        [] => String::new(),
-        [only] => only.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
-    }
-}
-
-/// The saving error for cards locked by other built versions.
-fn locked_message(holders: &[(i64, String, String)]) -> String {
-    let names: Vec<String> = holders.iter().map(|(_, name, _)| name.clone()).collect();
-    let (are, they, them) = if holders.len() == 1 {
-        ("is", "it is", "it")
-    } else {
-        ("are", "they are", "them")
-    };
-    let places = if holders.len() == 1 {
-        holders[0].2.clone()
-    } else {
-        holders
-            .iter()
-            .map(|(_, name, version)| format!("{name}: {version}"))
-            .collect::<Vec<_>>()
-            .join("; ")
-    };
-    format!(
-        "{} {are} already in a built deck ({places}), so {they} no longer in your \
-         collection. Reload the page: {} will be gone from the reserve; add proxies \
-         instead if this deck needs {them}.",
-        and_list(&names),
-        if holders.len() == 1 { "it" } else { "they" },
-    )
-}
-
-/// Build version `id` (in `tx`): `plan_build`, then the proxies, then the
-/// flag. Returns what was done, for the deck builder. Also run again when a
-/// built version's zones are saved: only its new shared cards change then.
+/// Build version `id` (in `tx`): its copies (`lists::assign_copies`), then
+/// the flag; no longer planned.
 async fn build(conn: &mut sqlx::SqliteConnection, id: i64) -> AppResult<BuildReport> {
-    let mut in_zones = Vec::new();
-    for zone in Zone::ALL {
-        in_zones.extend(zone.card_ids(conn, id).await?);
-    }
-    let real: HashSet<i64> = if in_zones.is_empty() {
-        HashSet::new()
-    } else {
-        let mut qb = QueryBuilder::new("SELECT id FROM card WHERE is_proxy = 0 AND id IN ");
-        push_ids(&mut qb, in_zones.iter().copied());
-        qb.build_query_scalar()
-            .fetch_all(&mut *conn)
-            .await?
-            .into_iter()
-            .collect()
-    };
-    let cards: Vec<i64> = in_zones.into_iter().filter(|c| real.contains(c)).collect();
-
-    let locked: HashSet<i64> = sqlx::query_scalar(&locked_elsewhere(id))
-        .fetch_all(&mut *conn)
-        .await?
-        .into_iter()
-        .collect();
-    let mut used_elsewhere: HashMap<i64, Vec<i64>> = HashMap::new();
-    if !cards.is_empty() {
-        let mut qb = QueryBuilder::new(
-            "SELECT card_id, deck_version_id
-             FROM (SELECT deck_version_id, card_id FROM deck_version_main_deck
-                   UNION ALL SELECT deck_version_id, card_id FROM deck_version_extra_deck
-                   UNION ALL SELECT deck_version_id, card_id FROM deck_version_side_deck)
-             WHERE deck_version_id != ",
-        );
-        qb.push_bind(id).push(" AND card_id IN ");
-        push_ids(&mut qb, cards.iter().copied());
-        let rows: Vec<(i64, i64)> = qb.build_query_as().fetch_all(&mut *conn).await?;
-        for (card, version) in rows {
-            used_elsewhere.entry(card).or_default().push(version);
-        }
-    }
-
-    let plan = plan_build(&cards, &locked, &used_elsewhere);
-
-    // the report's names, read before the swaps
-    let mut report = BuildReport::default();
-    for (_, name, version) in locked_holders(conn, id, &plan.proxied_here).await? {
-        report.proxied_here.push(format!("{name} (in {version})"));
-    }
-    let mut elsewhere: Vec<(i64, Vec<String>)> = Vec::new();
-    for (card, version) in &plan.proxied_elsewhere {
-        let version_name: String = sqlx::query_scalar(
-            "SELECT coalesce(deck.name, 'No Deck') || ' - ' || deck_version.version_name
-             FROM deck_version LEFT JOIN deck ON deck.id = deck_version.deck_id
-             WHERE deck_version.id = ?",
-        )
-        .bind(version)
-        .fetch_one(&mut *conn)
-        .await?;
-        match elsewhere.last_mut() {
-            Some((last, versions)) if last == card => versions.push(version_name),
-            _ => elsewhere.push((*card, vec![version_name])),
-        }
-    }
-    for (card, versions) in elsewhere {
-        let name: String = sqlx::query_scalar("SELECT name FROM card WHERE id = ?")
-            .bind(card)
-            .fetch_one(&mut *conn)
-            .await?;
-        report
-            .proxied_elsewhere
-            .push(format!("{name} → {}", versions.join(", ")));
-    }
-
-    for card in &plan.proxied_here {
-        let proxy = proxy_copy(conn, *card).await?;
-        swap_card(conn, id, *card, proxy).await?;
-    }
-    for (card, version) in &plan.proxied_elsewhere {
-        let proxy = proxy_copy(conn, *card).await?;
-        swap_card(conn, *version, *card, proxy).await?;
-    }
-    sqlx::query("UPDATE deck_version SET is_built = 1 WHERE id = ?")
+    let done = lists::assign_copies(conn, id).await?;
+    sqlx::query("UPDATE deck_version SET is_built = 1, is_planned = 0 WHERE id = ?")
         .bind(id)
         .execute(&mut *conn)
         .await?;
-
     tracing::info!(
         version_id = id,
-        proxied_here = plan.proxied_here.len(),
-        proxied_elsewhere = plan.proxied_elsewhere.len(),
+        copies = done.copies,
+        missing = done.missing,
         "deck version built"
     );
-    Ok(report)
+    Ok(BuildReport {
+        copies: done.copies,
+        missing: done.missing,
+    })
 }
 
 pub async fn update_version(
@@ -456,40 +332,47 @@ pub async fn update_version(
         }
     }
 
-    let zones = [
-        (Zone::Main, &update.main),
-        (Zone::Extra, &update.extra),
-        (Zone::Side, &update.side),
-    ];
-    let mut zones_changed = false;
-    for (zone, ids) in zones {
-        let Some(ids) = ids else { continue };
-        zones_changed = true;
-        let mut seen = HashSet::new();
-        let ids: Vec<i64> = ids.iter().copied().filter(|i| seen.insert(*i)).collect();
-        if !ids.is_empty() {
-            let mut qb = QueryBuilder::new("SELECT count(*) FROM card WHERE id IN ");
-            push_ids(&mut qb, ids.iter().copied());
-            let found: i64 = qb.build_query_scalar().fetch_one(&mut *tx).await?;
-            if found != ids.len() as i64 {
-                return bad_request("Some cards don't exist any more, reload the page.");
-            }
-
-            let holders = locked_holders(&mut tx, id, &ids).await?;
-            if !holders.is_empty() {
-                return bad_request(locked_message(&holders));
-            }
-        }
-        sqlx::query(&format!(
-            "DELETE FROM {} WHERE deck_version_id = ?",
-            zone.table()
-        ))
-        .bind(id)
-        .execute(&mut *tx)
+    let zones_changed = update.main.is_some() || update.extra.is_some() || update.side.is_some();
+    if zones_changed {
+        // a zone not sent keeps what it holds
+        let saved = lists::as_list(&lists::lines(&mut tx, id).await?);
+        let kept = |zone: DeckZone| -> Vec<CardInput> {
+            saved
+                .zone(zone)
+                .flat_map(|e| (0..e.count).map(|_| CardInput::new(e.card_data_id, &e.name)))
+                .collect()
+        };
+        let main = update.main.clone().unwrap_or_else(|| kept(DeckZone::Main));
+        let extra = update
+            .extra
+            .clone()
+            .unwrap_or_else(|| kept(DeckZone::Extra));
+        let side = update.side.clone().unwrap_or_else(|| kept(DeckZone::Side));
+        let list = input_list(
+            &mut tx,
+            [
+                (DeckZone::Main, main.as_slice()),
+                (DeckZone::Extra, extra.as_slice()),
+                (DeckZone::Side, side.as_slice()),
+            ],
+        )
         .await?;
-        for card_id in ids {
-            zone.insert(&mut tx, id, card_id).await?;
-        }
+        lists::write_lines(&mut tx, id, &list).await?;
+    }
+    if let Some(is_planned) = update.is_planned {
+        // a built version is not planned: it is built
+        sqlx::query("UPDATE deck_version SET is_planned = (? AND is_built = 0) WHERE id = ?")
+            .bind(is_planned)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    if let Some(is_public) = update.is_public {
+        sqlx::query("UPDATE deck_version SET is_public = ? WHERE id = ?")
+            .bind(is_public)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
     }
     for (column, value) in [("deck_box", &update.deck_box), ("sleeves", &update.sleeves)] {
         if let Some(value) = value {
@@ -503,18 +386,15 @@ pub async fn update_version(
         }
     }
 
-    let mut proxies_deleted = 0;
     if zones_changed {
         sqlx::query(&format!(
             "DELETE FROM card_category_assignment
              WHERE category_id IN (SELECT id FROM card_category WHERE deck_version_id = ?1)
-               AND card_id NOT IN ({IN_VERSION})"
+               AND card_data_id NOT IN ({LISTED_IN_VERSION})"
         ))
         .bind(id)
         .execute(&mut *tx)
         .await?;
-        // a proxy taken out of the deck and in no other one is not kept
-        proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     }
 
     // building comes after the zones: it works on the saved cards
@@ -524,30 +404,48 @@ pub async fn update_version(
         .await?;
     let mut build_report = None;
     match update.is_built {
-        Some(true) if !was_built => build_report = Some(build(&mut tx, id).await?),
+        Some(true) if !was_built => {
+            build_report = Some(build(&mut tx, id).await?);
+            // a built deck is on the public site by default (hidden by hand
+            // afterwards, it stays hidden: only building turns it on)
+            if update.is_public.is_none() {
+                sqlx::query("UPDATE deck_version SET is_public = 1 WHERE id = ?")
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
         Some(false) if was_built => {
-            // the proxies made in other versions stay: clean-cards swaps them back
+            let freed = lists::release_copies(&mut tx, id).await?;
             sqlx::query("UPDATE deck_version SET is_built = 0 WHERE id = ?")
                 .bind(id)
                 .execute(&mut *tx)
                 .await?;
-            tracing::info!(version_id = id, "deck version unbuilt");
+            tracing::info!(version_id = id, freed, "deck version unbuilt");
         }
-        // a built version saved with new cards takes them from the other
-        // versions too, like building did (locked ones were refused above)
+        // a built version's new lines get free copies; the cards still
+        // listed keep theirs
         None | Some(true) if was_built && zones_changed => {
-            let report = build(&mut tx, id).await?;
-            if !report.proxied_elsewhere.is_empty() {
-                build_report = Some(report);
-            }
+            lists::assign_copies(&mut tx, id).await?;
         }
         _ => {}
+    }
+
+    // the history: what the zones hold now, by card
+    let snapshot_id = if zones_changed {
+        snapshots::record(&mut tx, id).await?
+    } else {
+        None
+    };
+    if let Some(name) = &update.snapshot_name {
+        let name = required(name, "The name can't be empty.")?;
+        snapshots::name_current(&mut tx, id, name).await?;
     }
     tx.commit().await?;
     tracing::info!(
         version_id = id,
         zones_changed,
-        proxies_deleted,
+        ?snapshot_id,
         renamed,
         ban_list_changed,
         "deck version saved"
@@ -575,18 +473,13 @@ pub async fn delete_version(
             .fetch_optional(&mut *tx)
             .await?
             .or_404()?;
+    // its lines and copies cascade: the copies are free again
     sqlx::query("DELETE FROM deck_version WHERE id = ?")
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    let proxies_deleted = delete_orphan_proxies(&mut tx).await?;
     tx.commit().await?;
-    tracing::info!(
-        version_id = id,
-        ?deck_id,
-        proxies_deleted,
-        "deck version deleted"
-    );
+    tracing::info!(version_id = id, ?deck_id, "deck version deleted");
     Ok(Json(Deleted { deck_id }))
 }
 
@@ -596,16 +489,22 @@ pub struct NameInput {
     name: String,
 }
 
-/// New version of the same deck with the same cards: real cards are shared,
-/// proxy cards are duplicated. The copy is not built, and the cards locked by
-/// a built version (the original's too) become proxies in it.
+/// New version of the same deck with the same lines, a plain list (not
+/// built: it holds no copies).
 pub async fn clone_version(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(input): Json<NameInput>,
 ) -> AppResult<(StatusCode, Json<Created>)> {
-    let name = required(&input.name, "The version name can't be empty.")?;
-    let mut tx = begin_write(&state.pool).await?;
+    let new_id = copy_version(&state.pool, id, &input.name).await?;
+    Ok((StatusCode::CREATED, Json(Created { id: new_id })))
+}
+
+/// The copy itself (also the deck page's "new version" form): the id of the
+/// new version `name`.
+pub(crate) async fn copy_version(pool: &Pool, id: i64, name: &str) -> AppResult<i64> {
+    let name = required(name, "The version name can't be empty.")?;
+    let mut tx = begin_write(pool).await?;
     exists(&mut tx, "deck_version", id).await?;
     let new_id: i64 = sqlx::query(
         "INSERT INTO deck_version (deck_id, version_name, ban_list_id, format_id)
@@ -618,40 +517,33 @@ pub async fn clone_version(
     .await?
     .last_insert_rowid();
 
-    let locked: HashSet<i64> = sqlx::query_scalar(&locked_elsewhere(new_id))
-        .fetch_all(&mut *tx)
-        .await?
-        .into_iter()
-        .collect();
-    for zone in Zone::ALL {
-        for card_id in zone.card_ids(&mut tx, id).await? {
-            let is_proxy: bool = sqlx::query_scalar("SELECT is_proxy FROM card WHERE id = ?")
-                .bind(card_id)
-                .fetch_one(&mut *tx)
-                .await?;
-            let card_id = if is_proxy || locked.contains(&card_id) {
-                proxy_copy(&mut tx, card_id).await?
-            } else {
-                card_id
-            };
-            zone.insert(&mut tx, new_id, card_id).await?;
-        }
-    }
+    sqlx::query(
+        "INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position)
+         SELECT ?, zone, card_data_id, name, count, position FROM deck_version_card
+         WHERE deck_version_id = ?",
+    )
+    .bind(new_id)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    snapshots::record(&mut tx, new_id).await?;
     tx.commit().await?;
     tracing::info!(
         from_version_id = id,
         version_id = new_id,
         "deck version copied"
     );
-    Ok((StatusCode::CREATED, Json(Created { id: new_id })))
+    Ok(new_id)
 }
 
 /// The answer of [`check_version`]: `{"format": "Edison v2", "problems":
 /// ["Raigeki: 2 copies, 1 allowed"], "errata": [...], "errata_pending": 0}`;
-/// `format` null and no problem without a format. `errata`: the proxies and
-/// owned copies whose text was errata'd after the cutoff of the format or
-/// the ban list (`store::errata`); `errata_pending`: cards still being
-/// looked up on Yugipedia.
+/// `format` null and no problem without a format. `errata`: the missing
+/// cards and the built version's copies whose text was errata'd after the
+/// cutoff of the format or the ban list (`store::errata`); `errata_pending`:
+/// cards still being looked up on Yugipedia. `wants`: the Cardmarket wants
+/// list of the version's missing cards, one `count name` per line (empty: none); `wants_note`:
+/// what to do with it (shared with `/decks/built`).
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct Check {
@@ -659,6 +551,8 @@ pub struct Check {
     problems: Vec<String>,
     errata: Vec<MissingCard>,
     errata_pending: usize,
+    wants: String,
+    wants_note: &'static str,
 }
 
 /// `GET /api/deck-versions/:id/check`: its problems in the format it plays,
@@ -681,23 +575,12 @@ pub async fn check_version(
     let contexts = errata::contexts(&state.pool, &[id]).await?;
     let (errata, errata_pending) = match contexts.get(&id) {
         Some(context) => {
-            let cards: Vec<CardRef> = sqlx::query_as(&format!(
-                "SELECT {}
-                 FROM (SELECT card_id FROM deck_version_main_deck WHERE deck_version_id = ?1
-                       UNION ALL SELECT card_id FROM deck_version_extra_deck WHERE deck_version_id = ?1
-                       UNION ALL SELECT card_id FROM deck_version_side_deck WHERE deck_version_id = ?1) AS zone
-                 JOIN card ON card.id = zone.card_id
-                 LEFT JOIN card_data ON card_data.id = card.card_data_id
-                 ORDER BY card.name",
-                CardRef::COLUMNS
-            ))
-            .bind(id)
-            .fetch_all(&state.pool)
-            .await?;
+            let cards: Vec<CardRef> =
+                errata::version_cards(&mut *state.pool.acquire().await?, id).await?;
             let probes: Vec<(&Context, &CardRef)> = cards.iter().map(|c| (context, c)).collect();
             let verdicts = Verdicts::load(&state, &probes).await?;
             let missing = verdicts.missing(Some(context), cards.iter());
-            // only the cards with a warning: a proxy without errata is no news
+            // only the cards with a warning: a missing card without errata is no news
             let lines = missing
                 .lines
                 .into_values()
@@ -712,5 +595,7 @@ pub async fn check_version(
         problems,
         errata,
         errata_pending,
+        wants: version_wants_list(&state.pool, id).await?,
+        wants_note: WANTS_NOTE,
     }))
 }

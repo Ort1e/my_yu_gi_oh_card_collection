@@ -142,7 +142,7 @@ pub fn month_range(start: NaiveDate, end: NaiveDate) -> Vec<NaiveDate> {
 /// `RecapEntry.from_db`: one entry per month, **most recent first**, from the
 /// first budget month (or, without budgets, the first purchase) up to the
 /// current month — or the next month when `include_next_month` (Django's
-/// `prev=True`, used by the dashboard and the budget table).
+/// `prev=True`, used by the budget table and its charts).
 pub fn recap(
     lots: &[LotSummary],
     budgets: &[BudgetSummary],
@@ -227,7 +227,7 @@ fn budget_map(
     map
 }
 
-/// Dashboard / budget page "available debt": 3 × the amount of the last
+/// Budget page "available debt": 3 × the amount of the last
 /// `monthly_budget` row by id (Django's `MonthlyBudget.objects.last()`).
 pub fn available_debt(budgets: &[BudgetSummary]) -> Decimal {
     budgets

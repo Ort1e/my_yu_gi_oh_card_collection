@@ -1,16 +1,15 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
     import { banStatus, englishName, imageUrl, outOfFormat } from '../deck';
-    import type { ApiCard } from '../api-types/ApiCard';
-    import type { DragData, Place, Rules } from '../types';
+    import type { DragData, Place, Rules, Tile } from '../types';
 
-    export let card: ApiCard;
+    export let card: Tile;
     /** zone the card is in ("main", "reserve", …); null = not draggable */
     export let from: Place | null = null;
     export let rules: Rules | null = null;
     export let selected = false;
 
-    const dispatch = createEventDispatcher<{ select: ApiCard }>();
+    const dispatch = createEventDispatcher<{ select: Tile }>();
 
     // only when `from` is set (draggable)
     function dragStart(e: DragEvent) {
@@ -30,7 +29,7 @@
     class="deck-card"
     class:selected
     draggable={from !== null}
-    data-is_proxy={card.is_proxy}
+    data-missing={card.missing}
     data-ban_status={ban}
     class:out-of-format={out}
     {title}
@@ -87,14 +86,14 @@
         outline: 3px solid var(--primary);
     }
 
-    /* proxy cards: red border and badge (bottom-left) */
-    .deck-card[data-is_proxy="true"] {
+    /* missing cards (not owned): red border and badge (bottom-left) */
+    .deck-card[data-missing="true"] {
         border: 2px solid red;
         box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
     }
 
-    .deck-card[data-is_proxy="true"]::after {
-        content: "Proxy";
+    .deck-card[data-missing="true"]::after {
+        content: "Missing";
         position: absolute;
         bottom: 2px;
         left: 4px;
@@ -108,7 +107,7 @@
     }
 
     /* out of the format's card pool: greyed, "Out" badge (top-left: the
-       proxy badge is at the bottom, the limit at the top-right) */
+       missing badge is at the bottom, the limit at the top-right) */
     .deck-card.out-of-format img {
         filter: grayscale(1);
         opacity: 0.55;

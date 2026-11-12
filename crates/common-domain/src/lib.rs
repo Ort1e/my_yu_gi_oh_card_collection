@@ -1,5 +1,8 @@
 //! Pure rules shared by the card collections (Yu-Gi-Oh!, Pokémon): a card's
-//! condition and what it does to its value. No database, no HTTP.
+//! condition and what it does to its value, Cardmarket's price guide
+//! ([`cardmarket`]). No database, no HTTP.
+
+pub mod cardmarket;
 
 use rust_decimal::Decimal;
 

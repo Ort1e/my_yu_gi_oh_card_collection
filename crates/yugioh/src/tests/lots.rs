@@ -35,11 +35,6 @@ async fn create_lot_with_new_seller_and_cards() {
             .await,
         2
     );
-    assert_eq!(
-        t.scalar("SELECT is_proxy FROM card WHERE name = 'Kuriboh'")
-            .await,
-        1
-    );
 
     // card data is linked in the background
     for _ in 0..50 {
@@ -154,7 +149,19 @@ async fn add_cards_to_existing_lot() {
     t.post("/lots/add", LOT).await;
     let lot_id = t.scalar("SELECT max(id) FROM lot").await;
 
-    let uri = format!("/lots/{lot_id}/cards");
+    let uri = format!("/lots/{lot_id}/add-cards");
+    // the lot page only links to the form, on its own page
+    let (_, page) = t.get(&format!("/lots/{lot_id}")).await;
+    assert!(page.contains(&format!("href=\"/lots/{lot_id}/add-cards\"")));
+    assert!(!page.contains("card-rows"), "no form on the lot page");
+    let (status, page) = t.get(&uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains("card-rows") && page.contains("quick-add"),
+        "{page}"
+    );
+    assert_eq!(t.get("/lots/999/add-cards").await.0, StatusCode::NOT_FOUND);
+
     let (status, _) = t
         .post(
             &uri,
@@ -188,7 +195,9 @@ async fn add_cards_to_existing_lot() {
     assert_eq!(t.scalar("SELECT count(*) FROM unite").await, 5);
 
     assert_eq!(
-        t.post("/lots/999/cards", &[("cards-0-name", "X")]).await.0,
+        t.post("/lots/999/add-cards", &[("cards-0-name", "X")])
+            .await
+            .0,
         StatusCode::NOT_FOUND
     );
 }

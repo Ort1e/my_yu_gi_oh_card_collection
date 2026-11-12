@@ -56,21 +56,15 @@ async fn edit_card() {
     );
     assert_eq!(
         t.scalar(&format!(
-            "SELECT code IS NULL AND is_proxy = 0 AND card_data_id = 1 FROM card WHERE id = {id}"
+            "SELECT code IS NULL AND card_data_id = 1 FROM card WHERE id = {id}"
         ))
         .await,
         1
     );
 
     // new English name: relinked
-    t.post(&uri, &[("name", "Kuriboh"), ("is_proxy", "on")])
-        .await;
+    t.post(&uri, &[("name", "Kuriboh")]).await;
     assert_eq!(t.wait_linked(id).await, Some(2));
-    assert_eq!(
-        t.scalar(&format!("SELECT is_proxy FROM card WHERE id = {id}"))
-            .await,
-        1
-    );
 
     let (status, page) = t.post(&uri, &[("name", ""), ("status", "ZZ")]).await;
     assert_eq!(status, StatusCode::OK);

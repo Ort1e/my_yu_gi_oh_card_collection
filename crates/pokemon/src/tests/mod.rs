@@ -1,6 +1,7 @@
 //! The Pokémon pages' handler tests, on a fresh migrated database (no
 //! network: TCGdex's cards, prices and sets are inserted first).
 
+mod boosters;
 mod pokemon;
 
 use std::ops::Deref;

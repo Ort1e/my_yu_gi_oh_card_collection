@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { toast } from './toast';
     // Adds a category to the deck version: a plain one, or a conditional one
     // (a card that counts as one category or another depending on the rest
     // of the hand, see ApiCondition in crates/yugioh/src/routes/decks/api/categories.rs).
@@ -34,9 +35,9 @@
         let condition: ApiCondition | null = null;
 
         if (conditional) {
-            if (ifAnyOf.length === 0) return alert('Choose at least one category for the condition.');
+            if (ifAnyOf.length === 0) return toast.error('Choose at least one category for the condition.');
 
-            if (then === null) return alert('Choose the category it counts as when the condition is met.');
+            if (then === null) return toast.error('Choose the category it counts as when the condition is met.');
 
             condition = { description, if_any_of: ifAnyOf, then, otherwise };
         }
@@ -46,7 +47,7 @@
             reset();
             dispatch('added');
         } catch (e) {
-            alert(`Could not add the category: ${e.message}`);
+            toast.error(`Could not add the category: ${e.message}`);
         }
     }
 </script>

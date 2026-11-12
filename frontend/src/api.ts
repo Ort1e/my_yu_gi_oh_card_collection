@@ -3,24 +3,28 @@
 // (api-types/): `satisfies` ties each body to its input type.
 
 import type { ApiCard } from './api-types/ApiCard';
+import type { ApiChange } from './api-types/ApiChange';
 import type { ApiCategory } from './api-types/ApiCategory';
 import type { ApiCondition } from './api-types/ApiCondition';
 import type { AssignInput } from './api-types/AssignInput';
 import type { CardCategory } from './api-types/CardCategory';
+import type { CardInput } from './api-types/CardInput';
 import type { CategoryInput } from './api-types/CategoryInput';
 import type { Check } from './api-types/Check';
+import type { CompareInput } from './api-types/CompareInput';
 import type { Created } from './api-types/Created';
 import type { DeckVersion } from './api-types/DeckVersion';
 import type { Deleted } from './api-types/Deleted';
+import type { LookupInput } from './api-types/LookupInput';
 import type { NameInput } from './api-types/NameInput';
-import type { ProxyInput } from './api-types/ProxyInput';
-import type { ReplacedProxy } from './api-types/ReplacedProxy';
 import type { ReserveQuery } from './api-types/ReserveQuery';
 import type { SimulationInput } from './api-types/SimulationInput';
 import type { SimulationResult } from './api-types/SimulationResult';
+import type { Snapshot } from './api-types/Snapshot';
+import type { SnapshotNameInput } from './api-types/SnapshotNameInput';
+import type { Taken } from './api-types/Taken';
 import type { VersionUpdate } from './api-types/VersionUpdate';
 import type { YdkeInput } from './api-types/YdkeInput';
-import type { Zone } from './api-types/Zone';
 
 /** The answer's JSON as `T`; `null` for an empty answer (204). */
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -58,11 +62,11 @@ export function deckApi(id: number) {
         update: (changes: VersionUpdate) => request<DeckVersion>('PATCH', base, changes),
         remove: () => request<Deleted>('DELETE', base),
         clone: (name: string) => request<Created>('POST', `${base}/clone`, { name } satisfies NameInput),
-        addProxy: (name: string, zone: Zone) =>
-            request<ApiCard>('POST', `${base}/proxies`, { name, zone } satisfies ProxyInput),
-        deleteProxy: (cardId: number) => request<null>('DELETE', `${base}/proxies/${cardId}`),
-        /** The owned copy now in place of the proxy, and the versions it stays a proxy in. */
-        replaceProxy: (cardId: number) => request<ReplacedProxy>('POST', `${base}/proxies/${cardId}/replace`),
+        /** A tile of the card named `name` ("+ Missing card"); nothing is saved. */
+        lookup: (name: string) => request<ApiCard>('POST', `${base}/lookup`, { name } satisfies LookupInput),
+        /** A built version's empty slots take the free copies of their cards. */
+        takeFree: () => request<Taken>('POST', `${base}/take-free`),
+        /** The cards matching the filters, with what the collection holds of each. */
         reserve: (filters: ReserveQuery) => request<ApiCard[]>('POST', `${base}/reserve`, filters),
         /** The saved version's problems in its format. */
         check: () => request<Check>('GET', `${base}/check`),
@@ -71,14 +75,30 @@ export function deckApi(id: number) {
         addCategory: (name: string, condition: ApiCondition | null = null) =>
             request<ApiCategory>('POST', `${base}/categories`, { name, condition } satisfies CategoryInput),
         deleteCategory: (categoryId: number) => request<null>('DELETE', `${base}/categories/${categoryId}`),
-        cardCategories: (cardId: number) => request<CardCategory[]>('GET', `${base}/cards/${cardId}/categories`),
-        assignCategory: (cardId: number, categoryId: number, assigned: boolean) =>
-            request<null>('PUT', `${base}/cards/${cardId}/categories/${categoryId}`, { assigned } satisfies AssignInput),
-        simulate: (handSize: number, simulations: number) =>
+        /** A card's categories: by its card data (all its copies). */
+        cardCategories: (cardDataId: number) => request<CardCategory[]>('GET', `${base}/cards/${cardDataId}/categories`),
+        assignCategory: (cardDataId: number, categoryId: number, assigned: boolean) =>
+            request<null>('PUT', `${base}/cards/${cardDataId}/categories/${categoryId}`, { assigned } satisfies AssignInput),
+        /** `main`: the Main Deck's tiles as they are on the screen (saved or not): a card data id each, null for a name-only card. */
+        simulate: (handSize: number, simulations: number, main: (number | null)[]) =>
             request<SimulationResult>('POST', `${base}/monte-carlo`, {
                 hand_size: handSize,
                 simulations,
+                main,
             } satisfies SimulationInput),
+        /** The deck's saved lists, newest first. */
+        history: () => request<Snapshot[]>('GET', `${base}/history`),
+        /** What changed from saved list `snapshotId` to these zones (their tiles, saved or not). */
+        compare: (snapshotId: number, main: CardInput[], extra: CardInput[], side: CardInput[]) =>
+            request<ApiChange[]>('POST', `${base}/compare`, {
+                snapshot_id: snapshotId,
+                main,
+                extra,
+                side,
+            } satisfies CompareInput),
+        /** Name saved list `snapshotId` of the deck (`null`: an automatic one again). */
+        nameSnapshot: (snapshotId: number, name: string | null) =>
+            request<null>('POST', `${base}/history/${snapshotId}/name`, { name } satisfies SnapshotNameInput),
     };
 }
 

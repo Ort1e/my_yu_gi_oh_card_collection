@@ -1,19 +1,22 @@
 //! New deck version from a YDKE URL.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-use yugioh_domain::card::normalize_card_name;
+use sqlx::SqliteConnection;
+use yugioh_domain::deck_history::SnapshotList;
 use yugioh_domain::ydke::YdkeDeck;
 
 use super::Created;
 use crate::store::card_data::get_or_fetch_by_ygopro_id;
-use crate::store::cards::{locked_elsewhere, new_proxy, Zone, SOLD_EXISTS};
+use crate::store::cards::Zone;
 use crate::store::db::{begin_write, exists};
+use crate::store::lists;
+use crate::store::snapshots;
 use crate::web::error::{bad_request, non_blank, AppResult};
 use crate::AppState;
 use ts_rs::TS;
@@ -25,20 +28,30 @@ pub struct YdkeInput {
     name: Option<String>,
 }
 
-/// New version of `deck_id` from a YDKE URL. Each card uses an owned copy
-/// not already used by this import nor locked by a built version when there
-/// is one, else a new proxy.
+/// New version of `deck_id` from a YDKE URL: its cards and counts.
 pub async fn import_ydke(
     State(state): State<AppState>,
     Path(deck_id): Path<i64>,
     Json(input): Json<YdkeInput>,
 ) -> AppResult<(StatusCode, Json<Created>)> {
-    let deck = match YdkeDeck::parse(input.ydke.trim()) {
+    let name = non_blank(input.name).unwrap_or_else(|| "Imported".to_string());
+    let version_id = import_into_deck(&state, deck_id, &input.ydke, &name).await?;
+    Ok((StatusCode::CREATED, Json(Created { id: version_id })))
+}
+
+/// The import itself (also the deck page's "new version" form): the id of
+/// the new version `name` of `deck_id`.
+pub(crate) async fn import_into_deck(
+    state: &AppState,
+    deck_id: i64,
+    ydke: &str,
+    name: &str,
+) -> AppResult<i64> {
+    let deck = match YdkeDeck::parse(ydke.trim()) {
         Ok(d) => d,
         Err(e) => return bad_request(e.to_string()),
     };
     exists(&mut *state.pool.acquire().await?, "deck", deck_id).await?;
-    let name = non_blank(input.name).unwrap_or_else(|| "Imported".to_string());
 
     // Resolve card data first (network), outside the transaction.
     let mut data: HashMap<u32, Option<(i64, String)>> = HashMap::new();
@@ -50,49 +63,62 @@ pub async fn import_ydke(
         }
     }
 
+    let card = |ygopro_id: &u32| match &data[ygopro_id] {
+        Some((data_id, en_name)) => ListCard {
+            card_data: Some((*data_id, en_name.clone())),
+            name: en_name.clone(),
+        },
+        None => ListCard {
+            card_data: None,
+            name: format!("Unknown-{ygopro_id}"),
+        },
+    };
+    let zones = [
+        (Zone::Main, deck.main.iter().map(card).collect()),
+        (Zone::Extra, deck.extra.iter().map(card).collect()),
+        (Zone::Side, deck.side.iter().map(card).collect()),
+    ];
+
     let mut tx = begin_write(&state.pool).await?;
+    let version_id = create_version_from_list(&mut tx, deck_id, name, zones).await?;
+    snapshots::record(&mut tx, version_id).await?;
+    tx.commit().await?;
+    tracing::info!(deck_id, version_id, "deck version imported from YDKE");
+    Ok(version_id)
+}
+
+/// A card of a list to make a version of: its card data (id, English
+/// name), or only a name for a card unknown to ygoprodeck.
+struct ListCard {
+    card_data: Option<(i64, String)>,
+    name: String,
+}
+
+/// New version `name` of `deck_id` listing these cards (a plain list: the
+/// collection says what is owned). Its id; call inside a write transaction.
+async fn create_version_from_list(
+    tx: &mut SqliteConnection,
+    deck_id: i64,
+    name: &str,
+    zones: [(Zone, Vec<ListCard>); 3],
+) -> sqlx::Result<i64> {
     let version_id: i64 =
         sqlx::query("INSERT INTO deck_version (deck_id, version_name) VALUES (?, ?)")
             .bind(deck_id)
-            .bind(&name)
+            .bind(name)
             .execute(&mut *tx)
             .await?
             .last_insert_rowid();
 
-    let mut used: HashSet<i64> = HashSet::new();
-    for (zone, ids) in [
-        (Zone::Main, &deck.main),
-        (Zone::Extra, &deck.extra),
-        (Zone::Side, &deck.side),
-    ] {
-        for ygopro_id in ids {
-            let card_id = match &data[ygopro_id] {
-                Some((data_id, en_name)) => {
-                    let owned: Vec<i64> = sqlx::query_scalar(&format!(
-                        "SELECT id FROM card
-                         WHERE is_proxy = 0 AND (card_data_id = ? OR en_name = ?)
-                           AND NOT {SOLD_EXISTS} AND id NOT IN ({}) ORDER BY id",
-                        locked_elsewhere(0)
-                    ))
-                    .bind(data_id)
-                    .bind(normalize_card_name(en_name))
-                    .fetch_all(&mut *tx)
-                    .await?;
-                    match owned.into_iter().find(|id| !used.contains(id)) {
-                        Some(id) => id,
-                        None => new_proxy(&mut tx, en_name, Some(*data_id)).await?,
-                    }
-                }
-                None => {
-                    let name = format!("Unknown-{ygopro_id}");
-                    new_proxy(&mut tx, &name, None).await?
-                }
-            };
-            used.insert(card_id);
-            zone.insert(&mut tx, version_id, card_id).await?;
-        }
-    }
-    tx.commit().await?;
-    tracing::info!(deck_id, version_id, "deck version imported from YDKE");
-    Ok((StatusCode::CREATED, Json(Created { id: version_id })))
+    let list = SnapshotList::from_cards(zones.iter().flat_map(|(zone, cards)| {
+        cards.iter().map(|c| {
+            (
+                zone.deck_zone(),
+                c.card_data.as_ref().map(|(id, _)| *id),
+                c.name.as_str(),
+            )
+        })
+    }));
+    lists::write_lines(tx, version_id, &list).await?;
+    Ok(version_id)
 }
