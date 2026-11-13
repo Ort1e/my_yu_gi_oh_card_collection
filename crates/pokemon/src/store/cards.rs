@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
 
-use super::{ptcgio, tcgdex};
+use super::{limitless, ptcgio, tcgdex};
 use common::db::{begin_write, is_fresh, today, Money, Pool};
 use common::web::error::AppResult;
 
@@ -216,10 +216,11 @@ async fn save(pool: &Pool, catalogue: Catalogue, card: &Fetched) -> AppResult<i6
 }
 
 /// For a card TCGdex has no picture of (Trainer Galleries, some promos,
-/// the Classic Collection reprints): the same print's picture from the
-/// Pokémon TCG API (`store::ptcgio`), saved in `image` (a full
-/// URL) with `image_from = 'pokemontcg:<its id>'`; `''` when it has none
-/// either. Never another print's: the picture would be wrong (a Trainer
+/// the Classic Collection reprints): the same print's picture from
+/// Limitless TCG (`store::limitless`: English in `image`, French in
+/// `image_fr`, `image_from = 'limitless:<id>'`), else from the Pokémon TCG
+/// API (`store::ptcgio`: `image`, `image_from = 'pokemontcg:<its id>'`);
+/// `''` when neither has it. TCGdex's own pictures are never overwritten. Never another print's: the picture would be wrong (a Trainer
 /// Gallery's artwork is its own). A failure (that service answers 500 now
 /// and then) is not saved: the card is tried again an hour later. The
 /// picture's URL, if any. Asks the network: not inside a write transaction.
@@ -261,27 +262,35 @@ pub async fn find_image(
         }
     };
 
-    let (from, image) = match &found {
-        Some((id, url)) => (format!("pokemontcg:{id}"), Some(url.clone())),
-        None => (String::new(), None),
+    let (from, image, image_fr) = match found {
+        Some(found) => (found.from, found.image, found.image_fr),
+        None => (String::new(), None, None),
     };
     let mut tx = begin_write(pool).await?;
-    sqlx::query("UPDATE pokemon_card SET image = coalesce(?, image), image_from = ? WHERE id = ?")
-        .bind(&image)
-        .bind(&from)
-        .bind(card_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE pokemon_card SET image = coalesce(?, image), image_fr = coalesce(?, image_fr),
+             image_from = ? WHERE id = ?",
+    )
+    .bind(&image)
+    .bind(&image_fr)
+    .bind(&from)
+    .bind(card_id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     tracing::info!(card_id, from, "Pokémon picture looked up elsewhere");
-    Ok(image)
+    Ok(image.or(image_fr))
 }
 
-/// The Pokémon TCG API's card for TCGdex's English card JSON.
-async fn lookup_elsewhere(
-    http: &reqwest::Client,
-    json: &Value,
-) -> AppResult<Option<(String, String)>> {
+/// A picture found elsewhere: where from, the English and French ones.
+struct Elsewhere {
+    from: String,
+    image: Option<String>,
+    image_fr: Option<String>,
+}
+
+/// Limitless TCG's, else the Pokémon TCG API's card for TCGdex's English card JSON.
+async fn lookup_elsewhere(http: &reqwest::Client, json: &Value) -> AppResult<Option<Elsewhere>> {
     let (Some(name), Some(number), Some(set_id)) = (
         json["name"].as_str(),
         json["localId"].as_str(),
@@ -295,6 +304,15 @@ async fn lookup_elsewhere(
         .as_ref()
         .and_then(|set| set["abbreviation"]["official"].as_str())
         .map(|code| code.split(':').next().unwrap_or(code).to_string());
+    if let Some(code) = code.as_deref() {
+        if let Some(found) = limitless::find(http, code, number).await {
+            return Ok(Some(Elsewhere {
+                from: format!("limitless:{}", found.id),
+                image: found.en,
+                image_fr: found.fr,
+            }));
+        }
+    }
     let wanted = ptcgio::Wanted {
         name,
         artist: json["illustrator"].as_str(),
@@ -304,7 +322,13 @@ async fn lookup_elsewhere(
         set_code: code.as_deref(),
         official: json["set"]["cardCount"]["official"].as_i64(),
     };
-    ptcgio::find(http, &wanted).await
+    Ok(ptcgio::find(http, &wanted)
+        .await?
+        .map(|(id, url)| Elsewhere {
+            from: format!("pokemontcg:{id}"),
+            image: Some(url),
+            image_fr: None,
+        }))
 }
 
 /// The cards nobody owns (or ever owned) nor wishes any more, with their
