@@ -70,6 +70,28 @@ function catalogueOf(language) {
 
 // ---------- search ----------
 
+// Japanese and the other languages are two catalogues: a card picked in
+// one is not in the other.
+let catalogue = catalogueOf(searchLanguage());
+
+const catalogueChanged = () => {
+    const now = catalogueOf(searchLanguage());
+
+    if (now === catalogue) {
+        showCard();
+        return;
+    }
+
+    catalogue = now;
+
+    if (cardField.value) {
+        cardField.value = '';
+        say('Japanese cards are other cards: find the card again.');
+    }
+
+    showCard();
+};
+
 async function search() {
     const q = queryField.value.trim();
 
@@ -82,6 +104,7 @@ async function search() {
     results.replaceChildren();
 
     let answer;
+    let guessedNote = '';
 
     try {
         answer = await getJson(`/pokemon/api/search?${new URLSearchParams({ q, lang: searchLanguage() })}`);
@@ -90,14 +113,23 @@ async function search() {
         return;
     }
 
+    // the code belongs to another language than the form's: switch the form
+    if (answer.guessed && languageField) {
+        const option = Array.from(languageField.options).find((o) => o.value === answer.language);
+
+        languageField.value = answer.language;
+        catalogueChanged();
+        guessedNote = `${q.split(/\s+/)[0]} is a code of ${option?.textContent?.trim() ?? answer.language}: language set to it.`;
+    }
+
     if (answer.cards.length === 1 && !answer.note) {
-        say('');
+        say(guessedNote);
         await pick(answer.cards[0].id, answer.catalogue, answer.cards[0].secret);
         return;
     }
 
     if (answer.note) {
-        say(answer.note);
+        say(`${guessedNote} ${answer.note}`.trim());
 
         for (const card of answer.cards) {
             results.append(resultButton(card, answer.catalogue));
@@ -108,9 +140,9 @@ async function search() {
 
     const sameCode = answer.cards.length > 1 && answer.cards.every((c) => c.set_name);
 
-    say(sameCode
+    say(`${guessedNote} ${sameCode
         ? 'This code is used by several sets: pick the card with the number printed on yours (the set size after the slash tells them apart).'
-        : `${answer.cards.length} cards: pick yours.`);
+        : `${answer.cards.length} cards: pick yours.`}`.trim());
 
     for (const card of answer.cards) {
         results.append(resultButton(card, answer.catalogue));
@@ -323,28 +355,6 @@ if (queryField) {
     });
 
     variantField?.addEventListener('change', markVariant);
-
-    // Japanese and the other languages are two catalogues: a card picked in
-    // one is not in the other.
-    let catalogue = catalogueOf(searchLanguage());
-
-    const catalogueChanged = () => {
-        const now = catalogueOf(searchLanguage());
-
-        if (now === catalogue) {
-            showCard();
-            return;
-        }
-
-        catalogue = now;
-
-        if (cardField.value) {
-            cardField.value = '';
-            say('Japanese cards are other cards: find the card again.');
-        }
-
-        showCard();
-    };
 
     languageField?.addEventListener('change', catalogueChanged);
     catalogueField?.addEventListener('change', catalogueChanged);

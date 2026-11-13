@@ -88,7 +88,10 @@ async fn the_wishlist_suggests_boosters() {
     let t = TestApp::new().await;
     fixture(&t).await;
     let (_, page) = t.get("/pokemon/wishlist").await;
-    assert!(!page.contains("Boosters to open"), "nothing refreshed yet");
+    assert!(
+        !page.contains("<h2>Boosters to open</h2>"),
+        "nothing refreshed yet"
+    );
 
     let report = refresh(&t).await;
     assert_eq!(

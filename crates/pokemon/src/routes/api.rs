@@ -10,7 +10,11 @@
 //!   in Latin letters (`Horsea`) finds the Japanese cards of that Pokémon
 //!   by its Pokédex number. 200 `{"catalogue", "cards": [{"id", "name",
 //!   "local_id", "set_id", "set_name", "thumb", "secret"}], "set",
-//!   "note"}`, 400 / 404 / 502 `{"error"}`.
+//!   "note", "language", "guessed"}`, 400 / 404 / 502 `{"error"}`. A printed
+//!   code usually tells its language (`FNE` French, `SFA` English, `SV6a`
+//!   Japanese): when the asked language doesn't know it but another does
+//!   (`sets::language_of`), that one is searched, `language` names it and
+//!   `guessed` is true: the finder switches the form to it.
 //! - `GET /pokemon/api/card?id=…&lang=fr`: one card, saved in
 //!   `pokemon_card`, with what the form needs to choose: rarity (and the
 //!   guide's link), printed variants with today's price, full art
@@ -61,7 +65,7 @@ pub async fn search(
     State(state): State<AppState>,
     Query(params): Query<SearchParams>,
 ) -> AppResult<Response> {
-    let language = params
+    let asked = params
         .lang
         .as_deref()
         .and_then(parse_language)
@@ -73,7 +77,30 @@ pub async fn search(
             "Type a name or a code like FNE 067.",
         ));
     }
-    let catalogue = Catalogue::of_language(&language);
+
+    // a printed code usually tells its language: use the one that knows it
+    let code = match card_ref::parse(q) {
+        Ok(CardRef {
+            set_code: Some(code),
+            ..
+        }) => Some(code),
+        Err(_) => q
+            .split_once(' ')
+            .map(|(code, _)| code)
+            .filter(|code| card_ref::is_set_code(code))
+            .map(str::to_string),
+        _ => None,
+    };
+    let language = match code {
+        Some(code) => match sets::language_of(&state.pool, &state.http, &asked, &code).await {
+            Ok(language) => language,
+            Err(e) => return unavailable(e),
+        },
+        None => asked.clone(),
+    };
+    let guessed = language != asked;
+    let language = language.as_str();
+    let catalogue = Catalogue::of_language(language);
 
     let found =
         match card_ref::parse(q) {
@@ -82,7 +109,7 @@ pub async fn search(
                 number,
                 total,
                 ..
-            }) => by_code(&state, &language, &code, &number, total.as_deref()).await,
+            }) => by_code(&state, language, &code, &number, total.as_deref()).await,
             // `F 034/189`, `034/189`: no code printed (Sword & Shield): the
             // set by its size, the card by its regulation mark
             Ok(CardRef {
@@ -92,14 +119,14 @@ pub async fn search(
                 regulation,
                 ..
             }) if total.parse::<i64>().is_ok() => {
-                by_size(&state, &language, &number, &total, regulation).await
+                by_size(&state, language, &number, &total, regulation).await
             }
             Ok(CardRef {
                 set_code: None,
                 number,
                 ..
             }) if number.starts_with(|c: char| c.is_ascii_alphabetic()) => {
-                by_number(&state, &language, &number).await
+                by_number(&state, language, &number).await
             }
             Ok(CardRef { set_code: None, .. }) => return Ok(answer(
                 StatusCode::BAD_REQUEST,
@@ -107,9 +134,9 @@ pub async fn search(
             )),
             Err(_) => match q.split_once(' ') {
                 Some((code, name)) if card_ref::is_set_code(code) => {
-                    in_set(&state, &language, code, name.trim(), q).await
+                    in_set(&state, language, code, name.trim(), q).await
                 }
-                _ => by_name(&state, &language, q).await,
+                _ => by_name(&state, language, q).await,
             },
         };
     let (cards, set, note) = match found {
@@ -120,6 +147,8 @@ pub async fn search(
 
     Ok(Json(json!({
         "catalogue": catalogue.code(),
+        "language": language,
+        "guessed": guessed,
         "cards": cards,
         "set": set,
         "note": note,
