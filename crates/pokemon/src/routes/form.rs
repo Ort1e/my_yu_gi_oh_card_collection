@@ -96,9 +96,10 @@ impl CopyValues {
         self.language == code
     }
 
-    /// A copy has one language ("Any" is for wishes).
+    /// "Any language" asks the finder to guess it from the printed code;
+    /// a copy is saved with a real language (the finder sets it).
     pub fn any_language(&self) -> bool {
-        false
+        true
     }
 
     /// A language typed that the list doesn't offer.
@@ -146,7 +147,9 @@ fn read_copy(form: &mut FormData) -> Option<(String, CopyFields)> {
     let card = form.required("card", "Card (find it above)");
     let language = match form.get("language").or(form.get("other_language")) {
         None => {
-            form.errors.push("Language is required.".into());
+            form.errors.push(
+                "Language is required: choose it, or find the card by its printed code.".into(),
+            );
             None
         }
         Some(text) => {
@@ -331,7 +334,7 @@ pub async fn add_page(
 ) -> AppResult<AddCopyPage> {
     let mut values = CopyValues {
         card: params.card.unwrap_or_default(),
-        language: params.language.unwrap_or_else(|| "fr".into()),
+        language: params.language.unwrap_or_default(),
         variant: params.variant.unwrap_or_default(),
         source: Source::Single.code().into(),
         obtained_on: today().to_string(),

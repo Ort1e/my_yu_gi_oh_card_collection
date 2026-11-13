@@ -114,12 +114,16 @@ async function search() {
     }
 
     // the code belongs to another language than the form's: switch the form
-    if (answer.guessed && languageField) {
+    const settingAny = languageField && !languageField.value && finderForm?.id === 'copy-form';
+
+    if ((answer.guessed || settingAny) && languageField) {
         const option = Array.from(languageField.options).find((o) => o.value === answer.language);
 
         languageField.value = answer.language;
         catalogueChanged();
-        guessedNote = `${q.split(/\s+/)[0]} is a code of ${option?.textContent?.trim() ?? answer.language}: language set to it.`;
+        guessedNote = answer.guessed
+            ? `${q.split(/\s+/)[0]} is a code of ${option?.textContent?.trim() ?? answer.language}: language set to it.`
+            : '';
     }
 
     if (answer.cards.length === 1 && !answer.note) {
