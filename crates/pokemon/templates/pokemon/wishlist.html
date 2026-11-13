@@ -38,6 +38,8 @@
   </div>
   <p class="hint">Cardmarket's booster prices, every language together, refreshed every week.</p>
 </section>
+{% else if !wanted.is_empty() && !common::export::public_copy() %}
+<p class="hint">Boosters to open appear after the weekly price refresh.</p>
 {% endif %}
 
 {% if wanted.is_empty() %}

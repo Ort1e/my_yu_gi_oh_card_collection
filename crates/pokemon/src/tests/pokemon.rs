@@ -863,3 +863,78 @@ async fn cards_already_owned_are_flagged() {
     let (_, page) = t.post("/pokemon/add/booster", &preview).await;
     assert!(!page.contains("You have 1"));
 }
+
+async fn search_in(t: &TestApp, lang: &str, q: &str) -> (StatusCode, serde_json::Value) {
+    let q: String = url::form_urlencoded::byte_serialize(q.as_bytes()).collect();
+    t.json(
+        "GET",
+        &format!("/pokemon/api/search?lang={lang}&q={q}"),
+        serde_json::json!(null),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn a_printed_code_tells_its_language() {
+    let t = TestApp::new().await;
+    fixture(&t).await;
+
+    // FNE is remembered in French only: asked in English, the French card
+    let (status, answer) = search_in(&t, "en", "FNE 067/064").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["cards"][0]["id"], "sv06.5-067");
+    assert_eq!(answer["language"], "fr");
+    assert_eq!(answer["guessed"], true);
+    assert_eq!(answer["catalogue"], "intl");
+
+    // a Japanese set found while French is chosen: the Japanese catalogue
+    sqlx::query(
+        "INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
+             ('ja', 'SV6a', 'ナイトワンダラー', 'SV6a', 64,
+              '[{\"id\":\"SV6a-001\",\"localId\":\"001\",\"name\":\"ミミッキュ\"}]', date('now'))",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let (status, answer) = search_in(&t, "fr", "SV6a 001").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["catalogue"], "ja");
+    assert_eq!(answer["language"], "ja");
+    assert_eq!(answer["guessed"], true);
+
+    // a code known in both languages keeps the chosen one
+    sqlx::query(
+        "INSERT INTO pokemon_set (language, id, name, code, official, cards, fetched_at) VALUES
+             ('en', 'sv06.5', 'Shrouded Fable', 'FNE', 64,
+              '[{\"id\":\"sv06.5-067\",\"localId\":\"067\",\"name\":\"Horsea\"}]', date('now'))",
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let (status, answer) = search_in(&t, "en", "FNE 067").await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["language"], "en");
+    assert_eq!(answer["guessed"], false);
+}
+
+#[tokio::test]
+async fn the_wishlist_hints_at_boosters_before_the_refresh() {
+    let t = TestApp::new().await;
+    fixture(&t).await;
+    t.post(
+        "/pokemon/wishlist/add",
+        &[
+            ("card", "sv06.5-067"),
+            ("catalogue", "intl"),
+            ("language", ""),
+            ("variant", "holo"),
+            ("max_price", "40"),
+            ("priority", "1"),
+        ],
+    )
+    .await;
+
+    let (_, page) = t.get("/pokemon/wishlist").await;
+    assert!(page.contains("Boosters to open appear after the weekly price refresh."));
+    assert!(!page.contains("<h2>Boosters to open</h2>"));
+}

@@ -9,6 +9,9 @@
 //! are both `30C`. A code also covers its family: TCGdex keeps a Trainer
 //! Gallery apart, coded `ASR:TG`, while its cards print `ASR` (TG29/TG30). A number found in both is told apart by the set size
 //! printed after it (`/128`, `/030`); else both are offered ([`cards`]).
+//!
+//! A code usually tells its language: [`language_of`] guesses it when the
+//! form's language doesn't know the code.
 
 use pokemon_domain::card_ref::{is_set_size, same_number};
 use pokemon_domain::name_matches;
@@ -206,6 +209,42 @@ pub async fn by_code(
         sort(&mut sets);
     }
     Ok(sets)
+}
+
+/// The owner's languages, in the order a code is looked for in them.
+const GUESSED: [&str; 3] = ["fr", "en", "ja"];
+
+/// The language a printed code belongs to (`FNE` French, `SFA` English,
+/// `SV6a` Japanese): the chosen one when it knows the code, else another of
+/// [`GUESSED`], else `chosen` (the usual "no such set" answer follows).
+/// Looks in `pokemon_set` first (no network), then asks TCGdex.
+pub async fn language_of(
+    pool: &Pool,
+    http: &reqwest::Client,
+    chosen: &str,
+    code: &str,
+) -> AppResult<String> {
+    let code = code.trim();
+    let others = || GUESSED.iter().copied().filter(|l| *l != chosen);
+
+    if !remembered(pool, chosen, code).await?.is_empty() {
+        return Ok(chosen.to_string());
+    }
+    for language in others() {
+        if !remembered(pool, language, code).await?.is_empty() {
+            return Ok(language.to_string());
+        }
+    }
+
+    if !by_code_once(pool, http, chosen, code).await?.is_empty() {
+        return Ok(chosen.to_string());
+    }
+    for language in others() {
+        if !by_code_once(pool, http, language, code).await?.is_empty() {
+            return Ok(language.to_string());
+        }
+    }
+    Ok(chosen.to_string())
 }
 
 fn sort(sets: &mut [SetInfo]) {
