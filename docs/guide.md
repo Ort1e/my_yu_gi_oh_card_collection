@@ -114,7 +114,7 @@ and Japanese, with a wishlist and Cardmarket prices (weekly).
   cards: the opening's page → *Add cards by number*; wrong language: *Date,
   language, note*.
 - **One card** (*Add → One card*: a single, a gift, a graded card): find it by
-  printed code (`FNE 067`) or name, pick it, choose its variant. The code tells its language (`FNE` French, `SFA` English, `SV6a` Japanese): the form switches to it by itself.
+  printed code (`FNE 067`) or name, pick it, choose its variant. The language select has "Any language" (guess it from the code). The code tells its language (`FNE` French, `SFA` English, `SV6a` Japanese): the form switches to it by itself.
 - **The wishlist**: *Wishlist → Add a wish*; its row turns green when the
   trend is at or under your price. *I got it* opens the add form pre-filled.
   Above the wishes, *Boosters to open*: the 3 boosters with the most wished
