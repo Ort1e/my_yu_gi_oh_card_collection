@@ -907,7 +907,10 @@ one's language.
 
 **Pictures TCGdex lacks** (migrations 0014, 0015): TCGdex has no picture
 of some prints (the Trainer Galleries, some promos, the Classic Collection
-reprints). The picture route then asks the [Pokémon TCG
+reprints). The picture route then asks first [Limitless TCG](https://limitlesstcg.com)
+(`src/store/limitless.rs`: the official English and French scans, a `HEAD` at
+`tpci/MEP/MEP_057_R_EN_LG.png`; saved in `image` and `image_fr` with
+`image_from = 'limitless:MEP_057'`), then the [Pokémon TCG
 API](https://pokemontcg.io) for the same print, once (`src/store/ptcgio.rs`,
 `cards::find_image`): its set by printed code and size (`30C`, 30 cards:
 `me55c`), name or id written its way (`sv06.5` → `sv6pt5`); the card by

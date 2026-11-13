@@ -7,6 +7,7 @@
 //! - `boosters.rs`: each card's Cardmarket expansion and its booster's price
 //!   (the wishlist's suggestions), weekly too;
 //! - `openings.rs`: booster openings (`pokemon_opening`);
+//! - `limitless.rs`: Limitless TCG's official scans, first fallback for pictures;
 //! - `ptcgio.rs`: the Pokémon TCG API, for the pictures TCGdex lacks.
 //!
 //! Network calls happen before any write transaction (CLAUDE.md): the
@@ -14,6 +15,7 @@
 
 pub mod boosters;
 pub mod cards;
+pub mod limitless;
 pub mod openings;
 pub mod prices;
 pub mod ptcgio;

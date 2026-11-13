@@ -12,7 +12,8 @@ at the end.
 ```
 deploy/
   README.md                 this file
-  nas/                      on the NAS (in the app's archive, /apps/collection/deploy/)
+  nas/                      on the NAS (in the app's archive, /apps/collection/deploy/: no `nas/`
+                            folder there, the files sit directly in `deploy/`)
     install.sh              first install (folders, user, settings, services)
     update.sh               new build of main → backup, replace, restart (or back)
     nightly.sh              the nightly job: backup, update, public copy + upload

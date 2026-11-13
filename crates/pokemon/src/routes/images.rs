@@ -3,7 +3,8 @@
 //! Japanese) one. Downloaded once from TCGdex (`{image}/high.webp`) into
 //! `<media>/pokemon_card_images/`, then served from there. A card TCGdex
 //! has no picture of gets the same print's from the Pokémon TCG API
-//! (`cards::find_image`, a full URL, PNG): looked up once.
+//! (`cards::find_image`, a full URL, PNG): Limitless TCG's scans (English, and
+//! French in `image_fr`) first, then the Pokémon TCG API; looked up once.
 
 use std::collections::HashSet;
 
