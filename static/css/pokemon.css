@@ -343,3 +343,62 @@ form.wish-got {
     border: 2px dashed #fff;
     border-radius: var(--radius);
 }
+
+/* A card's text on its page (the layout is card.css's .card-text). */
+.card-text.frame-pokemon { --frame: #c9892b; }
+.card-text.frame-trainer { --frame: #3f7fa6; }
+.card-text.frame-energy { --frame: #6b6b6b; }
+
+.card-text .move {
+    padding: 0.4rem 0.8rem;
+}
+
+.card-text .move + .move {
+    border-top: 1px solid #e3dccb;
+}
+
+.card-text .move-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: bold;
+}
+
+.card-text .move-damage {
+    margin-left: auto;
+}
+
+.card-text .move-kind {
+    color: #a33;
+    font-size: 0.8em;
+    text-transform: uppercase;
+}
+
+.card-text .move p {
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+}
+
+.type-badge {
+    display: inline-block;
+    min-width: 1.4em;
+    padding: 0 0.45em;
+    border-radius: 999px;
+    background: #999;
+    color: #fff;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-align: center;
+}
+
+.type-badge.type-grass { background: #4c9a3c; }
+.type-badge.type-fire { background: #d9542b; }
+.type-badge.type-water { background: #3b8bd0; }
+.type-badge.type-lightning { background: #e0b81d; color: #222; }
+.type-badge.type-psychic { background: #a05bb0; }
+.type-badge.type-fighting { background: #a8672f; }
+.type-badge.type-darkness { background: #3a3a4a; }
+.type-badge.type-metal { background: #8a96a3; }
+.type-badge.type-fairy { background: #de7fb0; }
+.type-badge.type-dragon { background: #b58a2a; }
+.type-badge.type-colorless { background: #d8d4c8; color: #222; }

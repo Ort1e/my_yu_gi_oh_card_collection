@@ -2,6 +2,7 @@
 //! card, and the rules of the collection. New in the Rust app (Django had
 //! no Pokémon cards).
 //!
+//! - [`card_text`]: a card's facts, abilities, attacks and effect as text;
 //! - [`card_ref`]: the code printed at the bottom of a card (`FNE 067/064`);
 //! - [`pulls`]: a booster opening's numbers (`67 45r 12x2`);
 //! - [`price`]: a copy's market price from Cardmarket's numbers, and its value;
@@ -14,6 +15,7 @@
 
 pub mod booster;
 pub mod card_ref;
+pub mod card_text;
 pub mod price;
 pub mod pulls;
 pub mod wish;

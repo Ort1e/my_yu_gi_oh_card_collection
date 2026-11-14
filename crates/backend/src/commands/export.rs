@@ -32,7 +32,7 @@ const START: [&str; 14] = [
 
 /// The addresses the copy may hold: the start pages, a card's, a deck's, a
 /// deck version's, a deck's saved list, a tournament's, a copy's, a book's, an author's, a
-/// series' page, and the card pictures (ygoprodeck's, the printings' own).
+/// series' page, the books' covers, and the card pictures (ygoprodeck's, the printings' own).
 fn public(path: &str) -> bool {
     const NUMBERED: [&str; 9] = [
         "/cards/",
@@ -50,6 +50,10 @@ fn public(path: &str) -> bool {
             path.strip_prefix(prefix)
                 .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
         })
+        || path
+            .strip_prefix("/books/")
+            .and_then(|rest| rest.strip_suffix("/cover"))
+            .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
         || path.starts_with("/card-image/")
         || path.starts_with("/card-picture/")
         || path.starts_with("/pokemon/card-image/")

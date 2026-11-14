@@ -769,10 +769,16 @@ with the cards: the novels at home, in `crates/books/`. Every route starts
 with `/books` (`src/routes/`, `templates/books/`); the book templates swap the
 navigation bar (`{% block nav %}` → `partials/books_nav.html`) and the page
 background (`body.books`, `static/css/books.css`). No prices or lots, and
-no picture stored: a book's page shows its cover straight from Open Library
-by ISBN (`covers.openlibrary.org`, allowed in the CSP; a plain "book" when
-there is none, `static/js/book_cover.js`; none in the public copy, where
-ISBNs aren't shown).
+no picture stored for the app's pages: a book's page shows its cover
+straight from Open Library by ISBN (`covers.openlibrary.org`, allowed in the
+CSP; a plain "book" when there is none, `static/js/book_cover.js`). The
+public copy can't (the address holds the ISBN): it points to
+`/books/:id/cover` (`routes/cover.rs`), which downloads the `-M` cover once
+into `media/book_covers/<id>.jpg` (`<id>.none` = Open Library has none,
+asked again only when deleted; throttled, ~100 requests per 5 minutes are
+allowed), so the copy's file is `img/books-12-cover.webp`. `/books/random`'s
+JSON has no cover in the copy. `clean-pictures` deletes the covers of
+deleted books.
 
 | Piece | Where |
 |---|---|
@@ -1038,7 +1044,7 @@ data no card links to (and old Django duplicates), in `media/card_pictures/`
 the printings' pictures no copy has (those offered on an edit page and not
 chosen), in
 `media/pokemon_card_images/` those of Pokémon cards no longer owned or
-wished. Each collection lists its files in use (`yugioh::routes::used_card_pictures`,
+wished, in `media/book_covers/` those of deleted books. Each collection lists its files in use (`yugioh::routes::used_card_pictures`,
 `pokemon::routes::images::used_files`); a picture deleted by mistake is just
 downloaded again. The server runs it daily, 15 minutes after it starts.
 
@@ -1064,8 +1070,10 @@ runs. They are **the app's own pages**, saved as files:
    `cards-page-2.html`, `/cards/12` → `cards-12.html`; only the `page` and
    `view` parameters are kept: filters aren't in the copy), its links
    rewritten to these files (`#` for anything else), the pictures as
-   WebP at most 480 px wide (`img/card-image-12.webp`: about a third
-   smaller than JPEG for the same look; the OVH plan has 100 MB), the
+   WebP at most 360 px wide (`img/card-image-12.webp`; the card pages
+   show the card's text, so the picture needn't be readable. Measured
+   2026-11-14, 824 pictures: 65 MB at 480 px, 41 MB at 360, 34 MB at 320;
+   the whole copy 73, 49 and 42 MB. The OVH plan has 100 MB), the
    `/static` files it uses copied. The first start page is also
    `index.html`.
 

@@ -124,7 +124,8 @@ and Japanese, with a wishlist and Cardmarket prices (weekly).
 - A card sold or given away: its page → *Edit or mark sold*. Never deleted.
 
 Pictures are a cache (`media/pokemon_card_images/`), downloaded again when
-missing.
+missing. A copy's page shows the card's text (HP, attacks, abilities,
+effect…) from TCGdex's data, also in the public copy.
 
 ### From a phone
 On the home Wi-Fi open **`http://192.168.1.202:3000`** and log in with your
@@ -290,7 +291,9 @@ Every morning the NAS writes a **read-only static site** and uploads it to a
 web hosting. It contains: the Yu-Gi-Oh! and Pokémon cards, the statistics,
 the market values, the public decks (those a version of which is marked
 public, or played in a tournament), the tournaments and their stats (no old
-notes), the Pokémon wishlist and the books (except private ones).
+notes), the Pokémon wishlist and the books (except private ones) with
+their covers. The pictures are small (360 px wide): the cards' text is on
+their pages.
 
 It **never** contains: sellers, lots, shipment PDFs, prices paid, the budget,
 notes, ISBNs, tournaments' old notes, forms, private decks and books.

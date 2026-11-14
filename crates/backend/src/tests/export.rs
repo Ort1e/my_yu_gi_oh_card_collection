@@ -65,6 +65,14 @@ async fn the_public_copy_holds_nothing_private() {
     )
     .unwrap();
 
+    // a book's cover, kept by `/books/:id/cover`
+    std::fs::create_dir_all(t.state.media_dir.join("book_covers")).unwrap();
+    std::fs::write(
+        t.state.media_dir.join("book_covers/1.jpg"),
+        common::photos::test_png(180, 270),
+    )
+    .unwrap();
+
     let out = t.state.media_dir.parent().unwrap().join("site");
     let static_dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../static"));
     crate::commands::export::export(&t.state, &out, static_dir)
@@ -93,6 +101,7 @@ async fn the_public_copy_holds_nothing_private() {
         "tournaments-1.html",
         "tournaments-stats.html",
         "img/card-image-1.webp",
+        "img/books-1-cover.webp",
         "static/css/style.css",
         "static/js/card_preview.js",
         "static/js/card_zoom.js",
@@ -133,6 +142,7 @@ async fn the_public_copy_holds_nothing_private() {
         "quick round",
         r#"href="collection-stats.html""#,
         r#"src="img/card-image-1.webp""#,
+        r#"src="img/books-1-cover.webp""#,
         // the random pick's links to the books, made by its script
         r#""href":"books-1.html""#,
         "static/js/book_random.js",

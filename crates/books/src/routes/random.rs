@@ -30,7 +30,8 @@ pub struct LanguageChoice {
 pub struct RandomPage {
     languages: Vec<LanguageChoice>,
     /// Every book (`json_for_script`): `{id, href, title, authors, series,
-    /// series_id, volume, language, format, pages, read, cover}`.
+    /// series_id, volume, language, format, pages, read, cover}`. The copy
+    /// keeps no cover here: its JSON isn't crawled, so no picture would be saved.
     books_json: String,
 }
 
@@ -83,7 +84,7 @@ pub async fn page(State(state): State<AppState>) -> AppResult<RandomPage> {
                 "format": book.format,
                 "pages": extra.page_count,
                 "read": book.is_read,
-                "cover": cover_url(extra.isbn.as_deref()),
+                "cover": cover_url(book.id, extra.isbn.as_deref()).filter(|_| !common::export::public_copy()),
             })
         })
         .collect();

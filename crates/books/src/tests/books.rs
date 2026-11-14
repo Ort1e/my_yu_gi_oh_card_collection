@@ -57,6 +57,19 @@ async fn a_book_is_added_and_shown() {
     assert!(page.contains("https://covers.openlibrary.org/b/isbn/9780007448036-M.jpg"));
     assert!(page.contains("/books/authors/1") && page.contains("/books/series/1"));
 
+    // its cover kept in the media folder, for the public copy (no ISBN in its address)
+    let covers = t.state.media_dir.join("book_covers");
+    std::fs::create_dir_all(&covers).unwrap();
+    std::fs::write(
+        covers.join(format!("{id}.jpg")),
+        common::photos::test_png(18, 27),
+    )
+    .unwrap();
+    let (status, _) = t.get(&format!("/books/{id}/cover")).await;
+    assert_eq!(status, StatusCode::OK);
+    std::fs::write(covers.join("9.none"), b"").unwrap();
+    assert_eq!(t.get("/books/9/cover").await.0, StatusCode::NOT_FOUND);
+
     let (_, list) = t.get("/books").await;
     assert!(list.contains("A Game of Thrones") && list.contains("George R. R. Martin"));
     assert_eq!(t.get("/books/99").await.0, StatusCode::NOT_FOUND);
