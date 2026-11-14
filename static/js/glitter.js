@@ -15,8 +15,8 @@
 /**
  * @typedef {(g: CanvasRenderingContext2D, r: number, color: string) => void} Draw
  * @typedef {'fall' | 'flutter' | 'rise' | 'twinkle'} Motion
- * @typedef {{ draw: Draw, colors: string[], weight: number, motion: Motion, size?: number, res?: number }} Kind
- * @typedef {{ kinds: Kind[], count: number, duration: number, door?: number }} Skin
+ * @typedef {{ draw: Draw, colors: string[], weight: number, motion: Motion, size?: number }} Kind
+ * @typedef {{ kinds: Kind[], count: number, duration: number }} Skin
  */
 
 /** Days of the year with a skin of their own: [month, day]. */
@@ -352,25 +352,6 @@ const cake = (g, r, c) => {
     paint(g, '#ff9f1c');
 };
 
-/** A gift box carrying the day, a door of the advent calendar. @param {number} day @returns {Draw} */
-const door = (day) => (g, r, c) => {
-    rect(g, -r * 0.8, -r * 0.3, r * 1.6, r * 1.2);
-    paint(g, c);
-    rect(g, -r * 0.95, -r * 0.7, r * 1.9, r * 0.45);
-    paint(g, c);
-    rect(g, -r * 0.95, -r * 0.27, r * 1.9, r * 0.05);
-    paint(g, 'rgba(0,0,0,.25)');
-    oval(g, -r * 0.3, -r * 0.88, r * 0.32, r * 0.2, -0.4);
-    paint(g, GOLD);
-    oval(g, r * 0.3, -r * 0.88, r * 0.32, r * 0.2, 0.4);
-    paint(g, GOLD);
-    g.fillStyle = '#ffffff';
-    g.font = `bold ${r * 0.95}px sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(day), 0, r * 0.35);
-};
-
 // ---------- kinds and skins ----------
 
 /**
@@ -411,7 +392,7 @@ function christmasDay(n) {
     if (n >= 24) {
         const kinds = [...XMAS.map((k) => weighted(k, 1.5)), sparks, kind(dot, [GOLD, '#fff3b0'], 3, 'fall', 0.8), kind(star, [GOLD], 4, 'twinkle', 0.7)];
 
-        return { kinds, count: 190, duration: 4.4, door: n };
+        return { kinds, count: 190, duration: 4.4 };
     }
 
     const featured = (n - 1) % 12;
@@ -425,7 +406,7 @@ function christmasDay(n) {
 
     kinds.push(sparks);
 
-    return { kinds, count: Math.round(60 + ((n - 1) * 60) / 23), duration: 2.5 + (n - 1) / 23, door: n };
+    return { kinds, count: Math.round(60 + ((n - 1) * 60) / 23), duration: 2.5 + (n - 1) / 23 };
 }
 
 /** @type {Record<string, (day?: number) => Skin>} */
@@ -587,7 +568,7 @@ function spriteOf(k, color, dpr) {
 
     if (!canvas) {
         canvas = document.createElement('canvas');
-        const q = dpr * (k.res ?? 1);
+        const q = dpr;
         canvas.width = canvas.height = Math.ceil(SPRITE * 2 * q);
 
         const g = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
@@ -650,12 +631,6 @@ function burst(skin, light) {
         let roll = Math.random() * total;
         const k = skin.kinds.find((kd) => (roll -= kd.weight) < 0) ?? skin.kinds[0];
         particles.push(spawn(k));
-    }
-
-    if (skin.door !== undefined) {
-        const tile = { draw: door(skin.door), colors: ['#b3262e'], weight: 0, motion: /** @type {Motion} */ ('fall'), size: 1.5, res: 1.5 };
-        // a gift with the day on it: upright, slow, on top of the others, there from the start
-        particles.push({ ...spawn(tile), delay: 0, x: width * (0.3 + Math.random() * 0.4), speed: 110, amp: 0, spin: 0 });
     }
 
     const start = performance.now();
