@@ -15,7 +15,7 @@
 /**
  * @typedef {(g: CanvasRenderingContext2D, r: number, color: string) => void} Draw
  * @typedef {'fall' | 'flutter' | 'rise' | 'twinkle'} Motion
- * @typedef {{ draw: Draw, colors: string[], weight: number, motion: Motion, size?: number, gilded?: boolean }} Kind
+ * @typedef {{ draw: Draw, colors: string[], weight: number, motion: Motion, size?: number, res?: number }} Kind
  * @typedef {{ kinds: Kind[], count: number, duration: number, door?: number }} Skin
  */
 
@@ -33,19 +33,10 @@ const mode = document.currentScript?.dataset.glitter ?? 'burst';
 
 // ---------- drawing (origin at the centre, r = radius) ----------
 
-/** Set while a gilded kind is drawn: `paint` adds a gold outline. */
-let gilding = false;
-
-/** Fill the current path, outlined in gold when gilded. */
+/** Fill the current path. */
 function paint(g, color) {
     g.fillStyle = color;
     g.fill();
-
-    if (gilding) {
-        g.lineWidth = 1.2;
-        g.strokeStyle = GOLD;
-        g.stroke();
-    }
 }
 
 function oval(g, x, y, rx, ry, rot = 0) {
@@ -69,21 +60,6 @@ function starPath(g, r, n, inner) {
     }
 
     g.closePath();
-}
-
-/** Stroke the current path in the colour, over a gold one when gilded. */
-function line(g, color, width) {
-    g.lineCap = 'round';
-
-    if (gilding) {
-        g.lineWidth = width + 3;
-        g.strokeStyle = GOLD;
-        g.stroke();
-    }
-
-    g.lineWidth = width;
-    g.strokeStyle = color;
-    g.stroke();
 }
 
 /** @type {Draw} */
@@ -117,15 +93,22 @@ const star = (g, r, c) => {
 
 /** @type {Draw} */
 const snowflake = (g, r, c) => {
-    g.beginPath();
-
     for (let i = 0; i < 3; i++) {
-        const a = (Math.PI * i) / 3;
-        g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-        g.lineTo(-Math.cos(a) * r, -Math.sin(a) * r);
+        g.save();
+        g.rotate((Math.PI * i) / 3);
+        rect(g, -r, -r * 0.09, r * 2, r * 0.18);
+        paint(g, c);
+
+        for (const x of [-0.65, 0.65]) {
+            oval(g, r * x, 0, r * 0.14, r * 0.3);
+            paint(g, c);
+        }
+
+        g.restore();
     }
 
-    line(g, c, 1.6);
+    oval(g, 0, 0, r * 0.22, r * 0.22);
+    paint(g, c);
 };
 
 /** @type {Draw} */
@@ -140,30 +123,28 @@ const bauble = (g, r, c) => {
 
 /** @type {Draw} */
 const candyCane = (g, r, c) => {
-    const w = r * 0.5;
-    const hook = () => {
+    g.save();
+    g.beginPath();
+    g.moveTo(-r * 0.55, r * 0.9);
+    g.lineTo(-r * 0.55, -r * 0.2);
+    g.arc(r * 0.1, -r * 0.2, r * 0.65, Math.PI, 0);
+    g.lineTo(r * 0.25, -r * 0.2);
+    g.arc(r * 0.1, -r * 0.2, r * 0.15, 0, Math.PI, true);
+    g.lineTo(-r * 0.05, r * 0.9);
+    g.closePath();
+    paint(g, '#ffffff');
+    g.clip();
+
+    for (let y = -1; y < 1.2; y += 0.5) {
         g.beginPath();
-        g.moveTo(-r * 0.3, r * 0.9);
-        g.lineTo(-r * 0.3, -r * 0.2);
-        g.arc(r * 0.1, -r * 0.2, r * 0.4, Math.PI, 0);
-    };
-
-    hook();
-    g.lineCap = 'butt';
-
-    if (gilding) {
-        g.lineWidth = w + 3;
-        g.strokeStyle = GOLD;
-        g.stroke();
+        g.moveTo(-r, r * y);
+        g.lineTo(r, r * (y - 0.4));
+        g.lineTo(r, r * (y - 0.1));
+        g.lineTo(-r, r * (y + 0.3));
+        paint(g, c);
     }
 
-    g.lineWidth = w;
-    g.strokeStyle = '#ffffff';
-    g.stroke();
-    g.strokeStyle = c;
-    g.setLineDash([r * 0.28, r * 0.28]);
-    g.stroke();
-    g.setLineDash([]);
+    g.restore();
 };
 
 /** @type {Draw} */
@@ -217,24 +198,21 @@ const mitten = (g, r, c) => {
 
 /** @type {Draw} */
 const gingerbread = (g, r, c) => {
-    g.beginPath();
-    g.moveTo(-r * 0.8, -r * 0.05);
-    g.lineTo(r * 0.8, -r * 0.05);
-    g.moveTo(-r * 0.45, r * 0.85);
-    g.lineTo(0, r * 0.1);
-    g.lineTo(r * 0.45, r * 0.85);
-    g.moveTo(0, -r * 0.05);
-    g.lineTo(0, r * 0.3);
-    line(g, c, r * 0.4);
-    oval(g, 0, -r * 0.5, r * 0.38, r * 0.38);
+    oval(g, 0, r * 0.15, r * 0.3, r * 0.45);
+    paint(g, c);
+    oval(g, 0, -r * 0.5, r * 0.36, r * 0.36);
     paint(g, c);
 
     for (const x of [-1, 1]) {
+        oval(g, x * r * 0.5, -r * 0.02, r * 0.4, r * 0.15, x * -0.25);
+        paint(g, c);
+        oval(g, x * r * 0.27, r * 0.65, r * 0.15, r * 0.35, x * 0.35);
+        paint(g, c);
         oval(g, x * r * 0.13, -r * 0.55, r * 0.05, r * 0.05);
         paint(g, '#ffffff');
     }
 
-    for (const y of [0.1, 0.35]) {
+    for (const y of [0.05, 0.3]) {
         oval(g, 0, r * y, r * 0.07, r * 0.07);
         paint(g, '#ffffff');
     }
@@ -268,9 +246,7 @@ const angel = (g, r, c) => {
     starPath(g, r * 0.85, 5, 0.45);
     paint(g, c);
     oval(g, 0, -r * 0.95, r * 0.4, r * 0.12);
-    g.lineWidth = 1.4;
-    g.strokeStyle = GOLD;
-    g.stroke();
+    paint(g, '#ffffff');
 };
 
 /** @type {Draw} */
@@ -298,23 +274,19 @@ const leaf = (g, r, c) => {
     g.quadraticCurveTo(-r * 0.6, -r, r, -r * 0.7);
     g.quadraticCurveTo(r * 0.6, r * 0.9, -r, r * 0.6);
     paint(g, c);
-    g.beginPath();
-    g.moveTo(-r, r * 0.6);
-    g.lineTo(r * 0.5, -r * 0.4);
-    line(g, 'rgba(0,0,0,.3)', 1);
+    oval(g, 0, -r * 0.05, r * 0.7, r * 0.05, -0.65);
+    paint(g, 'rgba(0,0,0,.3)');
 };
 
 /** @type {Draw} */
 const egg = (g, r, c) => {
+    g.save();
     oval(g, 0, 0, r * 0.65, r * 0.85);
     paint(g, c);
-    g.beginPath();
-    g.moveTo(-r * 0.62, -r * 0.1);
-    g.lineTo(-r * 0.3, r * 0.1);
-    g.lineTo(0, -r * 0.1);
-    g.lineTo(r * 0.3, r * 0.1);
-    g.lineTo(r * 0.62, -r * 0.1);
-    line(g, '#ffffff', 2);
+    g.clip();
+    rect(g, -r, -r * 0.15, r * 2, r * 0.3);
+    paint(g, '#ffffff');
+    g.restore();
 };
 
 /** @type {Draw} */
@@ -336,12 +308,12 @@ const chick = (g, r, c) => {
 const pumpkin = (g, r, c) => {
     oval(g, 0, r * 0.1, r * 0.85, r * 0.7);
     paint(g, c);
-    g.beginPath();
-    g.moveTo(-r * 0.3, -r * 0.55);
-    g.quadraticCurveTo(-r * 0.4, r * 0.1, -r * 0.3, r * 0.75);
-    g.moveTo(r * 0.3, -r * 0.55);
-    g.quadraticCurveTo(r * 0.4, r * 0.1, r * 0.3, r * 0.75);
-    line(g, 'rgba(0,0,0,.25)', 1);
+
+    for (const x of [-0.35, 0.35]) {
+        oval(g, r * x, r * 0.1, r * 0.06, r * 0.6);
+        paint(g, 'rgba(0,0,0,.2)');
+    }
+
     rect(g, -r * 0.1, -r * 0.85, r * 0.2, r * 0.35);
     paint(g, '#3a7d2c');
 };
@@ -366,14 +338,12 @@ const balloon = (g, r, c) => {
     oval(g, 0, -r * 0.2, r * 0.6, r * 0.75);
     paint(g, c);
     g.beginPath();
-    g.moveTo(-r * 0.12, r * 0.55);
-    g.lineTo(r * 0.12, r * 0.55);
-    g.lineTo(0, r * 0.4);
+    g.moveTo(-r * 0.12, r * 0.6);
+    g.lineTo(r * 0.12, r * 0.6);
+    g.lineTo(0, r * 0.45);
     paint(g, c);
-    g.beginPath();
-    g.moveTo(0, r * 0.55);
-    g.quadraticCurveTo(r * 0.3, r * 0.75, 0, r);
-    line(g, '#888888', 1);
+    oval(g, -r * 0.2, -r * 0.4, r * 0.1, r * 0.2, 0.4);
+    paint(g, 'rgba(255,255,255,.5)');
 };
 
 /** @type {Draw} */
@@ -390,16 +360,15 @@ const cake = (g, r, c) => {
 
 /** A numbered tile, like a door of the advent calendar. @param {number} day @returns {Draw} */
 const door = (day) => (g, r, c) => {
+    rect(g, -r * 0.95, -r * 0.95, r * 1.9, r * 1.9);
+    paint(g, GOLD);
     rect(g, -r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
     paint(g, c);
-    g.lineWidth = 1.5;
-    g.strokeStyle = GOLD;
-    g.stroke();
     g.fillStyle = '#ffffff';
-    g.font = `bold ${r * 1.1}px sans-serif`;
+    g.font = `bold ${r * 1.25}px sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(String(day), 0, r * 0.05);
+    g.fillText(String(day), 0, r * 0.07);
 };
 
 // ---------- kinds and skins ----------
@@ -432,8 +401,8 @@ const XMAS = [
     kind(angel, [GOLD, '#fff3b0'], 1, 'twinkle', 1),
 ];
 
-/** @param {Kind} k @param {number} weight @param {boolean} [gilded] @returns {Kind} */
-const weighted = (k, weight, gilded = false) => ({ ...k, weight, gilded });
+/** Gilded: the same shape in gold. @param {Kind} k @param {number} weight @param {boolean} [gilded] @returns {Kind} */
+const weighted = (k, weight, gilded = false) => ({ ...k, weight, colors: gilded ? [GOLD, '#ffe08a', '#e0b13a'] : k.colors });
 
 /** Christmas, day `n` of the mini calendar (1-24), 25 = the finale. @returns {Skin} */
 function christmasDay(n) {
@@ -442,7 +411,7 @@ function christmasDay(n) {
     if (n >= 24) {
         const kinds = [...XMAS.map((k) => weighted(k, 1.5)), sparks, kind(confetti, [GOLD, '#fff3b0'], 3, 'fall', 0.6), kind(star, [GOLD], 4, 'twinkle', 0.7)];
 
-        return { kinds, count: 110, duration: 4.2, door: n };
+        return { kinds, count: 190, duration: 4.4, door: n };
     }
 
     const featured = (n - 1) % 12;
@@ -456,13 +425,13 @@ function christmasDay(n) {
 
     kinds.push(sparks);
 
-    return { kinds, count: Math.round(30 + ((n - 1) * 50) / 23), duration: 2.5 + (n - 1) / 23, door: n };
+    return { kinds, count: Math.round(60 + ((n - 1) * 60) / 23), duration: 2.5 + (n - 1) / 23, door: n };
 }
 
 /** @type {Record<string, (day?: number) => Skin>} */
 const SKINS = {
     birthday: () => ({
-        count: 60,
+        count: 110,
         duration: 3,
         kinds: [
             kind(confetti, ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5'], 4, 'fall', 0.6),
@@ -472,7 +441,7 @@ const SKINS = {
         ],
     }),
     easter: () => ({
-        count: 50,
+        count: 90,
         duration: 2.8,
         kinds: [
             kind(egg, ['#f7b2d9', '#b8e0f7', '#c8f0b0', '#ffe49a', '#d7bdf7'], 3, 'fall', 0.9),
@@ -482,7 +451,7 @@ const SKINS = {
         ],
     }),
     halloween: () => ({
-        count: 55,
+        count: 100,
         duration: 2.8,
         kinds: [
             kind(pumpkin, ['#ff7518', '#f08a24'], 25, 'fall', 0.9),
@@ -492,22 +461,22 @@ const SKINS = {
     }),
     christmas: (day = 12) => christmasDay(day),
     spring: () => ({
-        count: 50,
+        count: 90,
         duration: 2.5,
         kinds: [kind(petal, ['#ffc2d4', '#ffb3c6', '#fff0f5'], 5, 'fall', 0.7), kind(flower, ['#ffffff', '#ffd6e0'], 1, 'fall', 0.7), glitter(['#ffffff', '#ffb3c6'])],
     }),
     summer: () => ({
-        count: 50,
+        count: 90,
         duration: 2.5,
         kinds: [glitter([GOLD, '#ffd966', '#ffb703', '#ffffff'], 6), kind(dot, [GOLD, '#ffb703'], 2, 'twinkle', 0.6)],
     }),
     autumn: () => ({
-        count: 50,
+        count: 90,
         duration: 2.5,
         kinds: [kind(leaf, ['#e76f51', '#f4a261', '#bc6c25', '#9c4a1a', '#e9c46a'], 6, 'fall', 0.9), glitter(['#f4a261', '#ffffff'])],
     }),
     winter: () => ({
-        count: 50,
+        count: 90,
         duration: 2.5,
         kinds: [kind(snowflake, ['#ffffff', '#cfe8ff', '#a8d0f0'], 5, 'fall', 0.8), glitter(['#ffffff', '#a8d0f0'])],
     }),
@@ -613,19 +582,18 @@ const sprites = new Map();
 
 /** A shape in a colour, drawn once. @param {Kind} k @param {string} color @param {number} dpr */
 function spriteOf(k, color, dpr) {
-    const key = `${k.draw.name}|${k.gilded ? 'g' : ''}|${color}`;
+    const key = `${k.draw.name}|${color}`;
     let canvas = sprites.get(key);
 
     if (!canvas) {
         canvas = document.createElement('canvas');
-        canvas.width = canvas.height = Math.ceil(SPRITE * 2 * dpr);
+        const q = dpr * (k.res ?? 1);
+        canvas.width = canvas.height = Math.ceil(SPRITE * 2 * q);
 
         const g = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
-        g.scale(dpr, dpr);
+        g.scale(q, q);
         g.translate(SPRITE, SPRITE);
-        gilding = Boolean(k.gilded);
         k.draw(g, SPRITE * 0.75, color);
-        gilding = false;
         sprites.set(key, canvas);
     }
 
@@ -685,8 +653,9 @@ function burst(skin, light) {
     }
 
     if (skin.door !== undefined) {
-        const tile = { draw: door(skin.door), colors: ['#b3262e'], weight: 0, motion: /** @type {Motion} */ ('fall'), size: 1.2 };
-        particles.push(spawn(tile));
+        const tile = { draw: door(skin.door), colors: ['#b3262e'], weight: 0, motion: /** @type {Motion} */ ('fall'), size: 2.6, res: 2.6 };
+        // big, upright, slow, on top of the others and there from the start
+        particles.push({ ...spawn(tile), delay: 0, x: width * (0.3 + Math.random() * 0.4), speed: 100, amp: 0, spin: 0 });
     }
 
     const start = performance.now();
