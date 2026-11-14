@@ -352,17 +352,23 @@ const cake = (g, r, c) => {
     paint(g, '#ff9f1c');
 };
 
-/** A numbered tile, like a door of the advent calendar. @param {number} day @returns {Draw} */
+/** A gift box carrying the day, a door of the advent calendar. @param {number} day @returns {Draw} */
 const door = (day) => (g, r, c) => {
-    rect(g, -r * 0.95, -r * 0.95, r * 1.9, r * 1.9);
-    paint(g, GOLD);
-    rect(g, -r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
+    rect(g, -r * 0.8, -r * 0.3, r * 1.6, r * 1.2);
     paint(g, c);
+    rect(g, -r * 0.95, -r * 0.7, r * 1.9, r * 0.45);
+    paint(g, c);
+    rect(g, -r * 0.95, -r * 0.27, r * 1.9, r * 0.05);
+    paint(g, 'rgba(0,0,0,.25)');
+    oval(g, -r * 0.3, -r * 0.88, r * 0.32, r * 0.2, -0.4);
+    paint(g, GOLD);
+    oval(g, r * 0.3, -r * 0.88, r * 0.32, r * 0.2, 0.4);
+    paint(g, GOLD);
     g.fillStyle = '#ffffff';
-    g.font = `bold ${r * 1.25}px sans-serif`;
+    g.font = `bold ${r * 0.95}px sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(String(day), 0, r * 0.07);
+    g.fillText(String(day), 0, r * 0.35);
 };
 
 // ---------- kinds and skins ----------
@@ -647,9 +653,9 @@ function burst(skin, light) {
     }
 
     if (skin.door !== undefined) {
-        const tile = { draw: door(skin.door), colors: ['#b3262e'], weight: 0, motion: /** @type {Motion} */ ('fall'), size: 2.6, res: 2.6 };
-        // big, upright, slow, on top of the others and there from the start
-        particles.push({ ...spawn(tile), delay: 0, x: width * (0.3 + Math.random() * 0.4), speed: 100, amp: 0, spin: 0 });
+        const tile = { draw: door(skin.door), colors: ['#b3262e'], weight: 0, motion: /** @type {Motion} */ ('fall'), size: 1.5, res: 1.5 };
+        // a gift with the day on it: upright, slow, on top of the others, there from the start
+        particles.push({ ...spawn(tile), delay: 0, x: width * (0.3 + Math.random() * 0.4), speed: 110, amp: 0, spin: 0 });
     }
 
     const start = performance.now();
