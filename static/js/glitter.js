@@ -74,12 +74,6 @@ const sparkle = (g, r, c) => {
 };
 
 /** @type {Draw} */
-const confetti = (g, r, c) => {
-    rect(g, -r, -r * 0.45, r * 2, r * 0.9);
-    paint(g, c);
-};
-
-/** @type {Draw} */
 const dot = (g, r, c) => {
     oval(g, 0, 0, r * 0.6, r * 0.6);
     paint(g, c);
@@ -174,12 +168,16 @@ const bell = (g, r, c) => {
 
 /** @type {Draw} */
 const gift = (g, r, c) => {
-    rect(g, -r * 0.7, -r * 0.3, r * 1.4, r * 1.05);
+    rect(g, -r * 0.75, -r * 0.45, r * 1.5, r * 1.2);
     paint(g, c);
-    rect(g, -r * 0.8, -r * 0.65, r * 1.6, r * 0.4);
-    paint(g, c);
-    rect(g, -r * 0.8, -r * 0.3, r * 1.6, r * 0.05);
-    paint(g, 'rgba(0,0,0,.25)');
+    rect(g, -r * 0.12, -r * 0.45, r * 0.24, r * 1.2);
+    paint(g, GOLD);
+    rect(g, -r * 0.75, r * 0.05, r * 1.5, r * 0.22);
+    paint(g, GOLD);
+    oval(g, -r * 0.28, -r * 0.62, r * 0.28, r * 0.17, -0.4);
+    paint(g, GOLD);
+    oval(g, r * 0.28, -r * 0.62, r * 0.28, r * 0.17, 0.4);
+    paint(g, GOLD);
 };
 
 /** @type {Draw} */
@@ -405,7 +403,7 @@ function christmasDay(n) {
     const sparks = glitter([GOLD, '#ffffff', '#fff3b0']);
 
     if (n >= 24) {
-        const kinds = [...XMAS.map((k) => weighted(k, 1.5)), sparks, kind(confetti, [GOLD, '#fff3b0'], 3, 'fall', 0.6), kind(star, [GOLD], 4, 'twinkle', 0.7)];
+        const kinds = [...XMAS.map((k) => weighted(k, 1.5)), sparks, kind(dot, [GOLD, '#fff3b0'], 3, 'fall', 0.8), kind(star, [GOLD], 4, 'twinkle', 0.7)];
 
         return { kinds, count: 190, duration: 4.4, door: n };
     }
@@ -430,7 +428,7 @@ const SKINS = {
         count: 110,
         duration: 3,
         kinds: [
-            kind(confetti, ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5'], 4, 'fall', 0.6),
+            kind(dot, ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5'], 4, 'fall', 0.8),
             kind(balloon, ['#ef476f', '#ffd166', '#118ab2', '#9b5de5'], 2, 'rise', 1),
             kind(cake, ['#f4a6c0', '#c8a2e0'], 1, 'fall', 1),
             glitter(['#ffffff', '#ffd166']),
