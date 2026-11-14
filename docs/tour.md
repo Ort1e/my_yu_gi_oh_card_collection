@@ -562,6 +562,16 @@ are; `npm run check` also checks them from their JSDoc comments
 (`frontend/tsconfig.static.json`, each script in its own scope, what they
 share at runtime declared in `frontend/static-globals.d.ts`).
 
+`glitter.js`: a short canvas burst of glitter when an add page opens (and,
+`data-glitter="light"`, once a day per browser, key `glitter-last`, on the
+dashboard, `/pokemon` and `/books`, public copy included). The skin follows the
+date (`skinFor`: birthdays in `BIRTHDAYS`, Easter, Halloween, the mini advent
+calendar 1-24 December with `christmasDay`, else the season). A new kind = a
+`draw` function and an entry in a skin's list; a new skin = an entry in
+`SKINS` and a rule in `skinFor`. Test with `?glitter=<skin>` and
+`?glitter-date=YYYY-MM-DD`. Skipped under reduced motion and when the page
+shows form errors.
+
 During frontend work, `npm run dev` serves the app with hot reload on
 `:5173` and forwards `/api` to the backend on `:3000`.
 

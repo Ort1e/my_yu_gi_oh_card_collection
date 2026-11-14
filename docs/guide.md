@@ -127,6 +127,10 @@ Pictures are a cache (`media/pokemon_card_images/`), downloaded again when
 missing. A copy's page shows the card's text (HP, attacks, abilities,
 effect…) from TCGdex's data, also in the public copy.
 
+A small glitter burst greets the add pages (and, once a day, the three homes);
+its look follows the season, Halloween, Easter, Christmas (a mini advent
+calendar) and birthdays. Nothing under "reduce motion".
+
 ### From a phone
 On the home Wi-Fi open **`http://192.168.1.202:3000`** and log in with your
 own password; bookmark it or "Add to home screen". From anywhere, with the
