@@ -174,16 +174,12 @@ const bell = (g, r, c) => {
 
 /** @type {Draw} */
 const gift = (g, r, c) => {
-    rect(g, -r * 0.75, -r * 0.45, r * 1.5, r * 1.2);
+    rect(g, -r * 0.7, -r * 0.3, r * 1.4, r * 1.05);
     paint(g, c);
-    rect(g, -r * 0.12, -r * 0.45, r * 0.24, r * 1.2);
-    paint(g, GOLD);
-    rect(g, -r * 0.75, r * 0.05, r * 1.5, r * 0.22);
-    paint(g, GOLD);
-    oval(g, -r * 0.28, -r * 0.62, r * 0.28, r * 0.17, -0.4);
-    paint(g, GOLD);
-    oval(g, r * 0.28, -r * 0.62, r * 0.28, r * 0.17, 0.4);
-    paint(g, GOLD);
+    rect(g, -r * 0.8, -r * 0.65, r * 1.6, r * 0.4);
+    paint(g, c);
+    rect(g, -r * 0.8, -r * 0.3, r * 1.6, r * 0.05);
+    paint(g, 'rgba(0,0,0,.25)');
 };
 
 /** @type {Draw} */
