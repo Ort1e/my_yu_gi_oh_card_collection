@@ -969,6 +969,7 @@ for every collection:
 | a card's page: its picture beside its box | `.card-detail` (card.css) | `/cards/:id`, `/pokemon/:id` |
 | background tasks | `common::schedule` (`every`, `when_due`, `is_due`) | the daily clean-up, the weekly prices |
 | card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
+| a short sparkle (30 particles, `element.animate()` on transform + opacity, gone after ~5 s): `glitter.js` opens on the add pages every time, with `data-glitter="festive"` on the homes only on a festive day, once a day per browser (`localStorage` `glitter-last`). `paletteFor(date, addPage)` gives the colours and the small SVG pictures of `static/img/glitter/` (Noto Emoji, Apache 2.0, `LICENSE` beside them); the add pages' Christmas lasts 1-26 December, with three baubles carrying the day number (mini advent calendar). A new occasion = a date rule in `paletteFor` + a palette + its picture names. Test with `?glitter-date=YYYY-MM-DD`, `?glitter=force`; skipped under reduced motion and when the page shows form errors | `static/js/glitter.js` | the add pages, the three homes (public copy included) |
 | photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
 
 ## Login
