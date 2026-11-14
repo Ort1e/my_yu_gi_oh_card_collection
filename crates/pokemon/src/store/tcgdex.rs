@@ -110,12 +110,14 @@ pub async fn search(
 }
 
 /// The cards printed with this number in any set (`TG29`: one per Trainer
-/// Gallery), Pocket cards left out (brief).
+/// Gallery), Pocket cards left out (brief). TCGdex compares case-sensitively
+/// and printed letter numbers are uppercase, so `gg36` is asked as `GG36`.
 pub async fn by_number(
     http: &reqwest::Client,
     language: &str,
     number: &str,
 ) -> Result<Vec<Value>, AppError> {
+    let number = number.to_ascii_uppercase();
     let limit = SEARCH_LIMIT.to_string();
     let answer = get(
         http,

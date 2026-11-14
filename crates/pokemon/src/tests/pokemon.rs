@@ -938,3 +938,49 @@ async fn the_wishlist_hints_at_boosters_before_the_refresh() {
     assert!(page.contains("Boosters to open appear after the weekly price refresh."));
     assert!(!page.contains("<h2>Boosters to open</h2>"));
 }
+
+#[tokio::test]
+async fn a_copy_page_shows_the_cards_text() {
+    let t = TestApp::new().await;
+    fixture(&t).await;
+    sqlx::query(
+        "UPDATE pokemon_card SET json = ? WHERE id = 1",
+    )
+    .bind(
+        r#"{"category":"Pokemon","stage":"Basic","hp":70,"types":["Water"],
+            "attacks":[{"cost":["Water","Colorless"],"name":"Bubble Jet","damage":"30+","effect":"Flip a coin."}],
+            "weaknesses":[{"type":"Lightning","value":"×2"}],
+            "pricing":{"cardmarket":{"avg":99.99}}}"#,
+    )
+    .execute(&t.state.pool)
+    .await
+    .unwrap();
+    let id = add(&t, HORSEA_IR).await;
+
+    let (_, page) = t.get(&format!("/pokemon/{id}")).await;
+    for text in [
+        "Basic Pokémon",
+        "Bubble Jet",
+        "30+",
+        "Flip a coin.",
+        "type-badge type-water",
+        "<dd>70</dd>",
+    ] {
+        assert!(page.contains(text), "{text}: {page}");
+    }
+    assert!(!page.contains("99.99"), "the JSON's prices stay out");
+
+    // a card with an empty JSON has no text block
+    let other = add(
+        &t,
+        &[
+            ("card", "sv06.5-010"),
+            ("language", "fr"),
+            ("variant", "normal"),
+            ("source", "single"),
+        ],
+    )
+    .await;
+    let (_, page) = t.get(&format!("/pokemon/{other}")).await;
+    assert!(!page.contains("card-text-band"));
+}

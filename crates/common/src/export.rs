@@ -38,9 +38,11 @@ const MARKER: &str = ".public-export";
 
 /// The largest width of the pictures' copies (the grids, the card pages,
 /// the picture seen large on hover or full screen). The OVH free plan has
-/// 100 MB: the ~640 pictures (2026-10) are about 49 MB as WebP at 480 px
-/// (73 MB as JPEG; 600 px would be 67 MB as WebP, 101 MB as JPEG).
-const PICTURE_WIDTH: u32 = 480;
+/// 100 MB. Measured 2026-11-14 on 824 pictures (WebP q85): 65 MB at 480 px,
+/// 41 MB at 360 px, 34 MB at 320 px (whole copy: 73, 49 and 42 MB). The
+/// card pages show the card's text, so the picture needn't be readable:
+/// 360 px stays sharp at the tiles' 170-250 px.
+const PICTURE_WIDTH: u32 = 360;
 
 /// The query parameters a copied page keeps: the others (filters) aren't
 /// in the copy.

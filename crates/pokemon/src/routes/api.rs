@@ -368,6 +368,8 @@ async fn by_size(
 /// `TG29/TG30` without its code: the cards with this number in every set
 /// (a lettered number is rare enough to list them all).
 async fn by_number(state: &AppState, language: &str, number: &str) -> AppResult<Found> {
+    let number = number.to_ascii_uppercase();
+    let number = number.as_str();
     let briefs = tcgdex::by_number(&state.http, language, number).await?;
     if briefs.is_empty() {
         return Ok(Err(answer(

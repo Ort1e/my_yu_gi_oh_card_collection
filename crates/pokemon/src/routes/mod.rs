@@ -27,6 +27,7 @@ use std::collections::{BTreeSet, HashMap};
 use askama::Template;
 use axum::extract::{Path, Query, State};
 use common_domain::CardStatus;
+use pokemon_domain::card_text::CardText;
 use pokemon_domain::price::copy_value;
 use pokemon_domain::{language_label, Source, Variant};
 use rust_decimal::Decimal;
@@ -626,6 +627,8 @@ pub struct CopyDetail {
     wishes_got: Vec<i64>,
     /// The latest market price of its variant (before the condition factor).
     market: Option<Decimal>,
+    /// The card's text, from TCGdex's JSON (public data, also in the copy).
+    text: Option<CardText>,
 }
 
 impl CopyDetail {
@@ -672,8 +675,17 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         .fetch_all(pool)
         .await?;
 
+    let json: String = sqlx::query_scalar("SELECT json FROM pokemon_card WHERE id = ?")
+        .bind(copy.card_id)
+        .fetch_one(pool)
+        .await?;
+    let text = serde_json::from_str(&json)
+        .ok()
+        .and_then(|json: serde_json::Value| CardText::from_tcgdex(&json));
+
     Ok(CopyDetail {
         copy,
+        text,
         history,
         others: others
             .into_iter()

@@ -18,6 +18,7 @@
 pub mod advent;
 pub mod api;
 pub mod authors;
+pub mod cover;
 pub mod form;
 pub mod random;
 pub mod series;
@@ -246,7 +247,7 @@ impl BookDetail {
     }
 
     fn cover_url(&self) -> Option<String> {
-        cover_url(self.book.isbn.as_deref())
+        cover_url(self.book.id, self.book.isbn.as_deref())
     }
 
     /// "Origin", "Dan Brown": the authors on one line.
@@ -267,13 +268,15 @@ impl BookDetail {
     }
 }
 
-/// A book's cover at Open Library (by ISBN, shown from there: never stored);
-/// none in the public copy, where ISBNs aren't shown.
-pub fn cover_url(isbn: Option<&str>) -> Option<String> {
-    if common::export::public_copy() {
-        return None;
-    }
+/// A book's cover: in the app Open Library's address (by ISBN, shown from
+/// there); in the public copy `/books/:id/cover` (`cover.rs`, kept in the
+/// media folder), whose file name holds the id, never the ISBN. None when
+/// the book has no ISBN.
+pub fn cover_url(id: i64, isbn: Option<&str>) -> Option<String> {
     let isbn = isbn?;
+    if common::export::public_copy() {
+        return Some(format!("/books/{id}/cover"));
+    }
     Some(format!(
         "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false"
     ))

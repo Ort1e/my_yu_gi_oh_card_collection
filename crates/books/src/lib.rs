@@ -28,6 +28,7 @@ pub fn routes() -> Routes {
         public: Router::new()
             .route("/books", get(routes::list))
             .route("/books/:id", get(routes::detail))
+            .route("/books/:id/cover", get(routes::cover::cover))
             .route("/books/authors", get(routes::authors::list))
             .route("/books/authors/:id", get(routes::authors::detail))
             .route("/books/series", get(routes::series::list))
