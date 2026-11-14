@@ -42,7 +42,7 @@ function paint(g, color) {
     g.fill();
 
     if (gilding) {
-        g.lineWidth = 1.6;
+        g.lineWidth = 1.2;
         g.strokeStyle = GOLD;
         g.stroke();
     }
@@ -140,24 +140,43 @@ const bauble = (g, r, c) => {
 
 /** @type {Draw} */
 const candyCane = (g, r, c) => {
-    g.beginPath();
-    g.moveTo(-r * 0.3, r);
-    g.lineTo(-r * 0.3, -r * 0.3);
-    g.arc(r * 0.1, -r * 0.3, r * 0.4, Math.PI, 0);
-    line(g, '#ffffff', r * 0.5);
-    g.setLineDash([r * 0.3, r * 0.3]);
-    line(g, c, r * 0.5);
+    const w = r * 0.5;
+    const hook = () => {
+        g.beginPath();
+        g.moveTo(-r * 0.3, r * 0.9);
+        g.lineTo(-r * 0.3, -r * 0.2);
+        g.arc(r * 0.1, -r * 0.2, r * 0.4, Math.PI, 0);
+    };
+
+    hook();
+    g.lineCap = 'butt';
+
+    if (gilding) {
+        g.lineWidth = w + 3;
+        g.strokeStyle = GOLD;
+        g.stroke();
+    }
+
+    g.lineWidth = w;
+    g.strokeStyle = '#ffffff';
+    g.stroke();
+    g.strokeStyle = c;
+    g.setLineDash([r * 0.28, r * 0.28]);
+    g.stroke();
     g.setLineDash([]);
 };
 
 /** @type {Draw} */
 const holly = (g, r, c) => {
-    oval(g, 0, -r * 0.1, r * 0.95, r * 0.4, -0.5);
+    oval(g, -r * 0.35, -r * 0.2, r * 0.7, r * 0.32, -0.6);
     paint(g, c);
-    oval(g, -r * 0.2, r * 0.35, r * 0.28, r * 0.28);
-    paint(g, '#c0392b');
-    oval(g, r * 0.15, r * 0.4, r * 0.28, r * 0.28);
-    paint(g, '#c0392b');
+    oval(g, r * 0.35, -r * 0.2, r * 0.7, r * 0.32, 0.6);
+    paint(g, c);
+
+    for (const x of [-0.3, 0.3, 0]) {
+        oval(g, r * x, r * (x === 0 ? 0.1 : 0.4), r * 0.3, r * 0.3);
+        paint(g, '#c0392b');
+    }
 };
 
 /** @type {Draw} */
@@ -199,20 +218,26 @@ const mitten = (g, r, c) => {
 /** @type {Draw} */
 const gingerbread = (g, r, c) => {
     g.beginPath();
-    g.moveTo(-r * 0.9, -r * 0.1);
-    g.lineTo(r * 0.9, -r * 0.1);
-    g.moveTo(-r * 0.5, r);
-    g.lineTo(0, r * 0.2);
-    g.lineTo(r * 0.5, r);
-    g.moveTo(0, -r * 0.1);
+    g.moveTo(-r * 0.8, -r * 0.05);
+    g.lineTo(r * 0.8, -r * 0.05);
+    g.moveTo(-r * 0.45, r * 0.85);
+    g.lineTo(0, r * 0.1);
+    g.lineTo(r * 0.45, r * 0.85);
+    g.moveTo(0, -r * 0.05);
     g.lineTo(0, r * 0.3);
-    line(g, c, r * 0.45);
-    oval(g, 0, -r * 0.55, r * 0.4, r * 0.4);
+    line(g, c, r * 0.4);
+    oval(g, 0, -r * 0.5, r * 0.38, r * 0.38);
     paint(g, c);
-    g.beginPath();
-    g.moveTo(-r * 0.2, r * 0.05);
-    g.lineTo(r * 0.2, r * 0.05);
-    line(g, '#ffffff', 1.5);
+
+    for (const x of [-1, 1]) {
+        oval(g, x * r * 0.13, -r * 0.55, r * 0.05, r * 0.05);
+        paint(g, '#ffffff');
+    }
+
+    for (const y of [0.1, 0.35]) {
+        oval(g, 0, r * y, r * 0.07, r * 0.07);
+        paint(g, '#ffffff');
+    }
 };
 
 /** @type {Draw} */
@@ -384,7 +409,7 @@ const door = (day) => (g, r, c) => {
  * @param {Motion} [motion] @param {number} [size]
  * @returns {Kind}
  */
-function kind(draw, colors, weight, motion = 'fall', size = 0.8) {
+function kind(draw, colors, weight, motion = 'fall', size = 1) {
     return { draw, colors, weight, motion, size };
 }
 
@@ -599,7 +624,7 @@ function spriteOf(k, color, dpr) {
         g.scale(dpr, dpr);
         g.translate(SPRITE, SPRITE);
         gilding = Boolean(k.gilded);
-        k.draw(g, SPRITE - 2, color);
+        k.draw(g, SPRITE * 0.75, color);
         gilding = false;
         sprites.set(key, canvas);
     }
