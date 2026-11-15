@@ -14,11 +14,7 @@ use serde_json::Value;
 
 use crate::ban_list::BanStatus;
 
-/// A set name as both ygoprodeck answers write it once decoded
-/// (`Legendary 5D&apos;s Decks` → `Legendary 5D's Decks`).
-fn set_name(name: &str) -> String {
-    html_escape::decode_html_entities(name.trim()).into_owned()
-}
+use crate::card_set::set_name;
 
 /// Every set of ygoprodeck's `cardsets.php`: `(name, code, TCG date)`.
 pub fn set_dates(cardsets: &Value) -> Vec<(String, Option<String>, Option<NaiveDate>)> {

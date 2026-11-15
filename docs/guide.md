@@ -59,8 +59,10 @@ refund), its cards. **Lots → Add**:
 - by hand: type the cards, or use the quick add (a set code, then the
   cards' numbers);
 - a **pre-constructed deck** (structure deck): the quick add with its set
-  code, then **Add every card of the set** (one copy of each number); the
-  numbers printed in several rarities are highlighted, to choose theirs.
+  code, then **Add every card of the set**: each number as many times as
+  the deck holds it (3 Lonefire Blossom in Legendary 5D's Decks: ygoprodeck
+  writes that count as the rarity); the numbers printed in several rarities
+  are highlighted, to choose theirs.
 
 Cards forgotten or arrived later: the lot's page → **Add cards** (the same
 rows and quick add, on their own page; the lot page itself only reads).

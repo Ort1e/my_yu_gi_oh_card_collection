@@ -322,7 +322,7 @@ what can be remembered is.
 |---|---|---|
 | a card's data, by English name or ygopro id | `cardinfo.php?name=` / `?id=` | `card_data` (with the whole JSON in `json_data`) |
 | its picture | the URL in `json_data` | `media/card_images/` (`/card-image/:id`, `common::media::fetch_once`) |
-| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code | memory (`SET_CACHE`, until a restart; the old lone-`E` codes like `LOB-E031` are skipped when the set has `-EN` ones: another numbering); its French names also go to `card_translation` |
+| a set, for the quick add (`GET /api/sets/:code`) | `cardsets.php`, then `cardinfo.php?cardset=` in English and French for each set with that code; when the name finds nothing (`Legendary 5D&apos;s Decks`), the whole `cardinfo.php` once a day (only ids and set codes kept), then the cards by `id=` | memory (`SET_CACHE`, until a restart; the old lone-`E` codes like `LOB-E031` are skipped when the set has `-EN` ones: another numbering); its French names also go to `card_translation` |
 | a name in another language | `cardinfo.php?id=&language=fr` | `card_translation` (migration 0005): a name found is kept, "no translation yet" is asked again after 7 days |
 | a set code's card names, for its Cardmarket expansion (`store/prices/cardmarket.rs`) | `cardsets.php`, then `cardinfo.php?cardset=` per set with that code | `cardmarket_expansion` (once; not found: again after 30 days) |
 | market prices, weekly (`store/prices/ygoprodeck.rs`) | `cardinfo.php?id=1,2,…` (100 ids a request; unknown ids are left out, all unknown = 400) | `card_price` (migration 0008), one row per card and refresh date, never pruned |
