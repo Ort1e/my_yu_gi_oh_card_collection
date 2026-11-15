@@ -2,7 +2,10 @@
 //! memory) and for finding a set's Cardmarket expansion.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
@@ -32,7 +35,8 @@ static SET_CACHE: Mutex<BTreeMap<String, FetchedSet>> = Mutex::const_new(BTreeMa
 
 /// Fetch every card of the sets whose code is `prefix`, `None` for an
 /// unknown prefix. Calls `cardsets.php`, then `cardinfo.php` in English and
-/// French for each matching set; `YGOPRODECK.wait()` before each request. Answers
+/// French for each matching set (by its card codes when its name finds
+/// nothing: [`fetch_cards_with_code`]); `YGOPRODECK.wait()` before each request. Answers
 /// are cached ([`SET_CACHE`]), and the French names of a new fetch are
 /// remembered as translations (`card_translation`) for free.
 pub async fn fetch_set(
@@ -86,8 +90,12 @@ pub async fn fetch_set(
         en.extend(fetch_set_cards(http, set_name, None).await?);
         fr.extend(fetch_set_cards(http, set_name, Some("fr")).await?);
     }
+    if en.is_empty() {
+        en = fetch_cards_with_code(http, &prefix, None).await?;
+        fr = fetch_cards_with_code(http, &prefix, Some("fr")).await?;
+    }
     let set = FetchedSet {
-        name: matching[0].0.to_string(),
+        name: yugioh_domain::card_set::set_name(matching[0].0),
         en,
         fr,
     };
@@ -148,6 +156,107 @@ async fn fetch_set_cards(
     })
 }
 
+/// One card of ygoprodeck's whole list, only what finds a set's cards by code.
+#[derive(Debug, Deserialize)]
+struct CardCodes {
+    id: i64,
+    #[serde(default)]
+    card_sets: Vec<CardCode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CardCode {
+    set_code: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AllCards {
+    data: Vec<CardCodes>,
+}
+
+/// The set codes of every card, by ygopro id ([`card_ids_with_code`]), and
+/// when they were downloaded: kept a day.
+static CODE_INDEX: Mutex<Option<(Instant, Arc<Vec<CardCodes>>)>> = Mutex::const_new(None);
+const CODE_INDEX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// The ids of the cards printed under `prefix` (`"L5DD"`), from ygoprodeck's
+/// whole card list (`cardinfo.php` without a filter, ~20 MB, read once a day
+/// into [`CODE_INDEX`], only ids and set codes kept).
+async fn card_ids_with_code(http: &reqwest::Client, prefix: &str) -> AppResult<Vec<i64>> {
+    let index = {
+        let mut cached = CODE_INDEX.lock().await;
+        match cached.as_ref() {
+            Some((at, index)) if at.elapsed() < CODE_INDEX_AGE => index.clone(),
+            _ => {
+                let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
+                YGOPRODECK.wait().await;
+                let all: AllCards = http
+                    .get(API_URL)
+                    .send()
+                    .await
+                    .and_then(reqwest::Response::error_for_status)
+                    .map_err(internal)?
+                    .json()
+                    .await
+                    .map_err(internal)?;
+                let index = Arc::new(all.data);
+                *cached = Some((Instant::now(), index.clone()));
+                index
+            }
+        }
+    };
+
+    let wanted = format!("{}-", prefix.to_uppercase());
+    Ok(index
+        .iter()
+        .filter(|card| {
+            card.card_sets
+                .iter()
+                .any(|set| set.set_code.to_uppercase().starts_with(&wanted))
+        })
+        .map(|card| card.id)
+        .collect())
+}
+
+/// The cards printed under `prefix`, found by their set codes rather than
+/// the set's name: ygoprodeck's `cardset=` filter finds nothing for some
+/// names (`Legendary 5D&apos;s Decks`, an entity in its own data, answers
+/// 400 however it is written). The same answers as [`fetch_set_cards`]
+/// (`language` when given), asked by ids, 100 at a time.
+async fn fetch_cards_with_code(
+    http: &reqwest::Client,
+    prefix: &str,
+    language: Option<&str>,
+) -> AppResult<Vec<Value>> {
+    let ids = card_ids_with_code(http, prefix).await?;
+    let internal = |e: reqwest::Error| AppError::Internal(format!("ygoprodeck: {e}"));
+    let mut cards = Vec::new();
+    for batch in ids.chunks(100) {
+        let ids: Vec<String> = batch.iter().map(i64::to_string).collect();
+        let mut query = vec![("id", ids.join(","))];
+        if let Some(language) = language {
+            query.push(("language", language.to_string()));
+        }
+        YGOPRODECK.wait().await;
+        let response = http
+            .get(API_URL)
+            .query(&query)
+            .send()
+            .await
+            .map_err(internal)?;
+        // 400: none of them is known (in that language)
+        if !response.status().is_success() {
+            continue;
+        }
+        let mut body: Value = response.json().await.map_err(internal)?;
+        if let Value::Array(found) = body["data"].take() {
+            cards.extend(found);
+        }
+    }
+    tracing::info!(prefix = %prefix, cards = cards.len(), "set found by its card codes");
+    Ok(cards)
+}
+
 /// What ygoprodeck says about a set code, to find its Cardmarket expansion
 /// (`store::prices::cardmarket`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -185,6 +294,9 @@ pub async fn fetch_set_infos(
         let mut cards = Vec::new();
         for set_name in &set_names {
             cards.extend(fetch_set_cards(http, set_name, None).await?);
+        }
+        if cards.is_empty() && !set_names.is_empty() {
+            cards = fetch_cards_with_code(http, prefix, None).await?;
         }
         let names = yugioh_domain::card_set::set_card_names(prefix, &cards);
         infos.insert(prefix.clone(), SetInfo { names, release });

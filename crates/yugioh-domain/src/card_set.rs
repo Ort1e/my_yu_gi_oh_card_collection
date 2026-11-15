@@ -21,6 +21,12 @@ use serde_json::Value;
 use crate::card::{clean_card_name, Language};
 use crate::rarity::Rarity;
 
+/// A set name as ygoprodeck's answers write it, decoded
+/// (`Legendary 5D&apos;s Decks` → `Legendary 5D's Decks`).
+pub fn set_name(name: &str) -> String {
+    html_escape::decode_html_entities(name.trim()).into_owned()
+}
+
 /// One card number of a set, as sent to the panel.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SetCard {
@@ -32,6 +38,9 @@ pub struct SetCard {
     pub name_fr: Option<String>,
     /// Every rarity that code exists in, without duplicates.
     pub rarities: Vec<String>,
+    /// How many copies of that number a pre-constructed deck holds (1 for most):
+    /// see [`set_cards`].
+    pub copies: u32,
 }
 
 /// The number of a card code, without the set and the language:
@@ -182,7 +191,7 @@ pub fn sets_with_code(cardsets: &Value, prefix: &str) -> (Vec<String>, Option<Na
         }
 
         if let Some(name) = set.get("set_name").and_then(Value::as_str) {
-            names.push(html_escape::decode_html_entities(name).into_owned());
+            names.push(set_name(name));
         }
         let date = set
             .get("tcg_date")
@@ -231,7 +240,18 @@ pub fn set_card_names(prefix: &str, cards: &[Value]) -> HashSet<String> {
 /// another order. When the set has a modern `<prefix>-EN…` code, the old
 /// lone-`E` codes ([`is_old_european`]) are skipped, else number 031 would
 /// mix two cards. Sets with only old codes list them.
+///
+/// A pre-constructed deck may hold several copies of one number (Legendary
+/// 5D's Decks: 3 Lonefire Blossom `L5DD-ENA01`). ygoprodeck writes that count
+/// as the rarity (`"set_rarity": "3"`, copied from Yugipedia's quantity
+/// column, whose rarity is then the list's default, Common): a rarity made of
+/// digits is read as [`SetCard::copies`], not a rarity. Its print column
+/// (`"New"`, `"Reprint"`) also lands there sometimes and is no rarity
+/// either. A number left without a rarity is Common.
 pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
+    /// Yugipedia's print column, found in ygoprodeck's `set_rarity`.
+    const NOT_RARITIES: [&str; 3] = ["", "New", "Reprint"];
+
     let modern_prefix = format!("{prefix}-{}", Language::English.code());
     let has_modern = en
         .iter()
@@ -267,13 +287,19 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
                             }
                         })
                         .next();
-                    let rarities = vec![inside.get("set_rarity")?.as_str()?.to_string()];
+                    let rarity = inside.get("set_rarity")?.as_str()?.trim();
+                    let (rarities, copies) = match rarity.parse::<u32>() {
+                        Ok(copies) if copies > 0 => (Vec::new(), copies),
+                        _ if NOT_RARITIES.contains(&rarity) => (Vec::new(), 1),
+                        _ => (vec![rarity.to_string()], 1),
+                    };
                     Some(SetCard {
                         number: card_number(set_code).unwrap_or_else(|| set_code.to_string()),
                         ygopro_id,
                         name_en,
                         name_fr,
                         rarities,
+                        copies,
                     })
                 } else {
                     None
@@ -296,6 +322,7 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
             cards_map
                 .entry(card.number.clone())
                 .and_modify(|existing_card| {
+                    existing_card.copies = existing_card.copies.max(card.copies);
                     // without duplicates, in the order ygoprodeck lists them
                     for rarity in &card.rarities {
                         if !existing_card.rarities.contains(rarity) {
@@ -306,6 +333,12 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
                 .or_insert(card);
         }
         let mut values = cards_map.into_values().collect::<Vec<SetCard>>();
+        for card in &mut values {
+            // only a count: Yugipedia's default rarity of a deck's list
+            if card.rarities.is_empty() {
+                card.rarities.push(Rarity::Common.label().to_string());
+            }
+        }
         values.sort_by(|a, b| a.number.cmp(&b.number));
         values
     }
@@ -529,6 +562,31 @@ mod tests {
         assert_eq!(numbers(&cards), ["001", "010", "037"]);
         assert_eq!(cards[0].ygopro_id, 1);
         assert_eq!(cards[0].name_en, "Tri-Horned Dragon");
+    }
+
+    #[test]
+    fn a_count_as_rarity_is_the_number_of_copies() {
+        let en = [
+            // Legendary 5D's Decks: 3 copies, no rarity of their own
+            card(1, "Lonefire Blossom", &[("L5DD-ENA01", "3")]),
+            // the count and the rarity as two entries
+            card(
+                2,
+                "Tuning",
+                &[("L5DD-ENY20", "2"), ("L5DD-ENY20", "Common")],
+            ),
+            card(3, "Stardust Dragon", &[("L5DD-ENS01", "Secret Rare")]),
+            // the print column: not a rarity either
+            card(4, "Anchorbolt Hedgehog", &[("L5DD-ENY02", "New")]),
+        ];
+        let cards = set_cards("L5DD", &en, &[]);
+        assert_eq!(numbers(&cards), ["A01", "S01", "Y02", "Y20"]);
+        let copies: Vec<u32> = cards.iter().map(|c| c.copies).collect();
+        assert_eq!(copies, [3, 1, 1, 2]);
+        assert_eq!(cards[0].rarities, ["Common"]);
+        assert_eq!(cards[1].rarities, ["Secret Rare"]);
+        assert_eq!(cards[2].rarities, ["Common"]);
+        assert_eq!(cards[3].rarities, ["Common"]);
     }
 
     #[test]

@@ -465,35 +465,49 @@ numberInput.addEventListener('keydown', async (e) => {
 
 // ---------- every card of the set (a pre-constructed deck) ----------
 
+/** How many cards the loaded set's box holds: its numbers' copies put together. */
+function boxCount(set) {
+    let count = 0;
+
+    for (const card of set.cards.values()) count += card.copies ?? 1;
+
+    return count;
+}
+
 /** The button names the loaded set and its count; disabled without a set. */
 function showAddAll() {
     addAllButton.disabled = !current;
     addAllButton.textContent = current
-        ? `Add the ${current.set.cards.size} cards of ${current.prefix}`
+        ? `Add the ${boxCount(current.set)} cards of ${current.prefix}`
         : 'Add every card of the set';
 }
 
 /**
- * One copy of each number of the loaded set, in number order (the set lookup
- * sorts them). A number printed in several rarities can't be guessed: its row
- * offers only those, none selected, and is highlighted until one is chosen.
+ * Every number of the loaded set, in number order (the set lookup sorts them),
+ * as many copies as the deck holds (`copies`: 3 Lonefire Blossom in Legendary
+ * 5D's Decks). A number printed in several rarities can't be guessed: its rows
+ * (one per copy) offer only those, none selected, highlighted until one is chosen.
  */
 addAllButton.addEventListener('click', () => {
     if (!current) return;
 
     const { set, prefix } = current;
 
-    if (!window.confirm(`Add the ${set.cards.size} cards of ${set.name} (${prefix}), one copy each?`)) return;
+    const count = boxCount(set);
+
+    if (!window.confirm(`Add the ${count} cards of ${set.name} (${prefix})?`)) return;
 
     const toChoose = [];
 
     for (const card of set.cards.values()) {
-        const row = addCard({ ...current, card });
-        flash(row);
+        for (let copy = 0; copy < (card.copies ?? 1); copy++) {
+            const row = addCard({ ...current, card });
+            flash(row);
 
-        if ((card.rarities?.length ?? 0) > 1 && !field(row, 'rarity').value) {
-            row.classList.add('needs-rarity');
-            toChoose.push(prefix + card.number);
+            if ((card.rarities?.length ?? 0) > 1 && !field(row, 'rarity').value) {
+                row.classList.add('needs-rarity');
+                toChoose.push(prefix + card.number);
+            }
         }
     }
 
@@ -501,9 +515,9 @@ addAllButton.addEventListener('click', () => {
     showRarities(null);
 
     if (toChoose.length > 0) {
-        say(`Added ${set.cards.size} cards. ${toChoose.length} exist in several rarities: choose theirs in the highlighted rows (${toChoose.join(', ')}).`, true);
+        say(`Added ${count} cards. ${toChoose.length} exist in several rarities: choose theirs in the highlighted rows (${toChoose.join(', ')}).`, true);
     } else {
-        say(`Added ${set.cards.size} cards.`);
+        say(`Added ${count} cards.`);
     }
 });
 
