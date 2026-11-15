@@ -22,13 +22,16 @@
       <label for="qa-number">Number or code, then Enter</label>
       <input type="text" id="qa-number" placeholder="e.g. 37 or MAMO-EN012" autocomplete="off">
     </div>
+    <div class="qa-add-all">
+      <button type="button" id="qa-add-all" class="btn-secondary" disabled>Add every card of the set</button>
+    </div>
   </div>
 
   <div id="qa-set-choices" class="qa-set-choices" hidden></div>
 
   <div id="qa-rarities" class="qa-rarities" hidden></div>
 
-  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards, <strong>with the language</strong> (e.g. <code>RA05-FR</code>), then each card's number. A full code (<code>MAMO-EN012</code>) is used as typed, whatever the set above. A number printed in several rarities gets one row per copy: choose each one's rarity in its row.</small></p>
+  <p id="qa-info" class="quick-add-info"><small>Type the set code as printed on the cards, <strong>with the language</strong> (e.g. <code>RA05-FR</code>), then each card's number. A full code (<code>MAMO-EN012</code>) is used as typed, whatever the set above. A number printed in several rarities gets one row per copy: choose each one's rarity in its row. A pre-constructed deck (a structure deck): load its set code, then <strong>Add every card of the set</strong> adds one copy of each number; the numbers printed in several rarities are highlighted, to choose theirs.</small></p>
 
   <details>
     <summary>Or paste a list of numbers or codes</summary>
