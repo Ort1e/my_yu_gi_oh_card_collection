@@ -114,18 +114,36 @@ pub fn code_without_language(code: &str) -> Option<(String, String)> {
     }
 }
 
+/// Yugipedia's print column (`"New"`, `"Reprint"`) or nothing, found in
+/// ygoprodeck's `set_rarity` for some pre-constructed decks: no rarity.
+const NOT_RARITIES: [&str; 3] = ["", "New", "Reprint"];
+
+/// Whether a ygoprodeck `set_rarity` isn't a rarity but a pre-constructed
+/// deck's copy count (`"3"`) or print column (`"New"`): both come from a
+/// Yugipedia list line whose rarity was left blank, i.e. the list's default,
+/// Common. So a code with **only** such entries is Common; next to a real
+/// rarity they are ignored (a booster's stray `"New"`). See [`set_cards`].
+fn is_blank_rarity(set_rarity: &str) -> bool {
+    let set_rarity = set_rarity.trim();
+    NOT_RARITIES.contains(&set_rarity) || set_rarity.parse::<u32>().is_ok_and(|n| n > 0)
+}
+
 /// The rarity of a card coded `code`, from its ygoprodeck JSON (`card_sets`),
 /// when that code was printed in **one rarity only**: `"MAMO-FR023"` with only
 /// `{"set_code": "MAMO-EN023", "set_rarity": "Super Rare"}` → Super Rare.
+/// A deck's copy count or print column (`"3"`, `"New"`) is no rarity, and a
+/// code with only those is Common ([`is_blank_rarity`]): `"L5DD-FRA01"`
+/// listed as `"3"` → Common.
 ///
 /// `None` when the code isn't listed, when it was printed in several
-/// rarities, or when one of its rarities isn't a known name (`"2"`, `"New"`):
-/// the card can't be known for sure then.
+/// rarities, or when one of its rarities isn't a known name: the card can't
+/// be known for sure then.
 pub fn single_rarity(json: &Value, code: &str) -> Option<Rarity> {
     let wanted = code_without_language(code)?;
     let sets = json.get("card_sets")?.as_array()?;
 
     let mut found: Option<Rarity> = None;
+    let mut blank = false;
     for set in sets {
         let Some(set_code) = set.get("set_code").and_then(|c| c.as_str()) else {
             continue;
@@ -135,24 +153,32 @@ pub fn single_rarity(json: &Value, code: &str) -> Option<Rarity> {
             continue;
         }
 
-        let rarity = Rarity::from_label(set.get("set_rarity")?.as_str()?)?;
+        let set_rarity = set.get("set_rarity")?.as_str()?;
+        if is_blank_rarity(set_rarity) {
+            blank = true;
+            continue;
+        }
+        let rarity = Rarity::from_label(set_rarity)?;
         match found {
             Some(other) if other != rarity => return None,
             _ => found = Some(rarity),
         }
     }
-    found
+    found.or(blank.then_some(Rarity::Common))
 }
 
 /// Every rarity ygoprodeck lists for the code `code` in a card's JSON
 /// (`card_sets`), in the order listed, without repeats; unknown rarity names
-/// are skipped. `"SUDA-FR049"` matches `"SUDA-EN049"`.
+/// are skipped; a deck's count or print column too, and a code with only
+/// those is Common ([`is_blank_rarity`]).
+/// `"SUDA-FR049"` matches `"SUDA-EN049"`.
 pub fn code_rarities(json: &Value, code: &str) -> Vec<Rarity> {
     let Some(wanted) = code_without_language(code) else {
         return Vec::new();
     };
 
     let mut rarities = Vec::new();
+    let mut blank = false;
     let sets = json.get("card_sets").and_then(Value::as_array);
     for set in sets.into_iter().flatten() {
         let same_code = set
@@ -160,16 +186,24 @@ pub fn code_rarities(json: &Value, code: &str) -> Vec<Rarity> {
             .and_then(Value::as_str)
             .and_then(code_without_language)
             .is_some_and(|code| code == wanted);
-        let rarity = set
+        let set_rarity = set
             .get("set_rarity")
             .and_then(Value::as_str)
-            .and_then(Rarity::from_label);
+            .unwrap_or_default();
+        if same_code && is_blank_rarity(set_rarity) {
+            blank = true;
+            continue;
+        }
+        let rarity = Rarity::from_label(set_rarity);
 
         if let (true, Some(rarity)) = (same_code, rarity) {
             if !rarities.contains(&rarity) {
                 rarities.push(rarity);
             }
         }
+    }
+    if rarities.is_empty() && blank {
+        rarities.push(Rarity::Common);
     }
     rarities
 }
@@ -249,9 +283,6 @@ pub fn set_card_names(prefix: &str, cards: &[Value]) -> HashSet<String> {
 /// (`"New"`, `"Reprint"`) also lands there sometimes and is no rarity
 /// either. A number left without a rarity is Common.
 pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
-    /// Yugipedia's print column, found in ygoprodeck's `set_rarity`.
-    const NOT_RARITIES: [&str; 3] = ["", "New", "Reprint"];
-
     let modern_prefix = format!("{prefix}-{}", Language::English.code());
     let has_modern = en
         .iter()
@@ -288,10 +319,10 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
                         })
                         .next();
                     let rarity = inside.get("set_rarity")?.as_str()?.trim();
-                    let (rarities, copies) = match rarity.parse::<u32>() {
-                        Ok(copies) if copies > 0 => (Vec::new(), copies),
-                        _ if NOT_RARITIES.contains(&rarity) => (Vec::new(), 1),
-                        _ => (vec![rarity.to_string()], 1),
+                    let (rarities, copies) = if is_blank_rarity(rarity) {
+                        (Vec::new(), rarity.parse::<u32>().unwrap_or(1))
+                    } else {
+                        (vec![rarity.to_string()], 1)
                     };
                     Some(SetCard {
                         number: card_number(set_code).unwrap_or_else(|| set_code.to_string()),
@@ -513,12 +544,25 @@ mod tests {
 
     #[test]
     fn an_unknown_rarity_gives_none() {
-        assert_eq!(
-            single_rarity(&printings(&[("RA05-EN001", "2")]), "RA05-EN001"),
-            None
-        );
-        let json = printings(&[("RA05-EN001", "Common"), ("RA05-EN001", "New")]);
+        let json = printings(&[("RA05-EN001", "Shiny Rare")]);
         assert_eq!(single_rarity(&json, "RA05-EN001"), None);
+        let json = printings(&[("RA05-EN001", "Common"), ("RA05-EN001", "Shiny Rare")]);
+        assert_eq!(single_rarity(&json, "RA05-EN001"), None);
+    }
+
+    #[test]
+    fn a_decks_count_or_print_column_is_common() {
+        let json = printings(&[("L5DD-ENA01", "3")]);
+        assert_eq!(single_rarity(&json, "L5DD-FRA01"), Some(Rarity::Common));
+        let json = printings(&[("L5DD-ENY20", "2"), ("L5DD-ENY20", "Common")]);
+        assert_eq!(single_rarity(&json, "L5DD-ENY20"), Some(Rarity::Common));
+        let json = printings(&[("L5DD-ENY02", "New")]);
+        assert_eq!(single_rarity(&json, "L5DD-ENY02"), Some(Rarity::Common));
+        assert_eq!(code_rarities(&json, "L5DD-FRY02"), [Rarity::Common]);
+        // next to a real rarity: ignored
+        let json = printings(&[("SDWD-EN041", "2"), ("SDWD-EN041", "Ultra Rare")]);
+        assert_eq!(single_rarity(&json, "SDWD-EN041"), Some(Rarity::UltraRare));
+        assert_eq!(code_rarities(&json, "SDWD-FR041"), [Rarity::UltraRare]);
     }
 
     #[test]
