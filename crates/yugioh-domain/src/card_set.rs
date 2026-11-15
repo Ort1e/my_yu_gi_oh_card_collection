@@ -5,6 +5,9 @@
 //! - the rarity of a card from its card data, when its code was printed in
 //!   one rarity only (`clean-cards` step 7, [`single_rarity`]).
 //!
+//! Difference from the naive reading: a set with two numberings under one code
+//! (LOB: `LOB-EN040` and the 2002 `LOB-E031`) lists only the modern one.
+//!
 //! Pure: the backend fetches the JSON (`card_data::fetch_set`), this module
 //! only reads it.
 
@@ -58,6 +61,16 @@ pub fn card_number(code: &str) -> Option<String> {
     } else {
         Some(number.to_string())
     }
+}
+
+/// Whether a code is of the old European style, a lone `E` before a digit
+/// (`"LOB-E031"`), as opposed to the modern `"LOB-EN040"` or `"LOB-040"`.
+///
+/// Some sets (LOB) have both, with **different numberings**.
+pub fn is_old_european(code: &str) -> bool {
+    code.split_once('-')
+        .and_then(|(_, number)| number.strip_prefix(Language::English.old_code()))
+        .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
 }
 
 /// A code without its language, to compare a card with ygoprodeck's
@@ -212,8 +225,22 @@ pub fn set_card_names(prefix: &str, cards: &[Value]) -> HashSet<String> {
 ///
 /// Keeps only the `card_sets` entries whose `set_code` starts with
 /// `"<prefix>-"`; matches French names to English cards by `id`.
+///
+/// Some sets (LOB) hold two numberings under one code: `LOB-001` / `LOB-EN001`
+/// (the one of the French cards) and the 2002 European print `LOB-E001`, in
+/// another order. When the set has a modern `<prefix>-EN…` code, the old
+/// lone-`E` codes ([`is_old_european`]) are skipped, else number 031 would
+/// mix two cards. Sets with only old codes list them.
 pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
-    fn get_cards_from_value(prefix: &str, val: &Value, fr: &[Value]) -> Vec<SetCard> {
+    let modern_prefix = format!("{prefix}-{}", Language::English.code());
+    let has_modern = en
+        .iter()
+        .filter_map(|val| val.get("card_sets")?.as_array())
+        .flatten()
+        .filter_map(|inside| inside.get("set_code")?.as_str())
+        .any(|code| code.starts_with(&modern_prefix));
+
+    let get_cards_from_value = |prefix: &str, val: &Value, fr: &[Value]| -> Vec<SetCard> {
         let empty = Vec::new();
         let sets = val
             .get("card_sets")
@@ -225,7 +252,7 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
         sets.iter()
             .filter_map(|inside| {
                 let set_code = inside.get("set_code")?.as_str()?;
-                if set_code.starts_with(&wanted) {
+                if set_code.starts_with(&wanted) && !(has_modern && is_old_european(set_code)) {
                     let ygopro_id = val.get("id")?.as_i64()?;
                     let name_en = val.get("name")?.as_str()?.to_string();
                     let name_fr = fr
@@ -253,7 +280,7 @@ pub fn set_cards(prefix: &str, en: &[Value], fr: &[Value]) -> Vec<SetCard> {
                 }
             })
             .collect()
-    }
+    };
 
     let en_cards: Vec<SetCard> = en
         .iter()
@@ -545,6 +572,47 @@ mod tests {
             card(9, "Elsewhere", &[("LOB-EN009", "Common")]),
         ];
         assert_eq!(numbers(&set_cards("RA05", &en, &[])), ["001"]);
+    }
+
+    #[test]
+    fn two_numberings_under_one_code_keep_the_modern_one() {
+        let en = [
+            card(
+                10,
+                "Legendary Sword",
+                &[
+                    ("LOB-EN040", "Short Print"),
+                    ("LOB-EN040", "Common"),
+                    ("LOB-E031", "Common"),
+                ],
+            ),
+            card(
+                11,
+                "Other Card",
+                &[("LOB-E040", "Ultra Rare"), ("LOB-EN031", "Common")],
+            ),
+        ];
+        let cards = set_cards("LOB", &en, &[]);
+        assert_eq!(numbers(&cards), ["031", "040"]);
+        assert_eq!(cards[1].name_en, "Legendary Sword");
+        assert_eq!(cards[1].rarities, ["Short Print", "Common"]);
+        assert_eq!(cards[0].name_en, "Other Card");
+        assert_eq!(cards[0].rarities, ["Common"]);
+    }
+
+    #[test]
+    fn a_set_with_only_old_codes_still_lists_them() {
+        let en = [card(10, "Legendary Sword", &[("LOB-E031", "Common")])];
+        let cards = set_cards("LOB", &en, &[]);
+        assert_eq!(numbers(&cards), ["031"]);
+    }
+
+    #[test]
+    fn old_european_codes() {
+        assert!(is_old_european("LOB-E031"));
+        assert!(!is_old_european("LOB-EN031"));
+        assert!(!is_old_european("LOB-031"));
+        assert!(!is_old_european("ABPF-ENSE1"));
     }
 
     #[test]
