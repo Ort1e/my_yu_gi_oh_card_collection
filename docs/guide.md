@@ -56,8 +56,11 @@ refund), its cards. **Lots → Add**:
 - from a Cardmarket order: upload the **shipment PDF**; it is read in
   memory and the form comes back filled (date, seller, price, one line per
   card). Check it, then save. The PDF is kept as the lot's file (private);
-- by hand: type the cards, or use the quick add (a set code, then tick the
-  cards of the set).
+- by hand: type the cards, or use the quick add (a set code, then the
+  cards' numbers);
+- a **pre-constructed deck** (structure deck): the quick add with its set
+  code, then **Add every card of the set** (one copy of each number); the
+  numbers printed in several rarities are highlighted, to choose theirs.
 
 Cards forgotten or arrived later: the lot's page → **Add cards** (the same
 rows and quick add, on their own page; the lot page itself only reads).

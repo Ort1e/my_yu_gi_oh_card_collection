@@ -426,6 +426,19 @@ legend {
     to   { background-color: rgba(255, 255, 255, 0.03); }
 }
 
+/* "Add every card of the set", at the bottom of the panel's fields. */
+.qa-add-all {
+    align-self: end;
+    margin-bottom: 1rem;
+}
+
+/* A row added by "Add every card of the set" whose number exists in several
+   rarities: its rarity to choose (the class goes once one is). */
+.card-row.needs-rarity select[name$="-rarity"] {
+    outline: 3px solid #f9a825;
+    outline-offset: 1px;
+}
+
 /* "Sets in this lot: [MAMO-FR] [RA05-FR]": the loaded one is marked. */
 .qa-set-choices {
     display: flex;

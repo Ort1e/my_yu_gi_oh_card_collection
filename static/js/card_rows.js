@@ -49,6 +49,16 @@ rows.addEventListener('input', (e) => {
     }
 });
 
+// a rarity chosen: the row added by "Add every card of the set" is no longer
+// highlighted
+rows.addEventListener('change', (e) => {
+    const target = /** @type {HTMLSelectElement} */ (e.target);
+
+    if (!target.name?.endsWith('-rarity') || !target.value) return;
+
+    target.closest('.card-row')?.classList.remove('needs-rarity');
+});
+
 // ---------- quick add from a set ----------
 
 const setInput = /** @type {HTMLInputElement} */ (document.getElementById('qa-set'));
@@ -58,6 +68,7 @@ const info = /** @type {HTMLElement} */ (document.getElementById('qa-info'));
 const pasteArea = /** @type {HTMLTextAreaElement} */ (document.getElementById('qa-paste'));
 const pasteButton = /** @type {HTMLButtonElement} */ (document.getElementById('qa-paste-add'));
 const rarityHelp = /** @type {HTMLElement} */ (document.getElementById('qa-rarities'));
+const addAllButton = /** @type {HTMLButtonElement} */ (document.getElementById('qa-add-all'));
 
 /** The languages of the card codes (domain::card::Language). */
 const LANGUAGES = ['EN', 'FR', 'DE', 'IT', 'SP', 'PT'];
@@ -163,6 +174,7 @@ async function fetchSet(setCode) {
 async function loadSet() {
     const parsed = parseSetCode(setInput.value);
     current = null;
+    showAddAll();
 
     if (parsed.error) return say(parsed.error, Boolean(setInput.value.trim()));
 
@@ -175,6 +187,7 @@ async function loadSet() {
         return say(`Could not load ${parsed.setCode}: ${e.message}`, true);
     }
 
+    showAddAll();
     numberInput.focus();
     say(`${current.set.name}: ${current.set.cards.size} cards. Type a number (or a full code of any set) and press Enter.`);
     suggestSetCodes();
@@ -448,6 +461,50 @@ numberInput.addEventListener('keydown', async (e) => {
     suggestSetCodes();
     showRarities(pick);
     numberInput.value = '';
+});
+
+// ---------- every card of the set (a pre-constructed deck) ----------
+
+/** The button names the loaded set and its count; disabled without a set. */
+function showAddAll() {
+    addAllButton.disabled = !current;
+    addAllButton.textContent = current
+        ? `Add the ${current.set.cards.size} cards of ${current.prefix}`
+        : 'Add every card of the set';
+}
+
+/**
+ * One copy of each number of the loaded set, in number order (the set lookup
+ * sorts them). A number printed in several rarities can't be guessed: its row
+ * offers only those, none selected, and is highlighted until one is chosen.
+ */
+addAllButton.addEventListener('click', () => {
+    if (!current) return;
+
+    const { set, prefix } = current;
+
+    if (!window.confirm(`Add the ${set.cards.size} cards of ${set.name} (${prefix}), one copy each?`)) return;
+
+    const toChoose = [];
+
+    for (const card of set.cards.values()) {
+        const row = addCard({ ...current, card });
+        flash(row);
+
+        if ((card.rarities?.length ?? 0) > 1 && !field(row, 'rarity').value) {
+            row.classList.add('needs-rarity');
+            toChoose.push(prefix + card.number);
+        }
+    }
+
+    suggestSetCodes();
+    showRarities(null);
+
+    if (toChoose.length > 0) {
+        say(`Added ${set.cards.size} cards. ${toChoose.length} exist in several rarities: choose theirs in the highlighted rows (${toChoose.join(', ')}).`, true);
+    } else {
+        say(`Added ${set.cards.size} cards.`);
+    }
 });
 
 pasteButton.addEventListener('click', async () => {
