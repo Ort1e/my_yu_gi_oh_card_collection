@@ -81,13 +81,14 @@ rows and quick add, on their own page; the lot page itself only reads).
 
 **A deck received in a lot** (the previous owner had built it): the lot's
 page → **Add a deck**. Choose a new deck (name it) or an existing one, name
-the version (default "From lot 123"), then enter its cards like a lot's
+the version (default "From lot 123", then "From lot 123 (2)"…), then enter its cards like a lot's
 (rows, quick add, codes, rarity, condition), each with a **zone**: Auto
 (extra deck monsters go to the extra deck, the rest to the main deck) or
 Side. The cards go into the lot **and** into a built version holding exactly
 those copies; the deck as received is kept in the deck's history ("Received
-in lot 123"). One deck per lot; the lot's page then links to it and to
-**add cards to it** later. Move cards around in the builder afterwards if
+in lot 123"). A lot can hold any number of decks (**Add a deck** is always
+there, each time a new one); the lot's page lists them, each with
+**add cards to it** for later. Move cards around in the builder afterwards if
 needed. Unlike the lot's other cards, a name ygoprodeck doesn't know is
 refused (a copy without card data can't fill a slot).
 
@@ -289,7 +290,7 @@ Every **Save** in the deck builder keeps the list in the deck's history
 ### Built decks
 `/decks/built`: the decks you physically built. One card per deck (box,
 sleeves, its cards and the copies it holds, how many are missing), then the
-value of each deck. A deck received in a lot (lot page → **Add a deck**) is
+value of each deck. Each deck received in a lot (lot page → **Add a deck**) is
 built at once, with the copies of that lot.
 
 ### Shopping list

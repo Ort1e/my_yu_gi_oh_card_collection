@@ -253,7 +253,7 @@ pub struct LotDetail {
     /// The advent calendar whose lot this is, if any.
     calendar_year: Option<i64>,
     /// The deck received in this lot, if any.
-    lot_deck: Option<form::LotDeck>,
+    lot_decks: Vec<form::LotDeck>,
 }
 
 impl LotDetail {
@@ -325,6 +325,6 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         total_price,
         total_estimate,
         calendar_year,
-        lot_deck: form::LotDeck::of_lot(pool, id).await?,
+        lot_decks: form::LotDeck::all_of_lot(pool, id).await?,
     })
 }

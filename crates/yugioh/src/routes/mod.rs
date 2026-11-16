@@ -145,7 +145,11 @@ pub fn write_router() -> Router<AppState> {
         )
         .route(
             "/lots/:id/deck",
-            get(lots::form::deck_page).post(lots::form::add_deck_cards),
+            get(lots::form::deck_page).post(lots::form::new_deck),
+        )
+        .route(
+            "/lots/:id/deck/:snapshot_id",
+            get(lots::form::deck_cards_page).post(lots::form::add_to_deck),
         )
         .route(
             "/lots/:id/edit",

@@ -222,17 +222,20 @@ Things to notice:
   new copy as owned at once). The redirect doesn't wait
   for it (see [Talking to ygoprodeck](#talking-to-ygoprodeck)).
 
-### The lot deck form (`/lots/:id/deck`)
+### The lot deck form (`/lots/:id/deck`, `/lots/:id/deck/:snapshot_id`)
 
 `routes/lots/form/deck.rs`: the add-cards page again (`card_row.html` with
 `with_zone`: an Auto/Side select, read by `CardRowValues::zone` into
-`NewCards::side`), plus, the first time only, the deck and the version name.
+`NewCards::side`), plus, for a new deck only, the deck and the version name (`/lots/:id/deck`
+always makes a new deck, default version name `From lot N`, `From lot N (2)`…;
+`/lots/:id/deck/:snapshot_id` adds cards to one of the lot's decks, 404 when
+the snapshot is another lot's). Both POSTs share `save`.
 The POST validates the rows, then **before the transaction** gets each row's
 card data (`get_or_fetch`: a name ygoprodeck doesn't know is an error, a copy
 without card data can't fill a slot). In the transaction: the deck and a built
-public version (first time), `insert_lot_cards` with `card_data_id` set, then
+public version (new deck), `insert_lot_cards` with `card_data_id` set, then
 `lists::add_copies`, which puts **these copies** in the slots; the lot's
-snapshot is `snapshots::lot_freeze`n (first time) or `snapshots::append`ed.
+snapshot is `snapshots::lot_freeze`n (new deck) or `snapshots::append`ed.
 After the commit, `spawn_link_cards` does the rest (names, pictures). If the
 lot's version was deleted or unbuilt since, a new one is made from the lot
 snapshot's list (`assign_copies`, before the new copies exist).
@@ -665,8 +668,8 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
   list saved" (the default) or a version's list again. The version keeps
   changing; the list played doesn't. `deck_version.tournament_id` (0011) is a dead
   column, always NULL.
-- **A lot's deck** (`deck_snapshot.lot_id`, unique, 0031): `lot_freeze` at
-  the first POST of `/lots/:id/deck`, `append` for more cards (the list as
+- **A lot's deck** (`deck_snapshot.lot_id`, 0031; several per lot, 0033): `lot_freeze` at
+  each POST of `/lots/:id/deck`, `append` for more cards (the list as
   received: what the builder did to the version since doesn't enter it).
   Kept like a tournament's list (`Snapshot::kept`, never coalesced nor
   deleted), not public by default; the pages show "Received in lot N"
