@@ -22,6 +22,7 @@ use common::{AppState, Routes};
 pub fn routes() -> Routes {
     Routes {
         collection: "pokemon",
+        login_only: Router::new(),
         public: Router::new()
             .route("/pokemon", get(routes::list))
             .route("/pokemon/rarities", get(routes::rarities::page))

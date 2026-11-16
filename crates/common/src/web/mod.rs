@@ -8,3 +8,4 @@ pub mod forms;
 pub mod headers;
 pub mod pagination;
 pub mod tiles;
+pub mod users;

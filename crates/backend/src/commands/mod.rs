@@ -8,6 +8,7 @@
 //!   cargo run -p backend -- export-public [--out DIR]
 //!   cargo run -p backend -- backup --to DIR [--keep DAYS]
 //!   backend fetch-release --to DIR    (on the NAS: deploy/nas/update.sh)
+//!   backend set-password <name> [--admin]    (the password on stdin)
 //!   cargo run -p backend -- import-tournament-notes <file.json> [--dry-run]
 //!
 //! `--dry-run` does the work in a transaction that is rolled back and makes
@@ -61,6 +62,9 @@ pub const USAGE: &str = "usage:
   backend fetch-release --to DIR
       on the NAS: download the latest build of main into DIR when it isn't
       the one installed (the public release; deploy/nas/update.sh)
+  backend set-password <name> [--admin]
+      set a user's password, read from stdin (the user is created when
+      missing; --admin makes them an admin): the way back in when locked out
   backend import-tournament-notes <file.json> [--dry-run]
       one-off: load the tournaments' old notes, transcribed into a JSON file,
       as rounds and games (tournaments that have rounds are skipped)";
@@ -99,6 +103,10 @@ pub enum Command {
     ImportTournamentNotes {
         file: PathBuf,
         dry_run: bool,
+    },
+    SetPassword {
+        name: String,
+        admin: bool,
     },
 }
 
@@ -141,7 +149,17 @@ impl Command {
         } else {
             None
         };
+        let user = if name == "set-password" {
+            let i = flags
+                .iter()
+                .position(|f| !f.starts_with("--"))
+                .ok_or("set-password needs the user name")?;
+            Some(flags.remove(i).to_string())
+        } else {
+            None
+        };
         let allowed: &[&str] = match name.as_str() {
+            "set-password" => &["--admin"],
             "serve" | "export-public" | "backup" | "fetch-release" => &[],
             "scrap-ban-list" => &["--all", "--dry-run"],
             "clean-cards"
@@ -194,9 +212,40 @@ impl Command {
                 file: file.unwrap_or_default(),
                 dry_run: has("--dry-run"),
             },
+            "set-password" => Command::SetPassword {
+                name: user.unwrap_or_default(),
+                admin: has("--admin"),
+            },
             _ => Command::Serve,
         })
     }
+}
+
+/// `backend set-password`: the password comes from stdin, never from an
+/// argument (the shell history and `ps` would keep it).
+async fn set_password(state: &AppState, name: &str, admin: bool) -> anyhow::Result<()> {
+    let name = name.to_lowercase();
+    if !common::web::auth::valid_user_name(&name) {
+        anyhow::bail!("a user name is lower case letters, digits and _");
+    }
+    let input = std::io::read_to_string(std::io::stdin())?;
+    let password = input.trim_end_matches(['\r', '\n']);
+    if password.is_empty() {
+        anyhow::bail!("no password on stdin");
+    }
+    let created = common::web::users::set_password(&state.pool, &name, password, admin)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!(
+        "{} {name}{}",
+        if created {
+            "created"
+        } else {
+            "password changed for"
+        },
+        if admin { " (admin)" } else { "" }
+    );
+    Ok(())
 }
 
 /// Remove `flag VALUE` from `flags`: the value, `None` without the flag.
@@ -248,6 +297,7 @@ pub async fn run(command: Command, state: &AppState) -> anyhow::Result<()> {
         Command::ImportTournamentNotes { file, dry_run } => {
             tournament_notes::import(state, &file, dry_run).await
         }
+        Command::SetPassword { name, admin } => set_password(state, &name, admin).await,
     }
 }
 
@@ -354,6 +404,15 @@ mod tests {
         );
         assert!(parse(&["import-tournament-notes"]).is_err());
         assert!(parse(&["import-tournament-notes", "a.json", "b.json"]).is_err());
+        assert_eq!(
+            parse(&["set-password", "--admin", "ortie"]),
+            Ok(Command::SetPassword {
+                name: "ortie".into(),
+                admin: true,
+            })
+        );
+        assert!(parse(&["set-password"]).is_err());
+        assert!(parse(&["set-password", "ortie", "--dry-run"]).is_err());
         assert!(parse(&["nope"]).is_err());
     }
 }

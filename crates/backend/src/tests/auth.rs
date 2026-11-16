@@ -46,11 +46,23 @@ async fn login_guards_writes_and_shipment_files() {
 
     // wrong password, then the right one
     let (status, page) = t
-        .post("/login", &[("password", "nope"), ("next", "/decks/add")])
+        .post(
+            "/login",
+            &[
+                ("name", "admin"),
+                ("password", "nope"),
+                ("next", "/decks/add"),
+            ],
+        )
         .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    assert!(page.contains("Wrong password."));
-    let response = send(form("/login", "password=secret&next=%2F%2Fevil", "")).await;
+    assert!(page.contains("Wrong user name or password."));
+    let response = send(form(
+        "/login",
+        "name=admin&password=secret&next=%2F%2Fevil",
+        "",
+    ))
+    .await;
     assert_eq!(response.headers()[header::LOCATION], "/");
     let cookie = response.headers()[header::SET_COOKIE]
         .to_str()
