@@ -95,9 +95,9 @@ Settings come from the environment or `.env` (gitignored):
 |---|---|---|
 | `DATABASE_URL` | `sqlite:data/app.db` | the database (created if missing, migrations run at start) |
 | `BIND_ADDR` | `127.0.0.1:3000` | where to listen; a network address needs a password |
-| `APP_PASSWORD` | none | the owner's password; none = no login (loopback only) |
-| `APP_PASSWORD_<NAME>` | none | more users, one password each |
-| `APP_ACCESS_<NAME>` | `books` | what that user may change: `all`, or a list (`books,pokemon`); everyone reads everything |
+| `APP_PASSWORD` | none | seeds the user `admin` while there is no user in the database (then managed at `/users`); no user at all = no login (loopback only) |
+| `APP_PASSWORD_<NAME>` | none | seeds more users, one password each (same) |
+| `APP_ACCESS_<NAME>` | `books` | what a seeded user may change: `all`, or a list (`books,pokemon`); everyone reads everything |
 | `PUBLIC_READS` | `1` | `0` puts every page behind the login (the NAS) |
 | `SECURE_COOKIES` | `0` | `1` behind HTTPS |
 | `MEDIA_DIR`, `UPLOADS_DIR` | `data/media`, `uploads` | pictures and files, pending uploads |

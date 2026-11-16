@@ -111,7 +111,7 @@ two settings files from their examples. Fill them in on the NAS:
 
 ```bash
 ssh nas
-nano /apps/collection/collection.env   # APP_PASSWORD (yours), APP_PASSWORD_FRIEND
+nano /apps/collection/collection.env   # APP_PASSWORD (yours), APP_PASSWORD_FRIEND (first start only: then /users)
 nano /apps/collection/nightly.env      # OVH_USER, OVH_PASSWORD
 ```
 
@@ -297,10 +297,20 @@ in `X-Forwarded-For` (the wrong-password limit is per visitor,
   Tailscale, every page
   behind the login (`PUBLIC_READS=0`: a guest on the Wi-Fi sees nothing),
   5 wrong passwords → 15 minutes of refusal.
-- One password per person (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`): one can
-  be changed alone, and the log names who did what. The owner changes
-  everything; the others see everything but change only the books, unless
-  `APP_ACCESS_<NAME>=all` (or a list: `books,pokemon`) in `collection.env`.
+- Users and their permissions are in the database, managed in the app at
+  `/users` (admins only), one name and password per person (argon2 hashes):
+  one can be changed alone, and the log names who did what. An admin changes
+  everything; the others see everything but change what is ticked for them
+  (a collection, a Pokémon wishlist). `APP_PASSWORD` (user `admin`) and
+  `APP_PASSWORD_<NAME>` (with `APP_ACCESS_<NAME>`) in `collection.env` only
+  **seed** the first start, while there is no user; later they are ignored.
+  Locked out: on the NAS, `echo 'new password' | ./backend set-password admin --admin`
+  (as the app's user, in `/apps/collection`).
+- After the update that brought the users: log in as `admin` with the old
+  `APP_PASSWORD`. At `/users` create `ortie` (Yu-Gi-Oh!, Pokémon, wishlist
+  Ortie). At `/pokemon/wishlist` create the list "Neri", then create `neri`
+  (books, wishlist Neri); if `APP_PASSWORD_FRIEND` was Neri, rename `friend`
+  to `neri` instead and tick her wishlist.
 - Every answer carries a Content-Security-Policy, `X-Frame-Options: DENY`,
   `nosniff` and a `Referrer-Policy`; uploaded photos and PDFs are read
   with limits (huge images, deeply nested PDFs refused). Tests:

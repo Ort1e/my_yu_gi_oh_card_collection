@@ -102,7 +102,7 @@ bars, the shared partials), so its templates extend those by name.
 | `signals.py` | explicit code in the handler (e.g. the categories of a card removed from a deck) |
 | `manage.py <command>` | `cargo run -p backend -- <command>` (`commands/`) |
 | admin | edit pages (`/cards/:id/edit`, …) |
-| Django auth | `common::web::auth`: one password per user (`APP_PASSWORD`, `APP_PASSWORD_<NAME>`), signed cookie |
+| Django auth | `common::web::auth` + `users`: users and permissions in the database, argon2 passwords, signed cookie |
 | `runserver` | `cargo run -p backend` |
 
 ### Startup (`crates/backend/src/main.rs`)
@@ -843,7 +843,7 @@ instead, like the Yu-Gi-Oh! cards); wishes can be.
 | the collection (the shared picture grid or a table, filters, value), a copy | `src/routes/mod.rs` |
 | add one copy, edit (and sell) | `src/routes/form.rs` |
 | a booster opening: numbers → preview → save | `src/routes/booster.rs` |
-| the wishlist, and its booster suggestions | `src/routes/wishlist.rs`, `src/store/boosters.rs`, `pokemon_domain::booster` |
+| the wishlists (one per person, one permission each), and their booster suggestions | `src/routes/wishlist.rs`, `src/store/wishlists.rs`, `src/store/boosters.rs`, `pokemon_domain::booster` |
 | the card finder's JSON (`/pokemon/api/search`, `/pokemon/api/card`) | `src/routes/api.rs` |
 | pictures, downloaded once into `media/pokemon_card_images/` (`common::media`) | `src/routes/images.rs` |
 | the rarity and variant guide | `src/routes/rarities.rs`, `static/js/pokemon_rarities.js` (drawn by `rarity_guide.js`) |
@@ -974,24 +974,38 @@ for every collection:
 
 ## Login
 
-`common::web::auth`: with a password set, every collection's `write` and
-`private` routes and the private media folders (shipment PDFs, calendar
-photos) require a session cookie. Pages redirect to `/login?next=…`, the
-APIs (`/api/*`, `/books/api/*`, `/pokemon/api/*`) answer 401. Without any
-password there is no login, and the server refuses to listen anywhere but
-a loopback address (`127.0.0.1`).
+`common::web::auth`: with a user set, every collection's `write`,
+`private` and `login_only` routes and the private media folders (shipment
+PDFs, calendar photos) require a session cookie. Pages redirect to
+`/login?next=…`, the APIs (`/api/*`, `/books/api/*`, `/pokemon/api/*`)
+answer 401. Without any user there is no login, and the server refuses to
+listen anywhere but a loopback address (`127.0.0.1`).
 
-- **Users**: `APP_PASSWORD` is user `owner`, `APP_PASSWORD_<NAME>` adds
-  user `<name>` (a friend). The form asks only for the password, which says
-  who logs in (so two users can't share one); the logs name the user of
-  each request.
-- **What each may change** (`auth::Changes`): the owner everything; another
-  user the books only, unless `APP_ACCESS_<NAME>` says `all` or lists the
-  collections (`books,pokemon`). Everyone logged in reads everything. Each
-  collection's `Routes` names itself (`collection: "books"`), and
-  `common::app` puts `auth::require_access` on its `write` routes, inside
-  the login: a refusal is a 403 page, or JSON for the APIs. `/login` says
-  who is logged in and what they may change.
+- **Users** live in the database (migration 0030: `app_user` with an argon2
+  hash, `app_permission`, `app_user_permission`) and are managed at
+  `/users` (`common::web::users`, admins only): add, rename, set a password,
+  tick permissions, delete (not yourself, not the last admin). `Auth` keeps
+  them in memory (`Auth::reload` after each write: a permission change
+  counts at once). The form asks for a name and a password; an unknown
+  name is checked against a dummy hash. The logs name the user of each
+  request. `APP_PASSWORD` / `APP_PASSWORD_<NAME>` only **seed** an empty
+  table at the first start (`admin`, and `<name>` with the books, or
+  `APP_ACCESS_<NAME>`); later they are ignored, with a warning.
+  `backend set-password <name> [--admin]` (password on stdin) creates a user
+  or sets a password: the way back in when locked out.
+- **What each may change** (`auth::Permissions`): an admin everything; any
+  other user the `app_permission` keys granted to them: `yugioh`, `books`,
+  `pokemon` (a collection's copies and openings) and `pokemon_wishlist:<id>`
+  (one per wishlist, added, renamed and removed with the list by
+  `pokemon::store::wishlists`; `common` reads them generically). Everyone
+  logged in reads everything. A collection's `Routes` names itself
+  (`collection: "books"`), and `common::app` puts `auth::require_access` on
+  its `write` routes, inside the login: a refusal is a 403 page, or JSON
+  for the APIs. `Routes::login_only` has the login but no permission: each
+  handler takes a `CurrentUser` (`Option<CurrentUser>` on a public page that
+  shows more to who may change it) and calls `user.require(key)?`
+  (`AppError::Forbidden`, the 403 page). `/login` says who is logged in and
+  what they may change, and links admins to `/users`.
 - **The cookie** is `<user>.<expiry>.<signature>`, signed with the user's
   current password and a key kept in the `app_secret` table: a restart
   doesn't log anyone out, changing a password logs that user out.
