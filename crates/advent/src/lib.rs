@@ -142,6 +142,7 @@ pub fn routes<C: Calendar>() -> Routes {
         // merged into the collection's routes, which name it
         collection: "",
         public: Router::new(),
+        login_only: Router::new(),
         private: Router::new()
             .route(base, get(pages::list::<C>))
             .route(&format!("{base}/:year"), get(pages::calendar::<C>))

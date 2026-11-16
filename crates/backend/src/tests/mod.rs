@@ -6,6 +6,7 @@ mod backup;
 mod export;
 mod pages;
 mod security;
+mod users;
 
 use std::ops::Deref;
 

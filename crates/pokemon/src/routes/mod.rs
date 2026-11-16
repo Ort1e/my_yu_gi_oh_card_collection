@@ -7,7 +7,7 @@
 //! - `form.rs`: add one copy (singles, gifts, graded copies), edit, sell;
 //! - `booster.rs`: add a booster opening's cards at once (or more cards to one);
 //! - `openings.rs`: the booster openings, one with its cards;
-//! - `wishlist.rs`: the wishes, their price against the maximum;
+//! - `wishlist.rs`: the wishlists and their wishes, their price against the maximum;
 //! - `api.rs`: the card finder's JSON (`static/js/pokemon_finder.js`);
 //! - `rarities.rs`: the rarity and variant guide; `images.rs`: card pictures.
 //!
@@ -623,8 +623,8 @@ pub struct CopyDetail {
     history: Vec<PricePoint>,
     /// The other copies of the same card: `(id, language label, variant label, sold)`.
     others: Vec<(i64, String, String, bool)>,
-    /// The wishes this copy fulfilled: `(id)`.
-    wishes_got: Vec<i64>,
+    /// The wishlists with a wish this copy fulfilled: `(id, name)`.
+    wishes_got: Vec<(i64, String)>,
     /// The latest market price of its variant (before the condition factor).
     market: Option<Decimal>,
     /// The card's text, from TCGdex's JSON (public data, also in the copy).
@@ -670,10 +670,13 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     .bind(id)
     .fetch_all(pool)
     .await?;
-    let wishes_got = sqlx::query_scalar("SELECT id FROM pokemon_wish WHERE got_copy_id = ?")
-        .bind(id)
-        .fetch_all(pool)
-        .await?;
+    let wishes_got = sqlx::query_as(
+        "SELECT l.id, l.name FROM pokemon_wish w JOIN pokemon_wishlist l ON l.id = w.wishlist_id
+         WHERE w.got_copy_id = ? ORDER BY l.position, l.id",
+    )
+    .bind(id)
+    .fetch_all(pool)
+    .await?;
 
     let json: String = sqlx::query_scalar("SELECT json FROM pokemon_card WHERE id = ?")
         .bind(copy.card_id)

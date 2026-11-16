@@ -11,8 +11,8 @@
 
 {% block content %}
 <div class="inside-container narrow">
-<h1>{% if id.is_some() %}Edit the wish{% else %}Add a wish{% endif %}</h1>
-<p class="back-link"><a href="/pokemon/wishlist">← Back to the wishlist</a></p>
+<h1>{% if id.is_some() %}Edit the wish{% else %}Add a wish{% endif %} ({{ list.name }})</h1>
+<p class="back-link"><a href="/pokemon/wishlists/{{ list.id }}">← Back to the wishlist {{ list.name }}</a></p>
 
 {% include "partials/form_errors.html" %}
 
@@ -60,7 +60,7 @@
 {# Far from "Save" and folded: deleting takes an opening, a click and a confirmation. #}
 <details class="danger-zone">
   <summary>Delete this wish…</summary>
-  <form method="post" action="/pokemon/wishlist/{{ id }}/delete" data-confirm="Delete this wish?">
+  <form method="post" action="/pokemon/wishes/{{ id }}/delete" data-confirm="Delete this wish?">
     <button type="submit" class="btn-danger">Delete this wish</button>
   </form>
 </details>

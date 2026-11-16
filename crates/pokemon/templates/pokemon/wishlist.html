@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Pokémon wishlist{% endblock %}
+{% block title %}Wishlist {{ list.name }}{% endblock %}
 {% block body_class %}pokemon{% endblock %}
 {% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
 
@@ -11,11 +11,12 @@
 
 {% block content %}
 <div class="inside-container">
-<h1>Wishlist ({{ wanted.len() }})</h1>
-{% if self.under_max() > 0 && !common::export::public_copy() %}
+<h1>Wishlist {{ list.name }} ({{ wanted.len() }})</h1>
+<p class="back-link"><a href="/pokemon/wishlist">← All the wishlists</a></p>
+{% if self.under_max() > 0 && can_edit && !common::export::public_copy() %}
 <p class="success">{{ self.under_max() }} {% if self.under_max() == 1 %}card is{% else %}cards are{% endif %} at or under your price today.</p>
 {% endif %}
-<p>Prices: Cardmarket's trend, refreshed every week.{% if !common::export::public_copy() %} <a href="/pokemon/wishlist/add" class="btn">Add a wish</a>{% endif %}</p>
+<p>Prices: Cardmarket's trend, refreshed every week.{% if can_edit && !common::export::public_copy() %} <a href="/pokemon/wishlists/{{ list.id }}/add" class="btn">Add a wish</a>{% endif %}</p>
 
 {% if !most_wished.is_empty() %}
 <section class="booster-suggestions">
@@ -38,7 +39,7 @@
   </div>
   <p class="hint">Cardmarket's booster prices, every language together, refreshed every week.</p>
 </section>
-{% else if !wanted.is_empty() && !common::export::public_copy() %}
+{% else if !wanted.is_empty() && can_edit && !common::export::public_copy() %}
 <p class="hint">Boosters to open appear after the weekly price refresh.</p>
 {% endif %}
 
@@ -64,10 +65,16 @@
       </div>
       {% if !common::export::public_copy() %}
       {% match wish.note %}{% when Some with (note) %}<p class="book-notes">{{ note }}</p>{% when None %}{% endmatch %}
+      {% if can_edit %}
       <div class="button-row">
         <a href="/pokemon/add?{{ wish.got_it_href() }}" class="btn">I got it</a>
-        <a href="/pokemon/wishlist/{{ wish.id }}/edit" class="btn btn-secondary">Edit</a>
+        <form method="post" action="/pokemon/wishes/{{ wish.id }}/got" class="inline">
+          <input type="hidden" name="got" value="1">
+          <button type="submit" class="btn-secondary" title="Tick it off without adding a copy">Tick off</button>
+        </form>
+        <a href="/pokemon/wishes/{{ wish.id }}/edit" class="btn btn-secondary">Edit</a>
       </div>
+      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -82,10 +89,11 @@
     {% for wish in got %}
     <li>
       {{ wish.name() }} ({{ wish.set_name }} {{ wish.local_id }}){% match wish.got_copy_id %}{% when Some with (copy_id) %}: <a href="/pokemon/{{ copy_id }}">your copy</a>{% when None %}{% endmatch %}
-      <form method="post" action="/pokemon/wishlist/{{ wish.id }}/got" class="inline">
-        <input type="hidden" name="copy_id" value="">
+      {% if can_edit %}
+      <form method="post" action="/pokemon/wishes/{{ wish.id }}/got" class="inline">
         <button type="submit" class="btn-secondary">Wanted again</button>
       </form>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>

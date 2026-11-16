@@ -120,9 +120,14 @@ and Japanese, with a wishlist and Cardmarket prices (weekly).
   language, note*.
 - **One card** (*Add → One card*: a single, a gift, a graded card): find it by
   printed code (`FNE 067`) or name, pick it, choose its variant. The language select has "Any language" (guess it from the code). The code tells its language (`FNE` French, `SFA` English, `SV6a` Japanese): the form switches to it by itself.
-- **The wishlist**: *Wishlist → Add a wish*; its row turns green when the
-  trend is at or under your price. *I got it* opens the add form pre-filled.
-  Above the wishes, *Boosters to open*: the 3 boosters with the most wished
+- **The wishlists**: one per person (*Wishlist* lists them, each opens its
+  own). *Add a wish* is on a list you may change; its row turns green when
+  the trend is at or under your price. *I got it* opens the add form
+  pre-filled; *Tick off* marks it got without a copy. A list "filled from
+  the collection" (Ortie's) ticks off its wishes by itself when you add the
+  copy; the others (Neri's) are ticked off by hand. An admin creates,
+  renames and deletes the lists on the *Wishlist* page.
+  Above a list's wishes, *Boosters to open*: the 3 boosters with the most wished
   cards, and the 3 cheapest with at least one (Cardmarket's price, every
   language together, weekly; a Trainer Gallery card counts for its main
   set's booster, a promo for none). Also in the public copy.
@@ -136,9 +141,19 @@ A little sparkle greets the add pages, in the colours of the season (Halloween, 
 advent calendar of day numbers, Easter and birthdays have their own); the homes sparkle on those festive days,
 once a day. Nothing under "reduce motion".
 
+### Users and permissions
+Everyone reads everything once logged in; what each person may *change* is
+ticked per user on **`/users`** (admins only; linked from `/login`): the
+Yu-Gi-Oh! cards, the books, the Pokémon cards, and one box per Pokémon
+wishlist. An admin may change everything and manage the users. Add a user
+(name in lower case letters, digits and `_`, a password of 8 characters at
+least), rename one, set a new password (that user is logged out), delete one
+(not yourself, never the last admin). A change counts at once. Locked out:
+`backend set-password <name> --admin` on the NAS (the password on stdin).
+
 ### From a phone
 On the home Wi-Fi open **`http://192.168.1.202:3000`** and log in with your
-own password; bookmark it or "Add to home screen". From anywhere, with the
+own name and password; bookmark it or "Add to home screen". From anywhere, with the
 Tailscale app logged in to our account: the app's HTTPS address
 `https://lahochenas3.<name>.ts.net` (better: HTTPS, so the live book scan
 works). The NAS is on from 7:00 to 22:00.

@@ -28,6 +28,7 @@ pub use cards::images::used_picture_files as used_printing_pictures;
 /// Every route, by who may use them (assembled by `common::app`).
 pub fn all() -> common::Routes {
     common::Routes {
+        login_only: axum::Router::new(),
         collection: "yugioh",
         public: router(),
         write: write_router(),

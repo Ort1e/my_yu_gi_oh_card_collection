@@ -37,6 +37,7 @@ rust_decimal = { version = "1", features = ["serde-with-str"] }
 rust_decimal_macros = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 rand = "0.8"
+argon2 = "0.5"
 # lopdf rather than pdf-extract: pdf-extract println!s text fragments (personal data) to stdout
 lopdf = "0.42"
 url = "2"
@@ -57,3 +58,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 # the public copy's card pictures as lossy WebP (libwebp, C, SSE2 only by
 # default: fine for the NAS's old Atom); `image` only writes lossless WebP
 webp = { version = "0.3", default-features = false }
+
+# Password hashing is far too slow unoptimised (tests log in often)
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3

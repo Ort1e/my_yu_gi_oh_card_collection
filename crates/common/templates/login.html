@@ -7,9 +7,10 @@
   <h1>Log in</h1>
 
   {% if !enabled %}
-    <p>No password is set (<code>APP_PASSWORD</code>): login is disabled and changes are allowed.</p>
-  {% else if let Some((user, changes)) = who %}
+    <p>No user is set (<code>APP_PASSWORD</code>, <code>backend set-password</code>): login is disabled and changes are allowed.</p>
+  {% else if let Some((user, changes, admin)) = who %}
     <p>You are logged in as <strong>{{ user }}</strong>: you can see everything and change {{ changes }}.</p>
+    {% if admin %}<p><a href="/users">Users and their permissions</a></p>{% endif %}
     <form method="post" action="/logout">
       <input type="submit" value="Log out">
     </form>
@@ -18,8 +19,12 @@
     <form method="post" action="/login">
       <input type="hidden" name="next" value="{{ next }}">
       <p>
+        <label for="name">User name:</label>
+        <input type="text" name="name" id="name" value="{{ name }}" autocomplete="username" autocapitalize="none" autofocus required>
+      </p>
+      <p>
         <label for="password">Password:</label>
-        <input type="password" name="password" id="password" autocomplete="current-password" autofocus required>
+        <input type="password" name="password" id="password" autocomplete="current-password" required>
       </p>
       <input type="submit" value="Log in">
     </form>

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+  <h1>Users</h1>
+  <p>Admins may change everything and manage the users. The others read everything and change what is ticked. A new password logs that user out.</p>
+
+  {% if saved %}<div class="success">Saved.</div>{% endif %}
+  {% include "partials/form_errors.html" %}
+
+  {% for user in users %}
+  <form method="post" action="/users/{{ user.id }}" class="user-form">
+    <h2>{{ user.name }}{% if user.is_me %} <small>(you)</small>{% endif %}</h2>
+    <p>
+      <label for="name-{{ user.id }}">Name:</label>
+      <input type="text" name="name" id="name-{{ user.id }}" value="{{ user.name }}" autocapitalize="none" required>
+    </p>
+    <p>
+      <label for="password-{{ user.id }}">New password:</label>
+      <input type="password" name="password" id="password-{{ user.id }}" autocomplete="new-password" placeholder="unchanged">
+    </p>
+    <p><label><input type="checkbox" name="admin" value="1"{% if user.admin %} checked{% endif %}> Admin (everything)</label></p>
+    <p>Can change:</p>
+    <ul class="plain">
+      {% for box in user.boxes %}
+      <li><label><input type="checkbox" name="perm" value="{{ box.key }}"{% if box.checked %} checked{% endif %}> {{ box.label }}</label></li>
+      {% endfor %}
+    </ul>
+    <input type="submit" value="Save {{ user.name }}">
+  </form>
+
+  {% if !user.is_me %}
+  <details class="danger-zone">
+    <summary>Delete {{ user.name }}…</summary>
+    <form method="post" action="/users/{{ user.id }}/delete" data-confirm="Delete the user {{ user.name }}?">
+      <button type="submit" class="btn-danger">Delete {{ user.name }}</button>
+    </form>
+  </details>
+  {% endif %}
+  <hr>
+  {% endfor %}
+
+  <form method="post" action="/users/add" class="user-form">
+    <h2>New user</h2>
+    <p>
+      <label for="new-name">Name:</label>
+      <input type="text" name="name" id="new-name" autocapitalize="none" required>
+    </p>
+    <p>
+      <label for="new-password">Password:</label>
+      <input type="password" name="password" id="new-password" autocomplete="new-password" required>
+    </p>
+    <p><label><input type="checkbox" name="admin" value="1"> Admin (everything)</label></p>
+    <p>Can change:</p>
+    <ul class="plain">
+      {% for box in new_boxes %}
+      <li><label><input type="checkbox" name="perm" value="{{ box.key }}"> {{ box.label }}</label></li>
+      {% endfor %}
+    </ul>
+    <input type="submit" value="Add the user">
+  </form>
+</div>
+{% endblock %}

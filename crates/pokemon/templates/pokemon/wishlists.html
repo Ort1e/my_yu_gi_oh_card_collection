@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Pokémon wishlists{% endblock %}
+{% block body_class %}pokemon{% endblock %}
+{% block nav %}{% include "partials/pokemon_nav.html" %}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+  <link rel="stylesheet" href="/static/css/pokemon.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>Wishlists</h1>
+{% include "partials/form_errors.html" %}
+
+{% if lists.is_empty() %}
+<p>No wishlist yet.</p>
+{% else %}
+<ul class="plain">
+  {% for list in lists %}
+  <li>
+    <a href="/pokemon/wishlists/{{ list.id }}"><strong>{{ list.name }}</strong></a>
+    — {{ list.wanted }} wanted{% if list.got > 0 %}, {{ list.got }} got{% endif %}
+    {% if !common::export::public_copy() && list.fills_from_collection %}<small>(ticked off by the copies you add)</small>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if is_admin && !common::export::public_copy() %}
+<h2>Manage the lists</h2>
+{% for list in lists %}
+<form method="post" action="/pokemon/wishlists/{{ list.id }}/edit" class="inline-form">
+  <input type="text" name="name" value="{{ list.name }}" aria-label="Name" required>
+  <label><input type="checkbox" name="fills_from_collection" value="1"{% if list.fills_from_collection %} checked{% endif %}> filled from the collection</label>
+  <input type="submit" value="Save">
+</form>
+<details class="danger-zone">
+  <summary>Delete {{ list.name }}…</summary>
+  <form method="post" action="/pokemon/wishlists/{{ list.id }}/delete" data-confirm="Delete the wishlist {{ list.name }} and its {{ list.wanted + list.got }} wishes?">
+    <button type="submit" class="btn-danger">Delete {{ list.name }}</button>
+  </form>
+</details>
+{% endfor %}
+
+<h3>New list</h3>
+<form method="post" action="/pokemon/wishlists/add">
+  <p><label for="new-list">Name:</label> <input type="text" name="name" id="new-list" required></p>
+  <p><label><input type="checkbox" name="fills_from_collection" value="1"> Filled from the collection (a copy you add ticks off its matching wishes)</label></p>
+  <input type="submit" value="Create the list">
+</form>
+{% endif %}
+</div>
+{% endblock %}

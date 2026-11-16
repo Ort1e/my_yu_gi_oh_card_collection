@@ -18,8 +18,9 @@ use serde::Deserialize;
 
 use super::CopyRow;
 use crate::store::cards::{self, CopyFields};
-use crate::store::openings;
+use crate::store::{openings, wishlists};
 use common::db::{begin_write, today, Pool};
+use common::web::auth::CurrentUser;
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::web::forms::{FormData, Pairs};
 use common::AppState;
@@ -285,8 +286,8 @@ pub struct Added {
 }
 
 /// The copies just added and the wishes they fulfil (shown after a save,
-/// with "Mark got" buttons).
-pub async fn added(pool: &Pool, ids: &[i64]) -> AppResult<Vec<Added>> {
+/// with "Mark got" buttons: only the wishes of the lists `user` may change).
+pub async fn added(pool: &Pool, ids: &[i64], user: Option<&CurrentUser>) -> AppResult<Vec<Added>> {
     let mut added = Vec::new();
     let mut conn = pool.acquire().await?;
     for id in ids {
@@ -302,7 +303,12 @@ pub async fn added(pool: &Pool, ids: &[i64]) -> AppResult<Vec<Added>> {
             language: copy.language.clone(),
             variant: copy.variant_value().unwrap_or(Variant::Normal),
         };
-        let wishes = cards::wishes_fulfilled(&mut conn, &[(copy.id, key)]).await?;
+        let wishes = cards::wishes_fulfilled(&mut conn, &[(copy.id, key)])
+            .await?
+            .into_iter()
+            .filter(|f| user.is_some_and(|u| u.allows(&wishlists::permission(f.wishlist_id))))
+            .map(|f| (f.wish_id, f.copy_id))
+            .collect();
         added.push(Added { copy, wishes });
     }
     Ok(added)
@@ -330,6 +336,7 @@ pub struct AddParams {
 /// `GET /pokemon/add`.
 pub async fn add_page(
     State(state): State<AppState>,
+    user: CurrentUser,
     Query(params): Query<AddParams>,
 ) -> AppResult<AddCopyPage> {
     let mut values = CopyValues {
@@ -353,7 +360,7 @@ pub async fn add_page(
     }
     let values = values.with_openings(&state.pool).await?;
     let added = match params.added {
-        Some(id) => added(&state.pool, &[id]).await?,
+        Some(id) => added(&state.pool, &[id], Some(&user)).await?,
         None => Vec::new(),
     };
     Ok(AddCopyPage {

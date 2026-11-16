@@ -4,29 +4,35 @@
 
 use super::*;
 use common::testing::read;
-use common::web::auth::{AuthConfig, Changes, User, MAX_FAILURES};
+use common::web::auth::{AuthConfig, SeedUser, MAX_FAILURES};
 
-/// The deployed settings: the owner and a friend who changes the books
+/// The deployed settings: the admin and a friend who changes the books
 /// only, everything private, HTTPS.
-fn deployed() -> AuthConfig {
+pub(super) fn deployed() -> AuthConfig {
+    let mut admin = AuthConfig::password(Some("owner-pw")).users;
+    admin.push(SeedUser::books("friend", "friend-pw"));
     AuthConfig {
-        users: vec![
-            User::new("friend", "friend-pw", Changes::books()),
-            User::new("owner", "owner-pw", Changes::Everything),
-        ],
+        users: admin,
         secure_cookies: true,
         public_reads: false,
     }
 }
 
-/// Log in with `password`: the answer's status and its session cookie.
-async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
+/// Log in as the user whose password this is (`owner-pw`: `admin`,
+/// `friend-pw`: `friend`): the answer's status and its session cookie.
+pub(super) async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
+    let name = match password {
+        "friend-pw" => "friend",
+        _ => "admin",
+    };
     let response = t
         .router()
         .oneshot(
             Request::post("/login")
                 .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-                .body(Body::from(format!("password={password}&next=%2F")))
+                .body(Body::from(format!(
+                    "name={name}&password={password}&next=%2F"
+                )))
                 .unwrap(),
         )
         .await
@@ -39,7 +45,7 @@ async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
 }
 
 /// Send `request` with the session `cookie`: (status, Location or body).
-async fn send_with(
+pub(super) async fn send_with(
     t: &TestApp,
     request: axum::http::request::Builder,
     body: &str,
@@ -59,7 +65,7 @@ async fn send_with(
     read(response).await
 }
 
-async fn get_with(t: &TestApp, uri: &str, cookie: &str) -> StatusCode {
+pub(super) async fn get_with(t: &TestApp, uri: &str, cookie: &str) -> StatusCode {
     let cookie = cookie.split(';').next().unwrap();
     t.router()
         .oneshot(
@@ -149,7 +155,7 @@ async fn each_user_has_a_password_and_a_secure_cookie() {
     assert_eq!(get_with(&t, "/cards", &cookie).await, StatusCode::OK);
 
     // a session forged for the other user doesn't open anything
-    let forged = cookie.replacen("session=friend.", "session=owner.", 1);
+    let forged = cookie.replacen("session=friend.", "session=admin.", 1);
     assert_eq!(get_with(&t, "/cards", &forged).await, StatusCode::SEE_OTHER);
 
     // logging out clears the cookie the same way
@@ -199,7 +205,7 @@ async fn the_friend_sees_everything_and_changes_the_books_only() {
         "/lots/add",
         "/advent-calendar/add",
         "/pokemon/add",
-        "/pokemon/wishlist/add",
+        "/pokemon/wishlists/1/add",
     ] {
         let (status, body) = send_with(&t, Request::get(page), "", &friend).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{page}");
@@ -237,7 +243,7 @@ async fn the_friend_sees_everything_and_changes_the_books_only() {
 #[tokio::test]
 async fn app_access_gives_a_user_more() {
     let mut config = deployed();
-    config.users[0].changes = Changes::Only(vec!["books".into(), "pokemon".into()]);
+    config.users[1].permissions = vec!["books".into(), "pokemon".into()];
     let t = TestApp::with_config(config).await;
     let (_, friend) = login(&t, "friend-pw").await;
     let friend = friend.unwrap();
@@ -259,8 +265,10 @@ async fn too_many_wrong_passwords_lock_the_login() {
     let (status, cookie) = login(&t, "owner-pw").await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
     assert!(cookie.is_none());
-    let (_, page) = t.post("/login", &[("password", "owner-pw")]).await;
-    assert!(page.contains("Too many wrong passwords"), "{page}");
+    let (_, page) = t
+        .post("/login", &[("name", "admin"), ("password", "owner-pw")])
+        .await;
+    assert!(page.contains("Too many wrong attempts"), "{page}");
 }
 
 #[tokio::test]

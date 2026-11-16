@@ -67,6 +67,10 @@ pub struct Routes {
     pub write: Router<AppState>,
     /// Private reads (the advent calendars): behind the login too.
     pub private: Router<AppState>,
+    /// Routes behind the login only: each handler checks its own permission
+    /// (`CurrentUser::require`), for what no single collection permission
+    /// fits (the Pokémon wishlists, one permission each).
+    pub login_only: Router<AppState>,
     /// Files served by a handler (card pictures): public, kept out of the
     /// request log (a page loads dozens).
     pub files: Router<AppState>,
@@ -86,14 +90,15 @@ impl Routes {
             public: self.public.merge(other.public),
             write: self.write.merge(other.write),
             private: self.private.merge(other.private),
+            login_only: self.login_only.merge(other.login_only),
             files: self.files.merge(other.files),
             private_media,
         }
     }
 }
 
-/// The server: every collection's routes, the login (`/login`, `/logout`
-/// and the layer on the write and private routes), the request log, the
+/// The server: every collection's routes, the login (`/login`, `/logout`,
+/// `/users` and the layer on the write and private routes), the request log, the
 /// static files and the media.
 pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
     let login_required = from_fn_with_state(state.clone(), auth::require_login);
@@ -101,6 +106,7 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
     let mut public = Router::new();
     let mut write = Router::new();
     let mut private = Router::new();
+    let mut login_only = web::users::routes();
     let mut files = Router::new();
     // personal files: the shipment PDFs (names, addresses) and the advent
     // calendar photos, cards and books (handwritten notes)
@@ -117,6 +123,7 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
         }
         write = write.merge(collection_write);
         private = private.merge(routes.private);
+        login_only = login_only.merge(routes.login_only);
         files = files.merge(routes.files);
         for folder in routes.private_media {
             private_files = private_files.nest_service(
@@ -131,7 +138,7 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
     // CSS/JS (axum refuses a layer on a router without routes: a collection
     // may have none of one kind)
     let public_reads = state.auth.public_reads();
-    let mut protected = write.merge(private);
+    let mut protected = write.merge(private).merge(login_only);
     if !public_reads {
         protected = protected.merge(public);
         public = Router::new();

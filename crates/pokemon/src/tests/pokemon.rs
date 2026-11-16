@@ -6,7 +6,7 @@
 use super::*;
 
 /// Two cards of Shrouded Fable (French set code FNE), their prices, the set.
-async fn fixture(t: &TestApp) {
+pub(super) async fn fixture(t: &TestApp) {
     sqlx::query(
         "INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
              name_en, rarity, category, types, dex_id, variants, image, image_fr, json, fetched_at)
@@ -31,7 +31,7 @@ async fn fixture(t: &TestApp) {
     .unwrap();
 }
 
-const HORSEA_IR: &[(&str, &str)] = &[
+pub(super) const HORSEA_IR: &[(&str, &str)] = &[
     ("card", "sv06.5-067"),
     ("language", "fr"),
     ("variant", "holo"),
@@ -43,7 +43,7 @@ const HORSEA_IR: &[(&str, &str)] = &[
     ("note", "From the shop in town"),
 ];
 
-async fn add(t: &TestApp, form: &[(&str, &str)]) -> i64 {
+pub(super) async fn add(t: &TestApp, form: &[(&str, &str)]) -> i64 {
     let (status, location) = t.post("/pokemon/add", form).await;
     assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
     location
@@ -61,9 +61,10 @@ async fn pages_render_empty() {
         "/pokemon?view=table",
         "/pokemon/rarities",
         "/pokemon/wishlist",
+        "/pokemon/wishlists/1",
         "/pokemon/add",
         "/pokemon/add/booster",
-        "/pokemon/wishlist/add",
+        "/pokemon/wishlists/1/add",
     ] {
         let (status, page) = t.get(uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {page}");
@@ -293,14 +294,16 @@ async fn the_wishlist_compares_prices_and_is_fulfilled() {
             ("priority", "1"),
         ]
     };
-    let (status, location) = t.post("/pokemon/wishlist/add", &wish("40", "holo")).await;
+    let (status, location) = t
+        .post("/pokemon/wishlists/1/add", &wish("40", "holo"))
+        .await;
     assert_eq!(
         (status, location.as_str()),
-        (StatusCode::SEE_OTHER, "/pokemon/wishlist")
+        (StatusCode::SEE_OTHER, "/pokemon/wishlists/1")
     );
-    t.post("/pokemon/wishlist/add", &wish("10", "")).await;
+    t.post("/pokemon/wishlists/1/add", &wish("10", "")).await;
 
-    let (_, page) = t.get("/pokemon/wishlist").await;
+    let (_, page) = t.get("/pokemon/wishlists/1").await;
     assert!(
         page.contains("1 card is at or under your price today."),
         "{page}"
@@ -315,7 +318,7 @@ async fn the_wishlist_compares_prices_and_is_fulfilled() {
 
     let (status, location) = t
         .post(
-            "/pokemon/wishlist/1/got",
+            "/pokemon/wishes/1/got",
             &[("copy_id", "1"), ("back", "/pokemon/1")],
         )
         .await;
@@ -323,8 +326,8 @@ async fn the_wishlist_compares_prices_and_is_fulfilled() {
         (status, location.as_str()),
         (StatusCode::SEE_OTHER, "/pokemon/1")
     );
-    let (_, page) = t.get("/pokemon/wishlist").await;
-    assert!(page.contains("Wishlist (1)") && page.contains("Wishes got (1)"));
+    let (_, page) = t.get("/pokemon/wishlists/1").await;
+    assert!(page.contains("Wishlist Ortie (1)") && page.contains("Wishes got (1)"));
     let (_, page) = t.get("/pokemon/1").await;
     assert!(page.contains("Got from the"));
 
@@ -333,7 +336,7 @@ async fn the_wishlist_compares_prices_and_is_fulfilled() {
         .execute(&t.state.pool)
         .await
         .unwrap();
-    let (status, _) = t.post("/pokemon/wishlist/2/delete", &[]).await;
+    let (status, _) = t.post("/pokemon/wishes/2/delete", &[]).await;
     assert_eq!(status, StatusCode::SEE_OTHER);
     assert_eq!(t.scalar("SELECT count(*) FROM pokemon_card").await, 1);
     assert_eq!(
@@ -421,6 +424,7 @@ async fn writes_and_lookups_need_the_login() {
         "reads are public"
     );
     assert_eq!(t.get("/pokemon/wishlist").await.0, StatusCode::OK);
+    assert_eq!(t.get("/pokemon/wishlists/1").await.0, StatusCode::OK);
 }
 
 #[tokio::test]
@@ -922,7 +926,7 @@ async fn the_wishlist_hints_at_boosters_before_the_refresh() {
     let t = TestApp::new().await;
     fixture(&t).await;
     t.post(
-        "/pokemon/wishlist/add",
+        "/pokemon/wishlists/1/add",
         &[
             ("card", "sv06.5-067"),
             ("catalogue", "intl"),
@@ -934,7 +938,7 @@ async fn the_wishlist_hints_at_boosters_before_the_refresh() {
     )
     .await;
 
-    let (_, page) = t.get("/pokemon/wishlist").await;
+    let (_, page) = t.get("/pokemon/wishlists/1").await;
     assert!(page.contains("Boosters to open appear after the weekly price refresh."));
     assert!(!page.contains("<h2>Boosters to open</h2>"));
 }

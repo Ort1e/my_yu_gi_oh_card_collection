@@ -1,11 +1,21 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
+use crate::web::auth::ForbiddenPage;
+
 /// Error returned by handlers: 404 for missing rows, 400 with a JSON
 /// `{"error": ...}` body for invalid API input, 500 (logged) otherwise.
 #[derive(Debug)]
 pub enum AppError {
     NotFound,
+    /// 401: not logged in.
+    Unauthorized,
+    /// 403: logged in, but not allowed to change `what` (a permission's
+    /// label); `allowed`: what the login may change.
+    Forbidden {
+        what: String,
+        allowed: String,
+    },
     BadRequest(String),
     Internal(String),
 }
@@ -16,6 +26,8 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppError::NotFound => f.write_str("not found"),
+            AppError::Unauthorized => f.write_str("log in"),
+            AppError::Forbidden { what, .. } => write!(f, "not allowed to change {what}"),
             AppError::BadRequest(msg) | AppError::Internal(msg) => f.write_str(msg),
         }
     }
@@ -27,6 +39,10 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Not found").into_response(),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Log in").into_response(),
+            AppError::Forbidden { what, allowed } => {
+                (StatusCode::FORBIDDEN, ForbiddenPage { what, allowed }).into_response()
+            }
             AppError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({ "error": msg })),

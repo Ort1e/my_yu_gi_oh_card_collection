@@ -6,6 +6,7 @@
 //! - `prices.rs`: the weekly Cardmarket prices in `pokemon_price`;
 //! - `boosters.rs`: each card's Cardmarket expansion and its booster's price
 //!   (the wishlist's suggestions), weekly too;
+//! - `wishlists.rs`: the wishlists and their permissions (`app_permission`);
 //! - `openings.rs`: booster openings (`pokemon_opening`);
 //! - `limitless.rs`: Limitless TCG's official scans, first fallback for pictures;
 //! - `ptcgio.rs`: the Pokémon TCG API, for the pictures TCGdex lacks.
@@ -21,3 +22,4 @@ pub mod prices;
 pub mod ptcgio;
 pub mod sets;
 pub mod tcgdex;
+pub mod wishlists;

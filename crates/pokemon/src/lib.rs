@@ -22,10 +22,35 @@ use common::{AppState, Routes};
 pub fn routes() -> Routes {
     Routes {
         collection: "pokemon",
+        // each handler checks its own permission: one per wishlist
+        login_only: Router::new()
+            .route(
+                "/pokemon/wishlists/add",
+                post(routes::wishlist::create_list),
+            )
+            .route(
+                "/pokemon/wishlists/:id/edit",
+                post(routes::wishlist::update_list),
+            )
+            .route(
+                "/pokemon/wishlists/:id/delete",
+                post(routes::wishlist::delete_list),
+            )
+            .route(
+                "/pokemon/wishlists/:id/add",
+                get(routes::wishlist::add_page).post(routes::wishlist::create),
+            )
+            .route(
+                "/pokemon/wishes/:id/edit",
+                get(routes::wishlist::edit_page).post(routes::wishlist::update),
+            )
+            .route("/pokemon/wishes/:id/delete", post(routes::wishlist::delete))
+            .route("/pokemon/wishes/:id/got", post(routes::wishlist::got)),
         public: Router::new()
             .route("/pokemon", get(routes::list))
             .route("/pokemon/rarities", get(routes::rarities::page))
-            .route("/pokemon/wishlist", get(routes::wishlist::list))
+            .route("/pokemon/wishlist", get(routes::wishlist::index))
+            .route("/pokemon/wishlists/:id", get(routes::wishlist::list))
             .route("/pokemon/openings", get(routes::openings::list))
             .route("/pokemon/openings/:id", get(routes::openings::detail))
             .route("/pokemon/:id", get(routes::detail)),
@@ -42,19 +67,6 @@ pub fn routes() -> Routes {
                 "/pokemon/:id/edit",
                 get(routes::form::edit_page).post(routes::form::update),
             )
-            .route(
-                "/pokemon/wishlist/add",
-                get(routes::wishlist::add_page).post(routes::wishlist::create),
-            )
-            .route(
-                "/pokemon/wishlist/:id/edit",
-                get(routes::wishlist::edit_page).post(routes::wishlist::update),
-            )
-            .route(
-                "/pokemon/wishlist/:id/delete",
-                post(routes::wishlist::delete),
-            )
-            .route("/pokemon/wishlist/:id/got", post(routes::wishlist::got))
             .route(
                 "/pokemon/openings/:id/edit",
                 get(routes::openings::edit_page).post(routes::openings::update),

@@ -473,11 +473,18 @@ pub struct WishFields {
     pub note: Option<String>,
 }
 
-pub async fn insert_wish(conn: &mut SqliteConnection, wish: &WishFields) -> sqlx::Result<i64> {
+/// A wish on this wishlist.
+pub async fn insert_wish(
+    conn: &mut SqliteConnection,
+    wishlist_id: i64,
+    wish: &WishFields,
+) -> sqlx::Result<i64> {
     let done = sqlx::query(
-        "INSERT INTO pokemon_wish (card_id, language, variant, max_price, priority, note, added_on)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO pokemon_wish (wishlist_id, card_id, language, variant, max_price, priority,
+                                   note, added_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
+    .bind(wishlist_id)
     .bind(wish.card_id)
     .bind(&wish.language)
     .bind(wish.variant.map(Variant::code))
@@ -519,13 +526,15 @@ pub async fn delete_wish(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<b
     Ok(done.rows_affected() == 1)
 }
 
-/// Mark a wish got with this copy (`None`: wanted again).
+/// Mark a wish got today, with the copy that fulfils it when there is one
+/// (a list that isn't filled from the collection is just ticked off).
 pub async fn set_wish_got(
     conn: &mut SqliteConnection,
     id: i64,
     copy_id: Option<i64>,
 ) -> sqlx::Result<bool> {
-    let done = sqlx::query("UPDATE pokemon_wish SET got_copy_id = ? WHERE id = ?")
+    let done = sqlx::query("UPDATE pokemon_wish SET got_on = ?, got_copy_id = ? WHERE id = ?")
+        .bind(today().to_string())
         .bind(copy_id)
         .bind(id)
         .execute(conn)
@@ -533,23 +542,45 @@ pub async fn set_wish_got(
     Ok(done.rows_affected() == 1)
 }
 
+/// Wanted again: no longer got.
+pub async fn set_wish_wanted(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<bool> {
+    let done =
+        sqlx::query("UPDATE pokemon_wish SET got_on = NULL, got_copy_id = NULL WHERE id = ?")
+            .bind(id)
+            .execute(conn)
+            .await?;
+    Ok(done.rows_affected() == 1)
+}
+
 #[derive(sqlx::FromRow)]
 struct OpenWish {
     id: i64,
+    wishlist_id: i64,
     card_id: i64,
     language: Option<String>,
     variant: Option<String>,
 }
 
-/// The wishes still wanted that these copies fulfil: `(wish id, copy id)`,
-/// one copy per wish.
+/// A wish a copy fulfils.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Fulfilled {
+    pub wish_id: i64,
+    pub copy_id: i64,
+    pub wishlist_id: i64,
+}
+
+/// The wishes still wanted that these copies fulfil, one copy per wish. Only
+/// the lists filled from the collection (`fills_from_collection`) are looked
+/// at: the others are ticked off by hand.
 pub async fn wishes_fulfilled(
     conn: &mut SqliteConnection,
     copies: &[(i64, CopyKey)],
-) -> sqlx::Result<Vec<(i64, i64)>> {
+) -> sqlx::Result<Vec<Fulfilled>> {
     let wishes: Vec<OpenWish> = sqlx::query_as(
-        "SELECT id, card_id, language, variant FROM pokemon_wish WHERE got_copy_id IS NULL
-         ORDER BY priority, id",
+        "SELECT w.id, w.wishlist_id, w.card_id, w.language, w.variant
+         FROM pokemon_wish w JOIN pokemon_wishlist l ON l.id = w.wishlist_id
+         WHERE w.got_on IS NULL AND l.fills_from_collection = 1
+         ORDER BY w.priority, w.id",
     )
     .fetch_all(conn)
     .await?;
@@ -563,7 +594,11 @@ pub async fn wishes_fulfilled(
             max_price: None,
         };
         if let Some((copy_id, _)) = copies.iter().find(|(_, key)| rule.fulfilled_by(key)) {
-            found.push((wish.id, *copy_id));
+            found.push(Fulfilled {
+                wish_id: wish.id,
+                copy_id: *copy_id,
+                wishlist_id: wish.wishlist_id,
+            });
         }
     }
     Ok(found)
