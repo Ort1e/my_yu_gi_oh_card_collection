@@ -9,7 +9,7 @@
 <p class="hint">The cards go into the lot and into a built version of the deck holding exactly these copies.
   Extra deck monsters go to the extra deck; you can move cards in the deck builder afterwards.</p>
 
-<form method="post" action="/lots/{{ lot.id }}/deck" class="plain">
+<form method="post" action="{{ self.form_action() }}" class="plain">
   {% include "partials/form_errors.html" %}
   {% match lot_deck %}
   {% when Some with (d) %}

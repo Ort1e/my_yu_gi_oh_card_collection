@@ -148,12 +148,19 @@ pub async fn of_tournament(
         .await
 }
 
-/// The snapshot of the deck received in a lot, if any.
-pub async fn of_lot(conn: &mut SqliteConnection, lot_id: i64) -> sqlx::Result<Option<Snapshot>> {
-    sqlx::query_as(&format!("{SELECT} WHERE deck_snapshot.lot_id = ?"))
-        .bind(lot_id)
-        .fetch_optional(&mut *conn)
-        .await
+/// One deck received in a lot (`None` when the snapshot is not one of that lot's).
+pub async fn lot_deck(
+    conn: &mut SqliteConnection,
+    lot_id: i64,
+    snapshot_id: i64,
+) -> sqlx::Result<Option<Snapshot>> {
+    sqlx::query_as(&format!(
+        "{SELECT} WHERE deck_snapshot.lot_id = ? AND deck_snapshot.id = ?"
+    ))
+    .bind(lot_id)
+    .bind(snapshot_id)
+    .fetch_optional(&mut *conn)
+    .await
 }
 
 /// The cards of a snapshot.
@@ -305,7 +312,7 @@ pub async fn freeze(
 
 /// A new snapshot of what a version holds now, linked to `lot_id`: the deck
 /// as received in that lot, kept like a tournament's list. `None` without
-/// the version or its deck. One per lot (a unique index).
+/// the version or its deck. A lot may have several.
 pub async fn lot_freeze(
     conn: &mut SqliteConnection,
     version_id: i64,

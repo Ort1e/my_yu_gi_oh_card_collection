@@ -63,6 +63,11 @@ missing: boolean,
  */
 copy: ApiCopy | null, 
 /**
+ * The slot's copy is flagged "to sell" (`card.for_sale`): the deck holds
+ * it for lack of another free one, and it will be sold.
+ */
+for_sale: boolean, 
+/**
  * An owned copy of the card (unsold, the oldest; the slot's copy for a
  * built deck), for a link to its page; `None`: none owned.
  */

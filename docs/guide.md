@@ -41,6 +41,18 @@ the name, rarity, condition, printing picture (the edit page asks Yugipedia
 for the gallery) and the Cardmarket product. Cards are never deleted, only
 marked sold.
 
+**Selling.** A copy you mean to sell is flagged 🏷 **To sell**: with the switch
+on its page, or by ticking rows on its lot's page ("Mark to sell"); `/cards?for_sale=1`
+filters them. **Collection → To sell** lists them (name, code, rarity, condition,
+trend price, the built deck holding it) and, for Cardmarket's bulk sell (set first,
+then its cards), one folded section per set with a row per card, rarity, language
+and condition. A flagged copy still counts as owned; a deck takes it only when no
+other free copy exists (the builder shows a ⚠ on it). The sale itself is recorded
+by adding its **Cardmarket shipment as a lot** (Lots → Add, type sale): each line
+takes a matching flagged copy (same code and rarity, the same condition first) instead
+of making a new card; the copy keeps its purchase, becomes sold, and its slot in a
+built deck is emptied. A line with no flagged copy makes a new card as before.
+
 **A card showing the wrong art** (an Extended Art, a French card shown in
 English): open its edit page, "Picture". The pictures of its printing come
 from Yugipedia (looked up when the card was added; otherwise "Look on
@@ -69,13 +81,14 @@ rows and quick add, on their own page; the lot page itself only reads).
 
 **A deck received in a lot** (the previous owner had built it): the lot's
 page → **Add a deck**. Choose a new deck (name it) or an existing one, name
-the version (default "From lot 123"), then enter its cards like a lot's
+the version (default "From lot 123", then "From lot 123 (2)"…), then enter its cards like a lot's
 (rows, quick add, codes, rarity, condition), each with a **zone**: Auto
 (extra deck monsters go to the extra deck, the rest to the main deck) or
 Side. The cards go into the lot **and** into a built version holding exactly
 those copies; the deck as received is kept in the deck's history ("Received
-in lot 123"). One deck per lot; the lot's page then links to it and to
-**add cards to it** later. Move cards around in the builder afterwards if
+in lot 123"). A lot can hold any number of decks (**Add a deck** is always
+there, each time a new one); the lot's page lists them, each with
+**add cards to it** for later. Move cards around in the builder afterwards if
 needed. Unlike the lot's other cards, a name ygoprodeck doesn't know is
 refused (a copy without card data can't fill a slot).
 
@@ -277,7 +290,7 @@ Every **Save** in the deck builder keeps the list in the deck's history
 ### Built decks
 `/decks/built`: the decks you physically built. One card per deck (box,
 sleeves, its cards and the copies it holds, how many are missing), then the
-value of each deck. A deck received in a lot (lot page → **Add a deck**) is
+value of each deck. Each deck received in a lot (lot page → **Add a deck**) is
 built at once, with the copies of that lot.
 
 ### Shopping list
@@ -329,13 +342,14 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
 
 Every morning the NAS writes a **read-only static site** and uploads it to a
 web hosting. It contains: the Yu-Gi-Oh! and Pokémon cards, the statistics,
-the market values, the public decks (those a version of which is marked
+the market values, the purchase lots (dates and cards with their
+estimates: no seller, price or file), the public decks (those a version of which is marked
 public, or played in a tournament), the tournaments and their stats (no old
 notes), the Pokémon wishlist and the books (except private ones) with
 their covers. The pictures are small (360 px wide): the cards' text is on
 their pages.
 
-It **never** contains: sellers, lots, shipment PDFs, prices paid, the budget,
+It **never** contains: sellers, sale lots, shipment PDFs, prices paid, the budget,
 notes, ISBNs, tournaments' old notes, forms, private decks and books.
 
 A version is made public in the builder (*Settings → Sharing*); a built

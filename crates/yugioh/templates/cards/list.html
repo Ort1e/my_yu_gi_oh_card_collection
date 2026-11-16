@@ -26,7 +26,7 @@
       <tbody>
         {% for card in cards %}
         <tr>
-          <td><a href="/cards/{{ card.id }}">{{ card.name }}</a>{% if card.is_sold %} <span class="tag">Sold</span>{% endif %}{% match card.english_name() %}{% when Some with (english) %}<div class="cell-note">{{ english }}</div>{% when None %}{% endmatch %}</td>
+          <td><a href="/cards/{{ card.id }}">{{ card.name }}</a>{% if card.is_sold %} <span class="tag">Sold</span>{% endif %}{% if card.shows_for_sale() %} <span class="tag">🏷 To sell</span>{% endif %}{% match card.english_name() %}{% when Some with (english) %}<div class="cell-note">{{ english }}</div>{% when None %}{% endmatch %}</td>
           <td class="text">{{ card.code.as_deref().unwrap_or("") }}</td>
           <td class="text">{{ card.rarity.as_deref().unwrap_or("") }}</td>
           <td class="text">{% match card.status() %}{% when Some with (status) %}{{ status.label() }}{% when None %}{% endmatch %}</td>
@@ -89,6 +89,12 @@
         <option value="" {% if self.selected(filter.sold, "") %}selected{% endif %}>All cards</option>
         <option value="true" {% if self.selected(filter.sold, "true") %}selected{% endif %}>Only sold</option>
         <option value="false" {% if self.selected(filter.sold, "false") %}selected{% endif %}>Not sold</option>
+      </select>
+
+      <label for="for_sale">To sell:</label>
+      <select name="for_sale" id="for_sale">
+        <option value="" {% if self.selected(filter.for_sale, "") %}selected{% endif %}>All cards</option>
+        <option value="1" {% if self.selected(filter.for_sale, "1") %}selected{% endif %}>Only the copies to sell</option>
       </select>
 
       <div class="button-row">

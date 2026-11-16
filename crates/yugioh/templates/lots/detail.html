@@ -9,36 +9,43 @@
 {% block content %}
 <div class="inside-container">
 <h1>{{ lot.title() }}</h1>
+{% if !common::export::public_copy() %}
 <div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a> <a href="/lots/{{ lot.id }}/add-cards" class="btn">Add cards</a>
-  {% if !common::export::public_copy() %}{% if lot_deck.is_none() %}<a href="/lots/{{ lot.id }}/deck" class="btn">Add a deck</a>{% endif %}{% endif %}</div>
+  <a href="/lots/{{ lot.id }}/deck" class="btn">Add a deck</a></div>
+{% endif %}
 
 <div class="card wide-card">
   <div class="card-meta-line">
     <div><strong>Type:</strong> {{ lot.lot_type }}</div>
-    <div><strong>Price:</strong> {{ lot.price_text() }}</div>
+    {% if !common::export::public_copy() %}<div><strong>Price:</strong> {{ lot.price_text() }}</div>{% endif %}
     <div><strong>Buy date:</strong> {{ lot.buy_date|date }}</div>
     <div><strong>Received:</strong> {{ lot.received_date.as_deref().unwrap_or("—")|date }}</div>
-    <div><strong>Seller:</strong>
+    {% if !common::export::public_copy() %}<div><strong>Seller:</strong>
       {% match lot.seller_id %}
       {% when Some with (seller_id) %}<a href="/sellers/{{ seller_id }}">{{ lot.seller_name() }}</a>
       {% when None %}{{ lot.seller_name() }}
       {% endmatch %}
-    </div>
+    </div>{% endif %}
     <div><strong>Cards in Lot:</strong> {{ lot.card_count }}</div>
     {% match lot.estimate %}{% when Some with (estimate) %}
     <div title="Market value of its cards still owned: an estimate"><strong>Estimated value:</strong> {{ estimate }} €</div>
     {% when None %}{% endmatch %}
-    {% match calendar_year %}{% when Some with (year) %}
+    {% if !common::export::public_copy() %}{% match calendar_year %}{% when Some with (year) %}
     <div><strong>Advent calendar:</strong> <a href="/advent-calendar/{{ year }}">{{ year }}</a> (<a href="/advent-calendar/{{ year }}/edit">fill its days</a>)</div>
-    {% when None %}{% endmatch %}
-    {% if !common::export::public_copy() %}{% match lot_deck %}{% when Some with (d) %}
-    <div><strong>Deck received:</strong> <a href="/decks/{{ d.deck_id }}">{{ d.deck_name }}</a>
-      (<a href="/deck-snapshots/{{ d.snapshot_id }}">list as received</a>{% match d.version_id %}{% when Some with (v) %}, <a href="/deck-versions/{{ v }}">version {{ d.version_name.as_deref().unwrap_or("") }}</a>{% when None %}{% endmatch %},
-      <a href="/lots/{{ lot.id }}/deck">add cards to it</a>)</div>
     {% when None %}{% endmatch %}{% endif %}
-    {% match lot.shipment_file %}{% when Some with (file) %}
+    {% if !common::export::public_copy() %}{% if !lot_decks.is_empty() %}
+    <div><strong>Decks received:</strong>
+      <ul>
+        {% for d in lot_decks %}
+        <li><a href="/decks/{{ d.deck_id }}">{{ d.deck_name }}</a>
+          (<a href="/deck-snapshots/{{ d.snapshot_id }}">list as received</a>{% match d.version_id %}{% when Some with (v) %}, <a href="/deck-versions/{{ v }}">version {{ d.version_name.as_deref().unwrap_or("") }}</a>{% when None %}{% endmatch %},
+          <a href="/lots/{{ lot.id }}/deck/{{ d.snapshot_id }}">add cards to it</a>)</li>
+        {% endfor %}
+      </ul></div>
+    {% endif %}{% endif %}
+    {% if !common::export::public_copy() %}{% match lot.shipment_file %}{% when Some with (file) %}
     <div><a href="/media/{{ file }}">Shipment file</a></div>
-    {% when None %}{% endmatch %}
+    {% when None %}{% endmatch %}{% endif %}
   </div>
 </div>
 
@@ -46,7 +53,7 @@
 {% if groups.is_empty() %}
 <p>No cards in this lot.</p>
 {% else %}
-<p class="hint">The same copies (name, code, rarity, condition, price) on one line. Price and estimate: of one copy;
+<p class="hint">The same copies (name, code, rarity, condition{% if !common::export::public_copy() %}, price{% endif %}) on one line. Price and estimate: of one copy;
   the total counts every copy. Click a heading to sort.</p>
 <div class="table-tools">
   <input type="search" data-filter-table="lot-cards" placeholder="Search a name, a code…" aria-label="Search the cards of this lot">
@@ -57,24 +64,27 @@
   {% for r in rarities %}<button type="button" class="btn-small btn-secondary" data-filter-for="lot-cards" data-filter-tag="{{ r.rarity }}">{{ r.rarity }} <span class="tag-count">{{ r.count }}</span></button>{% endfor %}
 </div>
 {% endif %}
+{% if self.can_flag() %}<form method="post" action="/lots/{{ lot.id }}/for-sale">{% endif %}
 <div class="table-scroll">
 <table class="numbers sortable" id="lot-cards">
   <thead>
     <tr>
+      {% if self.can_flag() %}<th title="Tick the copies to flag or unflag as to sell"></th>{% endif %}
       <th data-sort="text">Card</th>
       <th class="text phone-hide" data-sort="text">Code</th>
       <th class="text phone-hide" data-sort="number">Rarity</th>
       <th class="text phone-hide" data-sort="text">Condition</th>
       <th data-sort="number">Copies</th>
-      <th data-sort="number">Price (€)</th>
+      {% if !common::export::public_copy() %}<th data-sort="number">Price (€)</th>{% endif %}
       <th data-sort="number" title="Market price × condition and language">Estimate (€)</th>
     </tr>
   </thead>
   <tbody>
     {% for g in groups %}
     <tr data-code="{{ g.code }}" data-tag="{{ g.rarity.as_deref().unwrap_or("") }}">
+      {% if self.can_flag() %}<td><input type="checkbox" name="group" value="{{ g.ids() }}" aria-label="Select {{ g.card_name }}"></td>{% endif %}
       <td>
-        <a href="/cards/{{ g.card_id }}">{{ g.card_name }}</a>
+        <a href="/cards/{{ g.card_id }}">{{ g.card_name }}</a>{% if g.for_sale && !common::export::public_copy() %} <span class="tag">🏷 To sell</span>{% endif %}
         {% match g.english_name %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
         <div class="cell-note phone-only">{{ g.code }}{% match g.rarity %}{% when Some with (rarity) %} · {{ rarity }}{% when None %}{% endmatch %}{% if !g.status.is_empty() %} · {{ g.status }}{% endif %}</div>
       </td>
@@ -82,22 +92,30 @@
       <td class="text phone-hide" data-sort-value="{{ g.rarity_rank() }}">{% match g.rarity %}{% when Some with (rarity) %}<a href="/rarities?rarity={{ rarity|urlencode }}" class="rarity-badge" title="How to recognise it">{{ rarity }}</a>{% when None %}—{% endmatch %}</td>
       <td class="text phone-hide" title="{{ g.status_label }}">{% if g.status.is_empty() %}—{% else %}{{ g.status }}{% endif %}</td>
       <td>{{ g.count }}</td>
-      <td>{% match g.price %}{% when Some with (price) %}{{ price }}{% when None %}—{% endmatch %}</td>
+      {% if !common::export::public_copy() %}<td>{% match g.price %}{% when Some with (price) %}{{ price }}{% when None %}—{% endmatch %}</td>{% endif %}
       <td>{% match g.estimate %}{% when Some with (estimate) %}{{ estimate }}{% when None %}—{% endmatch %}</td>
     </tr>
     {% endfor %}
   </tbody>
   <tfoot>
     <tr class="total-row">
+      {% if self.can_flag() %}<td></td>{% endif %}
       <td>Total</td>
       <td class="phone-hide" colspan="3"></td>
       <td>{{ copies }}</td>
-      <td>{{ total_price }}</td>
+      {% if !common::export::public_copy() %}<td>{{ total_price }}</td>{% endif %}
       <td>{{ total_estimate }}</td>
     </tr>
   </tfoot>
 </table>
 </div>
+{% if self.can_flag() %}
+<div class="button-row">
+  <button type="submit" name="action" value="mark" class="btn">🏷 Mark to sell</button>
+  <button type="submit" name="action" value="unmark" class="btn btn-secondary">Unmark</button>
+</div>
+</form>
+{% endif %}
 {% endif %}
 
 </div>

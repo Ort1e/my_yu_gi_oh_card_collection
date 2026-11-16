@@ -6,6 +6,7 @@ use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
 use crate::routes::cards::like_pattern;
+use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::models::{other_name, LotRow};
 use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
@@ -13,6 +14,10 @@ use crate::web::error::{AppResult, OrNotFound};
 use crate::web::filters;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
 use crate::AppState;
+
+/// The lots the public copy shows: purchases not cancelled (a sale or a
+/// cancelled lot answers 404 there).
+pub const PUBLIC_LOT: &str = "lot.lot_type = 'purchase' AND lot.is_cancelled = 0";
 
 #[derive(Debug, Default, Deserialize)]
 pub struct LotFilter {
@@ -24,6 +29,11 @@ pub struct LotFilter {
 impl LotFilter {
     fn push_where(&self, qb: &mut QueryBuilder<'_, Sqlite>) {
         qb.push(" WHERE 1");
+        // the public copy: purchases only, whatever the address asks
+        if common::export::public_copy() {
+            qb.push(" AND ").push(PUBLIC_LOT);
+            return;
+        }
         if let Some(name) = self
             .seller_name
             .as_deref()
@@ -92,9 +102,16 @@ pub async fn list(
     Ok(LotsList {
         page_title: "All Lots",
         page,
-        total: sqlx::query_scalar("SELECT count(*) FROM lot")
-            .fetch_one(pool)
-            .await?,
+        total: sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM lot WHERE {}",
+            if common::export::public_copy() {
+                PUBLIC_LOT
+            } else {
+                "1"
+            }
+        ))
+        .fetch_one(pool)
+        .await?,
         lots,
         filter,
     })
@@ -110,6 +127,8 @@ pub struct UniteRow {
     price: Option<Money>,
     status: Option<String>,
     market_price: Option<Money>,
+    /// Flagged "to sell" and not sold yet.
+    for_sale: bool,
 }
 
 impl UniteRow {
@@ -134,6 +153,10 @@ impl UniteRow {
 pub struct CopyGroup {
     /// The first copy, linked from the row.
     card_id: i64,
+    /// Every copy of the row (the lot page's checkbox).
+    card_ids: Vec<i64>,
+    /// The row's copies are flagged "to sell" (the rows never mix).
+    for_sale: bool,
     count: usize,
     card_name: String,
     english_name: Option<String>,
@@ -161,14 +184,18 @@ impl CopyGroup {
                     && g.status == status
                     && g.price == unite.price
                     && g.estimate == estimate
+                    && g.for_sale == unite.for_sale
             });
             if let Some(group) = same {
                 group.count += 1;
+                group.card_ids.push(unite.card_id);
                 continue;
             }
 
             groups.push(CopyGroup {
                 card_id: unite.card_id,
+                card_ids: vec![unite.card_id],
+                for_sale: unite.for_sale,
                 count: 1,
                 card_name: unite.card_name.clone(),
                 english_name: unite.english_name().map(str::to_string),
@@ -183,6 +210,15 @@ impl CopyGroup {
             });
         }
         groups
+    }
+
+    /// The ids of its copies, comma-separated (a checkbox's value).
+    fn ids(&self) -> String {
+        self.card_ids
+            .iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
     }
 
     /// The rank of its rarity in `Rarity::ALL` (most common first), to sort by.
@@ -217,22 +253,36 @@ pub struct LotDetail {
     /// The advent calendar whose lot this is, if any.
     calendar_year: Option<i64>,
     /// The deck received in this lot, if any.
-    lot_deck: Option<form::LotDeck>,
+    lot_decks: Vec<form::LotDeck>,
+}
+
+impl LotDetail {
+    /// Copies of a purchase lot can be flagged "to sell" (private page only).
+    fn can_flag(&self) -> bool {
+        self.lot.lot_type == "purchase" && !common::export::public_copy()
+    }
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
     let pool = &state.pool;
-    let mut lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .or_404()?;
+    let shown = if common::export::public_copy() {
+        PUBLIC_LOT
+    } else {
+        "1"
+    };
+    let mut lot: LotRow =
+        sqlx::query_as(&format!("{} WHERE lot.id = ? AND {shown}", LotRow::SELECT))
+            .bind(id)
+            .fetch_optional(pool)
+            .await?
+            .or_404()?;
     fill_lot_estimates(pool, std::slice::from_mut(&mut lot)).await?;
     let unites: Vec<UniteRow> = sqlx::query_as(&format!(
         "SELECT unite.card_id, card.name AS card_name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.rarity, unite.price, card.last_known_status AS status,
-                {MARKET_PRICE} AS market_price
+                {MARKET_PRICE} AS market_price,
+                (card.for_sale = 1 AND NOT {SOLD_EXISTS}) AS for_sale
          FROM unite JOIN card ON card.id = unite.card_id
          LEFT JOIN card_data ON card_data.id = card.card_data_id
          WHERE unite.lot_id = ? ORDER BY unite.id"
@@ -275,6 +325,6 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         total_price,
         total_estimate,
         calendar_year,
-        lot_deck: form::LotDeck::of_lot(pool, id).await?,
+        lot_decks: form::LotDeck::all_of_lot(pool, id).await?,
     })
 }

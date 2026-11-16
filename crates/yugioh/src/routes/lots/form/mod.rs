@@ -17,7 +17,7 @@ mod edit;
 
 pub use add::{create, page, upload};
 pub use cards::{add_cards, add_cards_page};
-pub use deck::{add_deck_cards, deck_page, LotDeck};
+pub use deck::{add_to_deck, deck_cards_page, deck_page, new_deck, LotDeck};
 pub use edit::{edit_page, update};
 
 use yugioh_domain::lot::LotType;

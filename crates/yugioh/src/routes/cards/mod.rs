@@ -1,3 +1,4 @@
+pub mod for_sale;
 pub mod form;
 pub mod images;
 pub mod text;
@@ -32,6 +33,8 @@ pub struct CardFilter {
     pub rarity: Option<String>,
     pub card_type: Option<String>,
     pub sold: Option<String>,
+    /// "1": the copies flagged "to sell" only.
+    pub for_sale: Option<String>,
     /// `grid` (default), `table`: [`View`].
     pub view: Option<String>,
 }
@@ -80,6 +83,9 @@ impl CardFilter {
             .push_bind(card_type.to_string())
             .push(" COLLATE NOCASE)");
         }
+        if self.for_sale.as_deref() == Some("1") && !common::export::public_copy() {
+            qb.push(" AND card.for_sale = 1");
+        }
         if let Some(sold) = Self::flag(&self.sold) {
             qb.push(if sold { " AND " } else { " AND NOT " })
                 .push(SOLD_EXISTS);
@@ -95,6 +101,7 @@ impl CardFilter {
             ("rarity", self.rarity.as_deref()),
             ("card_type", self.card_type.as_deref()),
             ("sold", self.sold.as_deref()),
+            ("for_sale", self.for_sale.as_deref()),
         ])
     }
 }

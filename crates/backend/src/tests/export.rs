@@ -9,8 +9,13 @@ async fn the_public_copy_holds_nothing_private() {
     // the collections, with private things around them
     t.exec(
         "INSERT INTO seller (id, name, is_person) VALUES (1, 'Jeanne Privatename', 1);
+         INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price, shipment_file)
+             VALUES (1, 'purchase', '123.45', '2025-06-01', 1, '0.00', 'shipment_files/shipment_1.pdf');
+         -- a sale and a cancelled purchase: never in the copy
          INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price)
-             VALUES (1, 'purchase', '123.45', '2025-06-01', 1, '0.00');
+             VALUES (2, 'sale', '77.77', '2025-06-05', 1, '0.00');
+         INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price, is_cancelled)
+             VALUES (3, 'purchase', '66.66', '2025-06-06', 1, '0.00', 1);
          INSERT INTO card (id, name, en_name, code, rarity, last_known_status, card_data_id)
              VALUES (1, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 'NM', 1);
          INSERT INTO unite (price, lot_id, card_id) VALUES ('98.76', 1, 1);
@@ -98,6 +103,8 @@ async fn the_public_copy_holds_nothing_private() {
         "books.html",
         "books-1.html",
         "books-random.html",
+        "lots.html",
+        "lots-1.html",
         "decks.html",
         "decks-2.html",
         "deck-snapshots-20.html",
@@ -121,8 +128,10 @@ async fn the_public_copy_holds_nothing_private() {
         "books-2.html",
         "books-series-1.html",
         "books-authors-1.html",
+        "lots-2.html",
+        "lots-3.html",
     ] {
-        assert!(!out.join(page).exists(), "{page}: a private book's");
+        assert!(!out.join(page).exists(), "{page}: private");
     }
     let mut pages = String::new();
     for entry in std::fs::read_dir(&out).unwrap() {
@@ -169,7 +178,11 @@ async fn the_public_copy_holds_nothing_private() {
             || out.join(link.split('#').next().unwrap()).exists();
         assert!(inside, "{link}: not in the copy");
     }
-    // never: sellers, prices paid, lots, private decks and versions,
+    // the lots: purchases, with their cards (no seller, price or file: below)
+    let lot = std::fs::read_to_string(out.join("lots-1.html")).unwrap();
+    assert!(lot.contains("Magicien Sombre"), "{lot}");
+    assert!(lot.contains("Lot 01/06/2025"), "{lot}");
+    // never: sellers, prices paid, sales, private decks and versions,
     // tournaments' old notes, budget, notes, wishes' maximum price, ISBNs, the
     // cards of private decks, the deck builder, links to the app
     for private in [
@@ -201,9 +214,10 @@ async fn the_public_copy_holds_nothing_private() {
         "Hidden Series",
         "Hidden Author",
         "🔒",
-        "/lots",
+        "77.77",
+        "66.66",
+        "shipment_",
         "/login",
-        "lots-",
         "sellers",
         "Budget",
         "href=\"/",

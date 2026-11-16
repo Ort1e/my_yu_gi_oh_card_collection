@@ -94,6 +94,9 @@ pub struct ApiCard {
     /// A built version's copy in this slot; `None` in a plain version, or a
     /// slot without one yet (missing, or a free copy to take).
     pub(crate) copy: Option<ApiCopy>,
+    /// The slot's copy is flagged "to sell" (`card.for_sale`): the deck holds
+    /// it for lack of another free one, and it will be sold.
+    pub(crate) for_sale: bool,
     /// An owned copy of the card (unsold, the oldest; the slot's copy for a
     /// built deck), for a link to its page; `None`: none owned.
     pub(crate) sample_copy: Option<i64>,
@@ -138,6 +141,7 @@ struct CopyRecord {
     picture: Option<String>,
     cardmarket_product_id: Option<i64>,
     linked_trend: Option<Money>,
+    for_sale: bool,
 }
 
 /// The tiles of `specs`, in the same order, seen from version `version_id`
@@ -165,7 +169,7 @@ async fn load_tiles(
     if !copy_ids.is_empty() {
         let mut qb = QueryBuilder::new(
             "SELECT card.id, card.code, card.rarity, card.last_known_status, card.picture,
-                    card.cardmarket_product_id, cardmarket_product.trend AS linked_trend
+                    card.cardmarket_product_id, cardmarket_product.trend AS linked_trend, card.for_sale
              FROM card
              LEFT JOIN cardmarket_product ON cardmarket_product.id = card.cardmarket_product_id
              WHERE card.id IN ",
@@ -292,6 +296,7 @@ async fn load_tiles(
                 free: a.free as u32,
                 here: a.here as u32,
                 missing: spec.missing,
+                for_sale: c.is_some_and(|c| c.for_sale),
                 sample_copy: spec
                     .copy
                     .or_else(|| spec.card_data_id.and_then(|id| sample.get(&id).copied())),

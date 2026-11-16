@@ -2,8 +2,9 @@
 //! the lot's (card rows, quick add), go into the lot **and** into a built
 //! version holding exactly those copies; a snapshot linked to the lot
 //! (`deck_snapshot.lot_id`, kept like a tournament's list) is the deck as
-//! received. One lot deck per lot; the page serves the first time (which
-//! deck, which version) and every later addition.
+//! received. A lot holds any number of decks: `/lots/:id/deck` always makes
+//! a new one (which deck, which version), `/lots/:id/deck/:snapshot_id` adds
+//! cards to one of them.
 
 use askama::Template;
 use axum::extract::{Path, State};
@@ -33,20 +34,42 @@ pub struct LotDeck {
     pub version_name: Option<String>,
 }
 
+const LOT_DECK_SELECT: &str = "SELECT s.id AS snapshot_id, s.deck_id, deck.name AS deck_name,
+        s.version_id, v.version_name
+     FROM deck_snapshot s
+     JOIN deck ON deck.id = s.deck_id
+     LEFT JOIN deck_version v ON v.id = s.version_id";
+
 impl LotDeck {
-    /// The lot's deck, if it has one.
-    pub async fn of_lot(pool: &Pool, lot_id: i64) -> sqlx::Result<Option<LotDeck>> {
-        sqlx::query_as(
-            "SELECT s.id AS snapshot_id, s.deck_id, deck.name AS deck_name, s.version_id,
-                    v.version_name
-             FROM deck_snapshot s
-             JOIN deck ON deck.id = s.deck_id
-             LEFT JOIN deck_version v ON v.id = s.version_id
-             WHERE s.lot_id = ?",
-        )
+    /// Every deck received in the lot, oldest first.
+    pub async fn all_of_lot(pool: &Pool, lot_id: i64) -> sqlx::Result<Vec<LotDeck>> {
+        sqlx::query_as(&format!(
+            "{LOT_DECK_SELECT} WHERE s.lot_id = ? ORDER BY s.id"
+        ))
         .bind(lot_id)
+        .fetch_all(pool)
+        .await
+    }
+
+    /// One of the lot's decks (`None` when the snapshot is another lot's).
+    pub async fn one(pool: &Pool, lot_id: i64, snapshot_id: i64) -> sqlx::Result<Option<LotDeck>> {
+        sqlx::query_as(&format!(
+            "{LOT_DECK_SELECT} WHERE s.lot_id = ? AND s.id = ?"
+        ))
+        .bind(lot_id)
+        .bind(snapshot_id)
         .fetch_optional(pool)
         .await
+    }
+}
+
+/// The version name proposed for a new deck: `From lot 7`, then
+/// `From lot 7 (2)`… when the lot already has decks.
+fn default_version_name(lot_id: i64, existing: usize) -> String {
+    if existing == 0 {
+        format!("From lot {lot_id}")
+    } else {
+        format!("From lot {lot_id} ({})", existing + 1)
     }
 }
 
@@ -54,7 +77,7 @@ impl LotDeck {
 #[template(path = "lots/deck.html")]
 pub struct LotDeckPage {
     lot: LotRow,
-    /// Set once the lot has its deck: the first-time fields are not shown.
+    /// The deck cards are added to; `None` = a new deck (its fields are shown).
     lot_deck: Option<LotDeck>,
     errors: Vec<String>,
     rows: Vec<CardRowValues>,
@@ -72,6 +95,7 @@ impl LotDeckPage {
         errors: Vec<String>,
         mut rows: Vec<CardRowValues>,
         fields: Option<&FormData>,
+        snapshot_id: Option<i64>,
     ) -> AppResult<LotDeckPage> {
         if rows.is_empty() {
             rows.push(CardRowValues::default());
@@ -81,7 +105,10 @@ impl LotDeckPage {
             .fetch_optional(pool)
             .await?
             .or_404()?;
-        let lot_deck = LotDeck::of_lot(pool, lot_id).await?;
+        let (lot_deck, existing) = match snapshot_id {
+            Some(id) => (Some(LotDeck::one(pool, lot_id, id).await?.or_404()?), 0),
+            None => (None, LotDeck::all_of_lot(pool, lot_id).await?.len()),
+        };
         let decks = sqlx::query_as("SELECT id, name FROM deck ORDER BY name COLLATE NOCASE")
             .fetch_all(pool)
             .await?;
@@ -89,7 +116,7 @@ impl LotDeckPage {
         Ok(LotDeckPage {
             version_name: fields
                 .map(|f| f.text("version_name"))
-                .unwrap_or_else(|| format!("From lot {lot_id}")),
+                .unwrap_or_else(|| default_version_name(lot_id, existing)),
             deck_id: text("deck_id"),
             deck_name: text("deck_name"),
             lot,
@@ -98,6 +125,14 @@ impl LotDeckPage {
             rows,
             decks,
         })
+    }
+
+    /// Where the form posts: a new deck, or more cards for one.
+    fn form_action(&self) -> String {
+        match &self.lot_deck {
+            Some(d) => format!("/lots/{}/deck/{}", self.lot.id, d.snapshot_id),
+            None => format!("/lots/{}/deck", self.lot.id),
+        }
     }
 
     fn blank_row(&self) -> CardRowValues {
@@ -121,7 +156,22 @@ pub async fn deck_page(
     State(state): State<AppState>,
     Path(lot_id): Path<i64>,
 ) -> AppResult<LotDeckPage> {
-    LotDeckPage::load(&state.pool, lot_id, Vec::new(), Vec::new(), None).await
+    LotDeckPage::load(&state.pool, lot_id, Vec::new(), Vec::new(), None, None).await
+}
+
+pub async fn deck_cards_page(
+    State(state): State<AppState>,
+    Path((lot_id, snapshot_id)): Path<(i64, i64)>,
+) -> AppResult<LotDeckPage> {
+    LotDeckPage::load(
+        &state.pool,
+        lot_id,
+        Vec::new(),
+        Vec::new(),
+        None,
+        Some(snapshot_id),
+    )
+    .await
 }
 
 /// Where a copy goes: the side deck when asked, else the extra deck for the
@@ -136,15 +186,37 @@ fn zone_of(card_type: &str, side: bool) -> DeckZone {
     }
 }
 
-pub async fn add_deck_cards(
+/// A new deck received in the lot.
+pub async fn new_deck(
     State(state): State<AppState>,
     Path(lot_id): Path<i64>,
     Form(pairs): Form<Pairs>,
 ) -> AppResult<Response> {
+    save(state, lot_id, None, pairs).await
+}
+
+/// More cards for a deck already received in the lot.
+pub async fn add_to_deck(
+    State(state): State<AppState>,
+    Path((lot_id, snapshot_id)): Path<(i64, i64)>,
+    Form(pairs): Form<Pairs>,
+) -> AppResult<Response> {
+    save(state, lot_id, Some(snapshot_id), pairs).await
+}
+
+async fn save(
+    state: AppState,
+    lot_id: i64,
+    snapshot_id: Option<i64>,
+    pairs: Pairs,
+) -> AppResult<Response> {
     let mut form = FormData::new(pairs);
     let pool = &state.pool;
     exists(&mut *pool.acquire().await?, "lot", lot_id).await?;
-    let first_time = LotDeck::of_lot(pool, lot_id).await?.is_none();
+    let first_time = snapshot_id.is_none();
+    if let Some(id) = snapshot_id {
+        LotDeck::one(pool, lot_id, id).await?.or_404()?;
+    }
 
     let mut cards = form.new_cards();
     if cards.is_empty() && form.errors.is_empty() {
@@ -158,10 +230,11 @@ pub async fn add_deck_cards(
         if deck_id.is_none() {
             deck_name = form.required("deck_name", "The new deck's name");
         }
+        let existing = LotDeck::all_of_lot(pool, lot_id).await?.len();
         version_name = form
             .get("version_name")
             .map(str::to_string)
-            .unwrap_or_else(|| format!("From lot {lot_id}"));
+            .unwrap_or_else(|| default_version_name(lot_id, existing));
     }
 
     // network first: every card needs its card data to fill a slot
@@ -187,21 +260,23 @@ pub async fn add_deck_cards(
     }
     if !form.errors.is_empty() {
         let rows = form.card_rows();
-        let page = LotDeckPage::load(pool, lot_id, form.errors.clone(), rows, Some(&form)).await?;
+        let page = LotDeckPage::load(
+            pool,
+            lot_id,
+            form.errors.clone(),
+            rows,
+            Some(&form),
+            snapshot_id,
+        )
+        .await?;
         return Ok(page.into_response());
     }
 
     let mut tx = begin_write(pool).await?;
-    let snapshot = snapshots::of_lot(&mut tx, lot_id).await?;
-    if snapshot.is_some() == first_time {
-        // someone else made the deck since the page was read
-        drop(tx);
-        form.errors
-            .push("This lot's deck changed meanwhile, try again.".into());
-        let rows = form.card_rows();
-        let page = LotDeckPage::load(pool, lot_id, form.errors.clone(), rows, Some(&form)).await?;
-        return Ok(page.into_response());
-    }
+    let snapshot = match snapshot_id {
+        Some(id) => Some(snapshots::lot_deck(&mut tx, lot_id, id).await?.or_404()?),
+        None => None,
+    };
 
     // the version holding the copies, built: made now, or the lot's still there
     let mut version_id: Option<i64> = None;

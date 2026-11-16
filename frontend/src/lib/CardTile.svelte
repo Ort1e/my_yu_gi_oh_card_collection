@@ -21,7 +21,11 @@
     $: ban = banStatus(card, rules);
     $: out = outOfFormat(card, rules);
     $: name = englishName(card) ? `${card.name} (${englishName(card)})` : card.name;
-    $: title = out ? `${name}: not in this format's card pool` : name;
+    $: title = out
+        ? `${name}: not in this format's card pool`
+        : card.for_sale
+          ? `${name}: this copy is flagged to sell`
+          : name;
 </script>
 
 <button
@@ -42,6 +46,7 @@
         <span class="no-image">{card.name}</span>
     {/if}
     {#if out}<span class="out-badge" aria-hidden="true">Out</span>{/if}
+    {#if card.for_sale}<span class="sale-badge" aria-hidden="true">⚠</span>{/if}
 </button>
 
 <style>
@@ -122,6 +127,20 @@
         background: #6c3483;
         color: white;
         font-size: 0.7rem;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    /* the copy in this slot is flagged "to sell" (bottom-right) */
+    .sale-badge {
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        padding: 0 3px;
+        border-radius: 4px;
+        background: #d68910;
+        color: white;
+        font-size: 0.75rem;
         pointer-events: none;
         z-index: 10;
     }

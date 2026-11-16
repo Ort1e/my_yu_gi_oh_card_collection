@@ -309,8 +309,12 @@ async fn the_lot_deck_first_time() {
 
     // the lot page and the snapshot page name each other
     let (_, page) = t.get(&format!("/lots/{lot}")).await;
-    assert!(page.contains("Deck received:") && page.contains("Received deck"));
-    assert!(!page.contains(">Add a deck<"), "{page}");
+    assert!(page.contains("Decks received:") && page.contains("Received deck"));
+    assert!(page.contains(">Add a deck<"), "{page}");
+    assert!(
+        page.contains(&format!("/lots/{lot}/deck/{snapshot}")),
+        "{page}"
+    );
     let (_, page) = t.get(&format!("/deck-snapshots/{snapshot}")).await;
     assert!(page.contains("Received in"), "{page}");
 }
@@ -319,10 +323,10 @@ async fn the_lot_deck_first_time() {
 async fn the_lot_deck_grows_with_more_cards() {
     let t = TestApp::new().await;
     let lot = lot_for_deck(&t).await;
-    let uri = format!("/lots/{lot}/deck");
-    t.post(&uri, DECK_ROWS).await;
+    t.post(&format!("/lots/{lot}/deck"), DECK_ROWS).await;
     let version = t.scalar("SELECT id FROM deck_version").await;
     let snapshot = t.scalar("SELECT id FROM deck_snapshot").await;
+    let uri = format!("/lots/{lot}/deck/{snapshot}");
 
     // a builder save in between doesn't touch the lot's list
     t.set_main(version, &[(Some(1), "Dark Magician", 1)]).await;
@@ -424,20 +428,101 @@ async fn the_lot_deck_refuses_what_it_cant_keep() {
     assert!(page.contains("unknown zone"), "{page}");
     assert_eq!(t.scalar("SELECT count(*) FROM deck").await, 0);
 
-    // one deck per lot: the form's deck fields are ignored the second time
     t.post(&uri, DECK_ROWS).await;
-    t.post(
-        &uri,
-        &[("deck_name", "Another"), ("cards-0-name", "Kuriboh")],
-    )
-    .await;
     assert_eq!(t.scalar("SELECT count(*) FROM deck").await, 1);
+    assert_eq!(t.get("/lots/999/deck").await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_lot_holds_several_decks() {
+    let t = TestApp::new().await;
+    let lot = lot_for_deck(&t).await;
+    let uri = format!("/lots/{lot}/deck");
+    let second: &[(&str, &str)] = &[
+        ("deck_name", "Second deck"),
+        ("cards-0-name", "Kuriboh"),
+        ("cards-0-quantity", "3"),
+    ];
+    assert_eq!(t.post(&uri, DECK_ROWS).await.0, StatusCode::SEE_OTHER);
+
+    // the second deck's form proposes the numbered name
+    let (_, page) = t.get(&uri).await;
+    assert!(page.contains("From lot 1 (2)"), "{page}");
+    assert_eq!(t.post(&uri, second).await.0, StatusCode::SEE_OTHER);
+    // ... and a form without a version name gets it too
+    assert_eq!(
+        t.text("SELECT version_name FROM deck_version WHERE deck_id = 2")
+            .await
+            .as_deref(),
+        Some("From lot 1 (2)")
+    );
+
+    assert_eq!(t.scalar("SELECT count(*) FROM deck").await, 2);
     assert_eq!(
         t.scalar("SELECT count(*) FROM deck_snapshot WHERE lot_id = 1")
             .await,
-        1
+        2
     );
-    assert_eq!(t.get("/lots/999/deck").await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM deck_version WHERE is_built = 1")
+            .await,
+        2
+    );
+    // each version holds only its own copies
+    let held = |deck: i64| {
+        format!(
+            "SELECT count(*) FROM deck_version_copy c
+             JOIN deck_version v ON v.id = c.deck_version_id
+             WHERE v.deck_id = {deck} AND c.card_id IS NOT NULL"
+        )
+    };
+    assert_eq!(t.scalar(&held(1)).await, 4);
+    assert_eq!(t.scalar(&held(2)).await, 3);
+
+    let (_, page) = t.get(&format!("/lots/{lot}")).await;
+    assert!(page.contains("Received deck") && page.contains("Second deck"));
+    assert!(page.contains(">Add a deck<"), "{page}");
+
+    // more cards go to the chosen one only
+    let snapshot = t
+        .scalar("SELECT id FROM deck_snapshot WHERE deck_id = 2")
+        .await;
+    let (status, _) = t
+        .post(
+            &format!("/lots/{lot}/deck/{snapshot}"),
+            &[("cards-0-name", "Kuriboh")],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(t.scalar(&held(1)).await, 4);
+    assert_eq!(t.scalar(&held(2)).await, 4);
+}
+
+#[tokio::test]
+async fn a_lot_deck_of_another_lot_is_not_found() {
+    let t = TestApp::new().await;
+    let lot = lot_for_deck(&t).await;
+    t.exec(
+        "INSERT INTO lot (id, lot_type, price, buy_date, seller_id, no_card_price)
+         VALUES (2, 'purchase', '5.00', '2025-06-13', 1, '0.00');",
+    )
+    .await;
+    t.post(&format!("/lots/{lot}/deck"), DECK_ROWS).await;
+    let snapshot = t.scalar("SELECT id FROM deck_snapshot").await;
+
+    for uri in [
+        format!("/lots/2/deck/{snapshot}"),
+        format!("/lots/{lot}/deck/999"),
+    ] {
+        assert_eq!(t.get(&uri).await.0, StatusCode::NOT_FOUND, "{uri}");
+        let (status, _) = t.post(&uri, &[("cards-0-name", "Kuriboh")]).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{uri}");
+    }
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM unite WHERE lot_id = 2")
+            .await,
+        0
+    );
 }
 
 #[tokio::test]
@@ -447,5 +532,8 @@ async fn the_lot_deck_needs_a_login() {
     let uri = format!("/lots/{lot}/deck");
     assert_eq!(t.get(&uri).await.0, StatusCode::SEE_OTHER);
     assert_eq!(t.post(&uri, DECK_ROWS).await.0, StatusCode::SEE_OTHER);
+    let more = format!("{uri}/1");
+    assert_eq!(t.get(&more).await.0, StatusCode::SEE_OTHER);
+    assert_eq!(t.post(&more, DECK_ROWS).await.0, StatusCode::SEE_OTHER);
     assert_eq!(t.scalar("SELECT count(*) FROM deck").await, 0);
 }
