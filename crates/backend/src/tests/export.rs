@@ -44,8 +44,8 @@ async fn the_public_copy_holds_nothing_private() {
                      'Seadra', 'Common', 'Pokemon', 'normal', '{}', date('now'));
          INSERT INTO pokemon_copy (card_id, language, variant, condition, source, price, note, added_on)
              VALUES (1, 'fr', 'holo', 'NM', 'single', '44.44', 'secret note', '2025-06-01');
-         INSERT INTO pokemon_wish (card_id, max_price, priority, note, added_on)
-             VALUES (2, '33.33', 1, 'wish note', '2025-06-01');
+         INSERT INTO pokemon_wish (wishlist_id, card_id, max_price, priority, note, added_on)
+             VALUES (1, 2, '33.33', 1, 'wish note', '2025-06-01');
          INSERT INTO book (id, isbn, title, notes, added_on)
              VALUES (1, '9780553573398', 'Assassin''s Apprentice', 'book note', '2025-06-01');
          -- a private book, its own author and series
@@ -90,6 +90,7 @@ async fn the_public_copy_holds_nothing_private() {
         "pokemon.html",
         "pokemon-1.html",
         "pokemon-wishlist.html",
+        "pokemon-wishlists-1.html",
         "books.html",
         "books-1.html",
         "books-random.html",

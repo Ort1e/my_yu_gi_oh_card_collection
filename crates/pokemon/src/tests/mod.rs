@@ -3,6 +3,7 @@
 
 mod boosters;
 mod pokemon;
+mod wishlists;
 
 use std::ops::Deref;
 
@@ -28,5 +29,10 @@ impl TestApp {
     /// `password`: enable the login with this password.
     pub(crate) async fn with_password(password: Option<&str>) -> TestApp {
         TestApp(common::testing::TestApp::new(crate::app, password).await)
+    }
+
+    /// With these users and settings.
+    pub(crate) async fn with_config(config: common::web::auth::AuthConfig) -> TestApp {
+        TestApp(common::testing::TestApp::with_config(crate::app, config).await)
     }
 }

@@ -75,7 +75,7 @@ pub async fn refresh(
     let wanted: Vec<(i64, String, String)> = sqlx::query_as(
         "SELECT c.id, c.catalogue, c.tcgdex_id FROM pokemon_card c
          WHERE (EXISTS (SELECT 1 FROM pokemon_copy WHERE card_id = c.id AND sold_on IS NULL)
-                OR EXISTS (SELECT 1 FROM pokemon_wish WHERE card_id = c.id AND got_copy_id IS NULL))
+                OR EXISTS (SELECT 1 FROM pokemon_wish WHERE card_id = c.id AND got_on IS NULL))
            AND NOT EXISTS (SELECT 1 FROM pokemon_price WHERE card_id = c.id AND date = ?)
          ORDER BY c.id",
     )

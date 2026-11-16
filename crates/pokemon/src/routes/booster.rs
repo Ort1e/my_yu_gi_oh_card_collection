@@ -35,6 +35,7 @@ use crate::store::cards::{self, CopyFields};
 use crate::store::openings::{self, Opening};
 use crate::store::sets::{self, SetInfo};
 use common::db::{begin_write, today};
+use common::web::auth::CurrentUser;
 use common::web::error::{AppError, AppResult};
 use common::web::forms::{FormData, Pairs};
 use common::AppState;
@@ -601,11 +602,15 @@ async fn save(
 }
 
 /// For the opening's page: the copies just added and their wishes.
-pub async fn added_copies(state: &AppState, added: Option<&str>) -> AppResult<Vec<Added>> {
+pub async fn added_copies(
+    state: &AppState,
+    added: Option<&str>,
+    user: Option<&CurrentUser>,
+) -> AppResult<Vec<Added>> {
     let ids: Vec<i64> = added
         .unwrap_or("")
         .split(',')
         .filter_map(|id| id.parse().ok())
         .collect();
-    super::form::added(&state.pool, &ids).await
+    super::form::added(&state.pool, &ids, user).await
 }

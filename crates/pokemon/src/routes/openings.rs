@@ -17,6 +17,7 @@ use super::{money, CopyRow};
 use crate::store::openings::{self, Opening};
 use crate::store::{prices, sets};
 use common::db::begin_write;
+use common::web::auth::CurrentUser;
 use common::web::error::{AppError, AppResult, OrNotFound};
 use common::web::filters;
 use common::web::forms::{FormData, Pairs};
@@ -114,6 +115,7 @@ pub struct OpeningParams {
 /// `/pokemon/openings/:id`.
 pub async fn detail(
     State(state): State<AppState>,
+    user: Option<CurrentUser>,
     Path(id): Path<i64>,
     Query(params): Query<OpeningParams>,
 ) -> AppResult<OpeningPage> {
@@ -125,7 +127,7 @@ pub async fn detail(
         .sum::<Decimal>()
         .round_dp(2);
     Ok(OpeningPage {
-        added: super::booster::added_copies(&state, params.added.as_deref()).await?,
+        added: super::booster::added_copies(&state, params.added.as_deref(), user.as_ref()).await?,
         opening,
         copies,
         value,

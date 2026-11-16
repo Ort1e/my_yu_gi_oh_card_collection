@@ -7,7 +7,7 @@
 </div>
 {% for item in added %}
 {% for (wish_id, copy_id) in item.wishes %}
-<form method="post" action="/pokemon/wishlist/{{ wish_id }}/got" class="wish-got">
+<form method="post" action="/pokemon/wishes/{{ wish_id }}/got" class="wish-got">
   <input type="hidden" name="copy_id" value="{{ copy_id }}">
   <input type="hidden" name="back" value="/pokemon/{{ copy_id }}">
   ★ <strong>{{ item.copy.name() }}</strong> was on your wishlist.

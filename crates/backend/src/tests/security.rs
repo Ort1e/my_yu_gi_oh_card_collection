@@ -205,7 +205,7 @@ async fn the_friend_sees_everything_and_changes_the_books_only() {
         "/lots/add",
         "/advent-calendar/add",
         "/pokemon/add",
-        "/pokemon/wishlist/add",
+        "/pokemon/wishlists/1/add",
     ] {
         let (status, body) = send_with(&t, Request::get(page), "", &friend).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{page}");

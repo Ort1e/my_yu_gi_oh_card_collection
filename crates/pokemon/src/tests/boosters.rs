@@ -33,8 +33,8 @@ async fn fixture(t: &TestApp) {
     sqlx::query(&format!(
         "INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
              name_en, category, variants, json, fetched_at) VALUES {};
-         INSERT INTO pokemon_wish (card_id, priority, added_on)
-             SELECT id, 2, date('now') FROM pokemon_card;",
+         INSERT INTO pokemon_wish (wishlist_id, card_id, priority, added_on)
+             SELECT 1, id, 2, date('now') FROM pokemon_card;",
         cards.join(", ")
     ))
     .execute(&t.state.pool)
@@ -87,7 +87,7 @@ async fn refresh(t: &TestApp) -> Report {
 async fn the_wishlist_suggests_boosters() {
     let t = TestApp::new().await;
     fixture(&t).await;
-    let (_, page) = t.get("/pokemon/wishlist").await;
+    let (_, page) = t.get("/pokemon/wishlists/1").await;
     assert!(
         !page.contains("<h2>Boosters to open</h2>"),
         "nothing refreshed yet"
@@ -104,7 +104,7 @@ async fn the_wishlist_suggests_boosters() {
         }
     );
 
-    let (status, page) = t.get("/pokemon/wishlist").await;
+    let (status, page) = t.get("/pokemon/wishlists/1").await;
     assert_eq!(status, StatusCode::OK);
     let section = &page[page.find("Boosters to open").unwrap()..page.find("Cheapest").unwrap()];
     // the card come since counts for its set's booster; the promo for none

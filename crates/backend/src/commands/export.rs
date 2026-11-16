@@ -34,13 +34,14 @@ const START: [&str; 14] = [
 /// deck version's, a deck's saved list, a tournament's, a copy's, a book's, an author's, a
 /// series' page, the books' covers, and the card pictures (ygoprodeck's, the printings' own).
 fn public(path: &str) -> bool {
-    const NUMBERED: [&str; 9] = [
+    const NUMBERED: [&str; 10] = [
         "/cards/",
         "/decks/",
         "/deck-versions/",
         "/deck-snapshots/",
         "/tournaments/",
         "/pokemon/",
+        "/pokemon/wishlists/",
         "/books/",
         "/books/authors/",
         "/books/series/",

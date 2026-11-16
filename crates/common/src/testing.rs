@@ -96,6 +96,74 @@ impl TestApp {
         read(response).await
     }
 
+    /// Log in (`name`, `password`): the session cookie (`session=…`) for
+    /// `get_as` and `post_as`.
+    pub async fn login(&self, name: &str, password: &str) -> String {
+        let body = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs([("name", name), ("password", password), ("next", "/")])
+            .finish();
+        let response = self
+            .router()
+            .oneshot(
+                Request::post("/login")
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let cookie = response
+            .headers()
+            .get(header::SET_COOKIE)
+            .unwrap_or_else(|| panic!("{name} could not log in: {}", response.status()));
+        cookie
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string()
+    }
+
+    /// GET with a session cookie (from `login`).
+    pub async fn get_as(&self, cookie: &str, uri: &str) -> (StatusCode, String) {
+        let response = self
+            .router()
+            .oneshot(
+                Request::get(uri)
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        read(response).await
+    }
+
+    /// POST an urlencoded form with a session cookie (from `login`).
+    pub async fn post_as(
+        &self,
+        cookie: &str,
+        uri: &str,
+        form: &[(&str, &str)],
+    ) -> (StatusCode, String) {
+        let body = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(form)
+            .finish();
+        let response = self
+            .router()
+            .oneshot(
+                Request::post(uri)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header(header::COOKIE, cookie)
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        read(response).await
+    }
+
     /// A JSON request; returns (status, the JSON answer or null).
     pub async fn json(
         &self,
