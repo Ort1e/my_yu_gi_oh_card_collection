@@ -8,7 +8,7 @@ use common::web::auth::{AuthConfig, SeedUser, MAX_FAILURES};
 
 /// The deployed settings: the admin and a friend who changes the books
 /// only, everything private, HTTPS.
-fn deployed() -> AuthConfig {
+pub(super) fn deployed() -> AuthConfig {
     let mut admin = AuthConfig::password(Some("owner-pw")).users;
     admin.push(SeedUser::books("friend", "friend-pw"));
     AuthConfig {
@@ -20,7 +20,7 @@ fn deployed() -> AuthConfig {
 
 /// Log in as the user whose password this is (`owner-pw`: `admin`,
 /// `friend-pw`: `friend`): the answer's status and its session cookie.
-async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
+pub(super) async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
     let name = match password {
         "friend-pw" => "friend",
         _ => "admin",
@@ -45,7 +45,7 @@ async fn login(t: &TestApp, password: &str) -> (StatusCode, Option<String>) {
 }
 
 /// Send `request` with the session `cookie`: (status, Location or body).
-async fn send_with(
+pub(super) async fn send_with(
     t: &TestApp,
     request: axum::http::request::Builder,
     body: &str,
@@ -65,7 +65,7 @@ async fn send_with(
     read(response).await
 }
 
-async fn get_with(t: &TestApp, uri: &str, cookie: &str) -> StatusCode {
+pub(super) async fn get_with(t: &TestApp, uri: &str, cookie: &str) -> StatusCode {
     let cookie = cookie.split(';').next().unwrap();
     t.router()
         .oneshot(
