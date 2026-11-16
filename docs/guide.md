@@ -41,6 +41,18 @@ the name, rarity, condition, printing picture (the edit page asks Yugipedia
 for the gallery) and the Cardmarket product. Cards are never deleted, only
 marked sold.
 
+**Selling.** A copy you mean to sell is flagged 🏷 **To sell**: with the switch
+on its page, or by ticking rows on its lot's page ("Mark to sell"); `/cards?for_sale=1`
+filters them. **Collection → To sell** lists them (name, code, rarity, condition,
+trend price, the built deck holding it) and, for Cardmarket's bulk sell (set first,
+then its cards), one folded section per set with a row per card, rarity, language
+and condition. A flagged copy still counts as owned; a deck takes it only when no
+other free copy exists (the builder shows a ⚠ on it). The sale itself is recorded
+by adding its **Cardmarket shipment as a lot** (Lots → Add, type sale): each line
+takes a matching flagged copy (same code and rarity, the same condition first) instead
+of making a new card; the copy keeps its purchase, becomes sold, and its slot in a
+built deck is emptied. A line with no flagged copy makes a new card as before.
+
 **A card showing the wrong art** (an Extended Art, a French card shown in
 English): open its edit page, "Picture". The pictures of its printing come
 from Yugipedia (looked up when the card was added; otherwise "Look on

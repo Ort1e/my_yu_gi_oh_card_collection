@@ -6,6 +6,7 @@ use serde::Deserialize;
 use sqlx::{QueryBuilder, Sqlite};
 
 use crate::routes::cards::like_pattern;
+use crate::store::cards::SOLD_EXISTS;
 use crate::store::db::Money;
 use crate::store::models::{other_name, LotRow};
 use crate::store::valuation::{estimate, fill_lot_estimates, MARKET_PRICE};
@@ -126,6 +127,8 @@ pub struct UniteRow {
     price: Option<Money>,
     status: Option<String>,
     market_price: Option<Money>,
+    /// Flagged "to sell" and not sold yet.
+    for_sale: bool,
 }
 
 impl UniteRow {
@@ -150,6 +153,10 @@ impl UniteRow {
 pub struct CopyGroup {
     /// The first copy, linked from the row.
     card_id: i64,
+    /// Every copy of the row (the lot page's checkbox).
+    card_ids: Vec<i64>,
+    /// The row's copies are flagged "to sell" (the rows never mix).
+    for_sale: bool,
     count: usize,
     card_name: String,
     english_name: Option<String>,
@@ -177,14 +184,18 @@ impl CopyGroup {
                     && g.status == status
                     && g.price == unite.price
                     && g.estimate == estimate
+                    && g.for_sale == unite.for_sale
             });
             if let Some(group) = same {
                 group.count += 1;
+                group.card_ids.push(unite.card_id);
                 continue;
             }
 
             groups.push(CopyGroup {
                 card_id: unite.card_id,
+                card_ids: vec![unite.card_id],
+                for_sale: unite.for_sale,
                 count: 1,
                 card_name: unite.card_name.clone(),
                 english_name: unite.english_name().map(str::to_string),
@@ -199,6 +210,15 @@ impl CopyGroup {
             });
         }
         groups
+    }
+
+    /// The ids of its copies, comma-separated (a checkbox's value).
+    fn ids(&self) -> String {
+        self.card_ids
+            .iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
     }
 
     /// The rank of its rarity in `Rarity::ALL` (most common first), to sort by.
@@ -236,6 +256,13 @@ pub struct LotDetail {
     lot_deck: Option<form::LotDeck>,
 }
 
+impl LotDetail {
+    /// Copies of a purchase lot can be flagged "to sell" (private page only).
+    fn can_flag(&self) -> bool {
+        self.lot.lot_type == "purchase" && !common::export::public_copy()
+    }
+}
+
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
     let pool = &state.pool;
     let shown = if common::export::public_copy() {
@@ -254,7 +281,8 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         "SELECT unite.card_id, card.name AS card_name,
                 json_extract(card_data.json_data, '$.name') AS name_en,
                 card.code, card.rarity, unite.price, card.last_known_status AS status,
-                {MARKET_PRICE} AS market_price
+                {MARKET_PRICE} AS market_price,
+                (card.for_sale = 1 AND NOT {SOLD_EXISTS}) AS for_sale
          FROM unite JOIN card ON card.id = unite.card_id
          LEFT JOIN card_data ON card_data.id = card.card_data_id
          WHERE unite.lot_id = ? ORDER BY unite.id"

@@ -44,6 +44,7 @@ pub fn router() -> Router<AppState> {
         .route("/", get(dashboard::index))
         .route("/budget", get(budget::overview))
         .route("/cards", get(cards::list))
+        .route("/cards/to-sell", get(cards::for_sale::page))
         .route("/cards/:id", get(cards::detail))
         .route("/collection/value", get(collection::page))
         .route("/collection/stats", get(collection::stats::page))
@@ -150,6 +151,8 @@ pub fn write_router() -> Router<AppState> {
             "/lots/:id/edit",
             get(lots::form::edit_page).post(lots::form::update),
         )
+        .route("/cards/:id/for-sale", post(cards::for_sale::set_one))
+        .route("/lots/:id/for-sale", post(cards::for_sale::set_many))
         .route(
             "/cards/:id/edit",
             get(cards::form::page).post(cards::form::update),

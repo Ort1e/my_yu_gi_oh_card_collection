@@ -63,6 +63,9 @@ pub struct Copy {
     pub status: Option<CardStatus>,
     /// Sold (a `sold_card` row): no longer in the collection.
     pub sold: bool,
+    /// Flagged "to sell" (`card.for_sale`): still owned, but a built deck
+    /// takes it only when no other free copy exists ([`take_order`]).
+    pub for_sale: bool,
 }
 
 /// How many copies of one card a list can count on.
@@ -115,6 +118,16 @@ pub fn condition_rank(status: Option<CardStatus>) -> u8 {
         Some(CardStatus::Good) => 3,
         Some(CardStatus::Poor) => 4,
     }
+}
+
+/// The sort key of a free copy a deck takes: the smallest is taken first.
+/// (To be written by the owner: a copy flagged "to sell" comes after all the
+/// others, then [`condition_rank`], then the lowest id. Used by
+/// [`crate::built_deck::plan_build`], which `store::lists::assign_copies`
+/// goes through for its free copies.)
+pub fn take_order(copy: &Copy) -> (bool, u8, CopyId) {
+    let _ = copy;
+    todo!("flagged copies last, then condition_rank, then id")
 }
 
 /// A line short of copies: `count` more are needed.
@@ -188,6 +201,23 @@ fn take(lines: &[Line], pool: &mut HashMap<CardDataId, usize>) -> Vec<MissingLin
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_to_sell_copy_comes_last() {
+        let mut flagged = copy(1, ASH, Some(CardStatus::Mint), false);
+        flagged.for_sale = true;
+        let plain = copy(2, ASH, Some(CardStatus::Poor), false);
+        assert!(take_order(&plain) < take_order(&flagged));
+    }
+
+    #[test]
+    fn take_order_is_condition_then_id() {
+        let mint = copy(9, ASH, Some(CardStatus::Mint), false);
+        let good = copy(1, ASH, Some(CardStatus::Good), false);
+        let old_mint = copy(3, ASH, Some(CardStatus::Mint), false);
+        assert!(take_order(&mint) < take_order(&good));
+        assert!(take_order(&old_mint) < take_order(&mint));
+    }
+
     const ASH: CardDataId = 10;
     const NIBIRU: CardDataId = 20;
 
@@ -197,6 +227,7 @@ mod tests {
             card_data_id,
             status,
             sold,
+            for_sale: false,
         }
     }
 

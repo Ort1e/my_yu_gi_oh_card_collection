@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Copies to sell{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/card.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>Copies to sell ({{ copies.len() }})</h1>
+
+<p class="hint">Flag a copy from its page (🏷 To sell) or from a lot's page. A flagged copy still counts as owned;
+  a deck takes it only when no other free copy exists. They are sold when you add the sale's
+  Cardmarket shipment as a lot: its lines take these copies.</p>
+
+{% if copies.is_empty() %}
+<p>No copy is flagged to sell. <a href="/cards?for_sale=1">Filter the cards</a> or flag some from a lot's page.</p>
+{% else %}
+<div class="table-scroll">
+<table class="numbers sortable" id="to-sell">
+  <thead>
+    <tr>
+      <th data-sort="text">Card</th>
+      <th class="text phone-hide" data-sort="text">Code</th>
+      <th class="text phone-hide" data-sort="text">Rarity</th>
+      <th class="text" data-sort="text">Condition</th>
+      <th data-sort="number" title="Cardmarket's trend price of the card">Trend (€)</th>
+      <th class="text phone-hide" data-sort="text">Built in</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in copies %}
+    <tr>
+      <td><a href="/cards/{{ c.id }}">{{ c.name }}</a>{% if c.english_name() != c.name %}<div class="english-name">{{ c.english_name() }}</div>{% endif %}</td>
+      <td class="text phone-hide">{{ c.code.as_deref().unwrap_or("—") }}</td>
+      <td class="text phone-hide">{{ c.rarity.as_deref().unwrap_or("—") }}</td>
+      <td class="text" title="{{ c.status_label() }}">{{ c.status.as_deref().unwrap_or("—") }}</td>
+      <td>{% match c.market_price %}{% when Some with (p) %}{{ p }}{% when None %}—{% endmatch %}</td>
+      <td class="text phone-hide">{% match c.deck_id %}{% when Some with (deck) %}<a href="/decks/{{ deck }}">{{ c.deck_name.as_deref().unwrap_or("") }}</a> {{ c.version_name.as_deref().unwrap_or("") }}{% when None %}—{% endmatch %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="total-row"><td>Total</td><td class="phone-hide" colspan="3"></td><td>{{ self.total_trend() }}</td><td class="phone-hide"></td></tr>
+  </tfoot>
+</table>
+</div>
+
+<h2>The Cardmarket list</h2>
+<p class="hint">Cardmarket's bulk sell asks for the set, then you pick its cards: one section per set, one row per
+  card, rarity, language and condition.</p>
+{% for set in sets %}
+<details class="card-set">
+  <summary>{{ set.name }} <span class="tag-count">{{ set.copies }}</span></summary>
+  <div class="table-scroll">
+  <table class="numbers">
+    <thead>
+      <tr><th class="text">Card</th><th class="text">Number</th><th class="text">Rarity</th><th class="text">Language</th><th class="text">Condition</th><th>Count</th></tr>
+    </thead>
+    <tbody>
+      {% for r in set.rows %}
+      <tr>
+        <td>{{ r.name }}</td>
+        <td class="text">{{ r.number }}</td>
+        <td class="text">{{ r.rarity }}</td>
+        <td class="text">{{ r.language }}</td>
+        <td class="text" title="{{ r.status_label }}">{{ r.status }}</td>
+        <td>{{ r.count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% endfor %}
+
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tables.js"></script>
+{% endblock %}

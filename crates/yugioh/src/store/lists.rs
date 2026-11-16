@@ -127,19 +127,21 @@ pub async fn owned_copies(
         return Ok(by_card);
     }
     let mut qb = QueryBuilder::new(format!(
-        "SELECT card.id, card.card_data_id, card.last_known_status, {SOLD_EXISTS} AS sold
+        "SELECT card.id, card.card_data_id, card.last_known_status, {SOLD_EXISTS} AS sold,
+                card.for_sale
          FROM card WHERE card.card_data_id IN "
     ));
     push_ids(&mut qb, ids);
     qb.push(" ORDER BY card.id");
-    let rows: Vec<(i64, i64, Option<String>, bool)> =
+    let rows: Vec<(i64, i64, Option<String>, bool, bool)> =
         qb.build_query_as().fetch_all(&mut *conn).await?;
-    for (id, card_data_id, status, sold) in rows {
+    for (id, card_data_id, status, sold, for_sale) in rows {
         by_card.entry(card_data_id).or_default().push(Copy {
             id,
             card_data_id,
             status: status.as_deref().and_then(CardStatus::from_code),
             sold,
+            for_sale,
         });
     }
     Ok(by_card)

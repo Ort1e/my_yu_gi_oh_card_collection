@@ -59,10 +59,12 @@
   {% for r in rarities %}<button type="button" class="btn-small btn-secondary" data-filter-for="lot-cards" data-filter-tag="{{ r.rarity }}">{{ r.rarity }} <span class="tag-count">{{ r.count }}</span></button>{% endfor %}
 </div>
 {% endif %}
+{% if self.can_flag() %}<form method="post" action="/lots/{{ lot.id }}/for-sale">{% endif %}
 <div class="table-scroll">
 <table class="numbers sortable" id="lot-cards">
   <thead>
     <tr>
+      {% if self.can_flag() %}<th title="Tick the copies to flag or unflag as to sell"></th>{% endif %}
       <th data-sort="text">Card</th>
       <th class="text phone-hide" data-sort="text">Code</th>
       <th class="text phone-hide" data-sort="number">Rarity</th>
@@ -75,8 +77,9 @@
   <tbody>
     {% for g in groups %}
     <tr data-code="{{ g.code }}" data-tag="{{ g.rarity.as_deref().unwrap_or("") }}">
+      {% if self.can_flag() %}<td><input type="checkbox" name="group" value="{{ g.ids() }}" aria-label="Select {{ g.card_name }}"></td>{% endif %}
       <td>
-        <a href="/cards/{{ g.card_id }}">{{ g.card_name }}</a>
+        <a href="/cards/{{ g.card_id }}">{{ g.card_name }}</a>{% if g.for_sale && !common::export::public_copy() %} <span class="tag">🏷 To sell</span>{% endif %}
         {% match g.english_name %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
         <div class="cell-note phone-only">{{ g.code }}{% match g.rarity %}{% when Some with (rarity) %} · {{ rarity }}{% when None %}{% endmatch %}{% if !g.status.is_empty() %} · {{ g.status }}{% endif %}</div>
       </td>
@@ -91,6 +94,7 @@
   </tbody>
   <tfoot>
     <tr class="total-row">
+      {% if self.can_flag() %}<td></td>{% endif %}
       <td>Total</td>
       <td class="phone-hide" colspan="3"></td>
       <td>{{ copies }}</td>
@@ -100,6 +104,13 @@
   </tfoot>
 </table>
 </div>
+{% if self.can_flag() %}
+<div class="button-row">
+  <button type="submit" name="action" value="mark" class="btn">🏷 Mark to sell</button>
+  <button type="submit" name="action" value="unmark" class="btn btn-secondary">Unmark</button>
+</div>
+</form>
+{% endif %}
 {% endif %}
 
 </div>

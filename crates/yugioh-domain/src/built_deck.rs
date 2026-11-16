@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::ownership::{condition_rank, CardDataId, Copy, CopyId, Line, LineRef};
+use crate::ownership::{take_order, CardDataId, Copy, CopyId, Line, LineRef};
 
 /// What building a list does: which free copy fills which line, and how
 /// many each line still lacks. Other versions are never touched.
@@ -30,7 +30,8 @@ pub struct BuildPlan {
 ///   built version), in any order.
 ///
 /// Each line takes up to its count of its card's free copies, best first
-/// (`ownership::condition_rank`, then the lowest id); lines of the same card
+/// (`ownership::take_order`: the copies flagged "to sell" last, then the best
+/// condition, then the lowest id); lines of the same card
 /// share them in the order of `lines`; a name-only line gets none.
 /// Deterministic: the same input gives the same plan.
 pub fn plan_build(lines: &[Line], free: &HashMap<CardDataId, Vec<Copy>>) -> BuildPlan {
@@ -40,7 +41,7 @@ pub fn plan_build(lines: &[Line], free: &HashMap<CardDataId, Vec<Copy>>) -> Buil
         .iter()
         .map(|(card_data_id, copies)| {
             let mut copies: Vec<&Copy> = copies.iter().collect();
-            copies.sort_by_key(|c| (condition_rank(c.status), c.id));
+            copies.sort_by_key(|c| take_order(c));
             (*card_data_id, copies.into_iter().map(|c| c.id).collect())
         })
         .collect();
@@ -87,6 +88,7 @@ mod tests {
             card_data_id: ASH,
             status,
             sold: false,
+            for_sale: false,
         }
     }
 
@@ -97,6 +99,29 @@ mod tests {
         let plan = plan_build(&lines, &free);
         let at = lines[0].line_ref();
         assert_eq!(plan.assigned, vec![(at, 1), (at, 2)]);
+        assert_eq!(plan.missing, vec![]);
+    }
+
+    #[test]
+    fn a_to_sell_copy_is_taken_last() {
+        let lines = [line(DeckZone::Main, 0, Some(ASH), 2)];
+        let mut flagged = copy(1, Some(CardStatus::Mint));
+        flagged.for_sale = true;
+        let free = HashMap::from([(ASH, vec![flagged, copy(2, None), copy(3, None)])]);
+        let plan = plan_build(&lines, &free);
+        let at = lines[0].line_ref();
+        assert_eq!(plan.assigned, vec![(at, 2), (at, 3)]);
+    }
+
+    #[test]
+    fn a_to_sell_copy_is_taken_when_it_is_the_only_one() {
+        let lines = [line(DeckZone::Main, 0, Some(ASH), 2)];
+        let mut flagged = copy(1, None);
+        flagged.for_sale = true;
+        let free = HashMap::from([(ASH, vec![flagged, copy(2, None)])]);
+        let plan = plan_build(&lines, &free);
+        let at = lines[0].line_ref();
+        assert_eq!(plan.assigned, vec![(at, 2), (at, 1)]);
         assert_eq!(plan.missing, vec![]);
     }
 

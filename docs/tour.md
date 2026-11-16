@@ -590,6 +590,12 @@ of the snapshots. Whether a line is owned is worked out from the collection
 version) or *elsewhere*; the rest are *free*. A list's tiles of a card beyond
 `free + here`, in zone order, are **missing** (`ownership::missing`); the
 builder works the same rule out again as you edit (`deck.ts` `markMissing`).
+A copy flagged "to sell" (`card.for_sale`, 0032) stays owned, but
+`ownership::take_order` sorts it after the others when a build or
+`assign_copies` takes free copies, and `ApiCard.for_sale` lets the builder
+show a ⚠. A sale lot's lines take matching flagged copies
+(`store::cards::insert_lot_cards`: same card row, a second `unite`, flag
+cleared, built slot emptied); there is no other way to sell them.
 There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
 (a migration will drop it).
 

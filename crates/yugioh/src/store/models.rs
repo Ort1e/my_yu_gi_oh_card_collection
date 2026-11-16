@@ -38,6 +38,8 @@ pub struct CardRow {
     pub market_price: Option<Money>,
     /// In a sale lot (`cards::SOLD_EXISTS`).
     pub is_sold: bool,
+    /// Flagged "to sell" (`card.for_sale`); private: never shown in the public copy.
+    pub for_sale: bool,
 }
 
 impl CardRow {
@@ -48,8 +50,14 @@ impl CardRow {
              card.card_data_id, card.picture AS picture_file, \
              (SELECT json_extract(card_data.json_data, '$.name') FROM card_data \
               WHERE card_data.id = card.card_data_id) AS name_en, \
-             {MARKET_PRICE} AS market_price, {SOLD_EXISTS} AS is_sold"
+             {MARKET_PRICE} AS market_price, {SOLD_EXISTS} AS is_sold, \
+             card.for_sale"
         )
+    }
+
+    /// The 🏷 "to sell" badge: in the app only.
+    pub fn shows_for_sale(&self) -> bool {
+        self.for_sale && !common::export::public_copy()
     }
 
     /// Its picture's address ([`picture_url`]).
@@ -62,6 +70,9 @@ impl CardRow {
         let mut tags = Vec::new();
         if self.is_sold {
             tags.push("Sold".to_string());
+        }
+        if self.shows_for_sale() {
+            tags.push("🏷 To sell".to_string());
         }
         CardTile {
             href: format!("/cards/{}", self.id),

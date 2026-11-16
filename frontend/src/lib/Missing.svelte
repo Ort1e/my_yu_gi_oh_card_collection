@@ -27,6 +27,8 @@
     $: missingCount = lines.reduce((sum, l) => sum + l.count, 0);
     // a built version's slots without a copy though one is free
     $: takeable = isBuilt && ZONES.some((z) => zones[z].some((c) => !c.missing && !c.copy));
+    // slots holding a copy flagged "to sell" (no other free copy was left)
+    $: toSell = ZONES.reduce((sum, z) => sum + zones[z].filter((c) => c.for_sale).length, 0);
     $: unpriced = lines.filter((l) => l.cost == null).reduce((sum, l) => sum + l.count, 0);
     $: cost = lines.reduce((sum, l) => sum + (l.cost ?? 0), 0);
 
@@ -69,6 +71,13 @@
                 {/each}
             </tbody>
         </table>
+    {/if}
+
+    {#if toSell > 0}
+        <p class="warning">
+            ⚠ {toSell} cop{toSell === 1 ? 'y' : 'ies'} of this deck {toSell === 1 ? 'is' : 'are'} flagged to sell: no other free copy
+            was left. Selling {toSell === 1 ? 'it' : 'them'} would leave the slot{toSell === 1 ? '' : 's'} missing.
+        </p>
     {/if}
 
     {#if takeable}
@@ -127,6 +136,10 @@
 </div>
 
 <style>
+    .warning {
+        color: #d68910;
+    }
+
     .missing {
         color: var(--text-light);
     }
