@@ -6,7 +6,7 @@
 //! - [`availability`]: one card's copies seen from one list;
 //! - [`missing`] and [`missing_for_all`]: what one list, or several sharing
 //!   the same copies (the shopping list), lack;
-//! - [`condition_rank`]: which copies a built deck takes first
+//! - [`condition_rank`] and [`take_order`]: which copies a built deck takes first
 //!   (`built_deck::plan_build`).
 //!
 //! Written by Claude on the owner's request (2026-11-09), like `format` and
@@ -121,13 +121,14 @@ pub fn condition_rank(status: Option<CardStatus>) -> u8 {
 }
 
 /// The sort key of a free copy a deck takes: the smallest is taken first.
-/// (To be written by the owner: a copy flagged "to sell" comes after all the
-/// others, then [`condition_rank`], then the lowest id. Used by
+/// A copy flagged "to sell" comes after all the others (`false < true`),
+/// then [`condition_rank`], then the lowest id. Used by
 /// [`crate::built_deck::plan_build`], which `store::lists::assign_copies`
-/// goes through for its free copies.)
+/// goes through for its free copies.
+///
+/// Written by Claude on the owner's request (2026-11-16).
 pub fn take_order(copy: &Copy) -> (bool, u8, CopyId) {
-    let _ = copy;
-    todo!("flagged copies last, then condition_rank, then id")
+    (copy.for_sale, condition_rank(copy.status), copy.id)
 }
 
 /// A line short of copies: `count` more are needed.
@@ -216,6 +217,26 @@ mod tests {
         let old_mint = copy(3, ASH, Some(CardStatus::Mint), false);
         assert!(take_order(&mint) < take_order(&good));
         assert!(take_order(&old_mint) < take_order(&mint));
+    }
+
+    #[test]
+    fn take_order_sorts_a_mixed_pile() {
+        use CardStatus::{Good, Mint, Poor};
+        let mut copies = [
+            copy(1, ASH, Some(Poor), false),
+            copy(2, ASH, Some(Mint), false),
+            copy(3, ASH, None, false),
+            copy(4, ASH, Some(Good), false),
+            copy(5, ASH, Some(Mint), false),
+            copy(6, ASH, None, false),
+        ];
+        copies[1].for_sale = true; // Mint, but to sell
+        copies[5].for_sale = true; // unknown, to sell
+        copies.sort_by_key(take_order);
+        let ids: Vec<CopyId> = copies.iter().map(|c| c.id).collect();
+        // kept copies by condition (Mint, unknown, Good, Poor), then the
+        // flagged ones, by condition among themselves
+        assert_eq!(ids, vec![5, 3, 4, 1, 2, 6]);
     }
 
     const ASH: CardDataId = 10;

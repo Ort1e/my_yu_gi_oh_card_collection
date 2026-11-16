@@ -181,7 +181,6 @@ async fn a_sale_lot_takes_the_flagged_copies() {
     assert_eq!(t.scalar("SELECT count(*) FROM card").await, 3);
 }
 
-/// Needs `ownership::take_order` (the owner's function) to be written.
 #[tokio::test]
 async fn building_takes_the_flagged_copy_last() {
     let t = TestApp::new().await;
