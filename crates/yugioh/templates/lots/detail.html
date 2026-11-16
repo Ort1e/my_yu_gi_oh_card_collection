@@ -9,7 +9,8 @@
 {% block content %}
 <div class="inside-container">
 <h1>{{ lot.title() }}</h1>
-<div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a> <a href="/lots/{{ lot.id }}/add-cards" class="btn">Add cards</a></div>
+<div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a> <a href="/lots/{{ lot.id }}/add-cards" class="btn">Add cards</a>
+  {% if !common::export::public_copy() %}{% if lot_deck.is_none() %}<a href="/lots/{{ lot.id }}/deck" class="btn">Add a deck</a>{% endif %}{% endif %}</div>
 
 <div class="card wide-card">
   <div class="card-meta-line">
@@ -30,6 +31,11 @@
     {% match calendar_year %}{% when Some with (year) %}
     <div><strong>Advent calendar:</strong> <a href="/advent-calendar/{{ year }}">{{ year }}</a> (<a href="/advent-calendar/{{ year }}/edit">fill its days</a>)</div>
     {% when None %}{% endmatch %}
+    {% if !common::export::public_copy() %}{% match lot_deck %}{% when Some with (d) %}
+    <div><strong>Deck received:</strong> <a href="/decks/{{ d.deck_id }}">{{ d.deck_name }}</a>
+      (<a href="/deck-snapshots/{{ d.snapshot_id }}">list as received</a>{% match d.version_id %}{% when Some with (v) %}, <a href="/deck-versions/{{ v }}">version {{ d.version_name.as_deref().unwrap_or("") }}</a>{% when None %}{% endmatch %},
+      <a href="/lots/{{ lot.id }}/deck">add cards to it</a>)</div>
+    {% when None %}{% endmatch %}{% endif %}
     {% match lot.shipment_file %}{% when Some with (file) %}
     <div><a href="/media/{{ file }}">Shipment file</a></div>
     {% when None %}{% endmatch %}

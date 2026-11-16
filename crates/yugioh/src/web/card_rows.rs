@@ -31,6 +31,7 @@ impl CardRows for FormData {
                     rarity: field("rarity"),
                     price: field("price"),
                     quantity: field("quantity"),
+                    zone: field("zone"),
                 }
             })
             .filter(|row| !row.is_blank())
@@ -94,6 +95,15 @@ impl CardRows for FormData {
                     }
                 },
             };
+            let side = match row.zone.as_str() {
+                "" | "auto" => false,
+                "side" => true,
+                _ => {
+                    self.errors.push(format!("Card {n}: unknown zone."));
+                    ok = false;
+                    false
+                }
+            };
             if ok {
                 let en_name = if row.en_name.is_empty() {
                     &row.name
@@ -108,6 +118,8 @@ impl CardRows for FormData {
                     rarity,
                     price,
                     quantity,
+                    side,
+                    card_data_id: None,
                 });
             }
         }
@@ -126,6 +138,8 @@ pub struct CardRowValues {
     pub rarity: String,
     pub price: String,
     pub quantity: String,
+    /// A lot deck's forms only: `auto` (or empty) or `side`.
+    pub zone: String,
 }
 
 impl CardRowValues {
@@ -148,6 +162,12 @@ pub struct NewCards {
     pub rarity: Option<Rarity>,
     pub price: Option<Decimal>,
     pub quantity: u32,
+    /// A lot deck's forms: the copies go to the side deck (else main or
+    /// extra, by their type).
+    pub side: bool,
+    /// Known before the insert (a lot deck's cards): the copies are linked
+    /// at once.
+    pub card_data_id: Option<i64>,
 }
 
 #[cfg(test)]

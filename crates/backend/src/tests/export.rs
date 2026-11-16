@@ -33,7 +33,11 @@ async fn the_public_copy_holds_nothing_private() {
              (20, 2, 10, '2025-07-01 00:00:00', 'Played list', 1),
              (21, 2, 11, '2025-07-02 00:00:00', 'Draft list', NULL),
              (22, 1, 13, '2025-07-02 00:00:00', 'Secret list', NULL);
+         -- a list received in a lot, shown by hand: the lot stays private
+         INSERT INTO deck_snapshot (id, deck_id, version_id, created_at, name, is_public, lot_id)
+             VALUES (23, 2, 10, '2025-07-03 00:00:00', 'Lot list', 1, 1);
          INSERT INTO deck_snapshot_card (snapshot_id, zone, card_data_id, name, count, position) VALUES
+             (23, 'main', 1, 'Magicien Sombre', 1, 1),
              (20, 'main', 1, 'Magicien Sombre', 1, 1), (21, 'main', 2, 'Kuriboh Draft', 1, 1);
          INSERT INTO monthly_budget (id, month, amount) VALUES (1, '2025-06-01', '55.55');
          INSERT INTO pokemon_card (id, catalogue, tcgdex_id, set_id, set_name, local_id, name_fr,
@@ -180,6 +184,8 @@ async fn the_public_copy_holds_nothing_private() {
         "Draft version",
         "Draft list",
         "Secret list",
+        "Received in",
+        "📦",
         "Hidden version",
         "deck-builder",
         "old tournament note",

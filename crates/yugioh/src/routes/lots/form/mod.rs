@@ -4,16 +4,20 @@
 //! - [`add`]: the "add lot" page, the shipment PDF upload that pre-fills it,
 //!   and the creation;
 //! - [`edit`]: the lot's fields and its unites' prices;
-//! - [`cards`]: cards added to an existing lot (`/lots/:id/add-cards`).
+//! - [`cards`]: cards added to an existing lot (`/lots/:id/add-cards`);
+//! - [`deck`]: the deck received in a lot, its cards entered the same way
+//!   (`/lots/:id/deck`).
 //!
 //! The lot fields shared by both forms are here.
 
 mod add;
 mod cards;
+mod deck;
 mod edit;
 
 pub use add::{create, page, upload};
 pub use cards::{add_cards, add_cards_page};
+pub use deck::{add_deck_cards, deck_page, LotDeck};
 pub use edit::{edit_page, update};
 
 use yugioh_domain::lot::LotType;

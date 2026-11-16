@@ -67,6 +67,18 @@ refund), its cards. **Lots → Add**:
 Cards forgotten or arrived later: the lot's page → **Add cards** (the same
 rows and quick add, on their own page; the lot page itself only reads).
 
+**A deck received in a lot** (the previous owner had built it): the lot's
+page → **Add a deck**. Choose a new deck (name it) or an existing one, name
+the version (default "From lot 123"), then enter its cards like a lot's
+(rows, quick add, codes, rarity, condition), each with a **zone**: Auto
+(extra deck monsters go to the extra deck, the rest to the main deck) or
+Side. The cards go into the lot **and** into a built version holding exactly
+those copies; the deck as received is kept in the deck's history ("Received
+in lot 123"). One deck per lot; the lot's page then links to it and to
+**add cards to it** later. Move cards around in the builder afterwards if
+needed. Unlike the lot's other cards, a name ygoprodeck doesn't know is
+refused (a copy without card data can't fill a slot).
+
 New cards are linked to ygoprodeck's card data in the background; every
 deck that lists them sees them as owned at once. **Sellers** lists who you bought
 from, with what you spent.
@@ -255,14 +267,18 @@ Every **Save** in the deck builder keeps the list in the deck's history
    the screen (saved or not); a list's page (`/deck-snapshots/:id`, from the
    deck page's History) compares it with the previous one, another list, or
    a version now.
-4. **Go back to an old list**: its page → **New version from this list**
+4. **A deck received in a lot**: its list as received is kept like a
+   tournament's (named "Received in lot N", never replaced; not public unless
+   you tick it), whatever the builder does to the version afterwards.
+5. **Go back to an old list**: its page → **New version from this list**
    (its cards and counts; the collection says what you own). Old versions you no longer
    play can be deleted: their lists stay in the history.
 
 ### Built decks
 `/decks/built`: the decks you physically built. One card per deck (box,
 sleeves, its cards and the copies it holds, how many are missing), then the
-value of each deck.
+value of each deck. A deck received in a lot (lot page → **Add a deck**) is
+built at once, with the copies of that lot.
 
 ### Shopping list
 `/decks/shopping` (Decks menu): what the built decks, then the planned ones,

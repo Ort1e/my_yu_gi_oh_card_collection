@@ -44,7 +44,8 @@ pub const SOLD_EXISTS: &str = "EXISTS (SELECT 1 FROM unite JOIN lot ON lot.id = 
      WHERE unite.card_id = card.id AND lot.lot_type = 'sale' AND lot.is_cancelled = 0)";
 
 /// Create the cards of `rows` (each `quantity` times) with one unite each in
-/// `lot_id`. Returns the new card ids.
+/// `lot_id`, linked to their card data when `card_data_id` is set. Returns
+/// the new card ids, in the order of the rows.
 pub async fn insert_lot_cards(
     conn: &mut SqliteConnection,
     lot_id: i64,
@@ -54,14 +55,15 @@ pub async fn insert_lot_cards(
     for row in rows {
         for _ in 0..row.quantity {
             let card_id = sqlx::query(
-                "INSERT INTO card (name, en_name, code, last_known_status, rarity)
-                 VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO card (name, en_name, code, last_known_status, rarity, card_data_id)
+                 VALUES (?, ?, ?, ?, ?, ?)",
             )
             .bind(&row.name)
             .bind(&row.en_name)
             .bind(&row.code)
             .bind(row.status.map(yugioh_domain::card::CardStatus::code))
             .bind(row.rarity.map(yugioh_domain::rarity::Rarity::label))
+            .bind(row.card_data_id)
             .execute(&mut *conn)
             .await?
             .last_insert_rowid();

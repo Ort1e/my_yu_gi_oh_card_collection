@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Deck received in lot {{ lot.id }}{% endblock %}
+
+{% block content %}
+<div class="inside-container">
+<h1>{% if lot_deck.is_some() %}Add cards to the deck received in{% else %}Deck received in{% endif %} {{ lot.title() }}</h1>
+<p class="back-link"><a href="/lots/{{ lot.id }}">← Back to the lot</a></p>
+<p class="hint">The cards go into the lot and into a built version of the deck holding exactly these copies.
+  Extra deck monsters go to the extra deck; you can move cards in the deck builder afterwards.</p>
+
+<form method="post" action="/lots/{{ lot.id }}/deck" class="plain">
+  {% include "partials/form_errors.html" %}
+  {% match lot_deck %}
+  {% when Some with (d) %}
+  <p>Deck: <a href="/decks/{{ d.deck_id }}">{{ d.deck_name }}</a>
+    {% match d.version_id %}{% when Some with (v) %}(version <a href="/deck-versions/{{ v }}">{{ d.version_name.as_deref().unwrap_or("") }}</a>){% when None %}{% endmatch %}</p>
+  {% when None %}
+  <fieldset>
+    <legend>The deck</legend>
+    <div class="field-row">
+      <div>
+        <label for="deck_id">Existing deck:</label>
+        <select name="deck_id" id="deck_id">
+          <option value="">— a new deck —</option>
+          {% for deck in decks %}
+          <option value="{{ deck.0 }}" {% if self.deck_selected(deck.0) %}selected{% endif %}>{{ deck.1 }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wide">
+        <label for="deck_name">New deck's name:</label>
+        <input type="text" name="deck_name" id="deck_name" value="{{ deck_name }}" maxlength="255">
+      </div>
+      <div class="wide">
+        <label for="version_name">Version name:</label>
+        <input type="text" name="version_name" id="version_name" value="{{ version_name }}" maxlength="255">
+      </div>
+    </div>
+  </fieldset>
+  {% endmatch %}
+  <div id="card-rows">
+    {% include "partials/quick_add.html" %}
+    {% for row in rows %}
+      {% let i = loop.index0 %}
+      {% let remove_button = true %}
+      {% let with_zone = true %}
+      {% include "partials/card_row.html" %}
+    {% endfor %}
+    <button type="button" id="add-row" class="btn-secondary">+ Add a card</button>
+  </div>
+  <input type="submit" value="Add the cards to the lot and the deck">
+</form>
+
+<template id="card-row-template">
+  {% let i = "__i__" %}
+  {% let row = self.blank_row() %}
+  {% let remove_button = true %}
+  {% let with_zone = true %}
+  {% include "partials/card_row.html" %}
+</template>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/rarities.js"></script>
+<script src="/static/js/card_rows.js"></script>
+<script src="/static/js/glitter.js" defer></script>
+{% endblock %}

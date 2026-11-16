@@ -1,4 +1,4 @@
-{# One card row of a lot form. Needs `i` (row index) and `row` (CardRowValues). #}
+{# One card row of a lot form. Needs `i` (row index), `row` (CardRowValues) and `with_zone` (a lot deck's form: a zone select). #}
 <fieldset class="card-row">
   <legend>Card {% if remove_button %}<button type="button" class="remove-row btn-small btn-danger" title="Remove this card">✕</button>{% endif %}</legend>
 
@@ -44,5 +44,14 @@
       <label for="cards-{{ i }}-quantity">Quantity:</label>
       <input type="number" min="1" max="100" name="cards-{{ i }}-quantity" id="cards-{{ i }}-quantity" value="{{ row.quantity }}" placeholder="1">
     </div>
+    {% if with_zone %}
+    <div>
+      <label for="cards-{{ i }}-zone">Zone:</label>
+      <select name="cards-{{ i }}-zone" id="cards-{{ i }}-zone">
+        <option value="auto" {% if row.zone != "side" %}selected{% endif %}>Auto (main or extra)</option>
+        <option value="side" {% if row.zone == "side" %}selected{% endif %}>Side</option>
+      </select>
+    </div>
+    {% endif %}
   </div>
 </fieldset>

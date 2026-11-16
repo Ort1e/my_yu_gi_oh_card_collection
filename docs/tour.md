@@ -222,6 +222,21 @@ Things to notice:
   new copy as owned at once). The redirect doesn't wait
   for it (see [Talking to ygoprodeck](#talking-to-ygoprodeck)).
 
+### The lot deck form (`/lots/:id/deck`)
+
+`routes/lots/form/deck.rs`: the add-cards page again (`card_row.html` with
+`with_zone`: an Auto/Side select, read by `CardRowValues::zone` into
+`NewCards::side`), plus, the first time only, the deck and the version name.
+The POST validates the rows, then **before the transaction** gets each row's
+card data (`get_or_fetch`: a name ygoprodeck doesn't know is an error, a copy
+without card data can't fill a slot). In the transaction: the deck and a built
+public version (first time), `insert_lot_cards` with `card_data_id` set, then
+`lists::add_copies`, which puts **these copies** in the slots; the lot's
+snapshot is `snapshots::lot_freeze`n (first time) or `snapshots::append`ed.
+After the commit, `spawn_link_cards` does the rest (names, pictures). If the
+lot's version was deleted or unbuilt since, a new one is made from the lot
+snapshot's list (`assign_copies`, before the new copies exist).
+
 ### The shipment PDF flow
 
 `POST /lots/add/shipment` (`lots/form/add.rs::upload`): the PDF is parsed **in
@@ -610,6 +625,11 @@ There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
   after the import (`shopping::WANTS_NOTE`, also sent to the builder as
   `Check.wants_note`: one text). A version's own list is in the builder's To
   buy tab (`shopping::version_wants_list`, the version alone).
+- A lot's deck (`routes/lots/form/deck.rs`) doesn't go through `plan_build`:
+  `lists::add_copies` pins the very copies just received in the slots (a
+  line of the same card data and zone grows, else a new line at the end), so
+  better free copies owned already are never taken in their place. Later
+  saves keep them like any built version's ("the copies each line held").
 - Categories are given to a card of a version (`card_category_assignment.
   card_data_id`), so to all its copies; the Monte Carlo draws a card data id
   per copy.
@@ -639,6 +659,12 @@ than 30 minutes old (`SESSION`: a building session gives one snapshot);
   list saved" (the default) or a version's list again. The version keeps
   changing; the list played doesn't. `deck_version.tournament_id` (0011) is a dead
   column, always NULL.
+- **A lot's deck** (`deck_snapshot.lot_id`, unique, 0031): `lot_freeze` at
+  the first POST of `/lots/:id/deck`, `append` for more cards (the list as
+  received: what the builder did to the version since doesn't enter it).
+  Kept like a tournament's list (`Snapshot::kept`, never coalesced nor
+  deleted), not public by default; the pages show "Received in lot N"
+  (private).
 - **Pages** (`routes/decks/snapshots.rs`): the History table of the deck's
   page (`partials/deck_history.html`; automatic ones folded), and
   `/deck-snapshots/:id`: its cards (one tile per card, `×3`), the changes

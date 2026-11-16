@@ -14,13 +14,14 @@
 
 <div class="card wide-card">
   <div class="card-title">{{ self.full_title() }}
-    {% if snapshot.name.is_none() && snapshot.tournament_id.is_none() %} <span class="built-badge" title="Saved automatically when the version was saved">Automatic</span>{% endif %}
+    {% if snapshot.name.is_none() && snapshot.tournament_id.is_none() && snapshot.lot_id.is_none() %} <span class="built-badge" title="Saved automatically when the version was saved">Automatic</span>{% endif %}
     {% if snapshot.shown_publicly() && !common::export::public_copy() %} <span class="built-badge" title="Shown on the public site">Public</span>{% endif %}
   </div>
   <div class="card-meta-line">
     <div>Saved: {{ snapshot.date()|date }} {{ snapshot.time() }}</div>
     {% match snapshot.version_id %}{% when Some with (v) %}<div>From the version: {% if version_shown %}<a href="/deck-versions/{{ v }}" class="on-card">{{ snapshot.version_name.as_deref().unwrap_or("") }}</a>{% else %}{{ snapshot.version_name.as_deref().unwrap_or("") }}{% endif %}</div>{% when None %}<div>From a version since deleted</div>{% endmatch %}
     {% match snapshot.tournament_id %}{% when Some with (t) %}<div>🏆 Played at <a href="/tournaments/{{ t }}" class="on-card">{{ snapshot.tournament_name.as_deref().unwrap_or("") }}</a> ({{ snapshot.tournament_date.as_deref().unwrap_or("")|date }})</div>{% when None %}{% endmatch %}
+    {% if !common::export::public_copy() %}{% match snapshot.lot_id %}{% when Some with (l) %}<div>📦 Received in <a href="/lots/{{ l }}" class="on-card">lot {{ l }}</a></div>{% when None %}{% endmatch %}{% endif %}
     {% for zone in zones %}<div>{{ zone.name }}: {{ zone.count }}</div>{% endfor %}
   </div>
 </div>
