@@ -10,7 +10,8 @@ here=$(dirname "$(readlink -f "$0")")
 
 next="$APP_DIR/next"
 install -d -o "$APP_USER" -g "$APP_USER" "$next"
-result=$(app fetch-release --to "$next")
+# the app may log a warning before its answer: the answer is the last line
+result=$(app fetch-release --to "$next" | tail -n 1)
 log "$result"
 case "$result" in
     new:*) ;;
