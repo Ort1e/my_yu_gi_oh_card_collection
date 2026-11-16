@@ -221,6 +221,7 @@ async fn prefill(state: &AppState, page: &mut AddLotPage, shipment: Shipment) ->
                 .unwrap_or_default(),
             price: card.price.to_string(),
             quantity: String::new(),
+            zone: String::new(),
         };
         match rows.iter_mut().find(|(r, _)| {
             (&r.name, &r.code, &r.status, &r.rarity, &r.price)

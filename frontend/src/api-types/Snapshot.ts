@@ -15,4 +15,8 @@ created_at: string,
 /**
  * Null: an automatic one.
  */
-name: string | null, tournament_id: number | null, tournament_name: string | null, tournament_date: string | null, is_public: boolean, main: number, extra: number, side: number, };
+name: string | null, tournament_id: number | null, tournament_name: string | null, tournament_date: string | null, 
+/**
+ * The lot this deck was received in (the list as received).
+ */
+lot_id: number | null, is_public: boolean, main: number, extra: number, side: number, };

@@ -216,6 +216,8 @@ pub struct LotDetail {
     total_estimate: Money,
     /// The advent calendar whose lot this is, if any.
     calendar_year: Option<i64>,
+    /// The deck received in this lot, if any.
+    lot_deck: Option<form::LotDeck>,
 }
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
@@ -273,5 +275,6 @@ pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         total_price,
         total_estimate,
         calendar_year,
+        lot_deck: form::LotDeck::of_lot(pool, id).await?,
     })
 }

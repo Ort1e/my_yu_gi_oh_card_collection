@@ -39,7 +39,7 @@ pub struct Summary {
 pub async fn summaries(pool: &Pool) -> sqlx::Result<Vec<Summary>> {
     sqlx::query_as(
         "SELECT l.id, l.name, l.fills_from_collection,
-                COALESCE(SUM(w.got_on IS NULL), 0) AS wanted,
+                COALESCE(SUM(w.id IS NOT NULL AND w.got_on IS NULL), 0) AS wanted,
                 COALESCE(SUM(w.got_on IS NOT NULL), 0) AS got
          FROM pokemon_wishlist l LEFT JOIN pokemon_wish w ON w.wishlist_id = l.id
          GROUP BY l.id ORDER BY l.position, l.id",

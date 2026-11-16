@@ -37,6 +37,8 @@ pub struct Snapshot {
     pub tournament_id: Option<i64>,
     pub tournament_name: Option<String>,
     pub tournament_date: Option<String>,
+    /// The lot this deck was received in (the list as received).
+    pub lot_id: Option<i64>,
     pub is_public: bool,
     pub main: i64,
     pub extra: i64,
@@ -44,9 +46,12 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Named, a tournament's, or public: never replaced nor deleted by hand.
+    /// Named, a tournament's, a lot's, or public: never replaced nor deleted by hand.
     pub fn kept(&self) -> bool {
-        self.name.is_some() || self.tournament_id.is_some() || self.is_public
+        self.name.is_some()
+            || self.tournament_id.is_some()
+            || self.lot_id.is_some()
+            || self.is_public
     }
 
     pub fn shown_publicly(&self) -> bool {
@@ -71,6 +76,9 @@ impl Snapshot {
         if let Some(t) = &self.tournament_name {
             return t.clone();
         }
+        if let Some(lot) = self.lot_id {
+            return format!("Received in lot {lot}");
+        }
         match &self.version_name {
             Some(v) => format!("{v} (saved)"),
             None => "Saved list".to_string(),
@@ -81,7 +89,7 @@ impl Snapshot {
 const SELECT: &str = "SELECT deck_snapshot.id, deck_snapshot.deck_id, deck_snapshot.version_id,
         deck_version.version_name, deck_snapshot.created_at, deck_snapshot.name,
         deck_snapshot.tournament_id, tournament.name AS tournament_name,
-        tournament.date AS tournament_date, deck_snapshot.is_public,
+        tournament.date AS tournament_date, deck_snapshot.lot_id, deck_snapshot.is_public,
         COALESCE((SELECT sum(count) FROM deck_snapshot_card c
                   WHERE c.snapshot_id = deck_snapshot.id AND c.zone = 'main'), 0) AS main,
         COALESCE((SELECT sum(count) FROM deck_snapshot_card c
@@ -136,6 +144,14 @@ pub async fn of_tournament(
 ) -> sqlx::Result<Option<Snapshot>> {
     sqlx::query_as(&format!("{SELECT} WHERE deck_snapshot.tournament_id = ?"))
         .bind(tournament_id)
+        .fetch_optional(&mut *conn)
+        .await
+}
+
+/// The snapshot of the deck received in a lot, if any.
+pub async fn of_lot(conn: &mut SqliteConnection, lot_id: i64) -> sqlx::Result<Option<Snapshot>> {
+    sqlx::query_as(&format!("{SELECT} WHERE deck_snapshot.lot_id = ?"))
+        .bind(lot_id)
         .fetch_optional(&mut *conn)
         .await
 }
@@ -287,6 +303,47 @@ pub async fn freeze(
     Ok(Some(id))
 }
 
+/// A new snapshot of what a version holds now, linked to `lot_id`: the deck
+/// as received in that lot, kept like a tournament's list. `None` without
+/// the version or its deck. One per lot (a unique index).
+pub async fn lot_freeze(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+    lot_id: i64,
+) -> sqlx::Result<Option<i64>> {
+    let Some(deck_id) = deck_of(conn, version_id).await? else {
+        return Ok(None);
+    };
+    let cards = version_cards(conn, version_id).await?;
+    let id = insert(conn, deck_id, version_id, now()).await?;
+    write_cards(conn, id, &cards).await?;
+    sqlx::query("UPDATE deck_snapshot SET lot_id = ? WHERE id = ?")
+        .bind(lot_id)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(Some(id))
+}
+
+/// More cards received in the lot: `added` joins the lot snapshot's list (what
+/// was received, not what the version became in the builder since).
+pub async fn append(
+    conn: &mut SqliteConnection,
+    id: i64,
+    added: &[(DeckZone, i64, String)],
+) -> sqlx::Result<()> {
+    let list = cards(conn, id).await?;
+    let before = list
+        .entries
+        .iter()
+        .flat_map(|e| (0..e.count).map(move |_| (e.zone, e.card_data_id, e.name.as_str())));
+    let after = added
+        .iter()
+        .map(|(zone, card_data_id, name)| (*zone, Some(*card_data_id), name.as_str()));
+    let merged = SnapshotList::from_cards(before.chain(after));
+    write_cards(conn, id, &merged).await
+}
+
 /// No snapshot is that tournament's list any more.
 pub async fn unlink_tournament(
     conn: &mut SqliteConnection,
@@ -382,7 +439,7 @@ pub async fn set_public(conn: &mut SqliteConnection, id: i64, public: bool) -> s
 pub async fn delete(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<bool> {
     let deleted = sqlx::query(
         "DELETE FROM deck_snapshot WHERE id = ?
-           AND name IS NULL AND tournament_id IS NULL AND is_public = 0",
+           AND name IS NULL AND tournament_id IS NULL AND lot_id IS NULL AND is_public = 0",
     )
     .bind(id)
     .execute(&mut *conn)

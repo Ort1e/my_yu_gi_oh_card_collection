@@ -338,6 +338,115 @@ pub async fn assign_copies(conn: &mut SqliteConnection, version_id: i64) -> sqlx
     Ok(done)
 }
 
+/// Add copies to a **built** version, each pinned in its slot: a card of the
+/// same card data and zone adds one to its line (filling a missing slot
+/// first), else a new line at the end of the zone. The copies given are the
+/// ones held, so `plan_build` never takes others in their place (a lot's
+/// deck: `routes::lots::form::deck`). Returns `(zone, card data, name)` of
+/// each copy added.
+pub async fn add_copies(
+    conn: &mut SqliteConnection,
+    version_id: i64,
+    copies: &[(DeckZone, CardDataId, CopyId)],
+) -> sqlx::Result<Vec<(DeckZone, CardDataId, String)>> {
+    let mut added = Vec::with_capacity(copies.len());
+    for &(zone, card_data_id, card_id) in copies {
+        let name: String = sqlx::query_scalar("SELECT en_name FROM card_data WHERE id = ?")
+            .bind(card_data_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        let line: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT position, count FROM deck_version_card
+             WHERE deck_version_id = ? AND zone = ? AND card_data_id = ?
+             ORDER BY position LIMIT 1",
+        )
+        .bind(version_id)
+        .bind(zone.as_str())
+        .bind(card_data_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+
+        let (position, slot) = match line {
+            Some((position, count)) => {
+                let missing: Option<i64> = sqlx::query_scalar(
+                    "SELECT slot FROM deck_version_copy
+                     WHERE deck_version_id = ? AND zone = ? AND position = ? AND card_id IS NULL
+                     ORDER BY slot LIMIT 1",
+                )
+                .bind(version_id)
+                .bind(zone.as_str())
+                .bind(position)
+                .fetch_optional(&mut *conn)
+                .await?;
+                match missing {
+                    Some(slot) => {
+                        sqlx::query(
+                            "UPDATE deck_version_copy SET card_id = ?
+                             WHERE deck_version_id = ? AND zone = ? AND position = ? AND slot = ?",
+                        )
+                        .bind(card_id)
+                        .bind(version_id)
+                        .bind(zone.as_str())
+                        .bind(position)
+                        .bind(slot)
+                        .execute(&mut *conn)
+                        .await?;
+                        added.push((zone, card_data_id, name));
+                        continue;
+                    }
+                    None => {
+                        sqlx::query(
+                            "UPDATE deck_version_card SET count = count + 1
+                             WHERE deck_version_id = ? AND zone = ? AND position = ?",
+                        )
+                        .bind(version_id)
+                        .bind(zone.as_str())
+                        .bind(position)
+                        .execute(&mut *conn)
+                        .await?;
+                        (position, count)
+                    }
+                }
+            }
+            None => {
+                let position: i64 = sqlx::query_scalar(
+                    "SELECT COALESCE(MAX(position), 0) + 1 FROM deck_version_card
+                     WHERE deck_version_id = ? AND zone = ?",
+                )
+                .bind(version_id)
+                .bind(zone.as_str())
+                .fetch_one(&mut *conn)
+                .await?;
+                sqlx::query(
+                    "INSERT INTO deck_version_card (deck_version_id, zone, card_data_id, name, count, position)
+                     VALUES (?, ?, ?, ?, 1, ?)",
+                )
+                .bind(version_id)
+                .bind(zone.as_str())
+                .bind(card_data_id)
+                .bind(&name)
+                .bind(position)
+                .execute(&mut *conn)
+                .await?;
+                (position, 0)
+            }
+        };
+        sqlx::query(
+            "INSERT INTO deck_version_copy (deck_version_id, zone, position, slot, card_id)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(version_id)
+        .bind(zone.as_str())
+        .bind(position)
+        .bind(slot)
+        .bind(card_id)
+        .execute(&mut *conn)
+        .await?;
+        added.push((zone, card_data_id, name));
+    }
+    Ok(added)
+}
+
 /// A built version unbuilt: its copies are free again.
 pub async fn release_copies(conn: &mut SqliteConnection, version_id: i64) -> sqlx::Result<u64> {
     Ok(
