@@ -333,3 +333,14 @@ async fn wishes_got_before_the_migration_keep_their_date() {
         Some("2026-09-01")
     );
 }
+
+#[tokio::test]
+async fn an_empty_list_wants_nothing() {
+    let t = app().await;
+    let admin = t.login("admin", "admin-pw").await;
+    neris_list(&t, &admin).await;
+
+    let (_, page) = t.get("/pokemon/wishlist").await;
+    assert!(page.contains("— 0 wanted"), "{page}");
+    assert!(!page.contains("1 wanted"), "{page}");
+}
