@@ -147,12 +147,14 @@ impl LotRow {
         }
     }
 
+    /// `Lot 01/06/2025 - Seller`; the public copy leaves the seller out.
     pub fn title(&self) -> String {
-        format!(
-            "Lot {} - {}",
-            crate::web::filters::french_date(&self.buy_date.to_string()),
-            self.seller_name()
-        )
+        let date = crate::web::filters::french_date(&self.buy_date.to_string());
+        if common::export::public_copy() {
+            format!("Lot {date}")
+        } else {
+            format!("Lot {date} - {}", self.seller_name())
+        }
     }
 }
 

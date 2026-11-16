@@ -329,13 +329,14 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
 
 Every morning the NAS writes a **read-only static site** and uploads it to a
 web hosting. It contains: the Yu-Gi-Oh! and Pokémon cards, the statistics,
-the market values, the public decks (those a version of which is marked
+the market values, the purchase lots (dates and cards with their
+estimates: no seller, price or file), the public decks (those a version of which is marked
 public, or played in a tournament), the tournaments and their stats (no old
 notes), the Pokémon wishlist and the books (except private ones) with
 their covers. The pictures are small (360 px wide): the cards' text is on
 their pages.
 
-It **never** contains: sellers, lots, shipment PDFs, prices paid, the budget,
+It **never** contains: sellers, sale lots, shipment PDFs, prices paid, the budget,
 notes, ISBNs, tournaments' old notes, forms, private decks and books.
 
 A version is made public in the builder (*Settings → Sharing*); a built

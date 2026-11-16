@@ -13,8 +13,9 @@ use common::web::auth::{Auth, AuthConfig};
 use common::AppState;
 
 /// The pages the copy starts from; the first one is its home page.
-const START: [&str; 14] = [
+const START: [&str; 15] = [
     "/cards",
+    "/lots",
     "/collection/stats",
     "/decks",
     "/tournaments",
@@ -30,12 +31,13 @@ const START: [&str; 14] = [
     "/books/random",
 ];
 
-/// The addresses the copy may hold: the start pages, a card's, a deck's, a
+/// The addresses the copy may hold: the start pages, a card's, a purchase lot's, a deck's, a
 /// deck version's, a deck's saved list, a tournament's, a copy's, a book's, an author's, a
 /// series' page, the books' covers, and the card pictures (ygoprodeck's, the printings' own).
 fn public(path: &str) -> bool {
-    const NUMBERED: [&str; 10] = [
+    const NUMBERED: [&str; 11] = [
         "/cards/",
+        "/lots/",
         "/decks/",
         "/deck-versions/",
         "/deck-snapshots/",
@@ -93,6 +95,8 @@ mod tests {
     fn only_the_public_addresses() {
         for path in [
             "/cards",
+            "/lots",
+            "/lots/1",
             "/cards/12",
             "/books/series/3",
             "/books/standalone",
@@ -110,8 +114,9 @@ mod tests {
         }
         for path in [
             "/",
-            "/lots",
-            "/lots/1",
+            "/lots/1/edit",
+            "/lots/add",
+            "/cards/to-sell",
             "/sellers/1",
             "/cards/12/edit",
             "/pokemon/openings",

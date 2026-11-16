@@ -14,6 +14,10 @@ use crate::web::filters;
 use crate::web::pagination::{self, Page, PAGE_SIZE};
 use crate::AppState;
 
+/// The lots the public copy shows: purchases not cancelled (a sale or a
+/// cancelled lot answers 404 there).
+pub const PUBLIC_LOT: &str = "lot.lot_type = 'purchase' AND lot.is_cancelled = 0";
+
 #[derive(Debug, Default, Deserialize)]
 pub struct LotFilter {
     seller_name: Option<String>,
@@ -24,6 +28,11 @@ pub struct LotFilter {
 impl LotFilter {
     fn push_where(&self, qb: &mut QueryBuilder<'_, Sqlite>) {
         qb.push(" WHERE 1");
+        // the public copy: purchases only, whatever the address asks
+        if common::export::public_copy() {
+            qb.push(" AND ").push(PUBLIC_LOT);
+            return;
+        }
         if let Some(name) = self
             .seller_name
             .as_deref()
@@ -92,9 +101,16 @@ pub async fn list(
     Ok(LotsList {
         page_title: "All Lots",
         page,
-        total: sqlx::query_scalar("SELECT count(*) FROM lot")
-            .fetch_one(pool)
-            .await?,
+        total: sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM lot WHERE {}",
+            if common::export::public_copy() {
+                PUBLIC_LOT
+            } else {
+                "1"
+            }
+        ))
+        .fetch_one(pool)
+        .await?,
         lots,
         filter,
     })
@@ -222,11 +238,17 @@ pub struct LotDetail {
 
 pub async fn detail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LotDetail> {
     let pool = &state.pool;
-    let mut lot: LotRow = sqlx::query_as(&format!("{} WHERE lot.id = ?", LotRow::SELECT))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .or_404()?;
+    let shown = if common::export::public_copy() {
+        PUBLIC_LOT
+    } else {
+        "1"
+    };
+    let mut lot: LotRow =
+        sqlx::query_as(&format!("{} WHERE lot.id = ? AND {shown}", LotRow::SELECT))
+            .bind(id)
+            .fetch_optional(pool)
+            .await?
+            .or_404()?;
     fill_lot_estimates(pool, std::slice::from_mut(&mut lot)).await?;
     let unites: Vec<UniteRow> = sqlx::query_as(&format!(
         "SELECT unite.card_id, card.name AS card_name,

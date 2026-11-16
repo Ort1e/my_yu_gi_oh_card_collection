@@ -2,9 +2,9 @@
   <div class="card">
     <div class="card-title">{{ lot.title() }}</div>
     <div class="card-meta-line">
-      <div>Price: {{ lot.price_text() }}</div>
+      {% if !common::export::public_copy() %}<div>Price: {{ lot.price_text() }}</div>{% endif %}
       <div>Buy Date: {{ lot.buy_date|date }}</div>
-      <div>Seller: {{ lot.seller_name() }}</div>
+      {% if !common::export::public_copy() %}<div>Seller: {{ lot.seller_name() }}</div>{% endif %}
       <div>Cards: {{ lot.card_count }}</div>
       {% match lot.estimate %}{% when Some with (estimate) %}<div title="Market value of its cards still owned: an estimate">Estimate: {{ estimate }} €</div>{% when None %}{% endmatch %}
     </div>
