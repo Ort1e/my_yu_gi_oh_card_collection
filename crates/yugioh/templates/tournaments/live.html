@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Live notes: {{ name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow live" id="live" data-tournament="{{ id }}" data-team="{{ is_team }}">
+  <p class="back-link"><a href="/tournaments/{{ id }}">← {{ name }}</a></p>
+  <h1>{{ name }}</h1>
+  <p class="live-head">
+    {% if !deck.is_empty() %}<span>{{ deck }}</span>{% endif %}
+    <strong id="live-record"></strong>
+    <span id="live-sync" aria-live="polite"></span>
+  </p>
+  <p id="live-problem" class="error" hidden></p>
+  <p id="live-login" hidden><a href="/login?next=/tournaments/{{ id }}/live">Log in again</a> (your notes stay on this phone)</p>
+  <p><button type="button" id="live-retry" class="btn btn-secondary" hidden>Retry</button></p>
+
+  <ol id="live-rounds" class="live-rounds"></ol>
+
+  <form id="live-form" class="live-form" autocomplete="off">
+    <h2 id="live-title">Round 1</h2>
+
+    <div id="live-games" class="live-games"></div>
+    <div class="live-buttons">
+      <button type="button" class="btn live-big live-won" data-game="won">W</button>
+      <button type="button" class="btn live-big live-lost" data-game="lost">L</button>
+      <button type="button" class="btn live-big live-draw" data-game="draw">D</button>
+    </div>
+    <p id="live-result" class="live-result"></p>
+
+    <h3>Opponent's deck</h3>
+    <div id="live-chips" class="live-chips"></div>
+    <div class="live-more">
+      <input type="text" id="live-label" list="live-labels" placeholder="Another deck…" maxlength="60">
+      <button type="button" id="live-label-add" class="btn btn-secondary">Add</button>
+    </div>
+    <datalist id="live-labels"></datalist>
+
+    <details>
+      <summary>Die roll</summary>
+      <div class="live-buttons">
+        <button type="button" class="btn btn-secondary" data-die="won">Die won</button>
+        <button type="button" class="btn btn-secondary" data-die="lost">Die lost</button>
+      </div>
+    </details>
+
+    <details>
+      <summary>Other result…</summary>
+      <label for="live-result-select">Result:</label>
+      <select id="live-result-select">
+        <option value="">From the games</option>
+        <option value="win">Win</option>
+        <option value="loss">Loss</option>
+        <option value="double_loss">Double loss</option>
+        <option value="bye">Bye</option>
+        <option value="forfeit_win">Win by forfeit</option>
+      </select>
+      {% if is_team %}
+      <label for="live-team-select">Team result:</label>
+      <select id="live-team-select">
+        <option value="">—</option>
+        <option value="win">Win</option>
+        <option value="loss">Loss</option>
+        <option value="double_loss">Double loss</option>
+      </select>
+      {% endif %}
+    </details>
+
+    <details>
+      <summary>Comment</summary>
+      <textarea id="live-comment" rows="3" maxlength="2000"></textarea>
+      <p class="hint">A round's comment is shown on the public site.</p>
+    </details>
+
+    <div class="live-save-bar">
+      <button type="submit" class="btn live-big" id="live-save-share">Save &amp; share</button>
+      <button type="button" class="btn btn-secondary" id="live-save">Save only</button>
+    </div>
+  </form>
+
+  <p><button type="button" id="live-share-day" class="btn btn-secondary">Share the day</button></p>
+  <textarea id="live-fallback" class="live-fallback" rows="6" readonly hidden></textarea>
+
+  <details class="live-end">
+    <summary>End of the day</summary>
+    <form id="live-end-form">
+      <label for="live-placement">Placement:</label>
+      <input type="number" id="live-placement" min="1" inputmode="numeric">
+      <label for="live-players">Players:</label>
+      <input type="number" id="live-players" min="1" inputmode="numeric">
+      <label for="live-conclusion">Conclusion:</label>
+      <textarea id="live-conclusion" rows="3"></textarea>
+      <button type="submit" class="btn">Save the end of the day</button>
+      <span id="live-end-sync"></span>
+    </form>
+  </details>
+
+  <p><a href="/tournaments/{{ id }}/edit">Full edit page</a></p>
+</div>
+<script type="application/json" id="live-data">{{ data_json|safe }}</script>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="/static/js/tournament_live.js"></script>
+{% endblock %}

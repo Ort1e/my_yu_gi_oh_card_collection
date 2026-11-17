@@ -287,3 +287,47 @@ pub async fn label_names(pool: &Pool) -> sqlx::Result<Vec<String>> {
         .fetch_all(pool)
         .await
 }
+
+/// The labels of the opponents' decks met since `since` (`YYYY-MM-DD`), most
+/// often first (ties by name): the live page's chips.
+pub async fn frequent_opponent_labels(pool: &Pool, since: &str) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar(
+        "SELECT l.name FROM tournament_round_label rl
+         JOIN tournament_round r ON r.id = rl.round_id
+         JOIN tournament t ON t.id = r.tournament_id
+         JOIN deck_label l ON l.id = rl.label_id
+         WHERE t.date >= ?
+         GROUP BY l.id ORDER BY COUNT(*) DESC, l.name COLLATE NOCASE",
+    )
+    .bind(since)
+    .fetch_all(pool)
+    .await
+}
+
+/// What the start form is pre-filled with: the latest tournament's name,
+/// place, team switch and deck version.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct StartDefaults {
+    pub name: String,
+    pub location: String,
+    pub is_team: bool,
+    pub version_id: Option<i64>,
+}
+
+pub async fn start_defaults(pool: &Pool) -> sqlx::Result<StartDefaults> {
+    let row: Option<(String, Option<String>, bool, Option<i64>)> = sqlx::query_as(
+        "SELECT t.name, t.location, t.is_team, s.version_id FROM tournament t
+         LEFT JOIN deck_snapshot s ON s.tournament_id = t.id
+         ORDER BY t.date DESC, t.id DESC LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row
+        .map(|(name, location, is_team, version_id)| StartDefaults {
+            name,
+            location: location.unwrap_or_default(),
+            is_team,
+            version_id,
+        })
+        .unwrap_or_default())
+}

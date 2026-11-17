@@ -21,7 +21,7 @@ const LAST_LOTS: i64 = 5;
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 pub struct Dashboard {
-    /// Real copies owned (not sold, not proxies).
+    /// Real copies owned (not sold).
     owned: i64,
     /// `None` before the first price refresh.
     value: Option<ValueTile>,

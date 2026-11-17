@@ -82,8 +82,8 @@ deploy/pc/pull-backup.sh --push     # and pushed, with the pointer committed her
 
 Never commit a `data/app.db` changed by the development server: the NAS's
 copy would replace it the next time anyway. Never delete or regenerate
-it either: the importer only works on an empty DB, and the Django dump is
-older than the Rust-era changes.
+it either: the Django dump is older than the Rust-era changes (the importer
+that loaded it was deleted; it lives in history, `git show 60339cb:importer/src/main.rs`).
 
 If a `.db-wal` file sits next to a database after its server stopped
 (killed with `kill -9`, crash…), open and close the DB once to fold it in:
@@ -277,8 +277,7 @@ delete routes for them.
      **never** `DROP` a table that other tables reference while foreign
      keys are on: `ON DELETE CASCADE` would empty the children. Ask for
      help, and test on a copy of the real data first (below).
-3. Update the row structs and SQL that use the table, and the importer only
-   if you still care about importing Django dumps (you don't need to).
+3. Update the row structs and SQL that use the table.
 4. `cargo test --workspace`: tests run all migrations on a fresh DB.
 5. Try it on a copy of the real data: `deploy/pc/pull-backup.sh`, then
    `cp data/app.db /tmp/try.db` and

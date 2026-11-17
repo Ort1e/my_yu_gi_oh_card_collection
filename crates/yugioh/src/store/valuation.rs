@@ -39,7 +39,7 @@ struct CopyRow {
     sold_for: Option<Money>,
 }
 
-/// Every non-proxy card bought in a purchase lot that isn't cancelled, sold
+/// Every card bought in a purchase lot that isn't cancelled, sold
 /// or not.
 pub async fn owned_copies(pool: &Pool) -> sqlx::Result<Vec<OwnedCopy>> {
     let rows: Vec<CopyRow> = sqlx::query_as(
@@ -123,7 +123,7 @@ struct LotCard {
 }
 
 /// Fill `estimate` of the purchase lots of `lots`: the estimated value of
-/// their cards still owned (proxies and sold cards aside), `None` when none
+/// their cards still owned (sold cards aside), `None` when none
 /// of them has a market price.
 pub async fn fill_lot_estimates(pool: &Pool, lots: &mut [LotRow]) -> sqlx::Result<()> {
     let ids: Vec<i64> = lots

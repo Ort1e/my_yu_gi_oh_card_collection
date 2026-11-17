@@ -63,7 +63,7 @@ The app has four goals, and the tour follows them after the foundations:
    (no DB, no HTTP)                           │ migrations/ applied at startup
 ```
 
-The Cargo workspace (`crates/*` and `importer`):
+The Cargo workspace (`crates/*`):
 
 | Crate | What it is | Django equivalent |
 |---|---|---|
@@ -76,7 +76,6 @@ The Cargo workspace (`crates/*` and `importer`):
 | `crates/yugioh-domain/` | Pure Yu-Gi-Oh! business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
 | `crates/books-domain/`, `crates/pokemon-domain/` | The other collections' pure logic | (none) |
 | `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors, Cardmarket's price guide file (`cardmarket`) | |
-| `importer/` | One-off Django `dumpdata` loader, used for the cutover | `loaddata` |
 
 Dependencies only go down: a collection uses its domain crate, `common`
 (and `advent`); `backend` uses them all; nothing uses `backend`. Plus
@@ -599,8 +598,7 @@ A copy flagged "to sell" (`card.for_sale`, 0032) stays owned, but
 show a ⚠. A sale lot's lines take matching flagged copies
 (`store::cards::insert_lot_cards`: same card row, a second `unite`, flag
 cleared, built slot emptied); there is no other way to sell them.
-There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
-(a migration will drop it).
+There are no proxy `card` rows (0034 dropped `card.is_proxy`).
 
 - **Built** (`deck_version.is_built`, 0010): the physical deck exists, so the
   version holds copies (`deck_version_copy`: one slot per copy of a line,
@@ -741,6 +739,20 @@ played is a snapshot of the deck's history (`deck_snapshot.tournament_id`,
 frozen when the form is saved: "A deck's history"); the stats "by version"
 group the lists by the version they were taken from.
 
+- **Live notes** (`routes/tournaments/live.rs`, `api.rs`,
+  `templates/tournaments/live*.html`, `static/js/tournament_live.js`): the
+  phone page `/tournaments/:id/live` (`/tournaments/live` goes to today's
+  tournament or starts one pre-filled by `data::start_defaults`), private, never
+  in the public copy. Its data (rounds, `data::frequent_opponent_labels` over
+  90 days as chips, labels) is a JSON block. Saves go to
+  `PUT /api/tournaments/:id/rounds/:number` (`store::tournaments::set_round`:
+  replaces round `number`, no gap, so a resend is harmless) and
+  `PATCH /api/tournaments/:id` (`set_end`; `0`/`""` empty a field), 401 JSON
+  without login. The script first writes each change to a queue in
+  `localStorage` (`tournament-live-<id>`), then sends it (on save, `online`,
+  tab visible, Retry); the share line is built on the phone from the page's data
+  and the queue (`navigator.share`, else clipboard, else a selected textarea),
+  never stored. No service worker: the page must be open before the network goes.
 - **Labels** (`deck_label`): archetype/engine names, one table for your decks
   (`deck_deck_label`, on the deck edit page) and the opponents' rounds
   (`tournament_round_label`). Typed comma-separated with suggestions

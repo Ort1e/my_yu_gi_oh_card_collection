@@ -160,49 +160,112 @@ pub async fn set_results(
         .execute(&mut *conn)
         .await?;
     for (n, round) in results.rounds.iter().enumerate() {
-        let round_id = sqlx::query(
-            "INSERT INTO tournament_round
-                 (tournament_id, number, opponent_deck, die, result, team_result, comment)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(id)
-        .bind(n as i64 + 1)
-        .bind(&round.opponent_deck)
-        .bind(round.die.map(Die::code))
-        .bind(round.result.code())
-        .bind(round.team_result.map(RoundResult::code))
-        .bind(&round.comment)
-        .execute(&mut *conn)
-        .await?
-        .last_insert_rowid();
-
-        for label in &round.labels {
-            let label_id = label_id(conn, label).await?;
-            sqlx::query(
-                "INSERT OR IGNORE INTO tournament_round_label (round_id, label_id) VALUES (?, ?)",
-            )
-            .bind(round_id)
-            .bind(label_id)
-            .execute(&mut *conn)
-            .await?;
-        }
-
-        for (g, game) in round.games.iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO tournament_game (round_id, number, result, went_first, comment)
-                 VALUES (?, ?, ?, ?, ?)",
-            )
-            .bind(round_id)
-            .bind(g as i64 + 1)
-            .bind(game.result.code())
-            .bind(game.went_first)
-            .bind(&game.comment)
-            .execute(&mut *conn)
-            .await?;
-        }
+        insert_round(conn, id, n as i64 + 1, round).await?;
     }
 
     delete_unused_labels(conn).await
+}
+
+/// Insert round `number` of a tournament with its labels (created on the way)
+/// and games.
+async fn insert_round(
+    conn: &mut SqliteConnection,
+    tournament_id: i64,
+    number: i64,
+    round: &RoundFields,
+) -> sqlx::Result<()> {
+    let round_id = sqlx::query(
+        "INSERT INTO tournament_round
+             (tournament_id, number, opponent_deck, die, result, team_result, comment)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(tournament_id)
+    .bind(number)
+    .bind(&round.opponent_deck)
+    .bind(round.die.map(Die::code))
+    .bind(round.result.code())
+    .bind(round.team_result.map(RoundResult::code))
+    .bind(&round.comment)
+    .execute(&mut *conn)
+    .await?
+    .last_insert_rowid();
+
+    for label in &round.labels {
+        let label_id = label_id(conn, label).await?;
+        sqlx::query(
+            "INSERT OR IGNORE INTO tournament_round_label (round_id, label_id) VALUES (?, ?)",
+        )
+        .bind(round_id)
+        .bind(label_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    for (g, game) in round.games.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO tournament_game (round_id, number, result, went_first, comment)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(round_id)
+        .bind(g as i64 + 1)
+        .bind(game.result.code())
+        .bind(game.went_first)
+        .bind(&game.comment)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Replace round `number` (its games and labels with it), or add it when it is
+/// the next one: a resend after a lost answer changes nothing. `Ok(false)`
+/// when `number` would leave a gap (or is below 1). The tournament must
+/// exist. Call inside a write transaction.
+pub async fn set_round(
+    conn: &mut SqliteConnection,
+    tournament_id: i64,
+    number: i64,
+    round: &RoundFields,
+) -> sqlx::Result<bool> {
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM tournament_round WHERE tournament_id = ?")
+            .bind(tournament_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if number < 1 || number > count + 1 {
+        return Ok(false);
+    }
+
+    sqlx::query("DELETE FROM tournament_round WHERE tournament_id = ? AND number = ?")
+        .bind(tournament_id)
+        .bind(number)
+        .execute(&mut *conn)
+        .await?;
+    insert_round(conn, tournament_id, number, round).await?;
+    delete_unused_labels(conn).await?;
+    Ok(true)
+}
+
+/// The end of the day: placement, players and conclusion. `false` when there
+/// is no tournament with this id.
+pub async fn set_end(
+    conn: &mut SqliteConnection,
+    id: i64,
+    placement: Option<i64>,
+    players: Option<i64>,
+    conclusion: Option<&str>,
+) -> sqlx::Result<bool> {
+    let updated = sqlx::query(
+        "UPDATE tournament SET placement = ?, players = ?, conclusion = ? WHERE id = ?",
+    )
+    .bind(placement)
+    .bind(players)
+    .bind(conclusion)
+    .bind(id)
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(updated > 0)
 }
 
 /// The id of a label by name (case-insensitive: an existing label keeps its

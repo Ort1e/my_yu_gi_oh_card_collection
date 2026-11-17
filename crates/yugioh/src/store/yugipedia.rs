@@ -558,13 +558,13 @@ mod tests {
                        "DarkMagician-SDY-FR-UR-1E.png", "DarkMagician-SDY-FR-UR-1E-AA.png"]',
                   date('now')),
                  (2, NULL, date('now'));
-             INSERT INTO card (id, name, en_name, code, rarity, card_data_id, is_proxy, picture,
+             INSERT INTO card (id, name, en_name, code, rarity, card_data_id, picture,
                                picture_manual) VALUES
-                 (1, 'one artwork', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1, 0, NULL, 0),
-                 (2, 'two artworks', 'dark magician', 'SDY-FR005', 'Ultra Rare', 1, 0, NULL, 0),
-                 (3, 'chosen by hand', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1, 0, NULL, 1),
-                 (4, 'no gallery', 'kuriboh', 'MRD-FR071', NULL, 2, 0, NULL, 0),
-                 (5, 'no code', 'dark magician', NULL, NULL, 1, 0, NULL, 0);"#,
+                 (1, 'one artwork', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1, NULL, 0),
+                 (2, 'two artworks', 'dark magician', 'SDY-FR005', 'Ultra Rare', 1, NULL, 0),
+                 (3, 'chosen by hand', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1, NULL, 1),
+                 (4, 'no gallery', 'kuriboh', 'MRD-FR071', NULL, 2, NULL, 0),
+                 (5, 'no code', 'dark magician', NULL, NULL, 1, NULL, 0);"#,
         )
         .await;
         // its picture already downloaded: nothing asked to Yugipedia

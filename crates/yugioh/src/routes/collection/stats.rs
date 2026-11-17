@@ -1,6 +1,6 @@
 //! `/collection/stats`: the Yu-Gi-Oh! collection in numbers, also in the
-//! public copy, so nothing about lots or prices paid: the cards owned (no
-//! proxy, not sold) at their market estimate, grouped by
+//! public copy, so nothing about lots or prices paid: the cards owned (not
+//! sold) at their market estimate, grouped by
 //! `yugioh_domain::stats`; the value over time and the price moves of the
 //! value page's data.
 

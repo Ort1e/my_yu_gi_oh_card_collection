@@ -39,8 +39,8 @@ pub const USAGE: &str = "usage:
       fallback, the US pages of dates still missing (--date: also the US list
       of that date, which the US index may not link yet)
   backend clean-cards [--dry-run]
-      normalise card names, link cards to the right card data, replace
-      proxies in decks by owned copies and delete unused proxies
+      normalise card names, link cards to the right card data, give
+      the right rarity and language
   backend find-pictures [--dry-run]
       give the cards their printing's picture from Yugipedia (language,
       Extended Art…) when there is no doubt (new cards get theirs when

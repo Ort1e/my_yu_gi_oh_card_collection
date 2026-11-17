@@ -467,13 +467,16 @@ async fn read_form(
 }
 
 pub struct VersionChoice {
-    id: i64,
-    name: String,
-    selected: bool,
+    pub(super) id: i64,
+    pub(super) name: String,
+    pub(super) selected: bool,
 }
 
 /// Every deck version, for "Deck version played".
-async fn version_choices(pool: &Pool, current: &str) -> sqlx::Result<Vec<VersionChoice>> {
+pub(super) async fn version_choices(
+    pool: &Pool,
+    current: &str,
+) -> sqlx::Result<Vec<VersionChoice>> {
     let rows: Vec<(i64, Option<String>, String)> = sqlx::query_as(
         "SELECT v.id, deck.name, v.version_name FROM deck_version v
          LEFT JOIN deck ON deck.id = v.deck_id

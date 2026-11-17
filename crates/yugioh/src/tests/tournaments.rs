@@ -396,3 +396,205 @@ async fn the_deck_builder_shows_a_summary_and_copies_are_not_played() {
         .await;
     assert_eq!(copy["tournament"], json!(null));
 }
+
+// ---------- live notes ----------
+
+fn live_round(result: &str, labels: &[&str], games: &[&str]) -> serde_json::Value {
+    json!({
+        "opponent_deck": labels.join(" / "),
+        "labels": labels,
+        "die": "won",
+        "result": result,
+        "games": games.iter().map(|g| json!({ "result": g, "went_first": null })).collect::<Vec<_>>(),
+    })
+}
+
+#[tokio::test]
+async fn the_live_start_creates_today_s_tournament_then_redirects_to_it() {
+    let t = TestApp::new().await;
+    let today = crate::store::db::today().to_string();
+
+    let (status, page) = t.get("/tournaments/live").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Start today"));
+
+    let (status, location) = t
+        .post(
+            "/tournaments/live",
+            &[
+                ("name", "Locals"),
+                ("location", "Rennes"),
+                ("is_team", "on"),
+            ],
+        )
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER, "{location}");
+    assert_eq!(location, "/tournaments/1/live");
+    assert_eq!(
+        t.text("SELECT date FROM tournament WHERE id = 1").await,
+        Some(today)
+    );
+    assert_eq!(
+        t.scalar("SELECT is_team FROM tournament WHERE id = 1")
+            .await,
+        1
+    );
+
+    let (status, location) = t.get("/tournaments/live").await;
+    assert_eq!(
+        (status, location.as_str()),
+        (StatusCode::SEE_OTHER, "/tournaments/1/live")
+    );
+    let (status, page) = t.get("/tournaments/1/live").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(r#"id="live-data""#));
+
+    // a name is needed
+    let (status, page) = t.post("/tournaments/live", &[("name", " ")]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Name"));
+}
+
+#[tokio::test]
+async fn the_start_form_is_filled_from_the_last_tournament() {
+    let t = TestApp::new().await;
+    let (v, _) = t.deck_fixture().await;
+    post_form(&t, "/tournaments/add", &form(&v.to_string())).await;
+
+    let (_, page) = t.get("/tournaments/live").await;
+    assert!(page.contains(r#"value="Locals""#), "{page}");
+    assert!(page.contains(r#"value="Rennes""#));
+    assert!(page.contains("checked"));
+    assert!(page.contains(&format!(r#"<option value="{v}" selected"#)));
+}
+
+#[tokio::test]
+async fn a_live_round_is_replaced_not_duplicated_and_has_no_gaps() {
+    let t = TestApp::new().await;
+    t.post("/tournaments/live", &[("name", "Locals")]).await;
+    let put = |n: i64, body: serde_json::Value| {
+        let t = &t;
+        async move {
+            t.json("PUT", &format!("/api/tournaments/1/rounds/{n}"), body)
+                .await
+        }
+    };
+
+    let (status, _) = put(1, live_round("win", &["Mitsurugi"], &["won", "won"])).await;
+    assert_eq!(status, StatusCode::OK);
+    // the same round sent again with other values
+    let (status, _) = put(1, live_round("loss", &["K9"], &["lost", "lost"])).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(t.scalar("SELECT count(*) FROM tournament_round").await, 1);
+    assert_eq!(t.scalar("SELECT count(*) FROM tournament_game").await, 2);
+    assert_eq!(
+        t.text("SELECT result FROM tournament_round")
+            .await
+            .as_deref(),
+        Some("loss")
+    );
+    // Mitsurugi was only in the replaced round: its label is gone
+    assert_eq!(
+        t.text("SELECT group_concat(name) FROM deck_label")
+            .await
+            .as_deref(),
+        Some("K9")
+    );
+
+    // round 3 with only 1 noted
+    let (status, error) = put(3, live_round("win", &[], &["won"])).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{error}");
+    let (status, _) = put(2, live_round("bye", &[], &[])).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(t.scalar("SELECT count(*) FROM tournament_round").await, 2);
+
+    let (status, _) = put(1, json!({ "result": "nope" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = t
+        .json(
+            "PUT",
+            "/api/tournaments/9/rounds/1",
+            live_round("win", &[], &[]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn the_live_end_of_the_day_changes_only_what_is_sent() {
+    let t = TestApp::new().await;
+    t.post("/tournaments/live", &[("name", "Locals")]).await;
+
+    let (status, _) = t
+        .json(
+            "PATCH",
+            "/api/tournaments/1",
+            json!({ "placement": 3, "players": 12, "conclusion": "Fun." }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = t
+        .json("PATCH", "/api/tournaments/1", json!({ "placement": 2 }))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(t.scalar("SELECT placement FROM tournament").await, 2);
+    assert_eq!(t.scalar("SELECT players FROM tournament").await, 12);
+    assert_eq!(
+        t.text("SELECT conclusion FROM tournament").await.as_deref(),
+        Some("Fun.")
+    );
+
+    // 0 and "" empty a field
+    t.json(
+        "PATCH",
+        "/api/tournaments/1",
+        json!({ "placement": 0, "conclusion": "" }),
+    )
+    .await;
+    assert_eq!(t.text("SELECT placement FROM tournament").await, None,);
+    assert_eq!(t.text("SELECT conclusion FROM tournament").await, None);
+    let (status, _) = t
+        .json("PATCH", "/api/tournaments/1", json!({ "players": -1 }))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn the_chips_come_most_met_first() {
+    let t = TestApp::new().await;
+    t.post("/tournaments/live", &[("name", "Locals")]).await;
+    for (n, labels) in [(1, ["Rare"]), (2, ["Often"]), (3, ["Often"])] {
+        t.json(
+            "PUT",
+            &format!("/api/tournaments/1/rounds/{n}"),
+            live_round("win", &labels, &["won"]),
+        )
+        .await;
+    }
+
+    let (_, page) = t.get("/tournaments/1/live").await;
+    assert!(page.contains(r#""chips":["Often","Rare"]"#), "{page}");
+}
+
+#[tokio::test]
+async fn the_live_page_and_its_api_need_the_login() {
+    let t = TestApp::with_password(Some("secret")).await;
+    for uri in ["/tournaments/live", "/tournaments/1/live"] {
+        assert_eq!(t.get(uri).await.0, StatusCode::SEE_OTHER, "{uri}");
+    }
+    assert_eq!(
+        t.post("/tournaments/live", &[("name", "x")]).await.0,
+        StatusCode::SEE_OTHER
+    );
+    let (status, answer) = t
+        .json(
+            "PUT",
+            "/api/tournaments/1/rounds/1",
+            live_round("win", &[], &[]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(answer["error"].is_string());
+    let (status, _) = t.json("PATCH", "/api/tournaments/1", json!({})).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}

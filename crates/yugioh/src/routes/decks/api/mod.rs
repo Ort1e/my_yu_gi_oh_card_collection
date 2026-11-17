@@ -3,7 +3,7 @@
 //!
 //! Deliberate differences from Django:
 //! - a version is a list of cards and counts (`store::lists`), not of
-//!   copies: no proxy card rows, only a built version holds copies;
+//!   copies: only a built version holds copies;
 //! - categories are given to a card of a version, not to a copy;
 //! - saving the zones drops the category assignments of cards that left the
 //!   deck (Django needed the `clean_card_categories` command);

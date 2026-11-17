@@ -254,3 +254,150 @@ form.is-team .team-only {
         box-sizing: border-box;
     }
 }
+
+/* ---------- live notes (phone first: templates/tournaments/live*.html) ---------- */
+
+.live-start form,
+.live-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.live-big {
+    min-height: 3.25rem;
+    font-size: 1.25rem;
+}
+
+.live-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    align-items: baseline;
+}
+
+.live-rounds {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.live-round {
+    width: 100%;
+    min-height: 3rem;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    border: 0;
+    background-color: var(--secondary);
+    color: var(--text-light);
+    font-size: 1rem;
+}
+
+.live-round.win { border-left: 6px solid #3a9d4a; }
+.live-round.loss { border-left: 6px solid var(--danger); }
+.live-round.other { border-left: 6px solid #888; }
+
+.live-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+    gap: 0.5rem;
+}
+
+.live-buttons .btn {
+    min-height: 3rem;
+}
+
+.live-buttons button.on {
+    outline: 3px solid currentColor;
+}
+
+.live-won { background-color: #3a9d4a; }
+.live-lost { background-color: var(--danger); }
+
+.live-games {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 1rem;
+}
+
+.live-game {
+    display: inline-flex;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 2px solid #888;
+}
+
+.live-game.won { border-color: #3a9d4a; }
+.live-game.lost { border-color: var(--danger); }
+
+.live-game button {
+    min-height: 3rem;
+    min-width: 3rem;
+    border: 0;
+    padding: 0 0.75rem;
+    font-size: 1rem;
+}
+
+.live-result {
+    margin: 0;
+    font-weight: bold;
+}
+
+.live-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.live-chip {
+    min-height: 3rem;
+    padding: 0 1rem;
+    border-radius: 1.5rem;
+    border: 2px solid var(--secondary);
+    background: transparent;
+    color: inherit;
+    font-size: 1rem;
+}
+
+.live-chip.on {
+    background-color: var(--secondary);
+    color: var(--text-light);
+}
+
+.live-more {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.live-more input {
+    flex: 1;
+    min-height: 3rem;
+}
+
+/* Save and share stay under the thumb. */
+.live-save-bar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    background-color: var(--bg-color);
+}
+
+.live-save-bar .live-big {
+    flex: 1;
+}
+
+.live-fallback {
+    width: 100%;
+}
+
+.live-end form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}

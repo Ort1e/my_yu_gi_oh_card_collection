@@ -56,8 +56,8 @@ pub fn copy_value(
     price * condition_factor(status) * language_factor(language)
 }
 
-/// One owned (or once owned) copy: a non-proxy card with a purchase lot that
-/// isn't cancelled.
+/// One owned (or once owned) copy: a card with a purchase lot that isn't
+/// cancelled.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Copy {
     pub card_data_id: Option<i64>,
@@ -243,7 +243,7 @@ pub fn unit_totals_on(copies: &[Copy], date: NaiveDate, prices: &Prices) -> Unit
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LotGain {
     pub price: Decimal,
-    /// Its cards (proxies aside), and how many are still owned.
+    /// Its cards, and how many are still owned.
     pub copies: usize,
     pub owned: usize,
     /// Value of the owned ones with a market price.

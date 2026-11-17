@@ -22,8 +22,6 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        pythonPackages = pkgs.python313Packages;
-
         # your full toolchain (rustc, cargo, rust-src, rust-analyzer, etc.)
         fullToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in
@@ -39,15 +37,6 @@
             #############################################
             fullToolchain
             cargo-llvm-cov   # test coverage (needs llvm-tools-preview, rust-toolchain.toml)
-
-            ###############################
-            # Python + scientific stack
-            ###############################
-            pythonPackages.python
-            pythonPackages.venvShellHook
-            
-            autoPatchelfHook
-
 
             ##########################
             # Databases
@@ -68,21 +57,6 @@
             gh               # GitHub: the CI's runs and logs, pull requests, releases
             shellcheck       # checks deploy/**/*.sh
           ];
-
-          #############################################
-          # Python venv handling
-          #############################################
-          venvDir = "./.venv";
-
-          postVenvCreation = ''
-            unset SOURCE_DATE_EPOCH
-
-            source .venv/bin/activate
-
-            pip install -r requirements.txt
-
-            autoPatchelf ./.venv
-          '';
 
           postShellHook = ''
             unset SOURCE_DATE_EPOCH

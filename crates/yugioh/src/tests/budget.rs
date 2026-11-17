@@ -118,7 +118,7 @@ async fn the_dashboard_leads_with_the_collection_and_the_budget_page_has_the_cha
     t.deck_fixture().await;
     let (status, page) = t.get("/").await;
     assert_eq!(status, StatusCode::OK, "{page}");
-    // 2 real copies (the proxy left out), no budget yet, the lot
+    // 2 copies, no budget yet, the lot
     for text in [
         r#"<div class="value-amount">2</div>"#,
         "No budget set yet.",
