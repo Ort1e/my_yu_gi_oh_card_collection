@@ -327,7 +327,7 @@ async fn the_builder_compares_the_screen_with_a_saved_list() {
     assert_eq!(list[0]["main"], 1);
     let id = list[0]["id"].as_i64().unwrap();
 
-    // unsaved: one more copy, the proxy in the side deck
+    // unsaved: one more copy, one in the side deck
     let (status, changes) = t
         .json(
             "POST",

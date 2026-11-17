@@ -598,8 +598,7 @@ A copy flagged "to sell" (`card.for_sale`, 0032) stays owned, but
 show a ⚠. A sale lot's lines take matching flagged copies
 (`store::cards::insert_lot_cards`: same card row, a second `unite`, flag
 cleared, built slot emptied); there is no other way to sell them.
-There are no proxy `card` rows: `card.is_proxy` is a dead column, always 0
-(a migration will drop it).
+There are no proxy `card` rows (0034 dropped `card.is_proxy`).
 
 - **Built** (`deck_version.is_built`, 0010): the physical deck exists, so the
   version holds copies (`deck_version_copy`: one slot per copy of a line,

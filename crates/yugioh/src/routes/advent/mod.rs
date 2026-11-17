@@ -161,8 +161,8 @@ async fn calendar_lot(pool: &Pool, calendar_id: i64) -> sqlx::Result<Option<i64>
 }
 
 /// The card a day field names: `#1794` (an id) or a code (`MAMO-FR023`,
-/// case-insensitive), preferring a copy not already in a calendar. Only real
-/// cards (no proxy). `Err` is the message to show.
+/// case-insensitive), preferring a copy not already in a calendar. `Err` is the message to
+/// show.
 async fn find_card(conn: &mut SqliteConnection, text: &str) -> AppResult<Result<i64, String>> {
     if let Some(id) = text.strip_prefix('#') {
         let Ok(id) = id.trim().parse::<i64>() else {

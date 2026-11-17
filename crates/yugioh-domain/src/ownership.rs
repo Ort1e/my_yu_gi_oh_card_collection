@@ -54,7 +54,7 @@ pub struct LineRef {
     pub position: u32,
 }
 
-/// An owned copy of a card (a `card` row that is not a proxy).
+/// An owned copy of a card (a `card` row).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Copy {
     pub id: CopyId,

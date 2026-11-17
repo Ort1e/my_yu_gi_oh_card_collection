@@ -484,10 +484,10 @@ mod tests {
         sqlx::query(
             "INSERT INTO card_data (id, en_name, ygopro_id, json_data)
                  VALUES (3, 'tri-horned dragon', 39111158, '{\"name\": \"Tri-Horned Dragon\"}');
-             INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy) VALUES
-                 (1, 'Dragon à Trois Cornes', 'tri-horned dragon', 'RA05-FR001', 3, 0),
-                 (2, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-EN001', 3, 0),
-                 (3, 'Tri-Horned Dragon', 'tri-horned dragon', 'SDY-001', 3, 0);",
+             INSERT INTO card (id, name, en_name, code, card_data_id) VALUES
+                 (1, 'Dragon à Trois Cornes', 'tri-horned dragon', 'RA05-FR001', 3),
+                 (2, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-EN001', 3),
+                 (3, 'Tri-Horned Dragon', 'tri-horned dragon', 'SDY-001', 3);",
         )
         .execute(&t.state.pool)
         .await
@@ -504,8 +504,8 @@ mod tests {
         sqlx::query(
             "INSERT INTO card_data (id, en_name, ygopro_id, json_data)
                  VALUES (3, 'tri-horned dragon', 39111158, '{\"name\": \"Tri-Horned Dragon\"}');
-             INSERT INTO card (id, name, en_name, code, card_data_id, is_proxy)
-                 VALUES (1, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-FR001', 3, 0);",
+             INSERT INTO card (id, name, en_name, code, card_data_id)
+                 VALUES (1, 'Tri-Horned Dragon', 'tri-horned dragon', 'RA05-FR001', 3);",
         )
         .execute(&t.state.pool)
         .await

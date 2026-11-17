@@ -5,8 +5,8 @@ use super::*;
 /// A 2025 calendar with Dark Magician behind door 3.
 async fn calendar(t: &TestApp) {
     sqlx::query(
-        "INSERT INTO card (id, name, en_name, code, rarity, card_data_id, is_proxy)
-             VALUES (7, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1, 0);
+        "INSERT INTO card (id, name, en_name, code, rarity, card_data_id)
+             VALUES (7, 'Magicien Sombre', 'dark magician', 'LOB-FR005', 'Ultra Rare', 1);
          INSERT INTO advent_calendar (id, year) VALUES (1, 2025);
          INSERT INTO advent_calendar_entry (calendar_id, day, card_id, photo)
              VALUES (1, 3, 7, 'advent_calendar_photos/2025/03.jpg');",
@@ -285,7 +285,7 @@ async fn a_calendar_gets_its_own_lot() {
 
     // its cards are suggested for the days, until they are behind a door
     sqlx::query(&format!(
-        "INSERT INTO card (id, name, en_name, code, is_proxy) VALUES (8, 'Kuriboh', 'kuriboh', 'MRD-FR071', 0);
+        "INSERT INTO card (id, name, en_name, code) VALUES (8, 'Kuriboh', 'kuriboh', 'MRD-FR071');
          INSERT INTO unite (price, lot_id, card_id) VALUES ('0.00', {lot}, 8);"
     ))
     .execute(&t.state.pool)

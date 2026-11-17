@@ -192,9 +192,9 @@ pub struct DeckLine {
     pub cards: usize,
     pub value: Decimal,
     /// The cards the collection lacks.
-    pub proxies: usize,
+    pub missing: usize,
     /// What they would cost (at market price).
-    pub proxies_value: Decimal,
+    pub missing_value: Decimal,
 }
 
 /// A copy a deck plays, for its value.
@@ -251,8 +251,8 @@ pub async fn deck_values(pool: &Pool, prices: &Prices) -> sqlx::Result<Vec<DeckL
             version,
             cards: 0,
             value: Decimal::ZERO,
-            proxies: short.values().map(|n| *n as usize).sum(),
-            proxies_value: Decimal::ZERO,
+            missing: short.values().map(|n| *n as usize).sum(),
+            missing_value: Decimal::ZERO,
         };
         let mut played: HashMap<Option<i64>, usize> = HashMap::new();
         for copy in &copies {
@@ -282,7 +282,7 @@ pub async fn deck_values(pool: &Pool, prices: &Prices) -> sqlx::Result<Vec<DeckL
             let other = (line.count as usize - taken).saturating_sub(lacking);
             deck.cards += other;
             deck.value += price * Decimal::from(other);
-            deck.proxies_value += price * Decimal::from(lacking);
+            deck.missing_value += price * Decimal::from(lacking);
         }
         decks.push(deck);
     }
@@ -290,7 +290,7 @@ pub async fn deck_values(pool: &Pool, prices: &Prices) -> sqlx::Result<Vec<DeckL
 
     for deck in &mut decks {
         deck.value = deck.value.round_dp(2);
-        deck.proxies_value = deck.proxies_value.round_dp(2);
+        deck.missing_value = deck.missing_value.round_dp(2);
     }
     decks.sort_by(|a, b| b.value.cmp(&a.value).then(a.id.cmp(&b.id)));
     Ok(decks)

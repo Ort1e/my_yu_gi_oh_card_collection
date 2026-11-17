@@ -155,7 +155,7 @@ pub struct VersionLine {
     side_count: i64,
     /// Cards still missing: what the collection lacks (`lists::missing`).
     #[sqlx(default)]
-    proxies: i64,
+    missing: i64,
     /// `Edison v2`, when it plays a format.
     format_label: Option<String>,
     /// The date of the ban list it plays (`YYYY-MM-DD`).
@@ -284,7 +284,7 @@ pub async fn load_detail(pool: &Pool, id: i64, errors: Vec<String>) -> AppResult
     let mut conn = pool.acquire().await?;
     for version in &mut versions {
         let lines = lists::lines(&mut conn, version.id).await?;
-        version.proxies = lists::missing(&mut conn, version.id, &lines)
+        version.missing = lists::missing(&mut conn, version.id, &lines)
             .await?
             .iter()
             .map(|m| i64::from(m.count))

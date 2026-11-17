@@ -33,7 +33,7 @@ pub(crate) fn file_name(en_name: &str) -> String {
 }
 
 /// The picture files the cards use (those of the card data linked to a
-/// card, proxies included): the others are a cache to clean.
+/// card): the others are a cache to clean.
 pub async fn used_files(pool: &Pool) -> sqlx::Result<HashSet<String>> {
     let names: Vec<String> = sqlx::query_scalar(
         "SELECT DISTINCT en_name FROM card_data
