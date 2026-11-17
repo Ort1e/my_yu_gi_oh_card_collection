@@ -112,6 +112,16 @@ pub fn write_router() -> Router<AppState> {
         )
         .route("/tournaments/:id/delete", post(tournaments::form::delete))
         .route(
+            "/tournaments/live",
+            get(tournaments::live::start_page).post(tournaments::live::start),
+        )
+        .route("/tournaments/:id/live", get(tournaments::live::page))
+        .route("/api/tournaments/:id", patch(tournaments::api::patch_end))
+        .route(
+            "/api/tournaments/:id/rounds/:number",
+            put(tournaments::api::put_round),
+        )
+        .route(
             "/formats/add",
             get(formats::form::add_form).post(formats::form::create),
         )

@@ -130,6 +130,8 @@ async fn the_public_copy_holds_nothing_private() {
         "books-authors-1.html",
         "lots-2.html",
         "lots-3.html",
+        "tournaments-live.html",
+        "tournaments-1-live.html",
     ] {
         assert!(!out.join(page).exists(), "{page}: private");
     }

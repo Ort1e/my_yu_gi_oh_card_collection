@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Start today's tournament{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="/static/css/tournaments.css">
+{% endblock %}
+
+{% block content %}
+<div class="inside-container narrow live-start">
+  <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
+  <h1>Start today's tournament</h1>
+  {% include "partials/form_errors.html" %}
+  <form method="post" action="/tournaments/live">
+    <label for="name">Name:</label>
+    <input type="text" name="name" id="name" value="{{ name }}" maxlength="255" required>
+    <label for="location">Location:</label>
+    <input type="text" name="location" id="location" value="{{ location }}" maxlength="255">
+    <label for="version_id">Deck list:</label>
+    <select name="version_id" id="version_id">
+      <option value="">— not noted —</option>
+      {% for version in versions %}
+      <option value="{{ version.id }}" {% if version.selected %}selected{% endif %}>{{ version.name }}</option>
+      {% endfor %}
+    </select>
+    <label class="switch"><input type="checkbox" name="is_team" {% if is_team %}checked{% endif %}> Team event</label>
+    <button type="submit" class="btn live-big">Start</button>
+  </form>
+</div>
+{% endblock %}

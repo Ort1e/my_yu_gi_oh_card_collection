@@ -181,7 +181,8 @@ On the home Wi-Fi open **`http://192.168.1.202:3000`** and log in with your
 own name and password; bookmark it or "Add to home screen". From anywhere, with the
 Tailscale app logged in to our account: the app's HTTPS address
 `https://lahochenas3.<name>.ts.net` (better: HTTPS, so the live book scan
-works). The NAS is on from 7:00 to 22:00.
+works, and the share sheet of the live tournament notes). The NAS is on from
+7:00 to 22:00.
 
 **Live book scan at the plain-HTTP address** (Chrome, once per phone): open
 `chrome://flags`, search "Insecure origins treated as secure", enable it,
@@ -332,6 +333,23 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   labels, result, and games: won, lost, draw, unfinished), the conclusion;
   *Save* stays at the bottom of the screen, and on the edit page the games of
   the rounds already noted are folded.
+- **Live notes from the phone**: at the tournament, bookmark
+  **`/tournaments/live`** (button "Start today's tournament"). The first time
+  it starts today's tournament in one tap (name, place, deck and team switch
+  taken from the last one); after that it opens today's tournament. A round
+  is `W` `L` (`W`) for the games, a chip for the opponent's deck (the ones met
+  most in the last 3 months; "Another deck…" to type), then **Save & share**:
+  the round is saved and the phone's share sheet opens with a short line
+  (`R2: W 2-1 vs Mitsurugi (die won, 2nd)`) to send to the chat. Die roll,
+  bye/forfeit/double loss, comment and the end of the day (placement, players,
+  conclusion) are folded. **Share the day** sends all the lines and the record.
+  Tap a round to correct it. Everything is kept on the phone at once and sent
+  when the network is there (⏳ becomes ✓); if the session ended, "Log in again".
+  Limit: open the page *before* losing the network (no offline reload yet).
+  A round's comment shows on the public site. Games' comments, labels by hand
+  and the rest stay on the full edit page; saving that form replaces all rounds.
+  Sharing needs the HTTPS Tailscale address (see "From a phone"), else the line
+  is copied.
 - **The list played** is a snapshot of the deck's history, frozen when the
   tournament is saved. It shows on the tournament page and on the deck.
 - `/tournaments/stats` (`?since=`, `?deck=`): win rates by version, your

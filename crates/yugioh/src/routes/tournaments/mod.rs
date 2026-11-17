@@ -4,9 +4,11 @@
 //! forms are in `form.rs`, the labels page in `labels.rs` (docs/tour.md,
 //! "Tournaments").
 
+pub mod api;
 mod data;
 pub mod form;
 pub mod labels;
+pub mod live;
 pub mod stats;
 
 use askama::Template;

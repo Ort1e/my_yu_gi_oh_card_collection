@@ -739,6 +739,20 @@ played is a snapshot of the deck's history (`deck_snapshot.tournament_id`,
 frozen when the form is saved: "A deck's history"); the stats "by version"
 group the lists by the version they were taken from.
 
+- **Live notes** (`routes/tournaments/live.rs`, `api.rs`,
+  `templates/tournaments/live*.html`, `static/js/tournament_live.js`): the
+  phone page `/tournaments/:id/live` (`/tournaments/live` goes to today's
+  tournament or starts one pre-filled by `data::start_defaults`), private, never
+  in the public copy. Its data (rounds, `data::frequent_opponent_labels` over
+  90 days as chips, labels) is a JSON block. Saves go to
+  `PUT /api/tournaments/:id/rounds/:number` (`store::tournaments::set_round`:
+  replaces round `number`, no gap, so a resend is harmless) and
+  `PATCH /api/tournaments/:id` (`set_end`; `0`/`""` empty a field), 401 JSON
+  without login. The script first writes each change to a queue in
+  `localStorage` (`tournament-live-<id>`), then sends it (on save, `online`,
+  tab visible, Retry); the share line is built on the phone from the page's data
+  and the queue (`navigator.share`, else clipboard, else a selected textarea),
+  never stored. No service worker: the page must be open before the network goes.
 - **Labels** (`deck_label`): archetype/engine names, one table for your decks
   (`deck_deck_label`, on the deck edit page) and the opponents' rounds
   (`tournament_round_label`). Typed comma-separated with suggestions
