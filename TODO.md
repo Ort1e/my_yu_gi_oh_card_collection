@@ -6,15 +6,14 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ### On the NAS (owner, after the next deploy)
 
-- **Check the migrations**: the NAS is at 0023; the next build brings
-  0024–0028 (errata, deck history, formats, deck lists, booster
-  suggestions). Applied cleanly to a copy of the NAS's database (2026-11-12).
 - **The Edison format** (2026-11-03): the NAS has no format yet. Tournaments
   → Formats → Add, from the Konami list of 2010-03-01, cutoff 2010-03-01 (the
   first visit fetches the set dates from ygoprodeck, a few seconds). Check
   the cutoff against the community's definition (ygoprodeck's set dates are
   used: The Shining Darkness = 07/05/2010 there), then pick the format in the
   deck builder. Goat or others: the same way.
+- **The ⚠ to-sell badge** in the deck builder (a copy flagged to sell in a
+  built deck's slot): look at it once in a browser.
 - **`backend find-pictures`** for the cards added before the Yugipedia
   pictures (~10 min), if the cards still show ygoprodeck's art.
 
@@ -32,19 +31,21 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 
 ### Tech debt
 
-- **Dead columns**: `card.is_proxy` (always 0) and `deck_version.tournament_id`
-  (always NULL): drop them in migration `0029`, once 0024–0028 run on the
-  NAS (never rebuild a parent table with foreign keys on: `ALTER TABLE …
-  DROP COLUMN`, and the tests' `INSERT … is_proxy` in `clean_cards.rs`,
-  `tests/advent.rs`, `store/yugipedia.rs` change with it).
-- **sqlx 0.7 → 0.8+**: clears the two sqlx advisories and RUSTSEC-2026-0459
-  (SQLite's C code in `libsqlite3-sys` 0.27, ignored in `.cargo/audit.toml`
-  for now); then drop those three `ignore` lines.
+- `deck_version.tournament_id` is a dead NULL column (`REFERENCES` blocks
+  `DROP COLUMN`; rebuilding `deck_version` with foreign keys on is too risky
+  for it). Drop it only with a table rebuild done outside a transaction.
+- sqlx 0.9 (libsqlite3-sys ≥ 0.39 clears RUSTSEC-2026-0459; `rsa` in the
+  lock, never built, keeps RUSTSEC-2023-0071): then edit `.cargo/audit.toml`.
 
 ## Done
 
 One line each; the details are in `docs/tour.md` and the git history.
 
+- 2026-11-17: clean-up: the Django leftovers (importer, Python venv) removed,
+  `card.is_proxy` dropped (0034), sqlx 0.8, the NAS checked at 0033.
+- 2026-11-16: copies flagged to sell (0032), purchase lots in the public
+  copy, several decks received per lot (0033), users and permissions in the
+  DB with several Pokémon wishlists (0030).
 - 2026-11-12: checked on the NAS: the book scan on the friend's phone, the
   book data fixed by hand, Tailscale (HTTPS address, live scan), the Google
   Books key, the public copy's text size on phones.
