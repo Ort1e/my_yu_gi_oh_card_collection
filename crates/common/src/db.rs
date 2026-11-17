@@ -10,7 +10,7 @@ use crate::web::error::{AppError, AppResult};
 
 pub type Pool = SqlitePool;
 
-// Two sqlx 0.7 + SQLite pitfalls, both seen as flaky "database is locked" /
+// Two sqlx + SQLite pitfalls (found with 0.7, rules kept with 0.8), both seen as flaky "database is locked" /
 // stale reads under concurrency:
 // - never use `INSERT ... RETURNING` with `fetch_one`: the statement isn't
 //   run to completion, so its autocommit isn't committed (other connections
@@ -54,7 +54,7 @@ pub fn connect_options(db_url: &str) -> SqliteConnectOptions {
 }
 
 /// Start a transaction holding the write lock from the start (`BEGIN
-/// IMMEDIATE`, which sqlx 0.7 can't issue). With a plain deferred `BEGIN`, a
+/// IMMEDIATE`, which sqlx 0.7 couldn't issue (not retried with 0.8)). With a plain deferred `BEGIN`, a
 /// transaction that reads then writes fails at once with "database is
 /// locked" when another connection (e.g. the background card-data linking)
 /// wrote in between; holding the lock makes it wait instead. Use this for
@@ -135,7 +135,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Money {
     fn encode_by_ref(
         &self,
         buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
-    ) -> sqlx::encode::IsNull {
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         <String as sqlx::Encode<sqlx::Sqlite>>::encode(self.0.to_string(), buf)
     }
 }

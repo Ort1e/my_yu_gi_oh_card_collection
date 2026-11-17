@@ -55,7 +55,7 @@ The port is finished; the project now serves as Rust practice for the owner, who
 | Layer | Tech |
 |---|---|
 | HTTP | axum 0.7, tower-http (ServeDir, trace) |
-| DB | SQLite (WAL) via sqlx 0.7 (runtime queries, `sqlx::migrate!`) |
+| DB | SQLite (WAL) via sqlx 0.8 (runtime queries, `sqlx::migrate!`) |
 | Pages | askama 0.12 + askama_axum templates, scripts in `static/js/` (no inline JS), Chart.js from a CDN on the budget and value pages |
 | Deck builder | Svelte 4 + Vite 5 app in `frontend/` (Chart.js), **TypeScript** (svelte-check), built to `static/deck-builder/` (gitignored), talks only to `/api/*`; its API's types generated from Rust (`ts-rs`) |
 | Env | Nix flake (`flake.nix`, `.envrc` → `use flake`), Rust 1.88.0 pinned in `rust-toolchain.toml` |
@@ -155,7 +155,7 @@ Backend env vars (defaults): `BIND_ADDR` (`127.0.0.1:3000`), `APP_PASSWORD` (see
 - Lot decks (0031): `deck_snapshot.lot_id` (0033: several decks received per lot, a plain index; the list as received, kept like a tournament's: `snapshots::{lot_deck, lot_freeze, append}`), the version behind it is built (`lists::add_copies` pins the lot's copies). Private: "Received in lot N" is inside `{% if !common::export::public_copy() %}`.
 - To sell (0032): `card.for_sale` 0/1: the copy is still owned, a deck takes it last (`ownership::take_order`), `/cards/to-sell` (Collection menu) lists the flagged ones, by set for Cardmarket's bulk sell. Set from the card page (`POST /cards/:id/for-sale`) and the lot page (`POST /lots/:id/for-sale`, checkboxes); **only a sale lot validates a sale**: `store::cards::insert_lot_cards` makes each line of a sale lot take a matching flagged card (code, rarity, condition first) instead of a new one, clears the flag and empties its built slot. Private: never in the public copy.
 - `sqlx::migrate!` checksums applied migrations. Cutover is done: **never edit an existing migration**, only add new numbered files (next: `0035_…sql`). They run on the NAS's database when it starts the next build of `main`.
-- sqlx 0.7 + SQLite concurrency (see `common/src/db.rs`): write transactions start with `db::begin_write(&pool)`, never `pool.begin()`; never `INSERT … RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. Do network calls (ygoprodeck, Open Library) **before** opening a write transaction: they write card data through the pool.
+- sqlx 0.8 + SQLite concurrency (see `common/src/db.rs`): write transactions start with `db::begin_write(&pool)`, never `pool.begin()`; never `INSERT … RETURNING` + `fetch_one` (not committed until the statement is reset) — use `execute()?.last_insert_rowid()`. Do network calls (ygoprodeck, Open Library) **before** opening a write transaction: they write card data through the pool.
 - SQLite + FKs: never drop/rebuild a parent table in a migration while `foreign_keys` is on — `DROP TABLE` fires ON DELETE CASCADE in children.
 
 ## Privacy rule: shipment PDFs

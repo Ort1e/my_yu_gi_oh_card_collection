@@ -1,16 +1,13 @@
 # `cargo audit` (run by the CI): advisories checked and accepted, with why.
-# Look at them again when sqlx moves to 0.8.
 [advisories]
 ignore = [
     # rsa (Marvin attack, no fixed version): only in Cargo.lock through
-    # sqlx's MySQL driver, which is never built (`cargo tree -i rsa` is empty).
+    # sqlx's MySQL driver (sqlx-mysql, pulled by the `macros` feature), which
+    # is never built (`cargo tree -i rsa` is empty).
     "RUSTSEC-2023-0071",
-    # sqlx 0.7 (casts in the Postgres/MySQL binary protocols): SQLite isn't
-    # concerned; fixed by sqlx 0.8 (a separate upgrade).
-    "RUSTSEC-2024-0363",
-    # SQLite's C code bundled by libsqlite3-sys 0.27 (CVE-2026-119375, medium):
+    # SQLite's C code bundled by libsqlite3-sys 0.30 (CVE-2026-119375, medium):
     # the app only opens its own database file and never runs untrusted SQL
-    # or reads a foreign database. Fixed by libsqlite3-sys >= 0.39, i.e. the
-    # same sqlx upgrade (TODO.md, tech debt).
+    # or reads a foreign database. Fixed by libsqlite3-sys >= 0.39, which sqlx
+    # 0.8 doesn't allow (it needs sqlx 0.9): look at it again with sqlx 0.9.
     "RUSTSEC-2026-0459",
 ]
