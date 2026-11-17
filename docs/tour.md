@@ -63,7 +63,7 @@ The app has four goals, and the tour follows them after the foundations:
    (no DB, no HTTP)                           │ migrations/ applied at startup
 ```
 
-The Cargo workspace (`crates/*` and `importer`):
+The Cargo workspace (`crates/*`):
 
 | Crate | What it is | Django equivalent |
 |---|---|---|
@@ -76,7 +76,6 @@ The Cargo workspace (`crates/*` and `importer`):
 | `crates/yugioh-domain/` | Pure Yu-Gi-Oh! business logic, unit-tested | model methods, `monte_carlos/`, `shipment_reader/` |
 | `crates/books-domain/`, `crates/pokemon-domain/` | The other collections' pure logic | (none) |
 | `crates/common-domain/` | Pure logic shared by both card collections: conditions and their value factors, Cardmarket's price guide file (`cardmarket`) | |
-| `importer/` | One-off Django `dumpdata` loader, used for the cutover | `loaddata` |
 
 Dependencies only go down: a collection uses its domain crate, `common`
 (and `advent`); `backend` uses them all; nothing uses `backend`. Plus
