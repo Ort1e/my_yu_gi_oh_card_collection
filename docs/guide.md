@@ -184,6 +184,16 @@ Tailscale app logged in to our account: the app's HTTPS address
 works, and the share sheet of the live tournament notes). The NAS is on from
 7:00 to 22:00.
 
+**Install it as an app** (the HTTPS address, Chrome): menu → *Install app*
+(or *Add to home screen*). The site then opens full screen from its icon,
+and a long press on the icon offers shortcuts: *Today's tournament*, *Open a
+Pokémon booster*, *Add a book*, *Add a lot*. **Without network** the pages
+already opened on that phone still show, as last seen (and their pictures);
+saving needs the network, except the live tournament notes, which wait on the
+phone and are sent later. Logging out wipes what the phone kept. Tip: in
+Android's settings, turn on Tailscale's *Always-on VPN*, so the app always
+reaches the NAS.
+
 **Live book scan at the plain-HTTP address** (Chrome, once per phone): open
 `chrome://flags`, search "Insecure origins treated as secure", enable it,
 type `http://192.168.1.202:3000` in its box, "Relaunch". Without it, "Scan"
@@ -354,10 +364,9 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   "Other result…", the end of the day (placement, players, conclusion) is
   folded. Everything is kept on the phone at once and sent when the network
   is there (⏳ becomes ✓); if the session ended, "Log in again".
-  **Install it as an app** (HTTPS Tailscale address, Chrome's menu → *Add to
-  home screen* / *Install app*): an icon that opens today's tournament full
-  screen, **even with no network** once the page has been opened there with
-  it. Tip: in Android's settings, turn on Tailscale's *Always-on VPN*.
+  With the site installed as an app ("From a phone"), the shortcut *Today's
+  tournament* opens it, **even with no network** once it has been opened on
+  the phone with it.
   A round's comment shows on the public site. Games' comments and the rest
   stay on the full edit page; saving that form replaces all rounds.
   Sharing needs the HTTPS address, else the line is copied.

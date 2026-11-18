@@ -9,7 +9,6 @@
 
 use askama::Template;
 use axum::extract::{Path, State};
-use axum::http::header;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Form, Json};
 use serde::Serialize;
@@ -251,21 +250,4 @@ pub async fn data_api(
     Path(id): Path<i64>,
 ) -> AppResult<Json<LiveJson>> {
     Ok(Json(live_data(&state, id).await?.0))
-}
-
-/// The service worker's own code (`static/js/live_sw.js`), in the page's
-/// tree: a worker controls only the pages under its address, so this one
-/// controls `/tournaments/` and nothing else.
-const SERVICE_WORKER: &str = include_str!("../../../../../static/js/live_sw.js");
-
-/// `GET /tournaments/live-sw.js` (public: the file holds no data).
-pub async fn service_worker() -> Response {
-    (
-        [
-            (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
-            (header::CACHE_CONTROL, "no-cache"),
-        ],
-        SERVICE_WORKER,
-    )
-        .into_response()
 }

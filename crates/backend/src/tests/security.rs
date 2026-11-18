@@ -305,6 +305,30 @@ async fn logging_out_clears_the_browser_cache() {
 }
 
 #[tokio::test]
+async fn the_app_s_service_worker_is_public_even_in_private_mode() {
+    let t = TestApp::with_config(deployed()).await;
+    let response = t
+        .router()
+        .oneshot(Request::get("/sw.js").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    // it holds no data, and the browser fetches it without the cookie's help
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response.headers()[header::CONTENT_TYPE]
+        .to_str()
+        .unwrap()
+        .starts_with("text/javascript"));
+    let (_, body) = read(response).await;
+    assert!(body.contains("addEventListener('fetch'"));
+
+    // every page says where the manifest is
+    let (status, page) = t.get("/login").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(r#"<link rel="manifest" href="/static/app.webmanifest">"#));
+    assert!(page.contains("/static/js/app_install.js"));
+}
+
+#[tokio::test]
 async fn the_media_folder_cannot_be_left() {
     let t = TestApp::new().await;
     std::fs::create_dir_all(&t.state.media_dir).unwrap();

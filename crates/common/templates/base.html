@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="/static/css/header.css">
     <link rel="stylesheet" href="/static/css/form.css">
     <link rel="stylesheet" href="/static/css/books.css">
+    {% if !common::export::public_copy() %}
+    <link rel="manifest" href="/static/app.webmanifest">
+    <meta name="theme-color" content="#04926f">
+    {% endif %}
     {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -27,6 +31,9 @@
     <script src="/static/js/nav.js"></script>
     <script src="/static/js/back_link.js"></script>
     <script src="/static/js/confirm.js"></script>
+    {% if !common::export::public_copy() %}
+    <script src="/static/js/app_install.js"></script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>

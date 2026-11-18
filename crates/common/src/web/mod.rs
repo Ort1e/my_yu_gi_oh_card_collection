@@ -1,6 +1,7 @@
 //! HTTP plumbing shared by every collection: errors, form parsing,
 //! pagination, template filters, the login.
 
+pub mod app;
 pub mod auth;
 pub mod error;
 pub mod filters;

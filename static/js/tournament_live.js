@@ -12,7 +12,7 @@
 //
 // Nothing is lost by locking the phone or losing the network: every change is
 // in the queue (`localStorage['tournament-live-<id>']`) until the app says OK.
-// The page itself may come from the phone's cache (static/js/live_sw.js): its
+// The page itself may come from the phone's cache (static/js/sw.js): its
 // data are then old, so the app's latest answer is kept too
 // (`localStorage['tournament-live-<id>-known']`, updated with each round sent).
 

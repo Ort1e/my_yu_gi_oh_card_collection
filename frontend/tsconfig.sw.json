@@ -1,5 +1,5 @@
 {
-    // The live tournament page's service worker (static/js/live_sw.js): a
+    // The app's service worker (static/js/sw.js): a
     // page script, but it runs in a worker, so it is checked with the
     // WebWorker library instead of the DOM's.
     "compilerOptions": {
@@ -15,5 +15,5 @@
         "skipLibCheck": true,
         "types": []
     },
-    "include": ["../static/js/live_sw.js"]
+    "include": ["../static/js/sw.js"]
 }

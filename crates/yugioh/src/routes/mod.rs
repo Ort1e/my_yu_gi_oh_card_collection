@@ -65,10 +65,6 @@ pub fn router() -> Router<AppState> {
         .route("/tournaments", get(tournaments::list))
         .route("/tournaments/stats", get(tournaments::stats::page))
         .route("/tournaments/labels", get(tournaments::labels::list))
-        .route(
-            "/tournaments/live-sw.js",
-            get(tournaments::live::service_worker),
-        )
         .route("/tournaments/:id", get(tournaments::detail))
         .route("/api/sets/:code", get(reference::sets::set_cards))
         .route("/api/deck-versions/:id", get(decks::api::get_version))

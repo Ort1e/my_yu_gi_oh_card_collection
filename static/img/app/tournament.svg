@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The live tournament notes' app icon: a cup on the app's green, inside
+  <!-- The "Today's tournament" shortcut icon: a cup on the app's green, inside
        the maskable safe zone (the middle 80 %). The PNGs are made from it:
-       magick -background none icon.svg -resize 512x512 icon-512.png (and 192). -->
+       magick -background none tournament.svg -resize 96x96 tournament-96.png. -->
   <rect width="512" height="512" fill="#04926f"/>
   <g fill="#ffffff">
     <path d="M176 136h160v72a80 80 0 0 1-160 0z"/>

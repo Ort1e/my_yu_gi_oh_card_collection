@@ -159,6 +159,7 @@ pub fn app(state: AppState, collections: Vec<Routes>) -> Router {
         .merge(protected)
         .route("/login", get(auth::page).post(auth::login))
         .route("/logout", post(auth::logout))
+        .route("/sw.js", get(web::app::service_worker))
         // One INFO line per page or API call: method, path, status and time.
         // A layer only wraps the routes added before it, so the files below
         // (card images, CSS, media) are not logged.

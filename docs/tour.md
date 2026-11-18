@@ -755,17 +755,10 @@ group the lists by the version they were taken from.
   and the queue (`navigator.share`, else clipboard, else a selected textarea),
   never stored. The quick form (die, games: `wentFirst` guesses 1st/2nd)
   queues the round; its summary (labels, comment) is queued as it changes.
-- **The installable app** (`static/live.webmanifest`, icons in
-  `static/img/live/` from `icon.svg`): `static/js/live_sw.js`, embedded by
-  `include_str!` and served at `/tournaments/live-sw.js` (public; scope
-  `/tournaments/`), registered by `static/js/live_install.js`. Live pages
-  network first then cached, `/tournaments/live` offline → the last live page,
-  their CSS/scripts cached and refreshed behind, `/api/*` never. A cached page
-  has old data: the script keeps the app's last answer
+- **Offline**: the page may come from the phone's cache (the service worker,
+  "The app on a phone"), with old data: the script keeps the app's last answer
   (`tournament-live-<id>-known`, updated after each send) and asks the API
-  again. Bump `CACHE` in the worker when its rules change; `/logout` sends
-  `Clear-Site-Data: "cache"`. Checked by `frontend/tsconfig.sw.json`
-  (WebWorker library).
+  again; offline, `/tournaments/live` opens the last live page.
 - **Archetypes** (`ygo_archetype`, 0035): ygoprodeck's `archetypes.php`,
   name fragments left out (`yugioh_domain::archetype::names`), refreshed with
   the weekly prices (`store::card_data::refresh_archetypes`; once on the live
@@ -1038,6 +1031,35 @@ for every collection:
 | card conditions and their value factors | `common-domain` | Yu-Gi-Oh! and Pokémon values |
 | a short sparkle (30 particles, `element.animate()` on transform + opacity, gone after ~5 s): `glitter.js` opens on the add pages every time, with `data-glitter="festive"` on the homes only on a festive day, once a day per browser (`localStorage` `glitter-last`). `paletteFor(date, addPage)` gives the colours and the small SVG pictures of `static/img/glitter/` (Noto Emoji, Apache 2.0, `LICENSE` beside them); the add pages' Christmas lasts 1-26 December, with three baubles carrying the day number (mini advent calendar). A new occasion = a date rule in `paletteFor` + a palette + its picture names. Test with `?glitter-date=YYYY-MM-DD`, `?glitter=force`; skipped under reduced motion and when the page shows form errors | `static/js/glitter.js` | the add pages, the three homes (public copy included) |
 | photos made web-ready (upright, 1600 px, no metadata) | `common::photos` | the calendars |
+
+## The app on a phone
+
+The site installs as an app (a PWA): `static/app.webmanifest` (name, icons in
+`static/img/app/` made from their SVGs, the long-press shortcuts), linked by
+`base.html` with `static/js/app_install.js`, both outside the public copy.
+That script registers the service worker `static/js/sw.js`, which
+`common::web::app` embeds (`include_str!`) and serves at `/sw.js`: a worker
+controls only the pages under its own address, so it is at the root, public
+even in private mode (it holds no data).
+
+What it does with each request (the rules are at the top of `sw.js`):
+- **pages**: network first, kept in the cache (`PAGES_MAX`, oldest out); the
+  cached copy when offline or when the network takes more than `WAIT_MS` (a
+  venue's bad network), the late answer refreshing it. A redirect (to the
+  login) or an error is never kept. Offline and never seen: a short page.
+- **`/static/`**: the same, so an update is never shown stale (the server's
+  `no-cache` already asks for that).
+- **pictures** (`/card-image/`, `/card-picture/`, `/pokemon/card-image/`,
+  book covers): cache first, `PICTURES_MAX` kept.
+- **never**: `/api/`, `/books/api/`, `/pokemon/api/`, `/login`, `/logout`,
+  `/media/` (the shipment PDFs, the calendars' photos), anything not `GET`.
+
+Saving needs the network, except the live tournament page, whose script
+queues its rounds ("Tournaments"). Bump `VERSION` in `sw.js` when its rules
+change (the old caches go). `/logout` sends `Clear-Site-Data: "cache"`, so a
+phone logged out keeps no private page. The worker is checked by
+`frontend/tsconfig.sw.json` (the WebWorker library, not the DOM's). Browsers
+only allow a service worker on HTTPS (the Tailscale address) or `localhost`.
 
 ## Login
 

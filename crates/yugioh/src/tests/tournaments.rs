@@ -600,24 +600,6 @@ async fn the_live_page_and_its_api_need_the_login() {
     let (status, answer) = t.json("GET", "/api/tournaments/1/live", json!(null)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(answer["error"].is_string());
-
-    // the service worker holds no data: public, so the browser can fetch it
-    let response = t
-        .router()
-        .oneshot(
-            Request::get("/tournaments/live-sw.js")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    assert!(response.headers()[header::CONTENT_TYPE]
-        .to_str()
-        .unwrap()
-        .starts_with("text/javascript"));
-    let (_, body) = read(response).await;
-    assert!(body.contains("addEventListener('fetch'"));
 }
 
 #[tokio::test]
@@ -641,10 +623,6 @@ async fn the_live_api_gives_the_page_s_data() {
 
     let (status, _) = t.json("GET", "/api/tournaments/9/live", json!(null)).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-
-    // the page says where its manifest is
-    let (_, page) = t.get("/tournaments/1/live").await;
-    assert!(page.contains(r#"rel="manifest" href="/static/live.webmanifest""#));
 }
 
 // ---------- archetypes ----------

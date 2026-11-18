@@ -18,5 +18,5 @@
     },
     "include": ["../static/js/*.js", "static-globals.d.ts"],
     // the service worker runs in a worker, not a page: tsconfig.sw.json
-    "exclude": ["../static/js/live_sw.js"]
+    "exclude": ["../static/js/sw.js"]
 }
