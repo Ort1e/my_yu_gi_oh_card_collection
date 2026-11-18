@@ -28,6 +28,18 @@ Add the next ideas here (a spec in `docs/specs/` for a big one).
 - Once: a scan of the public site (testssl.sh, OWASP ZAP baseline) and of
   the app from the home network (ZAP).
 - Dependabot for the Cargo and npm updates (weekly, onto `dev`).
+- **Discord webhook for the live tournament notes** (owner's choice over a
+  Telegram or a full bot, 2026-11-18): the NAS posts each round line and the
+  day's summary to a channel. `DISCORD_WEBHOOK_URL` setting (a secret like
+  the Google key: never logged, errors `without_url()`), `common::discord::post`
+  (`{"content"}` ≤ 2000 chars, `allowed_mentions: {parse: []}`, one retry on
+  429). One formatter, the JS one: `tournament_live.js` sends `line(round)` /
+  `dayText()` as `share_line` in the round `PUT` and `share_text` in the end
+  `PATCH`. Migration: `tournament.post_to_discord` (opt-in on the live start
+  page, shown only with a webhook) + `tournament_round.posted_line` (a queue
+  re-send posts nothing, a changed line is posted with "✏️"). Post after the
+  commit in a `tokio::spawn`, a failure only a `warn!`; nothing under
+  `cfg(test)`. Plumbing: Claude's.
 
 ### Tech debt
 

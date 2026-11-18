@@ -230,6 +230,8 @@ async fn the_public_copy_holds_nothing_private() {
         "Show on the public site",
         "cardmarket.com",
         "name=\"version_name\"",
+        "webmanifest",
+        "app_install.js",
     ] {
         assert!(!pages.contains(private), "{private} is in the public copy");
     }

@@ -16,5 +16,7 @@
         "skipLibCheck": true,
         "types": []
     },
-    "include": ["../static/js/*.js", "static-globals.d.ts"]
+    "include": ["../static/js/*.js", "static-globals.d.ts"],
+    // the service worker runs in a worker, not a page: tsconfig.sw.json
+    "exclude": ["../static/js/sw.js"]
 }

@@ -118,6 +118,10 @@ pub fn write_router() -> Router<AppState> {
         .route("/tournaments/:id/live", get(tournaments::live::page))
         .route("/api/tournaments/:id", patch(tournaments::api::patch_end))
         .route(
+            "/api/tournaments/:id/live",
+            get(tournaments::live::data_api),
+        )
+        .route(
             "/api/tournaments/:id/rounds/:number",
             put(tournaments::api::put_round),
         )

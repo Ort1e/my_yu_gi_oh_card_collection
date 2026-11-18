@@ -5,6 +5,7 @@
 
 use chrono::NaiveDate;
 use sqlx::SqliteConnection;
+use yugioh_domain::archetype;
 use yugioh_domain::tournament::{Die, GameResult, RoundResult};
 
 use crate::store::snapshots;
@@ -269,8 +270,16 @@ pub async fn set_end(
 }
 
 /// The id of a label by name (case-insensitive: an existing label keeps its
-/// spelling), created when new.
+/// spelling), created when new. A name that matches an archetype
+/// (`yugioh_domain::archetype::key`) takes the archetype's spelling.
 pub async fn label_id(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<i64> {
+    let archetype: Option<String> =
+        sqlx::query_scalar("SELECT name FROM ygo_archetype WHERE key = ? ORDER BY name LIMIT 1")
+            .bind(archetype::key(name))
+            .fetch_optional(&mut *conn)
+            .await?;
+    let name = archetype.as_deref().unwrap_or(name);
+
     let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM deck_label WHERE name = ?")
         .bind(name)
         .fetch_optional(&mut *conn)
@@ -356,6 +365,31 @@ pub async fn merge_labels(conn: &mut SqliteConnection, from: i64, into: i64) -> 
         .execute(&mut *conn)
         .await?;
     Ok(())
+}
+
+/// Give the labels that match an archetype its spelling
+/// (`yugioh_domain::archetype::relabels`): renamed, or merged into the label
+/// that already has it. Returns how many labels changed.
+pub async fn relabel(conn: &mut SqliteConnection) -> sqlx::Result<usize> {
+    let labels: Vec<(i64, String)> = sqlx::query_as("SELECT id, name FROM deck_label ORDER BY id")
+        .fetch_all(&mut *conn)
+        .await?;
+    let archetypes: Vec<(String, String)> =
+        sqlx::query_as("SELECT name, key FROM ygo_archetype ORDER BY name")
+            .fetch_all(&mut *conn)
+            .await?;
+
+    let changes = archetype::relabels(&labels, &archetypes);
+    for (id, name) in &changes {
+        if !rename_label(conn, *id, name).await? {
+            let into: i64 = sqlx::query_scalar("SELECT id FROM deck_label WHERE name = ?")
+                .bind(name)
+                .fetch_one(&mut *conn)
+                .await?;
+            merge_labels(conn, *id, into).await?;
+        }
+    }
+    Ok(changes.len())
 }
 
 /// Delete the labels no deck and no round uses any more.

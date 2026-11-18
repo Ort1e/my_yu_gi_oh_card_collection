@@ -1,11 +1,13 @@
 //! The Yu-Gi-Oh! part of `refresh-prices`: today's market prices from
 //! ygoprodeck into `card_price` (`store::prices::ygoprodeck`), then
 //! Cardmarket's price guide (`store::prices::cardmarket`), then the sets'
-//! TCG dates for the formats (`store::formats`). The backend runs it with
-//! the Pokémon prices, by hand and every week ([`due`]).
+//! TCG dates for the formats (`store::formats`), then the archetype names
+//! (`store::card_data::refresh_archetypes`). The backend runs it with the
+//! Pokémon prices, by hand and every week ([`due`]).
 
 use common::schedule::is_due;
 
+use crate::store::card_data::refresh_archetypes;
 use crate::store::db::today;
 use crate::store::formats::refresh_set_dates;
 use crate::store::prices::cardmarket;
@@ -25,6 +27,11 @@ pub async fn refresh(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
     if !dry_run {
         let sets = refresh_set_dates(&state.pool, &state.http).await?;
         println!("{sets} sets' release dates");
+        let report = refresh_archetypes(&state.pool, &state.http).await?;
+        println!(
+            "{} archetypes, {} labels given their spelling",
+            report.archetypes, report.relabelled
+        );
     }
     Ok(())
 }
@@ -42,6 +49,9 @@ pub async fn refresh_in_background(state: &AppState) {
     }
     if let Err(e) = refresh_set_dates(&state.pool, &state.http).await {
         tracing::warn!("background set dates refresh: {e}");
+    }
+    if let Err(e) = refresh_archetypes(&state.pool, &state.http).await {
+        tracing::warn!("background archetypes refresh: {e}");
     }
 }
 

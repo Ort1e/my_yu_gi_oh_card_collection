@@ -378,7 +378,43 @@ form.is-team .team-only {
     min-height: 3rem;
 }
 
-/* Save and share stay under the thumb. */
+/* a round without its opponent's deck yet */
+.live-todo {
+    margin-left: 0.5rem;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background-color: var(--bg-color);
+    color: var(--primary);
+    font-size: 0.8em;
+}
+
+/* a saved round's summary, written when there is time */
+.live-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--secondary);
+    border-radius: var(--radius);
+}
+
+.live-summary h2,
+.live-summary h3 {
+    margin: 0;
+}
+
+/* a 1st/2nd guessed from the die and the games: tap to change */
+.live-game-turn.guessed {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.live-die button {
+    min-height: 2.75rem;
+}
+
+/* Save stays under the thumb. */
 .live-save-bar {
     position: sticky;
     bottom: 0;
@@ -386,6 +422,11 @@ form.is-team .team-only {
     gap: 0.5rem;
     padding: 0.5rem 0;
     background-color: var(--bg-color);
+}
+
+/* the match is decided: time to save */
+.live-save-bar.ready .live-big {
+    box-shadow: 0 0 0 4px var(--secondary);
 }
 
 .live-save-bar .live-big {

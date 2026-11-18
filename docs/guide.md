@@ -184,6 +184,16 @@ Tailscale app logged in to our account: the app's HTTPS address
 works, and the share sheet of the live tournament notes). The NAS is on from
 7:00 to 22:00.
 
+**Install it as an app** (the HTTPS address, Chrome): menu → *Install app*
+(or *Add to home screen*). The site then opens full screen from its icon,
+and a long press on the icon offers shortcuts: *Today's tournament*, *Open a
+Pokémon booster*, *Add a book*, *Add a lot*. **Without network** the pages
+already opened on that phone still show, as last seen (and their pictures);
+saving needs the network, except the live tournament notes, which wait on the
+phone and are sent later. Logging out wipes what the phone kept. Tip: in
+Android's settings, turn on Tailscale's *Always-on VPN*, so the app always
+reaches the NAS.
+
 **Live book scan at the plain-HTTP address** (Chrome, once per phone): open
 `chrome://flags`, search "Insecure origins treated as secure", enable it,
 type `http://192.168.1.202:3000` in its box, "Relaunch". Without it, "Scan"
@@ -337,19 +347,33 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   **`/tournaments/live`** (button "Start today's tournament"). The first time
   it starts today's tournament in one tap (name, place, deck and team switch
   taken from the last one); after that it opens today's tournament. A round
-  is `W` `L` (`W`) for the games, a chip for the opponent's deck (the ones met
-  most in the last 3 months; "Another deck…" to type), then **Save & share**:
-  the round is saved and the phone's share sheet opens with a short line
-  (`R2: W 2-1 vs Mitsurugi (die won, 2nd)`) to send to the chat. Die roll,
-  bye/forfeit/double loss, comment and the end of the day (placement, players,
-  conclusion) are folded. **Share the day** sends all the lines and the record.
-  Tap a round to correct it. Everything is kept on the phone at once and sent
-  when the network is there (⏳ becomes ✓); if the session ended, "Log in again".
-  Limit: open the page *before* losing the network (no offline reload yet).
-  A round's comment shows on the public site. Games' comments, labels by hand
-  and the rest stay on the full edit page; saving that form replaces all rounds.
-  Sharing needs the HTTPS Tailscale address (see "From a phone"), else the line
-  is copied.
+  is noted in two steps, as it goes at a tournament:
+  - **right after the games** (a few taps): *Die won / Die lost*, then `W`
+    `L` `D` for each game. Who went first is guessed (game 1 from the die,
+    then the loser of the previous game goes first; after a draw the die is
+    rolled again, so it stays "1st/2nd?"); tap it to change it. **Save the
+    round** lights up once the match is decided.
+  - **when there is time** (sometimes never): the round's summary opens
+    under it: a chip for the opponent's deck (the ones met most in the last
+    3 months; "Another deck…" to type, with every archetype known to
+    ygoprodeck as suggestions), a comment. Saved as you tap or type. A round
+    without a deck shows "to complete"; tap it to write its summary later.
+  **Share** (in the summary) opens the phone's share sheet with a short line
+  (`R2: W 2-1 vs Mitsurugi (die won, 2nd)`) for the chat; **Share the day**
+  sends all the lines and the record. Bye/forfeit/double loss are under
+  "Other result…", the end of the day (placement, players, conclusion) is
+  folded. Everything is kept on the phone at once and sent when the network
+  is there (⏳ becomes ✓); if the session ended, "Log in again".
+  With the site installed as an app ("From a phone"), the shortcut *Today's
+  tournament* opens it, **even with no network** once it has been opened on
+  the phone with it.
+  A round's comment shows on the public site. Games' comments and the rest
+  stay on the full edit page; saving that form replaces all rounds.
+  Sharing needs the HTTPS address, else the line is copied.
+- **Deck names** (labels): typed freely; a name that is an archetype's
+  (`snake eye`, `Snake-Eye`) takes ygoprodeck's spelling, and the labels
+  already saved are given it with the weekly price refresh (merged when
+  both exist).
 - **The list played** is a snapshot of the deck's history, frozen when the
   tournament is saved. It shows on the tournament page and on the deck.
 - `/tournaments/stats` (`?since=`, `?deck=`): win rates by version, your

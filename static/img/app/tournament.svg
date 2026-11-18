@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The "Today's tournament" shortcut icon: a cup on the app's green, inside
+       the maskable safe zone (the middle 80 %). The PNGs are made from it:
+       magick -background none tournament.svg -resize 96x96 tournament-96.png. -->
+  <rect width="512" height="512" fill="#04926f"/>
+  <g fill="#ffffff">
+    <path d="M176 136h160v72a80 80 0 0 1-160 0z"/>
+    <path d="M176 152h-40a8 8 0 0 0-8 8v16a56 56 0 0 0 56 56h4v-24h-4a32 32 0 0 1-32-32v-0h24z"/>
+    <path d="M336 152h40a8 8 0 0 1 8 8v16a56 56 0 0 1-56 56h-4v-24h4a32 32 0 0 0 32-32v-0h-24z"/>
+    <rect x="240" y="284" width="32" height="52"/>
+    <rect x="196" y="336" width="120" height="32" rx="6"/>
+  </g>
+  <text x="256" y="216" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="64" fill="#04926f">W</text>
+</svg>

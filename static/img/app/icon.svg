@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The app's icon (static/app.webmanifest): two cards on the app's green,
+       inside the maskable safe zone (the middle 80 %). The PNGs are made from it:
+       magick -background none icon.svg -resize 512x512 icon-512.png (and 192). -->
+  <rect width="512" height="512" fill="#04926f"/>
+  <g transform="rotate(-12 256 256)">
+    <rect x="150" y="128" width="170" height="248" rx="14" fill="#0018a3" stroke="#ffffff" stroke-width="10"/>
+  </g>
+  <g transform="rotate(8 256 256)">
+    <rect x="196" y="136" width="170" height="248" rx="14" fill="#c6f4ff" stroke="#ffffff" stroke-width="10"/>
+    <rect x="216" y="160" width="130" height="118" rx="6" fill="#04926f"/>
+    <rect x="216" y="296" width="130" height="10" rx="5" fill="#0018a3"/>
+    <rect x="216" y="318" width="96" height="10" rx="5" fill="#0018a3"/>
+    <rect x="216" y="340" width="112" height="10" rx="5" fill="#0018a3"/>
+  </g>
+</svg>

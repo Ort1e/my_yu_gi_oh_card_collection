@@ -10,11 +10,12 @@
 use askama::Template;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Form;
+use axum::{Form, Json};
 use serde::Serialize;
 
 use super::data::{self, StartDefaults, Which};
 use super::form::{version_choices, VersionChoice};
+use crate::store::card_data::ensure_archetypes;
 use crate::store::db::{begin_write, today};
 use crate::store::tournaments::{self, Played, Results, TournamentHead};
 use crate::web::error::{AppResult, OrNotFound};
@@ -150,7 +151,7 @@ struct EndJson {
 
 /// What the script starts from.
 #[derive(Serialize)]
-struct LiveJson {
+pub struct LiveJson {
     id: i64,
     name: String,
     is_team: bool,
@@ -172,8 +173,10 @@ pub struct LivePage {
     data_json: String,
 }
 
-/// `GET /tournaments/:id/live`.
-pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LivePage> {
+/// The live data of tournament `id` (404 when none), and what the page's
+/// head shows: the deck played.
+async fn live_data(state: &AppState, id: i64) -> AppResult<(LiveJson, String)> {
+    ensure_archetypes(&state.pool, &state.http).await?;
     let loaded = data::load(
         &state.pool,
         &Which {
@@ -219,6 +222,12 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
             conclusion: t.conclusion.clone().unwrap_or_default(),
         },
     };
+    Ok((json, t.version_full_name().unwrap_or_default()))
+}
+
+/// `GET /tournaments/:id/live`.
+pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<LivePage> {
+    let (json, deck) = live_data(&state, id).await?;
 
     // no `</script>` can end the data block early
     let data_json = serde_json::to_string(&json)
@@ -227,9 +236,18 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
 
     Ok(LivePage {
         id,
-        name: t.name.clone(),
-        deck: t.version_full_name().unwrap_or_default(),
-        is_team: t.is_team,
+        name: json.name,
+        deck,
+        is_team: json.is_team,
         data_json,
     })
+}
+
+/// `GET /api/tournaments/:id/live`: the same data as the page's, fresh (a
+/// page opened from the phone's cache asks for it).
+pub async fn data_api(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> AppResult<Json<LiveJson>> {
+    Ok(Json(live_data(&state, id).await?.0))
 }

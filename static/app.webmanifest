@@ -1,0 +1,27 @@
+{
+    "name": "Card Collection",
+    "short_name": "Collection",
+    "description": "The Yu-Gi-Oh! and Pokémon cards, the decks and tournaments, the books.",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "theme_color": "#04926f",
+    "background_color": "#c6f4ff",
+    "icons": [
+        { "src": "/static/img/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/static/img/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/static/img/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ],
+    "shortcuts": [
+        {
+            "name": "Today's tournament",
+            "short_name": "Tournament",
+            "url": "/tournaments/live",
+            "icons": [{ "src": "/static/img/app/tournament-96.png", "sizes": "96x96", "type": "image/png" }]
+        },
+        { "name": "Open a Pokémon booster", "short_name": "Booster", "url": "/pokemon/add/booster" },
+        { "name": "Add a book", "short_name": "Book", "url": "/books/add" },
+        { "name": "Add a lot", "short_name": "Lot", "url": "/lots/add" }
+    ]
+}

@@ -2,15 +2,24 @@
 // localStorage at once, sent to the app when the network allows, and written
 // as a short line to share in the chat.
 //
+//   GET   /api/tournaments/:id/live             the page's data, fresh
 //   PUT   /api/tournaments/:id/rounds/:number   replaces one round
 //   PATCH /api/tournaments/:id                  the end of the day
 //
+// How a round goes: the games are played, then noted (die, W/L/D: the quick
+// form, "Save the round"); the summary (opponent's deck, comment) is written
+// after, when there is time before the next round, and saved as it changes.
+//
 // Nothing is lost by locking the phone or losing the network: every change is
 // in the queue (`localStorage['tournament-live-<id>']`) until the app says OK.
+// The page itself may come from the phone's cache (static/js/sw.js): its
+// data are then old, so the app's latest answer is kept too
+// (`localStorage['tournament-live-<id>-known']`, updated with each round sent).
 
 (function () {
     /**
-     * @typedef {{ result: string, went_first: boolean | null, comment: string }} Game
+     * @typedef {{ result: string, went_first: boolean | null, comment: string, manual?: boolean }} Game
+     *   `manual`: 1st/2nd tapped by hand (kept on the phone, never sent)
      * @typedef {{
      *     number: number, opponent_deck: string, labels: string[], die: string,
      *     result: string, team_result: string, comment: string, games: Game[]
@@ -20,7 +29,9 @@
      *     id: number, name: string, is_team: boolean, rounds: Round[],
      *     chips: string[], labels: string[], end: End
      * }} LiveData
-     * @typedef {{ rounds: Record<string, Round>, end: End | null, draft: Round | null }} Queue
+     * @typedef {{
+     *     rounds: Record<string, Round>, end: End | null, draft: Round | null, summary: number | null
+     * }} Queue
      */
 
     // The words of the shared line, in one place: switch them to French here.
@@ -45,6 +56,36 @@
     /** How many chips show before "more". */
     const CHIPS_SHOWN = 8;
 
+    /** How long the comment waits after the last key before it is sent. */
+    const COMMENT_PAUSE_MS = 1500;
+
+    /**
+     * Who went first in game `index`, from what came before it:
+     * - game 1: the die decides (won → 1st, lost → 2nd; not noted → unknown);
+     * - after a win or a loss: the loser of the previous game goes first (the
+     *   loser chooses, and most decks choose to go first);
+     * - after a draw: the die is rolled again, so unknown.
+     * `true` = 1st, `false` = 2nd, `null` = unknown (tapped by hand).
+     * @param {string} die '' | 'won' | 'lost'
+     * @param {Game[]} games
+     * @param {number} index
+     * @returns {boolean | null}
+     */
+    function wentFirst(die, games, index) {
+        if (index === 0) {
+            return die === 'won' ? true : die === 'lost' ? false : null;
+        }
+
+        switch (games[index - 1].result) {
+            case 'lost':
+                return true;
+            case 'won':
+                return false;
+            default:
+                return null;
+        }
+    }
+
     const root = document.getElementById('live');
     const dataElement = document.getElementById('live-data');
 
@@ -52,8 +93,10 @@
         return;
     }
 
-    const data = /** @type {LiveData} */ (JSON.parse(dataElement.textContent || 'null'));
+    /** @type {LiveData} */
+    let data = JSON.parse(dataElement.textContent || 'null');
     const storageKey = 'tournament-live-' + data.id;
+    const knownKey = storageKey + '-known';
 
     /** @param {string} id @returns {HTMLElement} */
     function element(id) {
@@ -67,18 +110,23 @@
         login: element('live-login'),
         retry: element('live-retry'),
         rounds: element('live-rounds'),
-        form: /** @type {HTMLFormElement} */ (element('live-form')),
-        title: element('live-title'),
-        games: element('live-games'),
-        result: element('live-result'),
+        summary: element('live-summary'),
+        summaryTitle: element('live-summary-title'),
+        summaryShare: element('live-summary-share'),
+        summaryGames: element('live-summary-games'),
+        summaryClose: element('live-summary-close'),
         chips: element('live-chips'),
         label: /** @type {HTMLInputElement} */ (element('live-label')),
         labelAdd: element('live-label-add'),
         labelList: element('live-labels'),
+        comment: /** @type {HTMLTextAreaElement} */ (element('live-comment')),
+        form: /** @type {HTMLFormElement} */ (element('live-form')),
+        title: element('live-title'),
+        games: element('live-games'),
+        result: element('live-result'),
         resultSelect: /** @type {HTMLSelectElement} */ (element('live-result-select')),
         teamSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('live-team-select')),
-        comment: /** @type {HTMLTextAreaElement} */ (element('live-comment')),
-        save: element('live-save'),
+        saveBar: element('live-save-bar'),
         shareDay: element('live-share-day'),
         fallback: /** @type {HTMLTextAreaElement} */ (element('live-fallback')),
         endForm: /** @type {HTMLFormElement} */ (element('live-end-form')),
@@ -96,17 +144,22 @@
             const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
 
             if (stored && typeof stored === 'object') {
-                return { rounds: stored.rounds || {}, end: stored.end || null, draft: stored.draft || null };
+                return {
+                    rounds: stored.rounds || {},
+                    end: stored.end || null,
+                    draft: stored.draft || null,
+                    summary: typeof stored.summary === 'number' ? stored.summary : null,
+                };
             }
         } catch {
             // an unreadable queue is an empty one
         }
 
-        return { rounds: {}, end: null, draft: null };
+        return { rounds: {}, end: null, draft: null, summary: null };
     }
 
     /** @type {Queue} */
-    let queue = loadQueue();
+    const queue = loadQueue();
 
     function saveQueue() {
         try {
@@ -116,12 +169,45 @@
         }
     }
 
+    /** The app's latest answer kept on the phone, null when none (or unreadable). @returns {LiveData | null} */
+    function loadKnown() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(knownKey) || 'null');
+
+            return stored && typeof stored === 'object' && Array.isArray(stored.rounds) ? stored : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function saveKnown() {
+        const copy = { ...data, rounds: [...known.values()], end: knownEnd };
+
+        try {
+            localStorage.setItem(knownKey, JSON.stringify(copy));
+        } catch {
+            // storage full or forbidden: the page's own data stay
+        }
+    }
+
     /** The rounds the app has, by number (what the page started with, then what was sent). */
     /** @type {Map<number, Round>} */
-    const known = new Map(data.rounds.map((r) => [r.number, r]));
+    let known = new Map(data.rounds.map((r) => [r.number, r]));
 
     /** @type {End} */
     let knownEnd = data.end;
+
+    // a page from the phone's cache doesn't have the rounds sent since: the
+    // copy kept on the phone does
+    const stored = loadKnown();
+
+    if (stored) {
+        for (const round of stored.rounds) {
+            if (!known.has(round.number)) {
+                known.set(round.number, round);
+            }
+        }
+    }
 
     /** @returns {Round[]} every round, the queued ones over the app's, in order */
     function allRounds() {
@@ -133,6 +219,11 @@
         }
 
         return [...merged.values()].sort((a, b) => a.number - b.number);
+    }
+
+    /** The latest version of round `number` (queued, else the app's). @param {number} number */
+    function latest(number) {
+        return queue.rounds[String(number)] || known.get(number) || null;
     }
 
     /** @param {number} number */
@@ -186,6 +277,11 @@
     /** @param {Round} round */
     function opponentText(round) {
         return round.opponent_deck || round.labels.join(' / ');
+    }
+
+    /** A round still without its opponent's deck (a bye has none). @param {Round} round */
+    function toComplete(round) {
+        return !opponentText(round) && effectiveResult(round) !== 'bye';
     }
 
     /** "2-1", "2-1-1" with draws, '' without games. @param {Round} round */
@@ -279,7 +375,7 @@
         return lines.join('\n');
     }
 
-    // ---------- the round being noted ----------
+    // ---------- the round being noted (the quick form) ----------
 
     /** @returns {Round} */
     function blankRound() {
@@ -312,6 +408,22 @@
         return /** @type {Round} */ (JSON.parse(JSON.stringify(round)));
     }
 
+    /** The 1st/2nd not tapped by hand follow the die and the games before them. @param {Round} round */
+    function prefill(round) {
+        round.games.forEach((game, index) => {
+            if (!game.manual) {
+                game.went_first = wentFirst(round.die, round.games, index);
+            }
+        });
+    }
+
+    /** Whether the games decide a best of three: two won or two lost. @param {Round} round */
+    function decided(round) {
+        const { won, lost } = score(round);
+
+        return won >= 2 || lost >= 2;
+    }
+
     /**
      * @param {string} tag
      * @param {string} [className]
@@ -342,11 +454,14 @@
             const text = [`R${round.number}`, resultWord(result), scoreText(round), opponentText(round) && `vs ${opponentText(round)}`];
             button.textContent = text.filter(Boolean).join(' ') + ' ' + state;
             button.classList.add(result === 'win' || result === 'forfeit_win' ? 'win' : result === 'bye' ? 'other' : 'loss');
+
+            if (toComplete(round)) {
+                button.append(make('span', 'live-todo', 'to complete'));
+            }
+
             button.addEventListener('click', () => {
-                current = copy(round);
-                keepDraft();
-                renderForm();
-                ui.form.scrollIntoView({ behavior: 'smooth' });
+                openSummary(round.number);
+                ui.summary.scrollIntoView({ behavior: 'smooth' });
             });
             item.append(button);
             ui.rounds.append(item);
@@ -365,15 +480,20 @@
             undo.title = 'Remove this game';
             undo.addEventListener('click', () => {
                 current.games.splice(index, 1);
+                prefill(current);
                 keepDraft();
                 renderForm();
             });
 
             const turn = make('button', 'live-game-turn', game.went_first === null ? '1st/2nd?' : game.went_first ? '1st' : '2nd');
             turn.setAttribute('type', 'button');
+            turn.classList.toggle('guessed', !game.manual && game.went_first !== null);
+            turn.title = game.manual ? 'Tapped by hand' : 'Guessed from the die and the games: tap to change';
             turn.addEventListener('click', () => {
                 // unknown → 1st → 2nd → unknown
                 game.went_first = game.went_first === null ? true : game.went_first ? false : null;
+                game.manual = true;
+                prefill(current);
                 keepDraft();
                 renderGames();
             });
@@ -390,54 +510,7 @@
             : current.games.length > 0
               ? 'Pick the result under “Other result…”'
               : 'Tap W or L for each game';
-    }
-
-    /** The chips: the most met, then the chosen ones that are not among them. */
-    function renderChips(showAll = false) {
-        ui.chips.replaceChildren();
-
-        const shown = showAll ? data.chips : data.chips.slice(0, CHIPS_SHOWN);
-        const names = [...shown];
-
-        for (const label of current.labels) {
-            if (!names.some((n) => n.toLowerCase() === label.toLowerCase())) {
-                names.push(label);
-            }
-        }
-
-        for (const name of names) {
-            const chip = make('button', 'live-chip', name);
-            chip.setAttribute('type', 'button');
-            const on = current.labels.some((l) => l.toLowerCase() === name.toLowerCase());
-            chip.classList.toggle('on', on);
-            chip.setAttribute('aria-pressed', String(on));
-            chip.addEventListener('click', () => toggleLabel(name));
-            ui.chips.append(chip);
-        }
-
-        if (!showAll && data.chips.length > CHIPS_SHOWN) {
-            const more = make('button', 'live-chip more', 'more…');
-            more.setAttribute('type', 'button');
-            more.addEventListener('click', () => renderChips(true));
-            ui.chips.append(more);
-        }
-    }
-
-    /** @param {string} name */
-    function toggleLabel(name) {
-        const lower = name.toLowerCase();
-        const at = current.labels.findIndex((l) => l.toLowerCase() === lower);
-
-        if (at >= 0) {
-            current.labels.splice(at, 1);
-        } else {
-            current.labels.push(name);
-        }
-
-        // one field: the deck as written follows the chips
-        current.opponent_deck = current.labels.join(' / ');
-        keepDraft();
-        renderChips();
+        ui.saveBar.classList.toggle('ready', decided(current));
     }
 
     function renderForm() {
@@ -445,14 +518,11 @@
         ui.title.textContent = (editing ? 'Correct round ' : 'Round ') + current.number;
         renderGames();
         renderResult();
-        renderChips();
         ui.resultSelect.value = current.result;
 
         if (ui.teamSelect) {
             ui.teamSelect.value = current.team_result;
         }
-
-        ui.comment.value = current.comment;
 
         for (const button of document.querySelectorAll('button[data-die]')) {
             button.classList.toggle('on', button.getAttribute('data-die') === current.die);
@@ -462,9 +532,14 @@
     for (const button of document.querySelectorAll('button[data-game]')) {
         button.addEventListener('click', () => {
             current.games.push({ result: button.getAttribute('data-game') || 'won', went_first: null, comment: '' });
+            prefill(current);
             keepDraft();
             renderGames();
             renderResult();
+
+            if (decided(current)) {
+                ui.saveBar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         });
     }
 
@@ -473,6 +548,7 @@
             const die = button.getAttribute('data-die') || '';
             // a second tap on the same one clears it
             current.die = current.die === die ? '' : die;
+            prefill(current);
             keepDraft();
             renderForm();
         });
@@ -489,21 +565,123 @@
         keepDraft();
     });
 
-    ui.comment.addEventListener('input', () => {
-        current.comment = ui.comment.value;
-        keepDraft();
-    });
+    // ---------- a saved round's summary (opponent's deck, comment) ----------
+
+    /** The round whose summary is open. @returns {Round | null} */
+    function summaryRound() {
+        return queue.summary === null ? null : latest(queue.summary);
+    }
+
+    /** @param {number | null} number */
+    function openSummary(number) {
+        flushComment();
+        queue.summary = number;
+        saveQueue();
+        renderSummary();
+    }
+
+    /**
+     * Change the open summary's round and queue it: what was typed is saved at once.
+     * @param {(round: Round) => void} change
+     */
+    function changeSummary(change) {
+        const round = summaryRound();
+
+        if (!round) {
+            return;
+        }
+
+        const changed = copy(round);
+        change(changed);
+        queue.rounds[String(changed.number)] = changed;
+        saveQueue();
+    }
+
+    function renderSummary() {
+        const round = summaryRound();
+        ui.summary.hidden = !round;
+
+        if (!round) {
+            return;
+        }
+
+        ui.summaryTitle.textContent = line(round);
+
+        if (document.activeElement !== ui.comment) {
+            ui.comment.value = round.comment;
+        }
+
+        renderChips();
+    }
+
+    /** The chips: the most met, then the chosen ones that are not among them. */
+    function renderChips(showAll = false) {
+        ui.chips.replaceChildren();
+
+        const round = summaryRound();
+
+        if (!round) {
+            return;
+        }
+
+        const shown = showAll ? data.chips : data.chips.slice(0, CHIPS_SHOWN);
+        const names = [...shown];
+
+        for (const label of round.labels) {
+            if (!names.some((n) => n.toLowerCase() === label.toLowerCase())) {
+                names.push(label);
+            }
+        }
+
+        for (const name of names) {
+            const chip = make('button', 'live-chip', name);
+            chip.setAttribute('type', 'button');
+            const on = round.labels.some((l) => l.toLowerCase() === name.toLowerCase());
+            chip.classList.toggle('on', on);
+            chip.setAttribute('aria-pressed', String(on));
+            chip.addEventListener('click', () => toggleLabel(name));
+            ui.chips.append(chip);
+        }
+
+        if (!showAll && data.chips.length > CHIPS_SHOWN) {
+            const more = make('button', 'live-chip more', 'more…');
+            more.setAttribute('type', 'button');
+            more.addEventListener('click', () => renderChips(true));
+            ui.chips.append(more);
+        }
+    }
+
+    /** @param {string} name */
+    function toggleLabel(name) {
+        changeSummary((round) => {
+            const lower = name.toLowerCase();
+            const at = round.labels.findIndex((l) => l.toLowerCase() === lower);
+
+            if (at >= 0) {
+                round.labels.splice(at, 1);
+            } else {
+                round.labels.push(name);
+            }
+
+            // one field: the deck as written follows the chips
+            round.opponent_deck = round.labels.join(' / ');
+        });
+        renderSummary();
+        renderRounds();
+        void sync();
+    }
 
     function addTypedLabel() {
         const name = ui.label.value.trim();
+        const round = summaryRound();
 
-        if (!name) {
+        if (!name || !round) {
             return;
         }
 
         ui.label.value = '';
 
-        if (!current.labels.some((l) => l.toLowerCase() === name.toLowerCase())) {
+        if (!round.labels.some((l) => l.toLowerCase() === name.toLowerCase())) {
             toggleLabel(name);
         }
     }
@@ -516,16 +694,73 @@
         }
     });
 
-    for (const label of data.labels) {
-        const option = document.createElement('option');
-        option.value = label;
-        ui.labelList.append(option);
+    /** @type {number | undefined} */
+    let commentTimer;
+
+    /** Send the comment typed so far, if it waits. */
+    function flushComment() {
+        if (commentTimer === undefined) {
+            return;
+        }
+
+        window.clearTimeout(commentTimer);
+        commentTimer = undefined;
+        void sync();
+    }
+
+    ui.comment.addEventListener('input', () => {
+        const comment = ui.comment.value;
+        changeSummary((round) => {
+            round.comment = comment;
+        });
+        window.clearTimeout(commentTimer);
+        commentTimer = window.setTimeout(flushComment, COMMENT_PAUSE_MS);
+    });
+    ui.comment.addEventListener('change', flushComment);
+
+    ui.summaryShare.addEventListener('click', () => {
+        const round = summaryRound();
+
+        if (round) {
+            void share(line(round));
+        }
+    });
+
+    ui.summaryGames.addEventListener('click', () => {
+        const round = summaryRound();
+
+        if (!round) {
+            return;
+        }
+
+        current = copy(round);
+
+        // the 1st/2nd as saved stay as they are
+        for (const game of current.games) {
+            game.manual = true;
+        }
+
+        keepDraft();
+        renderForm();
+        ui.form.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    ui.summaryClose.addEventListener('click', () => openSummary(null));
+
+    function fillLabelList() {
+        ui.labelList.replaceChildren();
+
+        for (const label of data.labels) {
+            const option = document.createElement('option');
+            option.value = label;
+            ui.labelList.append(option);
+        }
     }
 
     // ---------- saving: queue first, then the network ----------
 
     /**
-     * Put the round being noted in the queue and start the next one.
+     * Put the round being noted in the queue, open its summary and start the next one.
      * @returns {Round | null} the round queued, null when there is nothing to save
      */
     function queueCurrent() {
@@ -539,15 +774,24 @@
         }
 
         ui.problem.hidden = true;
+        flushComment();
 
-        const round = copy(current);
-        round.result = effectiveResult(round);
+        // the summary written meanwhile stays: only the games' part is the form's
+        const before = latest(current.number);
+        const round = before ? copy(before) : copy(current);
+        round.games = copy(current).games;
+        round.die = current.die;
+        round.result = effectiveResult(current);
+        round.team_result = current.team_result;
+
         queue.rounds[String(round.number)] = round;
         current = blankRound();
         queue.draft = null;
+        queue.summary = round.number;
         saveQueue();
         renderRounds();
         renderForm();
+        renderSummary();
 
         return round;
     }
@@ -574,7 +818,7 @@
             result: round.result,
             team_result: round.team_result,
             comment: round.comment,
-            games: round.games,
+            games: round.games.map((g) => ({ result: g.result, went_first: g.went_first, comment: g.comment })),
         };
     }
 
@@ -628,6 +872,7 @@
             }
 
             saveQueue();
+            saveKnown();
             renderRounds();
         }
 
@@ -646,6 +891,7 @@
             }
 
             saveQueue();
+            saveKnown();
         }
     }
 
@@ -677,6 +923,43 @@
         }
 
         return false;
+    }
+
+    /** Ask the app for its latest data (the page may come from the phone's cache). */
+    async function refresh() {
+        try {
+            const response = await fetch(`/api/tournaments/${data.id}/live`, { credentials: 'same-origin' });
+
+            if (response.status === 401) {
+                ui.login.hidden = false;
+
+                return;
+            }
+
+            if (!response.ok) {
+                return;
+            }
+
+            data = /** @type {LiveData} */ (await response.json());
+        } catch {
+            // no network: the copy on the phone stays
+            return;
+        }
+
+        known = new Map(data.rounds.map((r) => [r.number, r]));
+        knownEnd = data.end;
+        saveKnown();
+        fillLabelList();
+
+        // a new round being noted takes the number after the app's rounds
+        if (!queue.draft && current.games.length === 0 && !known.has(current.number) && !isPending(current.number)) {
+            current = blankRound();
+        }
+
+        renderRounds();
+        renderForm();
+        renderSummary();
+        fillEnd();
     }
 
     // ---------- sharing ----------
@@ -714,21 +997,10 @@
 
     ui.form.addEventListener('submit', (event) => {
         event.preventDefault();
-        const round = queueCurrent();
 
-        if (!round) {
-            return;
-        }
-
-        // the share sheet needs the tap's own moment: before any waiting
-        const shared = share(line(round));
-        void sync();
-        void shared;
-    });
-
-    ui.save.addEventListener('click', () => {
         if (queueCurrent()) {
             void sync();
+            ui.summary.scrollIntoView({ behavior: 'smooth' });
         }
     });
 
@@ -742,14 +1014,11 @@
 
     // ---------- the end of the day ----------
 
-    ui.placement.value = knownEnd.placement ? String(knownEnd.placement) : '';
-    ui.players.value = knownEnd.players ? String(knownEnd.players) : '';
-    ui.conclusion.value = knownEnd.conclusion;
-
-    if (queue.end) {
-        ui.placement.value = queue.end.placement ? String(queue.end.placement) : '';
-        ui.players.value = queue.end.players ? String(queue.end.players) : '';
-        ui.conclusion.value = queue.end.conclusion;
+    function fillEnd() {
+        const end = queue.end || knownEnd;
+        ui.placement.value = end.placement ? String(end.placement) : '';
+        ui.players.value = end.players ? String(end.players) : '';
+        ui.conclusion.value = end.conclusion;
     }
 
     ui.endForm.addEventListener('submit', (event) => {
@@ -771,11 +1040,20 @@
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
             void sync();
+        } else {
+            flushComment();
         }
     });
 
+    if (!queue.draft && known.has(current.number)) {
+        current = blankRound();
+    }
+
+    fillLabelList();
+    fillEnd();
     renderRounds();
     renderForm();
+    renderSummary();
     showSync();
-    void sync();
+    void sync().then(refresh);
 })();
