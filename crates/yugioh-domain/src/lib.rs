@@ -3,6 +3,7 @@
 //! Everything here is pure (no database, no HTTP) so it can be shared by the
 //! backend and the maintenance commands, and unit-tested directly.
 
+pub mod archetype;
 pub mod ban_list;
 pub mod budget;
 pub mod built_deck;

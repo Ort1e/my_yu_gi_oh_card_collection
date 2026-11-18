@@ -4,6 +4,8 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/tournaments.css">
+  <link rel="manifest" href="/static/live.webmanifest">
+  <meta name="theme-color" content="#04926f">
 {% endblock %}
 
 {% block content %}
@@ -21,16 +23,9 @@
 
   <ol id="live-rounds" class="live-rounds"></ol>
 
-  <form id="live-form" class="live-form" autocomplete="off">
-    <h2 id="live-title">Round 1</h2>
-
-    <div id="live-games" class="live-games"></div>
-    <div class="live-buttons">
-      <button type="button" class="btn live-big live-won" data-game="won">W</button>
-      <button type="button" class="btn live-big live-lost" data-game="lost">L</button>
-      <button type="button" class="btn live-big live-draw" data-game="draw">D</button>
-    </div>
-    <p id="live-result" class="live-result"></p>
+  {# a saved round's summary, written when there is time: saved as it changes #}
+  <section id="live-summary" class="live-summary" hidden>
+    <h2 id="live-summary-title">Round 1</h2>
 
     <h3>Opponent's deck</h3>
     <div id="live-chips" class="live-chips"></div>
@@ -40,13 +35,33 @@
     </div>
     <datalist id="live-labels"></datalist>
 
-    <details>
-      <summary>Die roll</summary>
-      <div class="live-buttons">
-        <button type="button" class="btn btn-secondary" data-die="won">Die won</button>
-        <button type="button" class="btn btn-secondary" data-die="lost">Die lost</button>
-      </div>
-    </details>
+    <label for="live-comment">Comment:</label>
+    <textarea id="live-comment" rows="3" maxlength="2000"></textarea>
+    <p class="hint">A round's comment is shown on the public site.</p>
+
+    <div class="live-buttons">
+      <button type="button" class="btn" id="live-summary-share">Share</button>
+      <button type="button" class="btn btn-secondary" id="live-summary-games">Correct the games</button>
+      <button type="button" class="btn btn-secondary" id="live-summary-close">Done</button>
+    </div>
+  </section>
+
+  {# the games, noted in a few taps during and right after the round #}
+  <form id="live-form" class="live-form" autocomplete="off">
+    <h2 id="live-title">Round 1</h2>
+
+    <div class="live-buttons live-die">
+      <button type="button" class="btn btn-secondary" data-die="won">Die won</button>
+      <button type="button" class="btn btn-secondary" data-die="lost">Die lost</button>
+    </div>
+
+    <div id="live-games" class="live-games"></div>
+    <div class="live-buttons">
+      <button type="button" class="btn live-big live-won" data-game="won">W</button>
+      <button type="button" class="btn live-big live-lost" data-game="lost">L</button>
+      <button type="button" class="btn live-big live-draw" data-game="draw">D</button>
+    </div>
+    <p id="live-result" class="live-result"></p>
 
     <details>
       <summary>Other result…</summary>
@@ -70,15 +85,8 @@
       {% endif %}
     </details>
 
-    <details>
-      <summary>Comment</summary>
-      <textarea id="live-comment" rows="3" maxlength="2000"></textarea>
-      <p class="hint">A round's comment is shown on the public site.</p>
-    </details>
-
-    <div class="live-save-bar">
-      <button type="submit" class="btn live-big" id="live-save-share">Save &amp; share</button>
-      <button type="button" class="btn btn-secondary" id="live-save">Save only</button>
+    <div class="live-save-bar" id="live-save-bar">
+      <button type="submit" class="btn live-big" id="live-save">Save the round</button>
     </div>
   </form>
 
@@ -106,4 +114,5 @@
 
 {% block extra_js %}
   <script src="/static/js/tournament_live.js"></script>
+  <script src="/static/js/live_install.js"></script>
 {% endblock %}

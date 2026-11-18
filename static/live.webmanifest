@@ -1,0 +1,17 @@
+{
+    "name": "Tournament notes",
+    "short_name": "Tournament",
+    "description": "Note a Yu-Gi-Oh! tournament round by round, even without network.",
+    "id": "/tournaments/live",
+    "start_url": "/tournaments/live",
+    "scope": "/tournaments/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "theme_color": "#04926f",
+    "background_color": "#c6f4ff",
+    "icons": [
+        { "src": "/static/img/live/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/static/img/live/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/static/img/live/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ]
+}

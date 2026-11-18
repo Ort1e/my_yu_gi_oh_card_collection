@@ -744,7 +744,8 @@ group the lists by the version they were taken from.
   phone page `/tournaments/:id/live` (`/tournaments/live` goes to today's
   tournament or starts one pre-filled by `data::start_defaults`), private, never
   in the public copy. Its data (rounds, `data::frequent_opponent_labels` over
-  90 days as chips, labels) is a JSON block. Saves go to
+  90 days as chips, labels and archetypes) is a JSON block, also at
+  `GET /api/tournaments/:id/live` (`live::data_api`). Saves go to
   `PUT /api/tournaments/:id/rounds/:number` (`store::tournaments::set_round`:
   replaces round `number`, no gap, so a resend is harmless) and
   `PATCH /api/tournaments/:id` (`set_end`; `0`/`""` empty a field), 401 JSON
@@ -752,7 +753,26 @@ group the lists by the version they were taken from.
   `localStorage` (`tournament-live-<id>`), then sends it (on save, `online`,
   tab visible, Retry); the share line is built on the phone from the page's data
   and the queue (`navigator.share`, else clipboard, else a selected textarea),
-  never stored. No service worker: the page must be open before the network goes.
+  never stored. The quick form (die, games: `wentFirst` guesses 1st/2nd)
+  queues the round; its summary (labels, comment) is queued as it changes.
+- **The installable app** (`static/live.webmanifest`, icons in
+  `static/img/live/` from `icon.svg`): `static/js/live_sw.js`, embedded by
+  `include_str!` and served at `/tournaments/live-sw.js` (public; scope
+  `/tournaments/`), registered by `static/js/live_install.js`. Live pages
+  network first then cached, `/tournaments/live` offline → the last live page,
+  their CSS/scripts cached and refreshed behind, `/api/*` never. A cached page
+  has old data: the script keeps the app's last answer
+  (`tournament-live-<id>-known`, updated after each send) and asks the API
+  again. Bump `CACHE` in the worker when its rules change; `/logout` sends
+  `Clear-Site-Data: "cache"`. Checked by `frontend/tsconfig.sw.json`
+  (WebWorker library).
+- **Archetypes** (`ygo_archetype`, 0035): ygoprodeck's `archetypes.php`,
+  name fragments left out (`yugioh_domain::archetype::names`), refreshed with
+  the weekly prices (`store::card_data::refresh_archetypes`; once on the live
+  page when empty), offered by `data::label_names`. `archetype::key` (letters
+  and digits, lower case) makes `label_id` save an archetype's spelling and
+  `store::tournaments::relabel` rename or merge the old labels after each
+  refresh.
 - **Labels** (`deck_label`): archetype/engine names, one table for your decks
   (`deck_deck_label`, on the deck edit page) and the opponents' rounds
   (`tournament_round_label`). Typed comma-separated with suggestions

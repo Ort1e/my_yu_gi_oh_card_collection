@@ -597,4 +597,150 @@ async fn the_live_page_and_its_api_need_the_login() {
     assert!(answer["error"].is_string());
     let (status, _) = t.json("PATCH", "/api/tournaments/1", json!({})).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, answer) = t.json("GET", "/api/tournaments/1/live", json!(null)).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(answer["error"].is_string());
+
+    // the service worker holds no data: public, so the browser can fetch it
+    let response = t
+        .router()
+        .oneshot(
+            Request::get("/tournaments/live-sw.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response.headers()[header::CONTENT_TYPE]
+        .to_str()
+        .unwrap()
+        .starts_with("text/javascript"));
+    let (_, body) = read(response).await;
+    assert!(body.contains("addEventListener('fetch'"));
+}
+
+#[tokio::test]
+async fn the_live_api_gives_the_page_s_data() {
+    let t = TestApp::new().await;
+    t.post("/tournaments/live", &[("name", "Locals")]).await;
+    t.json(
+        "PUT",
+        "/api/tournaments/1/rounds/1",
+        live_round("win", &["Mitsurugi"], &["won", "lost", "won"]),
+    )
+    .await;
+
+    let (status, data) = t.json("GET", "/api/tournaments/1/live", json!(null)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(data["name"], "Locals");
+    assert_eq!(data["rounds"][0]["number"], 1);
+    assert_eq!(data["rounds"][0]["labels"], json!(["Mitsurugi"]));
+    assert_eq!(data["rounds"][0]["games"].as_array().unwrap().len(), 3);
+    assert_eq!(data["chips"], json!(["Mitsurugi"]));
+
+    let (status, _) = t.json("GET", "/api/tournaments/9/live", json!(null)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // the page says where its manifest is
+    let (_, page) = t.get("/tournaments/1/live").await;
+    assert!(page.contains(r#"rel="manifest" href="/static/live.webmanifest""#));
+}
+
+// ---------- archetypes ----------
+
+#[tokio::test]
+async fn archetypes_are_offered_and_give_their_spelling_to_the_labels() {
+    let t = TestApp::new().await;
+    t.post("/tournaments/live", &[("name", "Locals")]).await;
+    // labels typed before the archetypes were known
+    for (n, label) in [
+        (1, "snake eye"),
+        (2, "Snake eye"),
+        (3, "Snake-Eye Fire King"),
+    ] {
+        t.json(
+            "PUT",
+            &format!("/api/tournaments/1/rounds/{n}"),
+            live_round("win", &[label], &["won"]),
+        )
+        .await;
+    }
+    assert_eq!(t.scalar("SELECT count(*) FROM deck_label").await, 2);
+
+    let names: Vec<String> = ["Snake-Eye", "Labrynth", "Tenpai Dragon"]
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
+    let report = crate::store::card_data::store_archetypes(&t.state.pool, &names)
+        .await
+        .unwrap();
+    assert_eq!((report.archetypes, report.relabelled), (3, 1));
+    // renamed, the deck name left as typed
+    assert_eq!(
+        t.text("SELECT group_concat(name, '|') FROM (SELECT name FROM deck_label ORDER BY name)")
+            .await
+            .as_deref(),
+        Some("Snake-Eye|Snake-Eye Fire King")
+    );
+
+    // a round typed now takes the archetype's spelling
+    t.json(
+        "PUT",
+        "/api/tournaments/1/rounds/4",
+        live_round("loss", &["LABRYNTH", "tenpai-dragon"], &["lost"]),
+    )
+    .await;
+    let (_, data) = t.json("GET", "/api/tournaments/1/live", json!(null)).await;
+    assert_eq!(
+        data["rounds"][3]["labels"],
+        json!(["Labrynth", "Tenpai Dragon"])
+    );
+
+    // the suggestions: our labels and the archetypes, each once
+    assert_eq!(
+        data["labels"],
+        json!([
+            "Labrynth",
+            "Snake-Eye",
+            "Snake-Eye Fire King",
+            "Tenpai Dragon"
+        ])
+    );
+    let (_, page) = t.get("/tournaments/add").await;
+    assert!(page.contains(r#"<option value="Snake-Eye Fire King">"#));
+
+    // a label spelt otherwise next to the archetype's own: merged into it
+    t.json(
+        "PUT",
+        "/api/tournaments/1/rounds/5",
+        live_round("win", &["Snake-Eye"], &["won"]),
+    )
+    .await;
+    t.exec("INSERT INTO deck_label (name) VALUES ('snake  eye')")
+        .await;
+    let typo = t
+        .scalar("SELECT id FROM deck_label WHERE name = 'snake  eye'")
+        .await;
+    t.exec(&format!(
+        "INSERT INTO tournament_round_label (round_id, label_id) SELECT id, {typo} FROM tournament_round WHERE number = 3"
+    ))
+    .await;
+    let report = crate::store::card_data::store_archetypes(&t.state.pool, &names)
+        .await
+        .unwrap();
+    assert_eq!(report.relabelled, 1);
+    assert_eq!(
+        t.scalar("SELECT count(*) FROM deck_label WHERE name LIKE 'snake%eye'")
+            .await,
+        1
+    );
+    assert_eq!(
+        t.scalar(
+            "SELECT count(*) FROM tournament_round_label rl JOIN deck_label l ON l.id = rl.label_id
+             WHERE l.name = 'Snake-Eye'"
+        )
+        .await,
+        4
+    );
 }

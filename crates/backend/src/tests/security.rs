@@ -293,6 +293,18 @@ async fn answers_carry_the_security_headers() {
 }
 
 #[tokio::test]
+async fn logging_out_clears_the_browser_cache() {
+    let t = TestApp::new().await;
+    let response = t
+        .router()
+        .oneshot(Request::post("/logout").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    // the live tournament page's service worker keeps private pages there
+    assert_eq!(response.headers()["clear-site-data"], "\"cache\"");
+}
+
+#[tokio::test]
 async fn the_media_folder_cannot_be_left() {
     let t = TestApp::new().await;
     std::fs::create_dir_all(&t.state.media_dir).unwrap();

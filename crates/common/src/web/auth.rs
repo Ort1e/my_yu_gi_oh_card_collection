@@ -884,10 +884,21 @@ pub async fn login(
     Ok(([(header::SET_COOKIE, cookie)], Redirect::to(&next)).into_response())
 }
 
+/// `/logout`: the cookie emptied, and the browser's caches too (the live
+/// tournament page's service worker keeps private pages there).
 pub async fn logout(State(state): State<AppState>) -> impl IntoResponse {
     let cookie = format!("{COOKIE}=; {}", state.auth.cookie_attributes(0));
     tracing::info!("logged out");
-    ([(header::SET_COOKIE, cookie)], Redirect::to("/"))
+    (
+        [
+            (header::SET_COOKIE, cookie),
+            (
+                header::HeaderName::from_static("clear-site-data"),
+                "\"cache\"".to_string(),
+            ),
+        ],
+        Redirect::to("/"),
+    )
 }
 
 #[cfg(test)]

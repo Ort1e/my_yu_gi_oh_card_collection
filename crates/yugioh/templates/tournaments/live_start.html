@@ -4,6 +4,8 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="/static/css/tournaments.css">
+  <link rel="manifest" href="/static/live.webmanifest">
+  <meta name="theme-color" content="#04926f">
 {% endblock %}
 
 {% block content %}
@@ -27,4 +29,8 @@
     <button type="submit" class="btn live-big">Start</button>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="/static/js/live_install.js"></script>
 {% endblock %}

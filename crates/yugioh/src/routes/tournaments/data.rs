@@ -281,11 +281,18 @@ pub async fn deck_labels(pool: &Pool, deck_id: i64) -> sqlx::Result<Vec<String>>
     .await
 }
 
-/// Every label name, for the fields' suggestions.
+/// Every label name and every archetype (`ygo_archetype`) once, for the
+/// fields' suggestions.
 pub async fn label_names(pool: &Pool) -> sqlx::Result<Vec<String>> {
-    sqlx::query_scalar("SELECT name FROM deck_label ORDER BY name COLLATE NOCASE")
-        .fetch_all(pool)
-        .await
+    sqlx::query_scalar(
+        "SELECT name FROM (
+             SELECT name FROM deck_label
+             UNION ALL
+             SELECT name FROM ygo_archetype WHERE name NOT IN (SELECT name FROM deck_label)
+         ) ORDER BY name COLLATE NOCASE",
+    )
+    .fetch_all(pool)
+    .await
 }
 
 /// The labels of the opponents' decks met since `since` (`YYYY-MM-DD`), most

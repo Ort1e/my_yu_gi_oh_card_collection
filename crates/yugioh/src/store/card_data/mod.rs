@@ -5,12 +5,15 @@
 //! - here: the client, and a card's data by name or ygopro id;
 //! - [`translations`]: card names in other languages (`card_translation`);
 //! - [`sets`]: the cards of a set (quick add, Cardmarket expansions);
-//! - [`linking`]: new cards linked to their data in the background.
+//! - [`linking`]: new cards linked to their data in the background;
+//! - [`archetypes`]: the archetype names (`ygo_archetype`), weekly.
 
+mod archetypes;
 mod linking;
 mod sets;
 mod translations;
 
+pub use archetypes::{ensure_archetypes, refresh_archetypes, store_archetypes, ArchetypeReport};
 pub use linking::spawn_link_cards;
 pub use sets::{fetch_set, fetch_set_infos, SetInfo};
 pub use translations::{plan_translations, Translation};
