@@ -487,7 +487,8 @@ async fn posting_to_discord_is_offered_only_with_a_webhook() {
     let (_, page) = t.get("/tournaments/2/live").await;
     assert!(page.contains("📣 Discord"), "{page}");
 
-    // the shared texts are taken (and posted after the commit)
+    // saves go on as before (the messages are written after the commit; an
+    // old page's `share_line` / `share_text` are ignored)
     let mut round = live_round("win", &["K9"], &["won", "won"]);
     round["share_line"] = json!("R1: W 2-0 vs K9");
     let (status, _) = t.json("PUT", "/api/tournaments/2/rounds/1", round).await;

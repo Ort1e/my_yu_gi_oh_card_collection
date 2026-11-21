@@ -5,8 +5,8 @@
 //   GET   /api/tournaments/:id/live             the page's data, fresh
 //   PUT   /api/tournaments/:id/rounds/:number   replaces one round
 //   PATCH /api/tournaments/:id                  the end of the day
-// Both carry the text the page shares (`share_line`, `share_text`): the app
-// posts it to Discord for a tournament opted in (store/discord.rs).
+// After each, the app brings the Discord messages of a tournament opted in up
+// to date from what is saved (routes/tournaments/discord.rs).
 //
 // How a round goes: the games are played, then noted (die, W/L/D: the quick
 // form, "Save the round"); the summary (opponent's deck, comment) is written
@@ -26,8 +26,7 @@
      *     number: number, opponent_deck: string, labels: string[], die: string,
      *     result: string, team_result: string, comment: string, games: Game[]
      * }} Round
-     * @typedef {{ placement: number | null, players: number | null, conclusion: string, share_text?: string }} End
-     *   `share_text`: the day's text for Discord, as when the end was saved
+     * @typedef {{ placement: number | null, players: number | null, conclusion: string }} End
      * @typedef {{
      *     id: number, name: string, is_team: boolean, rounds: Round[],
      *     chips: string[], labels: string[], end: End
@@ -822,8 +821,6 @@
             team_result: round.team_result,
             comment: round.comment,
             games: round.games.map((g) => ({ result: g.result, went_first: g.went_first, comment: g.comment })),
-            // posted to Discord when the tournament is opted in
-            share_line: line(round),
         };
     }
 
@@ -1033,8 +1030,6 @@
             placement: Number(ui.placement.value) || 0,
             players: Number(ui.players.value) || 0,
             conclusion: ui.conclusion.value.trim(),
-            // posted to Discord when the tournament is opted in
-            share_text: dayText(),
         };
         saveQueue();
         showSync();

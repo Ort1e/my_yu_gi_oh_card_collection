@@ -638,6 +638,7 @@ pub async fn update(
         rounds = results.rounds.len(),
         "tournament edited"
     );
+    super::discord::spawn_sync(&state, id);
 
     Ok(Redirect::to(&format!("/tournaments/{id}")).into_response())
 }
