@@ -267,11 +267,11 @@ async fn copies_are_sold_not_deleted() {
     );
     let (_, list) = t.get("/pokemon").await;
     assert!(
-        list.contains("Pokémon cards (0/1)"),
+        list.contains("Pokémon cards <span class=\"title-count\">(0 of 1)</span>"),
         "sold copies are hidden"
     );
     let (_, list) = t.get("/pokemon?sold=sold").await;
-    assert!(list.contains("Pokémon cards (1/1)"));
+    assert!(list.contains("Pokémon cards <span class=\"title-count\">(1)</span>"));
 
     assert_eq!(
         t.post("/pokemon/1/delete", &[]).await.0,
@@ -327,7 +327,10 @@ async fn the_wishlist_compares_prices_and_is_fulfilled() {
         (StatusCode::SEE_OTHER, "/pokemon/1")
     );
     let (_, page) = t.get("/pokemon/wishlists/1").await;
-    assert!(page.contains("Wishlist Ortie (1)") && page.contains("Wishes got (1)"));
+    assert!(
+        page.contains("Wishlist Ortie <span class=\"title-count\">(1)")
+            && page.contains("Wishes got (1)")
+    );
     let (_, page) = t.get("/pokemon/1").await;
     assert!(page.contains("Got from the"));
 
@@ -643,7 +646,10 @@ async fn openings_are_listed_and_grow() {
 
     let (status, page) = t.get("/pokemon/openings").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(page.contains("Booster openings (1)") && page.contains("Fable Nébuleuse"));
+    assert!(
+        page.contains("Booster openings <span class=\"title-count\">(1)")
+            && page.contains("Fable Nébuleuse")
+    );
     assert!(
         page.contains(r#"<td class="text">FNE</td>"#),
         "the set code"

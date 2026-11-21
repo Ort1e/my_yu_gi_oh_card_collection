@@ -58,6 +58,7 @@ impl TestApp {
                 uploads_dir: dir.join("uploads"),
                 cardmarket_account: "me".into(),
                 google_books_key: None,
+                discord: None,
                 auth,
             },
             dir,

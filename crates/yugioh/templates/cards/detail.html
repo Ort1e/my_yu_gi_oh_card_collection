@@ -9,7 +9,8 @@
 
 {% block content %}
 <div class="inside-container">
-<p class="back-link"><a href="/cards">← Back to the cards</a></p>
+<p class="back-link"><a href="/cards">← All cards</a></p>
+<h1>{{ card.name }}</h1>
 
 <div class="card-detail">
   {% match card.picture() %}{% when Some with (src) %}
@@ -19,7 +20,6 @@
   {% when None %}{% endmatch %}
 
   <div class="card">
-    <div class="card-title">{{ card.name }}</div>
     {% match card.english_name() %}{% when Some with (english) %}<div class="english-name">{{ english }}</div>{% when None %}{% endmatch %}
     <div class="card-subtitle">Code: {{ card.code.as_deref().unwrap_or("—") }}{% if card.is_sold %} · <strong>Sold</strong>{% endif %}{% if card.shows_for_sale() %} · <strong>🏷 To sell</strong>{% endif %}</div>
     {% match card.rarity %}{% when Some with (rarity) %}
@@ -70,22 +70,21 @@
     </section>
     {% when None %}{% endmatch %}
     {% if !common::export::public_copy() %}<div class="button-row"><a href="/cards/{{ card.id }}/edit" class="btn">Edit</a>
-      {% if !card.is_sold %}<form method="post" action="/cards/{{ card.id }}/for-sale" class="inline-form">
+      {% if !card.is_sold %}<form method="post" action="/cards/{{ card.id }}/for-sale" class="inline">
         <input type="hidden" name="for_sale" value="{% if card.for_sale %}0{% else %}1{% endif %}">
         <button type="submit" class="btn btn-secondary" title="Flagged copies are listed on the To sell page; a deck takes them last">{% if card.for_sale %}🏷 Not to sell any more{% else %}🏷 To sell{% endif %}</button>
       </form>{% endif %}</div>{% endif %}
   </div>
 </div>
-</div>
 
 {% if !common::export::public_copy() %}
 <div class="card-list">
   {% match lot %}{% when Some with (lot) %}
-  <h2 class="card-title">Lot details</h2>
+  <h2>Lot</h2>
   {% include "partials/lot_item.html" %}
   {% when None %}{% endmatch %}
 
-  <h2 class="card-title">Decks</h2>
+  <h2>Decks</h2>
   {% for deck in decks %}
   <a href="/decks/{{ deck.id }}" class="card-link">
     <div class="card">
@@ -98,6 +97,7 @@
   {% endfor %}
 </div>
 {% endif %}
+</div>
 {% endblock %}
 
 {% block extra_js %}

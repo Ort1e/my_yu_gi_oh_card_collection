@@ -11,8 +11,8 @@
 
 {% block content %}
 <div class="inside-container advent">
-  <h1>Edit the {{ spec.name|lower }} {{ year }}</h1>
   <p class="back-link"><a href="{{ spec.base }}/{{ year }}">← Back to the calendar</a> · <a href="{{ spec.base }}">All calendars</a></p>
+  <h1>Edit the {{ spec.name|lower }} {{ year }}</h1>
 
   {% include "partials/form_errors.html" %}
 

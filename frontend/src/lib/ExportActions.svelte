@@ -2,7 +2,10 @@
     // Take the deck elsewhere: copy it as YDKE, download it as a .ydk file,
     // open a community site to import it in. Computed from the zones as
     // they are on the screen, so unsaved changes are included.
+    import { tick } from 'svelte';
+
     import { ydkFile, ydkeUrl } from '../deck';
+    import { copyText } from './clipboard';
     import { toast } from './toast';
     import type { DeckZones, Tile } from '../types';
 
@@ -16,13 +19,25 @@
         ['missing only', (c) => c.missing],
     ];
 
+    /** the YDKE to copy by hand, when the browser refused to copy it */
+    let manual: string | null = null;
+    let manualArea: HTMLTextAreaElement | undefined;
+
     async function copy(label: string, keep: (card: Tile) => boolean) {
-        try {
-            await navigator.clipboard.writeText(ydkeUrl(zones, keep));
+        const url = ydkeUrl(zones, keep);
+
+        if (await copyText(url)) {
+            manual = null;
             toast.ok(`YDKE copied (${label})`);
-        } catch (e) {
-            toast.error(`Failed to copy: ${e.message}`);
+
+            return;
         }
+
+        manual = url;
+        toast.error('The browser refused to copy: copy the YDKE below by hand.');
+
+        await tick();
+        manualArea?.select();
     }
 
     function download(label: string, keep: (card: Tile) => boolean) {
@@ -48,6 +63,10 @@
             <button type="button" class="btn-secondary" on:click={() => copy(label, keep)}>{label}</button>
         {/each}
     </div>
+
+    {#if manual}
+        <textarea class="manual" readonly rows="3" bind:this={manualArea} value={manual} on:focus={() => manualArea?.select()}></textarea>
+    {/if}
 
     <p class="title">Download a .ydk file</p>
     <div class="row">
@@ -85,5 +104,13 @@
 
     .link {
         margin: 0.2rem 0;
+    }
+
+    .manual {
+        width: 100%;
+        margin-top: 0.4rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        word-break: break-all;
     }
 </style>

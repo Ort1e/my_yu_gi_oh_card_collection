@@ -7,9 +7,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="card-list">
-  <div class="card">
-    <div class="card-title">{{ deck.name }}</div>
+<div class="inside-container">
+<p class="back-link"><a href="/decks">← All decks</a></p>
+<h1>{{ deck.name }}</h1>
+{% if !common::export::public_copy() %}
+<div class="button-row"><a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a></div>
+{% endif %}
+
+  <div class="card wide-card">
     <div class="card-meta-line">
       <div>Description: {{ deck.description.as_deref().unwrap_or("") }}</div>
       {% if !labels.is_empty() %}<div>Labels: {{ labels }}</div>{% endif %}
@@ -17,14 +22,9 @@
       {% if has_tournaments %}<div><a href="/tournaments/stats?deck={{ deck.id }}">Its tournaments and stats</a></div>{% endif %}
       {% endif %}
     </div>
-    {% if !common::export::public_copy() %}
-    <div class="button-row">
-      <a href="/decks/{{ deck.id }}/edit" class="btn">Edit</a>
-    </div>
-    {% endif %}
   </div>
 
-  <h2 class="card-title">Versions</h2>
+  <h2>Versions</h2>
   <div class="table-scroll">
   <table class="numbers">
     <thead>
@@ -56,7 +56,7 @@
   </div>
 
   {% if !history.is_empty() %}
-  <h2 class="card-title" id="history">History</h2>
+  <h2 id="history">History</h2>
   <p class="hint">Each save of a version's cards is kept here{% if !common::export::public_copy() %} (an automatic one is replaced by the next save within 30 minutes); name a list on its page to keep it{% endif %}. Changes: since the previous list of the same version.</p>
   {% let kept = self.kept_history() %}
   {% if !kept.is_empty() %}

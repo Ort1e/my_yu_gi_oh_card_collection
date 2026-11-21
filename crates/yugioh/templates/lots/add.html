@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Add Lot{% endblock %}
+{% block title %}Add a lot{% endblock %}
 
 {% block content %}
 <div class="inside-container narrow">
-<h1>Add a New Lot</h1>
+<h1>Add a lot</h1>
 
 {% match pending %}
 {% when Some with (_token) %}
@@ -12,7 +12,7 @@
 {% when None %}
   <form method="post" action="/lots/add/shipment" enctype="multipart/form-data">
     <p>
-      <label for="shipment_file">Upload Shipment File:</label>
+      <label for="shipment_file">Cardmarket shipment file (PDF):</label>
       <input type="file" name="shipment_file" id="shipment_file" accept="application/pdf" required>
     </p>
     <input type="submit" value="Upload and pre-fill">
@@ -28,7 +28,7 @@
   {% when None %}{% endmatch %}
 
   <fieldset>
-    <legend>Lot Info</legend>
+    <legend>The lot</legend>
     <p>
       <label for="price">Price:</label>
       <input type="text" inputmode="decimal" name="price" id="price" value="{{ lot.price }}" required>
@@ -87,7 +87,7 @@
   </fieldset>
 
   <fieldset id="card-rows">
-    <legend>Cards in the Lot</legend>
+    <legend>Its cards</legend>
     {% include "partials/quick_add.html" %}
     {% for row in rows %}
       {% let i = loop.index0 %}

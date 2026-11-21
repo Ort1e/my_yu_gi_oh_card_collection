@@ -215,6 +215,25 @@ legend {
     margin-bottom: 0.9rem;
 }
 
+/* A field and its button on one line (Compare with: [select] [Compare]).
+ * The field takes the room left; they wrap on a narrow screen. */
+.inline-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+}
+
+.inline-fields > :is(input, select) {
+    flex: 1 1 12rem;
+    margin-bottom: 0;
+}
+
+.inline-fields > :is(button, input[type="submit"], .btn, .switch) {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* The card rows of the lot forms (templates/_card_row.html):           */
 /* a compact version of the fields, since a lot can have many cards.    */
@@ -297,6 +316,18 @@ legend {
     transform: translateX(calc(var(--track) - var(--knob) - 2 * var(--inset)));
 }
 
+/* Several switches, one per line (a user's permissions). */
+.switch-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.switch-list .switch {
+    margin: 0.2rem 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Buttons                                                              */
 /*                                                                      */
@@ -353,7 +384,7 @@ legend {
 /* A deletion on an edit page: well below the form's "Save", folded (the
    book and wish forms), so a thumb aiming at Save never hits it. */
 .danger-zone {
-    margin-top: 3rem;
+    margin: 3rem 0 2rem;
     padding: 0.6rem 0.9rem;
     border: 1px solid var(--danger);
     border-radius: var(--radius);

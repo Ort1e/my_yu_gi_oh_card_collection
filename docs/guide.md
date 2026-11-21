@@ -364,6 +364,17 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   "Other result…", the end of the day (placement, players, conclusion) is
   folded. Everything is kept on the phone at once and sent when the network
   is there (⏳ becomes ✓); if the session ended, "Log in again".
+  **To Discord**: with a webhook set on the NAS (`DISCORD_WEBHOOK_URL`, see
+  below), the start page has a switch *Post the rounds to Discord* (off by
+  default; the live page then shows 📣 Discord). Each round saved is posted
+  to the channel as its share line (the first one under the tournament's
+  name), and saving the end of the day posts the day's lines with the
+  placement. A round changed afterwards (its opponent's deck written later)
+  **edits** its message, nothing is posted twice. Rounds noted offline are
+  posted when the phone sends them. The webhook: in Discord, the channel's
+  *Edit channel → Integrations → Webhooks → New webhook → Copy webhook URL*,
+  then `deploy/pc/set-nas-setting.sh DISCORD_WEBHOOK_URL` (the URL is a
+  secret: whoever has it can post).
   With the site installed as an app ("From a phone"), the shortcut *Today's
   tournament* opens it, **even with no network** once it has been opened on
   the phone with it.

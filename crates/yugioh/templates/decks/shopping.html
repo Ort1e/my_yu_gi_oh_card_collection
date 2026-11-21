@@ -9,8 +9,8 @@
 
 {% block content %}
 <div class="inside-container">
-  <h1>Shopping list</h1>
   <p class="back-link"><a href="/decks">← All decks</a> · <a href="/decks/built">Built decks</a></p>
+  <h1>Shopping list</h1>
   <p>What the built decks, then the planned ones (the deck builder's Settings tab: Planned), still lack.
     They share your collection: a copy you own once counts for one deck only, the built ones first.</p>
   <p class="budget-left">{% match budget_left %}{% when Some with (left) %}Budget left this month: <strong>{{ left }} €</strong>{% when None %}No budget set{% endmatch %} · <a href="/budget">Budget</a></p>

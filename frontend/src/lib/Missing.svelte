@@ -8,6 +8,7 @@
     import type { Check } from '../api-types/Check';
     import type { Zone } from '../api-types/Zone';
     import type { DeckZones } from '../types';
+    import { copyText } from './clipboard';
     import { toast } from './toast';
 
     export let zones: DeckZones;
@@ -40,11 +41,10 @@
     }
 
     async function copyWants() {
-        try {
-            await navigator.clipboard.writeText(check.wants);
+        if (await copyText(check.wants)) {
             toast.ok('Wants list copied');
-        } catch (e) {
-            toast.error(`Failed to copy: ${e.message}`);
+        } else {
+            toast.error('The browser refused to copy: select the list and copy it by hand.');
         }
     }
 </script>

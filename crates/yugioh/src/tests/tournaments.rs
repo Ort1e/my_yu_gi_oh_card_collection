@@ -456,6 +456,53 @@ async fn the_live_start_creates_today_s_tournament_then_redirects_to_it() {
 }
 
 #[tokio::test]
+async fn posting_to_discord_is_offered_only_with_a_webhook() {
+    let t = TestApp::new().await;
+    let (_, page) = t.get("/tournaments/live").await;
+    assert!(!page.contains("post_to_discord"));
+    // the switch can't be forced without a webhook
+    t.post(
+        "/tournaments/live",
+        &[("name", "Locals"), ("post_to_discord", "on")],
+    )
+    .await;
+    assert_eq!(t.scalar("SELECT post_to_discord FROM tournament").await, 0);
+
+    let t = TestApp::with_discord().await;
+    let (_, page) = t.get("/tournaments/live").await;
+    assert!(page.contains(r#"name="post_to_discord""#), "{page}");
+    t.post("/tournaments/live", &[("name", "Off")]).await;
+    let (_, page) = t.get("/tournaments/1/live").await;
+    assert!(!page.contains("📣 Discord"));
+    t.post(
+        "/tournaments/live",
+        &[("name", "Locals"), ("post_to_discord", "on")],
+    )
+    .await;
+    assert_eq!(
+        t.scalar("SELECT post_to_discord FROM tournament WHERE name = 'Locals'")
+            .await,
+        1
+    );
+    let (_, page) = t.get("/tournaments/2/live").await;
+    assert!(page.contains("📣 Discord"), "{page}");
+
+    // the shared texts are taken (and posted after the commit)
+    let mut round = live_round("win", &["K9"], &["won", "won"]);
+    round["share_line"] = json!("R1: W 2-0 vs K9");
+    let (status, _) = t.json("PUT", "/api/tournaments/2/rounds/1", round).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = t
+        .json(
+            "PATCH",
+            "/api/tournaments/2",
+            json!({ "placement": 1, "share_text": "R1: W 2-0 vs K9" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn the_start_form_is_filled_from_the_last_tournament() {
     let t = TestApp::new().await;
     let (v, _) = t.deck_fixture().await;

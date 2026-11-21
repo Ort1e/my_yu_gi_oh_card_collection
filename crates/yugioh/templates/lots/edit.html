@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Lot {{ id }}{% endblock %}
+{% block title %}Edit the lot{% endblock %}
 
 {% block content %}
 <div class="inside-container narrow">
-<h1>Edit Lot {{ id }}</h1>
 <p class="back-link"><a href="/lots/{{ id }}">← Back to the lot</a></p>
+<h1>Edit the lot</h1>
 
 {% include "partials/form_errors.html" %}
 
 <form method="post" action="/lots/{{ id }}/edit">
   <fieldset>
-    <legend>Lot Info</legend>
+    <legend>The lot</legend>
     <p>
       <label for="price">Price:</label>
       <input type="text" inputmode="decimal" name="price" id="price" value="{{ lot.price }}" required>

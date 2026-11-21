@@ -1,7 +1,7 @@
 /*
  * The green boxes of the list and detail pages (a card, a lot, a deck…).
  *
- *   <div class="card-list">                      a centred column of boxes
+ *   <div class="card-list">                      a column of boxes, as wide as the page
  *     <a class="card-link" href="…">             the whole box is a link
  *       <div class="card">
  *         <div class="card-title">…</div>
@@ -16,19 +16,18 @@
 .card-list {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 0.6rem;
 }
 
-/* A form in the column is as wide as the boxes. */
-.card-list > form {
-    width: 100%;
-    max-width: 900px;
+/* In the column, the boxes and forms take the page's width (like its title
+   and its tables). */
+.card-list > form,
+.card-list .card {
+    max-width: none;
 }
 
 .card-link {
     width: 100%;
-    max-width: 900px;
     color: inherit;
     text-decoration: none;
 }
@@ -409,5 +408,3 @@ a.rarity-badge:hover {
         height: 80px;
     }
 }
-
-form.inline-form { display: inline; }

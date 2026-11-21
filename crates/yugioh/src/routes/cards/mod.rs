@@ -180,7 +180,7 @@ pub async fn list(
     let cards = select.build_query_as().fetch_all(pool).await?;
 
     Ok(CardsList {
-        page_title: "All Cards",
+        page_title: "Cards",
         page,
         view,
         total: if public {

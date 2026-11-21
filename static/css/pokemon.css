@@ -32,18 +32,6 @@ body.pokemon :is(form, .card) a:not(.btn, .rarity-badge) {
     color: #555;
 }
 
-label.checkbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-weight: normal;
-}
-
-label.checkbox input {
-    width: auto;
-    margin: 0;
-}
-
 .pokemon-summary {
     font-size: 1.05rem;
 }

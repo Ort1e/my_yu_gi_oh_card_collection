@@ -14,6 +14,7 @@
     {% if !deck.is_empty() %}<span>{{ deck }}</span>{% endif %}
     <strong id="live-record"></strong>
     <span id="live-sync" aria-live="polite"></span>
+    {% if discord %}<span title="Each round and the day's summary go to the Discord channel">📣 Discord</span>{% endif %}
   </p>
   <p id="live-problem" class="error" hidden></p>
   <p id="live-login" hidden><a href="/login?next=/tournaments/{{ id }}/live">Log in again</a> (your notes stay on this phone)</p>

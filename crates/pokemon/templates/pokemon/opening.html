@@ -12,7 +12,7 @@
 
 {% block content %}
 <div class="inside-container">
-<p class="back-link"><a href="/pokemon/openings">← The openings</a></p>
+<p class="back-link"><a href="/pokemon/openings">← All openings</a></p>
 <h1>{{ opening.set_name }}</h1>
 <p>
   Opened on {% match opening.opened_on %}{% when Some with (date) %}{{ date|date }}{% when None %}a day not noted{% endmatch %}

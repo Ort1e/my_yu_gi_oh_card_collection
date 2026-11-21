@@ -4,8 +4,8 @@
 
 {% block content %}
 <div class="inside-container">
-<h1>Add cards to {{ lot.title() }}</h1>
 <p class="back-link"><a href="/lots/{{ lot.id }}">← Back to the lot</a></p>
+<h1>Add cards to {{ lot.title() }}</h1>
 
 <form method="post" action="/lots/{{ lot.id }}/add-cards" class="plain">
   {% include "partials/form_errors.html" %}

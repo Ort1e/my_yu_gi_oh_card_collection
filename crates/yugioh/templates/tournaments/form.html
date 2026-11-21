@@ -10,11 +10,11 @@
 <div class="inside-container {% if notes.is_empty() %}narrow{% else %}with-notes{% endif %}">
 {% match id %}
 {% when Some with (id) %}
-  <h1>Edit {{ values.name }}</h1>
   <p class="back-link"><a href="/tournaments/{{ id }}">← Back to the tournament</a></p>
+  <h1>Edit {{ values.name }}</h1>
 {% when None %}
-  <h1>Add a tournament</h1>
   <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
+  <h1>Add a tournament</h1>
 {% endmatch %}
 
 <div class="form-and-notes">

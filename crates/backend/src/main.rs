@@ -62,6 +62,7 @@ async fn main() {
             .ok()
             .map(|key| key.trim().to_string())
             .filter(|key| !key.is_empty()),
+        discord: common::discord::Webhook::from_env(),
         auth,
     };
 

@@ -11,12 +11,15 @@
 
 {% block content %}
 <div class="inside-container">
-<h1>Wishlist {{ list.name }} ({{ wanted.len() }})</h1>
-<p class="back-link"><a href="/pokemon/wishlist">← All the wishlists</a></p>
+<p class="back-link"><a href="/pokemon/wishlist">← All wishlists</a></p>
+<h1>Wishlist {{ list.name }} <span class="title-count">({{ wanted.len() }})</span></h1>
+{% if can_edit && !common::export::public_copy() %}
+<div class="button-row"><a href="/pokemon/wishlists/{{ list.id }}/add" class="btn">Add a wish</a></div>
+{% endif %}
 {% if self.under_max() > 0 && can_edit && !common::export::public_copy() %}
 <p class="success">{{ self.under_max() }} {% if self.under_max() == 1 %}card is{% else %}cards are{% endif %} at or under your price today.</p>
 {% endif %}
-<p>Prices: Cardmarket's trend, refreshed every week.{% if can_edit && !common::export::public_copy() %} <a href="/pokemon/wishlists/{{ list.id }}/add" class="btn">Add a wish</a>{% endif %}</p>
+<p class="hint">Prices: Cardmarket's trend, refreshed every week.</p>
 
 {% if !most_wished.is_empty() %}
 <section class="booster-suggestions">

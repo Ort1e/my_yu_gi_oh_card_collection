@@ -51,7 +51,7 @@ pub async fn list(
     .await?;
 
     Ok(SellersList {
-        page_title: "All Sellers",
+        page_title: "Sellers",
         page,
         total,
         sellers,

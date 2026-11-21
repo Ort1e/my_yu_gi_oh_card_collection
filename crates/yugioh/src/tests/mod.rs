@@ -43,6 +43,14 @@ impl TestApp {
         TestApp::with_password(None).await
     }
 
+    /// With a Discord webhook set (nothing is posted under `cfg(test)`).
+    pub(crate) async fn with_discord() -> TestApp {
+        let mut t = TestApp::new().await;
+        t.0.state.discord =
+            common::discord::Webhook::parse("https://discord.com/api/webhooks/1/test").unwrap();
+        t
+    }
+
     /// `password`: enable the login with this password.
     pub(crate) async fn with_password(password: Option<&str>) -> TestApp {
         let t = common::testing::TestApp::new(crate::app, password).await;

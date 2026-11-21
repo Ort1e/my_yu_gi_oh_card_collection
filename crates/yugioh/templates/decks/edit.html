@@ -4,14 +4,14 @@
 
 {% block content %}
 <div class="inside-container narrow">
-<h1>Edit Deck</h1>
 <p class="back-link"><a href="/decks/{{ id }}">← Back to the deck</a></p>
+<h1>Edit the deck</h1>
 
 {% include "partials/form_errors.html" %}
 
 <form method="post" action="/decks/{{ id }}/edit">
   <fieldset>
-    <legend>Deck Information</legend>
+    <legend>The deck</legend>
     <p>
       <label for="name">Name:</label>
       <input type="text" name="name" id="name" value="{{ name }}" maxlength="100" required>
