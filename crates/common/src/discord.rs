@@ -102,6 +102,26 @@ impl Webhook {
             status => Err(format!("Discord answered {status}")),
         }
     }
+
+    /// Deletes message `id` (one this webhook posted); one already gone is
+    /// fine.
+    pub async fn delete(&self, http: &reqwest::Client, id: &str) -> Result<(), String> {
+        if !id.bytes().all(|b| b.is_ascii_digit()) {
+            return Ok(());
+        }
+        let url = format!("{}/messages/{id}", self.0);
+        let answer = http
+            .delete(&url)
+            .timeout(Duration::from_secs(20))
+            .send()
+            .await
+            .map_err(|e| format!("Discord: {}", e.without_url()))?;
+        match answer.status() {
+            StatusCode::NOT_FOUND => Ok(()),
+            status if status.is_success() => Ok(()),
+            status => Err(format!("Discord answered {status}")),
+        }
+    }
 }
 
 /// `content` cut to Discord's limit, with "…" when cut.

@@ -755,17 +755,19 @@ group the lists by the version they were taken from.
   and the queue (`navigator.share`, else clipboard, else a selected textarea),
   never stored. The quick form (die, games: `wentFirst` guesses 1st/2nd)
   queues the round; its summary (labels, comment) is queued as it changes.
-- **Discord** (`store/discord.rs`, `common::discord`, 0036): the round `PUT`
-  carries the page's `line(round)` as `share_line`, the end `PATCH`
-  `dayText()` as `share_text` (one formatter, the script's). After the commit,
-  for a tournament with `post_to_discord` (the start page's switch, shown only
-  with `AppState::discord`), a task posts it through the webhook (`?wait=true`
-  gives the message id) or edits the message already posted for that slot
-  (round number, `0` the summary), remembered in `tournament_discord_post`
-  (its own table: rounds are replaced on each save); the same text again posts
-  nothing. A static mutex runs one at a time; one retry on 429; a failure is a
-  `warn!`. The URL is never logged (`without_url()`); nothing under
-  `cfg(test)`.
+- **Discord** (`routes/tournaments/discord.rs`, `store/discord.rs`,
+  `common::discord`, 0036): after every save of a tournament with
+  `post_to_discord` (the start page's switch, shown only with
+  `AppState::discord`): the round `PUT`, the end `PATCH`, the edit form, a
+  task writes its messages **from the database** (one per round, the first
+  under the tournament's head; the day's summary once the placement, players
+  or conclusion is noted) and `store::discord::publish` makes the channel
+  match: a slot (round number, `0` the summary) never posted is posted
+  (`?wait=true` gives the message id), a changed one edited, one gone
+  deleted, all remembered in `tournament_discord_post`. A static mutex runs
+  one at a time and the tournament is read inside the turn (the last save is
+  published last); one retry on 429; a failure is a `warn!`. The URL is
+  never logged (`without_url()`); nothing under `cfg(test)`.
 - **Offline**: the page may come from the phone's cache (the service worker,
   "The app on a phone"), with old data: the script keeps the app's last answer
   (`tournament-live-<id>-known`, updated after each send) and asks the API

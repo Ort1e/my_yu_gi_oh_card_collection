@@ -6,6 +6,7 @@
 
 pub mod api;
 mod data;
+mod discord;
 pub mod form;
 pub mod labels;
 pub mod live;

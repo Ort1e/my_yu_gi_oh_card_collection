@@ -367,10 +367,13 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   **To Discord**: with a webhook set on the NAS (`DISCORD_WEBHOOK_URL`, see
   below), the start page has a switch *Post the rounds to Discord* (off by
   default; the live page then shows 📣 Discord). Each round saved is posted
-  to the channel as its share line (the first one under the tournament's
-  name), and saving the end of the day posts the day's lines with the
-  placement. A round changed afterwards (its opponent's deck written later)
-  **edits** its message, nothing is posted twice. Rounds noted offline are
+  to the channel with everything noted (result and score, opponent's deck,
+  die, each game with 1st/2nd and its comment, the round's comment; the first
+  one under the tournament's name, date, place and deck played), and noting
+  the end of the day posts a summary (placement, round and game records, a
+  line per round, the conclusion). A round changed afterwards (its opponent's
+  deck or comment written later, on the live page or the edit form) **edits**
+  its message, a round deleted deletes it; nothing is posted twice. Rounds noted offline are
   posted when the phone sends them. The webhook: in Discord, the channel's
   *Edit channel → Integrations → Webhooks → New webhook → Copy webhook URL*,
   then `deploy/pc/set-nas-setting.sh DISCORD_WEBHOOK_URL` (the URL is a
