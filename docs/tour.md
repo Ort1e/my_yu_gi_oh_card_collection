@@ -759,7 +759,7 @@ group the lists by the version they were taken from.
   `common::discord`, 0036): after every save of a tournament with
   `post_to_discord` (the start page's switch, shown only with
   `AppState::discord`): the round `PUT`, the end `PATCH`, the edit form, a
-  task writes its messages **from the database** (one per round, the first
+  task writes its messages (in French) **from the database** (one per round, the first
   under the tournament's head; the day's summary once the placement, players
   or conclusion is noted) and `store::discord::publish` makes the channel
   match: a slot (round number, `0` the summary) never posted is posted

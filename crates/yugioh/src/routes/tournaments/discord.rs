@@ -11,13 +11,16 @@
 //! deletes what is gone. In a task, one at a time, reading the tournament
 //! inside its turn (the last one sees the last save); a failure is only a
 //! `warn!` (the notes are saved anyway). Nothing under `cfg(test)`.
+//!
+//! The messages are in **French** (the channel's readers; the owner's
+//! choice, 2026-11-21): the words are here, not the domain's English labels.
 
 use common::web::filters::french_date;
 use tokio::sync::Mutex;
 use yugioh_domain::tournament::{stats, Die, Game, GameResult, RoundRecord, RoundResult};
 
 use super::data::{self, RoundView, Which};
-use super::{placement_text, record_text, tournament_record};
+use super::record_text;
 use crate::store::discord::{publish, SUMMARY};
 use crate::AppState;
 
@@ -83,7 +86,8 @@ async fn messages_of(
         location: t.location.clone(),
         is_team: t.is_team,
         deck: t.version_full_name(),
-        placement: placement_text(t),
+        placement: t.placement,
+        players: t.players,
         conclusion: t.conclusion.clone(),
     };
     Ok(Some(messages(&head, loaded.rounds_of(id))))
@@ -97,8 +101,8 @@ struct Head {
     is_team: bool,
     /// "Deck - list" of the list played.
     deck: Option<String>,
-    /// "3rd of 32", "" when not noted.
-    placement: String,
+    placement: Option<i64>,
+    players: Option<i64>,
     conclusion: Option<String>,
 }
 
@@ -116,7 +120,7 @@ fn messages(head: &Head, rounds: &[RoundView]) -> Vec<(i64, String)> {
             }
         })
         .collect();
-    let ended = !head.placement.is_empty() || head.conclusion.is_some();
+    let ended = head.placement.is_some() || head.players.is_some() || head.conclusion.is_some();
     if ended {
         messages.push((SUMMARY, summary_text(head, rounds)));
     }
@@ -130,11 +134,11 @@ fn head_text(head: &Head) -> String {
         details.push(format!("📍 {location}"));
     }
     if head.is_team {
-        details.push("👥 Team".into());
+        details.push("👥 Par équipes".into());
     }
     let mut text = format!("## 🏆 {}\n{}", head.name, details.join(" · "));
     if let Some(deck) = &head.deck {
-        text.push_str(&format!("\n🃏 Playing **{deck}**"));
+        text.push_str(&format!("\n🃏 Deck joué : **{deck}**"));
     }
     text
 }
@@ -145,6 +149,44 @@ fn result_emoji(result: RoundResult) -> &'static str {
         RoundResult::Loss => "❌",
         RoundResult::DoubleLoss => "⏱️",
         RoundResult::Bye => "💤",
+    }
+}
+
+fn result_word(result: RoundResult) -> &'static str {
+    match result {
+        RoundResult::Win => "Victoire",
+        RoundResult::Loss => "Défaite",
+        RoundResult::DoubleLoss => "Double défaite",
+        RoundResult::Bye => "Exempt",
+        RoundResult::ForfeitWin => "Victoire par forfait",
+    }
+}
+
+fn game_word(result: GameResult) -> &'static str {
+    match result {
+        GameResult::Won => "Gagnée",
+        GameResult::Lost => "Perdue",
+        GameResult::Draw => "Nulle",
+        GameResult::Unfinished => "Inachevée",
+    }
+}
+
+/// "1er", "3e".
+fn ordinal(n: i64) -> String {
+    if n == 1 {
+        "1er".into()
+    } else {
+        format!("{n}e")
+    }
+}
+
+/// "3e sur 32", "3e", "32 joueurs", `None` when not noted.
+fn placement_text(head: &Head) -> Option<String> {
+    match (head.placement, head.players) {
+        (Some(p), Some(n)) => Some(format!("{} sur {n}", ordinal(p))),
+        (Some(p), None) => Some(ordinal(p)),
+        (None, Some(n)) => Some(format!("{n} joueurs")),
+        (None, None) => None,
     }
 }
 
@@ -192,10 +234,10 @@ fn one_line(text: &str) -> String {
 /// result, each game, the comment.
 fn round_text(round: &RoundView) -> String {
     let mut title = format!(
-        "### Round {} · {} {}",
+        "### Ronde {} · {} {}",
         round.number,
         result_emoji(round.result),
-        round.result.label()
+        result_word(round.result)
     );
     if let Some(score) = score(round).filter(|_| round.result != RoundResult::Bye) {
         title.push_str(&format!(" {score}"));
@@ -204,19 +246,23 @@ fn round_text(round: &RoundView) -> String {
 
     if round.result != RoundResult::Bye {
         lines.push(match opponent(round) {
-            Some(deck) => format!("⚔️ vs **{deck}**"),
-            None => "⚔️ vs ❔ *deck not noted yet*".into(),
+            Some(deck) => format!("⚔️ contre **{deck}**"),
+            None => "⚔️ contre ❔ *deck pas encore noté*".into(),
         });
     }
 
     let mut details: Vec<String> = Vec::new();
     match round.die {
-        Some(Die::Won) => details.push("🎲 Die won".into()),
-        Some(Die::Lost) => details.push("🎲 Die lost".into()),
+        Some(Die::Won) => details.push("🎲 Dé gagné".into()),
+        Some(Die::Lost) => details.push("🎲 Dé perdu".into()),
         None => {}
     }
     if let Some(team) = round.team_result {
-        details.push(format!("👥 Team: {} {}", result_emoji(team), team.label()));
+        details.push(format!(
+            "👥 Équipe : {} {}",
+            result_emoji(team),
+            result_word(team)
+        ));
     }
     if !details.is_empty() {
         lines.push(details.join(" · "));
@@ -224,14 +270,14 @@ fn round_text(round: &RoundView) -> String {
 
     for game in &round.games {
         let mut text = format!(
-            "- G{} {} {}",
+            "- M{} {} {}",
             game.number,
             game_emoji(game.result),
-            game.result.label()
+            game_word(game.result)
         );
         match game.went_first {
-            Some(true) => text.push_str(" · went 1st"),
-            Some(false) => text.push_str(" · went 2nd"),
+            Some(true) => text.push_str(" · en premier"),
+            Some(false) => text.push_str(" · en second"),
             None => {}
         }
         if let Some(comment) = &game.comment {
@@ -247,13 +293,27 @@ fn round_text(round: &RoundView) -> String {
 }
 
 /// 🥇🥈🥉 for the podium.
-fn medal(placement: &str) -> &'static str {
-    match placement.split(' ').next() {
-        Some("1st") => "🥇",
-        Some("2nd") => "🥈",
-        Some("3rd") => "🥉",
+fn medal(placement: Option<i64>) -> &'static str {
+    match placement {
+        Some(1) => "🥇",
+        Some(2) => "🥈",
+        Some(3) => "🥉",
         _ => "🏅",
     }
+}
+
+/// "2-1", "2-1, 1 exempt" over the rounds, "" without any.
+fn rounds_record(s: &yugioh_domain::tournament::Stats) -> String {
+    if s.rounds.wins + s.rounds.losses + s.byes == 0 {
+        return String::new();
+    }
+    let mut text = record_text(&s.rounds);
+    match s.byes {
+        0 => {}
+        1 => text.push_str(", 1 exempt"),
+        n => text.push_str(&format!(", {n} exempts")),
+    }
+    text
 }
 
 /// The day: placement, records, deck played, a line per round, conclusion.
@@ -278,17 +338,17 @@ fn summary_text(head: &Head, rounds: &[RoundView]) -> String {
         .collect();
     let s = stats(&records);
 
-    let mut lines = vec![format!("## 🏁 {}: the day", head.name)];
+    let mut lines = vec![format!("## 🏁 {} : bilan", head.name)];
     let mut figures: Vec<String> = Vec::new();
-    if !head.placement.is_empty() {
-        figures.push(format!("{} **{}**", medal(&head.placement), head.placement));
+    if let Some(placement) = placement_text(head) {
+        figures.push(format!("{} **{placement}**", medal(head.placement)));
     }
-    let record = tournament_record(&s);
+    let record = rounds_record(&s);
     if !record.is_empty() {
-        figures.push(format!("Rounds **{record}**"));
+        figures.push(format!("Rondes **{record}**"));
     }
     if s.games.wins + s.games.losses + s.games.draws > 0 {
-        figures.push(format!("Games {}", record_text(&s.games)));
+        figures.push(format!("Manches {}", record_text(&s.games)));
     }
     if !figures.is_empty() {
         lines.push(figures.join(" · "));
@@ -303,13 +363,13 @@ fn summary_text(head: &Head, rounds: &[RoundView]) -> String {
     for round in rounds {
         let mut text = format!("R{} {}", round.number, result_emoji(round.result));
         if round.result == RoundResult::Bye {
-            text.push_str(" Bye");
+            text.push_str(" Exempt");
         } else {
             if let Some(score) = score(round) {
                 text.push_str(&format!(" {score}"));
             }
             text.push_str(&format!(
-                " vs {}",
+                " contre {}",
                 opponent(round).unwrap_or_else(|| "?".into())
             ));
         }
@@ -328,14 +388,15 @@ mod tests {
     use super::*;
     use crate::routes::tournaments::data::GameView;
 
-    fn head(placement: &str, conclusion: Option<&str>) -> Head {
+    fn head(placement: Option<i64>, players: Option<i64>, conclusion: Option<&str>) -> Head {
         Head {
             name: "Locals".into(),
             date: "2026-11-21".into(),
             location: Some("Paris".into()),
             is_team: false,
             deck: Some("Snake-Eye - v3".into()),
-            placement: placement.into(),
+            placement,
+            players,
             conclusion: conclusion.map(Into::into),
         }
     }
@@ -388,25 +449,25 @@ mod tests {
         r.comment = Some("Close one".into());
         assert_eq!(
             round_text(&r),
-            "### Round 2 · ✅ Win 2-1\n\
-             ⚔️ vs **Mitsurugi**\n\
-             🎲 Die won\n\
-             - G1 ✅ Won · went 1st · Ash on the search\n\
-             - G2 ❌ Lost · went 2nd\n\
-             - G3 ✅ Won\n\
+            "### Ronde 2 · ✅ Victoire 2-1\n\
+             ⚔️ contre **Mitsurugi**\n\
+             🎲 Dé gagné\n\
+             - M1 ✅ Gagnée · en premier · Ash on the search\n\
+             - M2 ❌ Perdue · en second\n\
+             - M3 ✅ Gagnée\n\
              💬 Close one"
         );
 
         let mut r = round(1, RoundResult::Loss, None, Vec::new());
         assert_eq!(
             round_text(&r),
-            "### Round 1 · ❌ Loss\n⚔️ vs ❔ *deck not noted yet*"
+            "### Ronde 1 · ❌ Défaite\n⚔️ contre ❔ *deck pas encore noté*"
         );
         r.labels = vec!["Ryzeal".into(), "Fiendsmith".into()];
-        assert!(round_text(&r).contains("⚔️ vs **Ryzeal / Fiendsmith**"));
+        assert!(round_text(&r).contains("⚔️ contre **Ryzeal / Fiendsmith**"));
 
         let bye = round(3, RoundResult::Bye, None, Vec::new());
-        assert_eq!(round_text(&bye), "### Round 3 · 💤 Bye");
+        assert_eq!(round_text(&bye), "### Ronde 3 · 💤 Exempt");
     }
 
     #[test]
@@ -420,32 +481,40 @@ mod tests {
             ),
             round(2, RoundResult::Bye, None, Vec::new()),
         ];
-        let m = messages(&head("", None), &rounds);
+        let m = messages(&head(None, None, None), &rounds);
         assert_eq!(m.len(), 2);
         assert_eq!(m[0].0, 1);
         assert!(
             m[0].1.starts_with(
-                "## 🏆 Locals\n📅 21/11/2026 · 📍 Paris\n🃏 Playing **Snake-Eye - v3**\n\n### Round 1"
+                "## 🏆 Locals\n📅 21/11/2026 · 📍 Paris\n🃏 Deck joué : **Snake-Eye - v3**\n\n### Ronde 1"
             ),
             "{}",
             m[0].1
         );
-        assert_eq!(m[1], (2, "### Round 2 · 💤 Bye".to_string()));
+        assert_eq!(m[1], (2, "### Ronde 2 · 💤 Exempt".to_string()));
+        assert_eq!(
+            placement_text(&head(Some(1), None, None)).as_deref(),
+            Some("1er")
+        );
+        assert_eq!(
+            placement_text(&head(None, Some(16), None)).as_deref(),
+            Some("16 joueurs")
+        );
 
-        let m = messages(&head("3rd of 32", Some("Good day")), &rounds);
+        let m = messages(&head(Some(3), Some(32), Some("Bonne journée")), &rounds);
         assert_eq!(m.len(), 3);
         assert_eq!(
             m[2],
             (
                 SUMMARY,
-                "## 🏁 Locals: the day\n\
-                 🥉 **3rd of 32** · Rounds **1-0, 1 bye** · Games 1-0\n\
+                "## 🏁 Locals : bilan\n\
+                 🥉 **3e sur 32** · Rondes **1-0, 1 exempt** · Manches 1-0\n\
                  🃏 Snake-Eye - v3\n\
                  \n\
-                 R1 ✅ 1-0 vs Mitsurugi\n\
-                 R2 💤 Bye\n\
+                 R1 ✅ 1-0 contre Mitsurugi\n\
+                 R2 💤 Exempt\n\
                  \n\
-                 📝 Good day"
+                 📝 Bonne journée"
                     .to_string()
             )
         );

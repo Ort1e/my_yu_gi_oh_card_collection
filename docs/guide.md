@@ -367,7 +367,7 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   **To Discord**: with a webhook set on the NAS (`DISCORD_WEBHOOK_URL`, see
   below), the start page has a switch *Post the rounds to Discord* (off by
   default; the live page then shows 📣 Discord). Each round saved is posted
-  to the channel with everything noted (result and score, opponent's deck,
+  to the channel, in French, with everything noted (result and score, opponent's deck,
   die, each game with 1st/2nd and its comment, the round's comment; the first
   one under the tournament's name, date, place and deck played), and noting
   the end of the day posts a summary (placement, round and game records, a
