@@ -44,9 +44,10 @@ pub fn spawn_sync(state: &AppState, id: i64) {
     };
     let pool = state.pool.clone();
     let http = state.http.clone();
+    let site = state.public_site.clone();
     tokio::spawn(async move {
         let _turn = PUBLISHING.lock().await;
-        let messages = match messages_of(&pool, id).await {
+        let messages = match messages_of(&pool, site.as_deref(), id).await {
             Ok(Some(messages)) => messages,
             Ok(None) => return,
             Err(e) => {
@@ -61,8 +62,10 @@ pub fn spawn_sync(state: &AppState, id: i64) {
 }
 
 /// The messages of tournament `id`, `None` when it isn't opted in (or gone).
+/// `site`: the public copy's address, for the summary's link to the list.
 async fn messages_of(
     pool: &crate::store::db::Pool,
+    site: Option<&str>,
     id: i64,
 ) -> Result<Option<Vec<(i64, String)>>, String> {
     let opted_in: Option<bool> =
@@ -84,6 +87,20 @@ async fn messages_of(
     let Some(t) = loaded.tournaments.first() else {
         return Ok(None);
     };
+    let mut conn = pool.acquire().await.map_err(|e| e.to_string())?;
+    let snapshot = snapshots::of_tournament(&mut conn, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let deck = match &snapshot {
+        Some(snapshot) => snapshots::cards(&mut conn, snapshot.id)
+            .await
+            .map_err(|e| e.to_string())?,
+        None => SnapshotList::default(),
+    };
+    // a tournament's list is always in the public copy (`PUBLIC_SNAPSHOT`)
+    let deck_url = site
+        .zip(snapshot.as_ref())
+        .map(|(site, s)| common::export::page_url(site, &format!("/deck-snapshots/{}", s.id)));
     let head = Head {
         name: t.name.clone(),
         date: t.date.clone(),
@@ -93,16 +110,7 @@ async fn messages_of(
         placement: t.placement,
         players: t.players,
         conclusion: t.conclusion.clone(),
-    };
-    let mut conn = pool.acquire().await.map_err(|e| e.to_string())?;
-    let deck = match snapshots::of_tournament(&mut conn, id)
-        .await
-        .map_err(|e| e.to_string())?
-    {
-        Some(snapshot) => snapshots::cards(&mut conn, snapshot.id)
-            .await
-            .map_err(|e| e.to_string())?,
-        None => SnapshotList::default(),
+        deck_url,
     };
     Ok(Some(messages(&head, &deck, loaded.rounds_of(id))))
 }
@@ -118,6 +126,8 @@ struct Head {
     placement: Option<i64>,
     players: Option<i64>,
     conclusion: Option<String>,
+    /// The list played on the public site, when its address is known.
+    deck_url: Option<String>,
 }
 
 /// Every message (slot, content), in the order they are posted: the deck
@@ -442,6 +452,12 @@ fn summary_text(head: &Head, rounds: &[RoundView]) -> String {
         lines.push(String::new());
         lines.push(format!("📝 {conclusion}"));
     }
+    if let Some(url) = &head.deck_url {
+        lines.push(String::new());
+        // `<…>`: a link without Discord's preview (the page isn't there yet)
+        lines.push(format!("🔗 La liste sur le site : <{url}>"));
+        lines.push("⏳ En ligne demain matin seulement (mise à jour du site la nuit)".into());
+    }
     lines.join("\n")
 }
 
@@ -461,6 +477,7 @@ mod tests {
             placement,
             players,
             conclusion: conclusion.map(Into::into),
+            deck_url: None,
         }
     }
 
@@ -585,6 +602,13 @@ mod tests {
                     .to_string()
             )
         );
+
+        let mut ended = head(Some(3), Some(32), None);
+        ended.deck_url = Some("https://cards.example.org/deck-snapshots-35.html".into());
+        assert!(summary_text(&ended, &rounds).ends_with(
+            "\n\n🔗 La liste sur le site : <https://cards.example.org/deck-snapshots-35.html>\n\
+             ⏳ En ligne demain matin seulement (mise à jour du site la nuit)"
+        ));
     }
 
     fn entry(zone: DeckZone, name: &str, count: u32) -> SnapshotEntry {

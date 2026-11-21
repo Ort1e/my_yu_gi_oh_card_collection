@@ -762,7 +762,9 @@ group the lists by the version they were taken from.
   edit form, a task writes its messages (in French) **from the database** (the
   deck list played first, from its snapshot; one per round, the first
   under the tournament's head; the day's summary once the placement, players
-  or conclusion is noted) and `store::discord::publish` makes the channel
+  or conclusion is noted, ending with the list's page on the public site when
+  `AppState::public_site` is set: `common::export::page_url`) and
+  `store::discord::publish` makes the channel
   match: a slot (round number, `0` the summary, `-1` the deck list, `-2` its
   side when too long) never posted is posted
   (`?wait=true` gives the message id), a changed one edited, one gone

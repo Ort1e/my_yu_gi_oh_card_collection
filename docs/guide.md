@@ -375,7 +375,8 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   die, each game with 1st/2nd and its comment, the round's comment; the first
   one under the tournament's name, date, place and deck played), and noting
   the end of the day posts a summary (placement, round and game records, a
-  line per round, the conclusion). A round changed afterwards (its opponent's
+  line per round, the conclusion; with `PUBLIC_SITE_URL` set, a link to the
+  list on the public site, which says it is only there the next morning). A round changed afterwards (its opponent's
   deck or comment written later, on the live page or the edit form) **edits**
   its message, a round deleted deletes it; nothing is posted twice. Rounds noted offline are
   posted when the phone sends them. The webhook: in Discord, the channel's

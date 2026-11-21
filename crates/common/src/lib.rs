@@ -54,6 +54,9 @@ pub struct AppState {
     /// The Discord channel the live tournament notes go to
     /// (`DISCORD_WEBHOOK_URL`), `None` when not set. Never logged.
     pub discord: Option<discord::Webhook>,
+    /// Where the public copy is online (`PUBLIC_SITE_URL`), for the links
+    /// given outside the app; `None` when not set.
+    pub public_site: Option<String>,
     pub auth: auth::Auth,
 }
 

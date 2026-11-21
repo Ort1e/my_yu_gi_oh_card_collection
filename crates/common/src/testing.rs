@@ -59,6 +59,7 @@ impl TestApp {
                 cardmarket_account: "me".into(),
                 google_books_key: None,
                 discord: None,
+                public_site: None,
                 auth,
             },
             dir,

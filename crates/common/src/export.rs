@@ -277,6 +277,42 @@ pub fn href(address: &str) -> String {
     }
 }
 
+/// Where the public copy is online (`PUBLIC_SITE_URL`, `https://…`), for
+/// the links the app gives out of itself (the tournament's Discord summary);
+/// `None` when unset or blank. Exits on an address that isn't `http(s)://`.
+pub fn site_from_env() -> Option<String> {
+    let value = std::env::var("PUBLIC_SITE_URL").ok()?;
+    match parse_site(&value) {
+        Ok(site) => site,
+        Err(e) => {
+            eprintln!("error: PUBLIC_SITE_URL: {e}");
+            std::process::exit(2);
+        }
+    }
+}
+
+/// `PUBLIC_SITE_URL`'s value, without its trailing `/`.
+pub fn parse_site(value: &str) -> Result<Option<String>, &'static str> {
+    let value = value.trim().trim_end_matches('/');
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let rest = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"))
+        .ok_or("not a web address (https://…)")?;
+    if rest.is_empty() || rest.contains(char::is_whitespace) || rest.contains(['?', '#']) {
+        return Err("not a web address (https://…)");
+    }
+    Ok(Some(value.to_string()))
+}
+
+/// The address on the public site `site` of the copy's page of app page
+/// `address`: `/deck-snapshots/4` → `https://…/deck-snapshots-4.html`.
+pub fn page_url(site: &str, address: &str) -> String {
+    format!("{site}/{}.html", flat_name(address))
+}
+
 /// A file name for an address: `/cards?page=2` → `cards-page-2`.
 fn flat_name(address: &str) -> String {
     let mut name = String::new();
@@ -335,6 +371,24 @@ fn folder_size(dir: &Path) -> std::io::Result<u64> {
 
 #[cfg(test)]
 mod tests {
+    use super::{page_url, parse_site};
+
+    #[test]
+    fn the_public_site_address() {
+        assert_eq!(parse_site("  "), Ok(None));
+        assert_eq!(
+            parse_site("https://cards.example.org/\n"),
+            Ok(Some("https://cards.example.org".into()))
+        );
+        assert!(parse_site("cards.example.org").is_err());
+        assert!(parse_site("https://").is_err());
+        assert!(parse_site("https://a b").is_err());
+        assert_eq!(
+            page_url("https://cards.example.org", "/deck-snapshots/35"),
+            "https://cards.example.org/deck-snapshots-35.html"
+        );
+    }
+
     use super::*;
 
     #[test]
