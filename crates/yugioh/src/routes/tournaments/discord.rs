@@ -3,10 +3,12 @@
 //! (`tournament.post_to_discord`).
 //!
 //! The messages are written here from the tournament **as saved**, after
-//! every save of it (a round `PUT` or the end `PATCH` of the live page, the
-//! edit form): one message per round, the first one under the tournament's
-//! head, and the day's summary once its end is noted (placement, players or
-//! conclusion). `store::discord::publish` then posts what is new, edits what
+//! every save of it (the live start, a round `PUT` or the end `PATCH` of the
+//! live page, the edit form): first the deck list played (its snapshot), so
+//! the friends in the channel see it during the day while the public copy only
+//! shows it from the next nightly export; then one message per round, the
+//! first one under the tournament's head, and the day's summary once its end
+//! is noted (placement, players or conclusion). `store::discord::publish` then posts what is new, edits what
 //! changed (the opponent's deck or a comment written after the round) and
 //! deletes what is gone. In a task, one at a time, reading the tournament
 //! inside its turn (the last one sees the last save); a failure is only a
@@ -17,11 +19,13 @@
 
 use common::web::filters::french_date;
 use tokio::sync::Mutex;
+use yugioh_domain::deck_history::{DeckZone, SnapshotList};
 use yugioh_domain::tournament::{stats, Die, Game, GameResult, RoundRecord, RoundResult};
 
 use super::data::{self, RoundView, Which};
 use super::record_text;
-use crate::store::discord::{publish, SUMMARY};
+use crate::store::discord::{publish, DECK, DECK_SIDE, SUMMARY};
+use crate::store::snapshots;
 use crate::AppState;
 
 /// One tournament's messages at a time: two quick saves must not both see
@@ -90,7 +94,17 @@ async fn messages_of(
         players: t.players,
         conclusion: t.conclusion.clone(),
     };
-    Ok(Some(messages(&head, loaded.rounds_of(id))))
+    let mut conn = pool.acquire().await.map_err(|e| e.to_string())?;
+    let deck = match snapshots::of_tournament(&mut conn, id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        Some(snapshot) => snapshots::cards(&mut conn, snapshot.id)
+            .await
+            .map_err(|e| e.to_string())?,
+        None => SnapshotList::default(),
+    };
+    Ok(Some(messages(&head, &deck, loaded.rounds_of(id))))
 }
 
 /// What the messages say of the tournament itself.
@@ -106,25 +120,73 @@ struct Head {
     conclusion: Option<String>,
 }
 
-/// Every message (slot, content), in the order they are posted: the rounds,
-/// then the summary when the end of the day is noted.
-fn messages(head: &Head, rounds: &[RoundView]) -> Vec<(i64, String)> {
-    let mut messages: Vec<(i64, String)> = rounds
-        .iter()
-        .map(|round| {
-            let text = round_text(round);
-            if round.number == 1 {
-                (round.number, format!("{}\n\n{text}", head_text(head)))
-            } else {
-                (round.number, text)
-            }
-        })
-        .collect();
+/// Every message (slot, content), in the order they are posted: the deck
+/// list, the rounds, then the summary when the end of the day is noted.
+fn messages(head: &Head, deck: &SnapshotList, rounds: &[RoundView]) -> Vec<(i64, String)> {
+    let mut messages = deck_messages(head, deck);
+    messages.extend(rounds.iter().map(|round| {
+        let text = round_text(round);
+        if round.number == 1 {
+            (round.number, format!("{}\n\n{text}", head_text(head)))
+        } else {
+            (round.number, text)
+        }
+    }));
     let ended = head.placement.is_some() || head.players.is_some() || head.conclusion.is_some();
     if ended {
         messages.push((SUMMARY, summary_text(head, rounds)));
     }
     messages
+}
+
+/// The deck list played, `None` for an empty zone: `**Main (40)**` then a
+/// line per card, `3× Name`.
+fn zone_text(deck: &SnapshotList, zone: DeckZone) -> Option<String> {
+    let entries: Vec<_> = deck.entries.iter().filter(|e| e.zone == zone).collect();
+    if entries.is_empty() {
+        return None;
+    }
+    let total: u32 = entries.iter().map(|e| e.count).sum();
+    let title = match zone {
+        DeckZone::Main => "Main",
+        DeckZone::Extra => "Extra",
+        DeckZone::Side => "Side",
+    };
+    let mut lines = vec![format!("**{title} ({total})**")];
+    lines.extend(entries.iter().map(|e| format!("{}× {}", e.count, e.name)));
+    Some(lines.join("\n"))
+}
+
+/// The deck list's message, or two when it's too long for one (the Side
+/// Deck in the second); none without a list.
+fn deck_messages(head: &Head, deck: &SnapshotList) -> Vec<(i64, String)> {
+    let [main, extra, side] = DeckZone::ALL.map(|zone| zone_text(deck, zone));
+    if main.is_none() && extra.is_none() && side.is_none() {
+        return Vec::new();
+    }
+    let title = match &head.deck {
+        Some(name) => format!("### 🃏 Liste jouée : **{name}**"),
+        None => "### 🃏 Liste jouée".to_string(),
+    };
+    let first: Vec<String> = [Some(title.clone()), main, extra]
+        .into_iter()
+        .flatten()
+        .collect();
+    let first = first.join("\n\n");
+    match side {
+        None => vec![(DECK, first)],
+        Some(side) => {
+            let whole = format!("{first}\n\n{side}");
+            if whole.chars().count() <= common::discord::MAX_CHARS {
+                vec![(DECK, whole)]
+            } else {
+                vec![
+                    (DECK, first),
+                    (DECK_SIDE, format!("{title} (side)\n\n{side}")),
+                ]
+            }
+        }
+    }
 }
 
 /// `## 🏆 Locals`, then the date, place, deck played.
@@ -387,6 +449,7 @@ fn summary_text(head: &Head, rounds: &[RoundView]) -> String {
 mod tests {
     use super::*;
     use crate::routes::tournaments::data::GameView;
+    use yugioh_domain::deck_history::SnapshotEntry;
 
     fn head(placement: Option<i64>, players: Option<i64>, conclusion: Option<&str>) -> Head {
         Head {
@@ -481,7 +544,7 @@ mod tests {
             ),
             round(2, RoundResult::Bye, None, Vec::new()),
         ];
-        let m = messages(&head(None, None, None), &rounds);
+        let m = messages(&head(None, None, None), &SnapshotList::default(), &rounds);
         assert_eq!(m.len(), 2);
         assert_eq!(m[0].0, 1);
         assert!(
@@ -501,7 +564,11 @@ mod tests {
             Some("16 joueurs")
         );
 
-        let m = messages(&head(Some(3), Some(32), Some("Bonne journée")), &rounds);
+        let m = messages(
+            &head(Some(3), Some(32), Some("Bonne journée")),
+            &SnapshotList::default(),
+            &rounds,
+        );
         assert_eq!(m.len(), 3);
         assert_eq!(
             m[2],
@@ -518,5 +585,68 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    fn entry(zone: DeckZone, name: &str, count: u32) -> SnapshotEntry {
+        SnapshotEntry {
+            zone,
+            card_data_id: None,
+            name: name.into(),
+            count,
+        }
+    }
+
+    #[test]
+    fn the_deck_list_comes_first() {
+        let deck = SnapshotList {
+            entries: vec![
+                entry(DeckZone::Main, "Snake-Eye Ash", 3),
+                entry(DeckZone::Main, "Ash Blossom & Joyous Spring", 2),
+                entry(DeckZone::Side, "Droll & Lock Bird", 3),
+            ],
+        };
+        let rounds = vec![round(1, RoundResult::Bye, None, Vec::new())];
+        let m = messages(&head(None, None, None), &deck, &rounds);
+        assert_eq!(m.len(), 2);
+        assert_eq!(
+            m[0],
+            (
+                DECK,
+                "### 🃏 Liste jouée : **Snake-Eye - v3**\n\n\
+                 **Main (5)**\n\
+                 3× Snake-Eye Ash\n\
+                 2× Ash Blossom & Joyous Spring\n\n\
+                 **Side (3)**\n\
+                 3× Droll & Lock Bird"
+                    .to_string()
+            )
+        );
+        assert_eq!(m[1].0, 1);
+
+        // before the first round: the list alone; no list, no message
+        assert_eq!(messages(&head(None, None, None), &deck, &[]).len(), 1);
+        let none = messages(&head(None, None, None), &SnapshotList::default(), &[]);
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn a_long_list_puts_its_side_in_a_second_message() {
+        let long = "A card with a very long name, the kind Konami prints";
+        let mut entries: Vec<SnapshotEntry> = (0..30)
+            .map(|i| entry(DeckZone::Main, &format!("{long} {i}"), 1))
+            .collect();
+        entries.extend((0..15).map(|i| entry(DeckZone::Side, &format!("{long} s{i}"), 1)));
+        let deck = SnapshotList { entries };
+        let m = deck_messages(&head(None, None, None), &deck);
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[0].0, DECK);
+        assert!(!m[0].1.contains("**Side"));
+        assert_eq!(m[1].0, DECK_SIDE);
+        assert!(m[1]
+            .1
+            .starts_with("### 🃏 Liste jouée : **Snake-Eye - v3** (side)\n\n**Side (15)**"));
+        assert!(m
+            .iter()
+            .all(|(_, text)| text.chars().count() <= common::discord::MAX_CHARS));
     }
 }

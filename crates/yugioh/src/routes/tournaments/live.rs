@@ -129,6 +129,8 @@ pub async fn start(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> A
     }
     tx.commit().await?;
     tracing::info!(tournament_id = id, "live tournament started");
+    // the deck list goes to the channel at once, before the first round
+    super::discord::spawn_sync(&state, id);
 
     Ok(Redirect::to(&format!("/tournaments/{id}/live")).into_response())
 }

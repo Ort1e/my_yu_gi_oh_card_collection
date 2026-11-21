@@ -758,11 +758,13 @@ group the lists by the version they were taken from.
 - **Discord** (`routes/tournaments/discord.rs`, `store/discord.rs`,
   `common::discord`, 0036): after every save of a tournament with
   `post_to_discord` (the start page's switch, shown only with
-  `AppState::discord`): the round `PUT`, the end `PATCH`, the edit form, a
-  task writes its messages (in French) **from the database** (one per round, the first
+  `AppState::discord`): the live start, the round `PUT`, the end `PATCH`, the
+  edit form, a task writes its messages (in French) **from the database** (the
+  deck list played first, from its snapshot; one per round, the first
   under the tournament's head; the day's summary once the placement, players
   or conclusion is noted) and `store::discord::publish` makes the channel
-  match: a slot (round number, `0` the summary) never posted is posted
+  match: a slot (round number, `0` the summary, `-1` the deck list, `-2` its
+  side when too long) never posted is posted
   (`?wait=true` gives the message id), a changed one edited, one gone
   deleted, all remembered in `tournament_discord_post`. A static mutex runs
   one at a time and the tournament is read inside the turn (the last save is

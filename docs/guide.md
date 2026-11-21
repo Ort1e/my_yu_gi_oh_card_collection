@@ -365,8 +365,12 @@ a *new version*, deletes it while unused. A version plays a ban list **or** a fo
   folded. Everything is kept on the phone at once and sent when the network
   is there (⏳ becomes ✓); if the session ended, "Log in again".
   **To Discord**: with a webhook set on the NAS (`DISCORD_WEBHOOK_URL`, see
-  below), the start page has a switch *Post the rounds to Discord* (off by
-  default; the live page then shows 📣 Discord). Each round saved is posted
+  below), the start page has a switch *Post the deck list and the rounds to
+  Discord* (off by default; the live page then shows 📣 Discord). The **deck
+  list played** is posted at once (main, extra, side with counts; the side in
+  a second message when the list is too long): the friends in the channel see
+  it during the day, while the public copy shows it only from the next
+  nightly export. A list changed on the edit form edits it. Each round saved is posted
   to the channel, in French, with everything noted (result and score, opponent's deck,
   die, each game with 1st/2nd and its comment, the round's comment; the first
   one under the tournament's name, date, place and deck played), and noting

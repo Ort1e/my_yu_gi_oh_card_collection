@@ -17,6 +17,13 @@ use crate::store::db::{begin_write, Pool};
 /// The slot of the day's summary.
 pub const SUMMARY: i64 = 0;
 
+/// The slot of the deck list played (posted first, at the start).
+pub const DECK: i64 = -1;
+
+/// The slot of the list's Side Deck, when the whole list is too long for one
+/// message.
+pub const DECK_SIDE: i64 = -2;
+
 /// Posts, edits or deletes so that the channel shows `messages` (slot,
 /// content; in the order they should appear) for tournament `id`.
 pub async fn publish(
