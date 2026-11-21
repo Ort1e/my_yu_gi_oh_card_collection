@@ -135,7 +135,7 @@ pub async fn list(
     .await?;
 
     Ok(DecksList {
-        page_title: "All Decks",
+        page_title: "Decks",
         page,
         total,
         decks,

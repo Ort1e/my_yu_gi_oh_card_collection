@@ -100,7 +100,7 @@ pub async fn list(
     fill_lot_estimates(pool, &mut lots).await?;
 
     Ok(LotsList {
-        page_title: "All Lots",
+        page_title: "Lots",
         page,
         total: sqlx::query_scalar(&format!(
             "SELECT count(*) FROM lot WHERE {}",

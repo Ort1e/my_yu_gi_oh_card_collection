@@ -13,12 +13,13 @@
 {% block content %}
 <div class="inside-container narrow">
 {% match opening %}{% when Some with (opening) %}
-<h1>Add cards to an opening</h1>
 <p class="back-link"><a href="/pokemon/openings/{{ opening.id }}">← Back to the opening</a></p>
+<h1>Add cards to an opening</h1>
 <p>{{ opening.label() }}. The cards are added to it.</p>
 {% when None %}
+<p class="back-link"><a href="/pokemon/openings">← All openings</a></p>
 <h1>Add a booster opening</h1>
-<p class="back-link"><a href="/pokemon/openings">← The openings</a> · One card (a single, a gift)? <a href="/pokemon/add">Add a card</a></p>
+<p class="hint">One card (a single, a gift)? <a href="/pokemon/add">Add a card</a>.</p>
 {% endmatch %}
 
 {% include "partials/form_errors.html" %}
@@ -135,7 +136,7 @@
             <input type="number" name="rows-{{ loop.index0 }}-count" id="rows-{{ loop.index0 }}-count" value="{{ row.count }}" min="0" max="99">
           </div>
         </div>
-        <label class="checkbox"><input type="checkbox" name="rows-{{ loop.index0 }}-full_art" value="1" {% if row.full_art %}checked{% endif %}> Full art</label>
+        <label class="switch"><input type="checkbox" name="rows-{{ loop.index0 }}-full_art" value="1" {% if row.full_art %}checked{% endif %}> Full art</label>
       </div>
     </div>
     {% endfor %}

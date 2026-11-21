@@ -10,7 +10,11 @@
 
 {% block content %}
 <div class="inside-container">
-  <h1 class="card-title">{{ page_title }} ({{ page.count }}/{{ total }}):</h1>
+  <h1>{{ page_title }} <span class="title-count">({% if page.count != total %}{{ page.count }} of {% endif %}{{ total }})</span></h1>
+
+  {% if !common::export::public_copy() %}
+  {% block add_button %}{% endblock %}
+  {% endif %}
 
   {% block summary %}{% endblock %}
 
@@ -19,8 +23,6 @@
   {% include "partials/pagination.html" %}
 
   {% if !common::export::public_copy() %}
-  {% block add_button %}{% endblock %}
-
   {% block filter %}{% endblock %}
   {% endif %}
 </div>

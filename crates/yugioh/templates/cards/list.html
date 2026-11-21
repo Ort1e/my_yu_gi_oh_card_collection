@@ -10,7 +10,7 @@
 
 {% block items %}
   {% if cards.is_empty() %}
-    <p class="card-title">No card.</p>
+    <p>No card.</p>
   {% else if view.is_table() %}
     <div class="table-scroll">
     <table class="numbers sortable">
@@ -76,7 +76,7 @@
         {% endfor %}
       </select>
 
-      <label for="card_type">Card Type:</label>
+      <label for="card_type">Card type:</label>
       <select name="card_type" id="card_type">
         <option value="" {% if self.selected(filter.card_type, "") %}selected{% endif %}>All types</option>
         {% for card_type in card_types %}

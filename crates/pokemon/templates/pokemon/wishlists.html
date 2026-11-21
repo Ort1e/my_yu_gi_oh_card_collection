@@ -31,10 +31,13 @@
 {% if is_admin && !common::export::public_copy() %}
 <h2>Manage the lists</h2>
 {% for list in lists %}
-<form method="post" action="/pokemon/wishlists/{{ list.id }}/edit" class="inline-form">
-  <input type="text" name="name" value="{{ list.name }}" aria-label="Name" required>
-  <label><input type="checkbox" name="fills_from_collection" value="1"{% if list.fills_from_collection %} checked{% endif %}> filled from the collection</label>
-  <input type="submit" value="Save">
+<form method="post" action="/pokemon/wishlists/{{ list.id }}/edit">
+  <label for="list-{{ list.id }}">Name:</label>
+  <div class="inline-fields">
+    <input type="text" name="name" id="list-{{ list.id }}" value="{{ list.name }}" required>
+    <label class="switch"><input type="checkbox" name="fills_from_collection" value="1"{% if list.fills_from_collection %} checked{% endif %}> Filled from the collection</label>
+    <input type="submit" value="Save">
+  </div>
 </form>
 <details class="danger-zone">
   <summary>Delete {{ list.name }}…</summary>
@@ -44,10 +47,12 @@
 </details>
 {% endfor %}
 
-<h3>New list</h3>
+<h2>New list</h2>
 <form method="post" action="/pokemon/wishlists/add">
-  <p><label for="new-list">Name:</label> <input type="text" name="name" id="new-list" required></p>
-  <p><label><input type="checkbox" name="fills_from_collection" value="1"> Filled from the collection (a copy you add ticks off its matching wishes)</label></p>
+  <label for="new-list">Name:</label>
+  <input type="text" name="name" id="new-list" required>
+  <label class="switch"><input type="checkbox" name="fills_from_collection" value="1"> Filled from the collection</label>
+  <p class="hint">A list filled from the collection: a copy you add ticks off its matching wishes.</p>
   <input type="submit" value="Create the list">
 </form>
 {% endif %}

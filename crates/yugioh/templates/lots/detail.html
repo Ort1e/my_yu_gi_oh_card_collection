@@ -8,6 +8,7 @@
 
 {% block content %}
 <div class="inside-container">
+<p class="back-link"><a href="/lots">← All lots</a></p>
 <h1>{{ lot.title() }}</h1>
 {% if !common::export::public_copy() %}
 <div class="button-row"><a href="/lots/{{ lot.id }}/edit" class="btn">Edit</a> <a href="/lots/{{ lot.id }}/add-cards" class="btn">Add cards</a>
@@ -26,7 +27,7 @@
       {% when None %}{{ lot.seller_name() }}
       {% endmatch %}
     </div>{% endif %}
-    <div><strong>Cards in Lot:</strong> {{ lot.card_count }}</div>
+    <div><strong>Cards:</strong> {{ lot.card_count }}</div>
     {% match lot.estimate %}{% when Some with (estimate) %}
     <div title="Market value of its cards still owned: an estimate"><strong>Estimated value:</strong> {{ estimate }} €</div>
     {% when None %}{% endmatch %}

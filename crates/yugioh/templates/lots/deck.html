@@ -4,8 +4,8 @@
 
 {% block content %}
 <div class="inside-container">
-<h1>{% if lot_deck.is_some() %}Add cards to the deck received in{% else %}Deck received in{% endif %} {{ lot.title() }}</h1>
 <p class="back-link"><a href="/lots/{{ lot.id }}">← Back to the lot</a></p>
+<h1>{% if lot_deck.is_some() %}Add cards to the deck received in{% else %}Deck received in{% endif %} {{ lot.title() }}</h1>
 <p class="hint">The cards go into the lot and into a built version of the deck holding exactly these copies.
   Extra deck monsters go to the extra deck; you can move cards in the deck builder afterwards.</p>
 

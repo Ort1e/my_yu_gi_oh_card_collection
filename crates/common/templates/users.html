@@ -21,13 +21,13 @@
       <label for="password-{{ user.id }}">New password:</label>
       <input type="password" name="password" id="password-{{ user.id }}" autocomplete="new-password" placeholder="unchanged">
     </p>
-    <p><label><input type="checkbox" name="admin" value="1"{% if user.admin %} checked{% endif %}> Admin (everything)</label></p>
-    <p>Can change:</p>
-    <ul class="plain">
+    <label class="switch"><input type="checkbox" name="admin" value="1"{% if user.admin %} checked{% endif %}> Admin (everything)</label>
+    <span class="label">Can change:</span>
+    <div class="switch-list">
       {% for box in user.boxes %}
-      <li><label><input type="checkbox" name="perm" value="{{ box.key }}"{% if box.checked %} checked{% endif %}> {{ box.label }}</label></li>
+      <label class="switch"><input type="checkbox" name="perm" value="{{ box.key }}"{% if box.checked %} checked{% endif %}> {{ box.label }}</label>
       {% endfor %}
-    </ul>
+    </div>
     <input type="submit" value="Save {{ user.name }}">
   </form>
 
@@ -52,13 +52,13 @@
       <label for="new-password">Password:</label>
       <input type="password" name="password" id="new-password" autocomplete="new-password" required>
     </p>
-    <p><label><input type="checkbox" name="admin" value="1"> Admin (everything)</label></p>
-    <p>Can change:</p>
-    <ul class="plain">
+    <label class="switch"><input type="checkbox" name="admin" value="1"> Admin (everything)</label>
+    <span class="label">Can change:</span>
+    <div class="switch-list">
       {% for box in new_boxes %}
-      <li><label><input type="checkbox" name="perm" value="{{ box.key }}"> {{ box.label }}</label></li>
+      <label class="switch"><input type="checkbox" name="perm" value="{{ box.key }}"> {{ box.label }}</label>
       {% endfor %}
-    </ul>
+    </div>
     <input type="submit" value="Add the user">
   </form>
 </div>

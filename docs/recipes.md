@@ -181,6 +181,33 @@ same way).
    `base.html` (or `list_base.html` for a paginated list; both are in
    `crates/common/templates/`, found through the crate's `askama.toml`). Every field of
    the struct is a variable; `{% for t in tournaments %}…{% endfor %}`.
+   **Every page looks the same at the top** (`static/css/style.css`, "Page
+   layout"), whichever collection it belongs to:
+
+   ```html
+   <div class="inside-container">            {# .narrow for a form page #}
+   <p class="back-link"><a href="/tournaments">← All tournaments</a></p>
+   <h1>{{ name }} <span class="title-count">(12)</span></h1>
+   <div class="button-row"><a href="…/edit" class="btn">Edit</a></div>
+   ```
+
+   - the back link (optional) **above** the title: "← All …" to a list,
+     "← Back to the …" to one thing;
+   - one black `<h1>`, in sentence case ("Add a lot", not "Add a New Lot"),
+     a count after it in `.title-count`; a detail page's title is the thing's
+     name, not hidden in its green box;
+   - its actions ("Add a …", "Edit") in a `.button-row` right under the title,
+     never floating (only "Filter" floats, bottom right); on a page with a
+     picture (a card, a book) "Edit" ends the box next to the picture;
+   - the facts of one thing in a `card wide-card` box (`lots/detail.html`);
+     a list of things as green boxes (`.card-list`, the page's width) or a
+     table, never both for the same kind;
+   - sections: plain `<h2>`s (no class), on the left;
+   - an on/off field is a switch (`<label class="switch">`), a checkbox
+     only selects table rows; a field with its button on one line:
+     `.inline-fields`; a deletion: a `danger-zone` after the form, never
+     inside it.
+
    A table of data follows the shared convention (`static/css/style.css`,
    "Data tables"): `<div class="table-scroll"><table class="numbers">`, on
    the page background, amounts as plain numbers with the unit in the

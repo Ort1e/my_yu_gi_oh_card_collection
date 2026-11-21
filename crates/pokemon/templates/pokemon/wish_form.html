@@ -11,8 +11,8 @@
 
 {% block content %}
 <div class="inside-container narrow">
-<h1>{% if id.is_some() %}Edit the wish{% else %}Add a wish{% endif %} ({{ list.name }})</h1>
 <p class="back-link"><a href="/pokemon/wishlists/{{ list.id }}">← Back to the wishlist {{ list.name }}</a></p>
+<h1>{% if id.is_some() %}Edit the wish{% else %}Add a wish{% endif %} ({{ list.name }})</h1>
 
 {% include "partials/form_errors.html" %}
 

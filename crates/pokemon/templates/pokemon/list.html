@@ -18,7 +18,7 @@
 
 {% block items %}
   {% if copies.is_empty() %}
-    <p class="card-title">{% if total == 0 %}No card yet: add a booster opening or a card with the "Add" menu.{% else %}No card matches these filters.{% endif %}</p>
+    <p>{% if total == 0 %}No card yet: add a booster opening or a card with the "Add" menu.{% else %}No card matches these filters.{% endif %}</p>
   {% else if view.is_table() %}
     <div class="table-scroll">
     <table class="numbers sortable">
@@ -60,7 +60,7 @@
 {% endblock %}
 
 {% block add_button %}
-  <a href="/pokemon/add/booster" title="Add a booster opening" class="btn floating-button top">Add cards</a>
+  <div class="button-row"><a href="/pokemon/add/booster" class="btn">Add a booster opening</a> <a href="/pokemon/add" class="btn btn-secondary">Add one card</a></div>
 {% endblock %}
 
 {% block filter %}
@@ -104,8 +104,8 @@
           {% for source in self.sources() %}<option value="{{ source.code() }}" {% if self.source_is(source.code()) %}selected{% endif %}>{{ source.label() }}</option>{% endfor %}
         </select>
 
-        <label class="checkbox"><input type="checkbox" name="full_art" value="1" {% if self.full_art_checked() %}checked{% endif %}> Full arts only</label>
-        <label class="checkbox"><input type="checkbox" name="graded" value="1" {% if self.graded_checked() %}checked{% endif %}> Graded only</label>
+        <label class="switch"><input type="checkbox" name="full_art" value="1" {% if self.full_art_checked() %}checked{% endif %}> Full arts only</label>
+        <label class="switch"><input type="checkbox" name="graded" value="1" {% if self.graded_checked() %}checked{% endif %}> Graded only</label>
 
         <label for="sold">Show:</label>
         <select name="sold" id="sold">

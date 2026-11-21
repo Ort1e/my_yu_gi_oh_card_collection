@@ -11,7 +11,8 @@
 
 {% block content %}
 <div class="inside-container">
-<p class="back-link"><a href="/pokemon">← Back to the collection</a></p>
+<p class="back-link"><a href="/pokemon">← All Pokémon cards</a></p>
+<h1>{{ copy.name() }}</h1>
 
 <div class="card-detail">
   {% if copy.has_image() %}
@@ -22,7 +23,6 @@
   {% endif %}
 
   <div class="card">
-    <div class="card-title">{{ copy.name() }}</div>
     {% if !copy.other_name().is_empty() %}<div class="english-name">{{ copy.other_name() }}</div>{% endif %}
     <div class="card-subtitle">{{ copy.set_name }} · No. {{ copy.local_id }} <small>(TCGdex {{ copy.tcgdex_id }})</small></div>
     {% if !copy.rarity_text().is_empty() %}

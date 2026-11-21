@@ -2,7 +2,7 @@
 
 {% block items %}
   {% if lots.is_empty() %}
-    <p class="card-title">No lot.</p>
+    <p>No lot.</p>
   {% else %}
     <div class="card-list">
       {% for lot in lots %}
@@ -36,5 +36,5 @@
 {% endblock %}
 
 {% block add_button %}
-  <a href="/lots/add" title="Add lot" class="btn floating-button top">Add lot</a>
+  <div class="button-row"><a href="/lots/add" class="btn">Add a lot</a></div>
 {% endblock %}

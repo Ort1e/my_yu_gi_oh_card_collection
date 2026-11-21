@@ -200,8 +200,8 @@ h2.form-section {
     bottom: 0;
     z-index: 2;
     padding: 0.6rem 0;
-    background-color: var(--bg-color);
-    box-shadow: 0 -1px 0 var(--border-color);
+    background-color: var(--secondary);     /* the form's own green: no band */
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .team-only {

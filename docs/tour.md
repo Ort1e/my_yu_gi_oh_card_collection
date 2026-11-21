@@ -144,7 +144,7 @@ pub async fn list(
     …
     let sellers = sqlx::query_as(…).bind(PAGE_SIZE).bind(page.offset())
         .fetch_all(pool).await?;        // rows → Vec<SellerRow> via #[derive(FromRow)]
-    Ok(SellersList { page_title: "All Sellers", page, total, sellers })
+    Ok(SellersList { page_title: "Sellers", page, total, sellers })
 }
 ```
 

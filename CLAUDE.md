@@ -16,6 +16,7 @@ What the app is for, in priority order (details and the usual tasks per goal: `d
 
 ### Where a feature goes (UI)
 - **One function per page**, one place per action (a button, a panel, a wants list exists once; link to it from elsewhere, don't repeat it). Reading pages and data-entry forms are separate pages.
+- **One look for every page** (all three collections, each in its own colours): back link above a black `<h1>`, actions in a `.button-row` under it, plain `<h2>` sections, switches for on/off, sentence case. The rules: `docs/recipes.md`, "Add a read-only page", step 2.
 - Before adding a page or a panel, read `docs/guide.md`: put it under the goal's menu entry, and update the guide and `docs/tour.md` in the same commit.
 
 ## History — read first

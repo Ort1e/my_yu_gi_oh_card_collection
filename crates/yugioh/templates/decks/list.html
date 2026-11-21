@@ -4,15 +4,13 @@
   {% if !common::export::public_copy() %}
   <nav class="sort-choices" aria-label="Sort the decks">
     Sort:
-    <a href="/decks" class="btn btn-small {% if self.sort_is_tournament() %}btn-secondary{% else %}active{% endif %}">Newest first</a>
-    <a href="/decks?sort=tournament" class="btn btn-small {% if self.sort_is_tournament() %}active{% else %}btn-secondary{% endif %}">Last tournament</a>
-    <a href="/decks/built" class="btn btn-small btn-secondary">Built decks</a>
-    {% if !common::export::public_copy() %}<a href="/decks/shopping" class="btn btn-small btn-secondary">Shopping list</a>{% endif %}
+    <a href="/decks" class="btn {% if self.sort_is_tournament() %}btn-secondary{% else %}active{% endif %}">Newest first</a>
+    <a href="/decks?sort=tournament" class="btn {% if self.sort_is_tournament() %}active{% else %}btn-secondary{% endif %}">Last tournament</a>
   </nav>
   {% endif %}
 
   {% if decks.is_empty() %}
-    <p class="card-title">No deck.</p>
+    <p>No deck.</p>
   {% else %}
     <div class="card-list">
       {% for deck in decks %}
@@ -32,5 +30,5 @@
 {% endblock %}
 
 {% block add_button %}
-  <a href="/decks/add" title="Add deck" class="btn floating-button top">Add deck</a>
+  <div class="button-row"><a href="/decks/add" class="btn">Add a deck</a></div>
 {% endblock %}

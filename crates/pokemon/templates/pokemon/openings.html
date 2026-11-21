@@ -11,7 +11,7 @@
 
 {% block content %}
 <div class="inside-container">
-<h1>Booster openings ({{ openings.len() }})</h1>
+<h1>Booster openings <span class="title-count">({{ openings.len() }})</span></h1>
 <p><a href="/pokemon/add/booster" class="btn">Add a booster opening</a></p>
 
 {% if openings.is_empty() %}

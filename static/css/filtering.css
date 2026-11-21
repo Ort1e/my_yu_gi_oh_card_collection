@@ -3,10 +3,9 @@
  * (templates/cards_list.html, lots_list.html, decks_list.html).
  */
 
-/* A round button that stays in a corner of the window while scrolling.
- *   class="floating-button"       bottom right (Filter)
- *   class="floating-button top"   top right, under the header (Add lot, Add deck)
- */
+/* A round button that stays in the bottom right corner of the window while
+   scrolling (Filter). The page's "Add …" button is under its title, like on
+   every page (a `.button-row`). */
 .floating-button {
     position: fixed;
     right: 20px;
@@ -18,10 +17,6 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
 }
 
-.floating-button.top {
-    top: 70px;
-    bottom: auto;
-}
 
 /* The popup: a dark veil over the whole page, the filters in the middle. */
 .filter-modal {
@@ -68,15 +63,4 @@
 
 .sort-choices .active {
     pointer-events: none;
-}
-
-/* Phones: the top button would cover the page's title (the header isn't
-   fixed there): bottom left, across from "Filter". */
-@media (max-width: 760px) {
-    .floating-button.top {
-        top: auto;
-        right: auto;
-        bottom: 20px;
-        left: 20px;
-    }
 }
