@@ -5,6 +5,9 @@
 //! (or adds it when it is the next one), so a resend after a lost answer does
 //! no harm; `PATCH /api/tournaments/:id` sets the end of the day: a field left
 //! out stays, `0` or `""` empties it.
+//!
+//! Both carry the page's text for Discord (`share_line`, `share_text`),
+//! posted after the commit for a tournament opted in (`store::discord`).
 
 use axum::extract::{Path, State};
 use axum::Json;
@@ -14,6 +17,7 @@ use yugioh_domain::tournament::{split_labels, Die, GameResult, RoundResult};
 
 use super::data::{self, Which};
 use crate::store::db::begin_write;
+use crate::store::discord;
 use crate::store::tournaments::{self, GameFields, RoundFields};
 use crate::web::error::{bad_request, AppError, AppResult};
 use crate::AppState;
@@ -36,6 +40,8 @@ pub struct RoundInput {
     comment: Option<String>,
     #[serde(default)]
     games: Vec<GameInput>,
+    /// The round's line as the page shares it, for Discord.
+    share_line: Option<String>,
 }
 
 /// Blank text is nothing.
@@ -92,8 +98,9 @@ impl RoundInput {
 pub async fn put_round(
     State(state): State<AppState>,
     Path((id, number)): Path<(i64, i64)>,
-    Json(input): Json<RoundInput>,
+    Json(mut input): Json<RoundInput>,
 ) -> AppResult<Json<Value>> {
+    let share_line = input.share_line.take();
     let round = input.into_fields()?;
 
     let mut tx = begin_write(&state.pool).await?;
@@ -109,6 +116,7 @@ pub async fn put_round(
     }
     tx.commit().await?;
     tracing::info!(tournament_id = id, round = number, "live round saved");
+    discord::spawn_share(&state, id, number, share_line);
 
     Ok(Json(json!({ "ok": true })))
 }
@@ -118,6 +126,8 @@ pub struct EndInput {
     placement: Option<i64>,
     players: Option<i64>,
     conclusion: Option<String>,
+    /// The day's text as the page shares it, for Discord.
+    share_text: Option<String>,
 }
 
 /// `PATCH /api/tournaments/:id`.
@@ -159,6 +169,7 @@ pub async fn patch_end(
     }
     tx.commit().await?;
     tracing::info!(tournament_id = id, "live end of day saved");
+    discord::spawn_share(&state, id, discord::SUMMARY, input.share_text);
 
     Ok(Json(json!({ "ok": true })))
 }

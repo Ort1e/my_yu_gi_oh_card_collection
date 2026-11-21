@@ -103,6 +103,7 @@ Settings come from the environment or `.env` (gitignored):
 | `MEDIA_DIR`, `UPLOADS_DIR` | `data/media`, `uploads` | pictures and files, pending uploads |
 | `CARDMARKET_ACCOUNT` | `0rtie` | your Cardmarket name, for reading the shipment PDFs |
 | `GOOGLE_BOOKS_API_KEY` | none | Google Books' API key for the ISBN lookups (free, Google Cloud console → Books API → Credentials); without one Google nearly always refuses |
+| `DISCORD_WEBHOOK_URL` | none | a Discord channel's webhook (Integrations → Webhooks): the live tournament notes opted in are posted there; a secret, never logged |
 
 ## Commands
 

@@ -33,6 +33,8 @@ pub struct StartPage {
     location: String,
     is_team: bool,
     versions: Vec<VersionChoice>,
+    /// A webhook is set: the "Post to Discord" switch is shown.
+    discord: bool,
 }
 
 impl StartPage {
@@ -51,6 +53,7 @@ impl StartPage {
             location: defaults.location,
             is_team: defaults.is_team,
             versions: version_choices(&state.pool, &current).await?,
+            discord: state.discord.is_some(),
         })
     }
 }
@@ -77,6 +80,7 @@ pub async fn start(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> A
     let mut form = FormData::new(pairs);
     let name = form.required("name", "Name");
     let is_team = form.checked("is_team");
+    let post_to_discord = state.discord.is_some() && form.checked("post_to_discord");
     let version = if form.text("version_id").is_empty() {
         None
     } else {
@@ -117,6 +121,12 @@ pub async fn start(State(state): State<AppState>, Form(pairs): Form<Pairs>) -> A
 
     let mut tx = begin_write(&state.pool).await?;
     let id = tournaments::insert(&mut tx, &head, &results).await?;
+    if post_to_discord {
+        sqlx::query("UPDATE tournament SET post_to_discord = 1 WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
     tracing::info!(tournament_id = id, "live tournament started");
 
@@ -171,6 +181,8 @@ pub struct LivePage {
     deck: String,
     is_team: bool,
     data_json: String,
+    /// Its rounds go to Discord.
+    discord: bool,
 }
 
 /// The live data of tournament `id` (404 when none), and what the page's
@@ -234,12 +246,18 @@ pub async fn page(State(state): State<AppState>, Path(id): Path<i64>) -> AppResu
         .unwrap_or_else(|_| "null".into())
         .replace('<', "\\u003c");
 
+    let opted_in: bool = sqlx::query_scalar("SELECT post_to_discord FROM tournament WHERE id = ?")
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
+
     Ok(LivePage {
         id,
         name: json.name,
         deck,
         is_team: json.is_team,
         data_json,
+        discord: opted_in && state.discord.is_some(),
     })
 }
 

@@ -13,6 +13,7 @@
 extern crate self as common;
 
 pub mod db;
+pub mod discord;
 pub mod export;
 pub mod http;
 pub mod media;
@@ -50,6 +51,9 @@ pub struct AppState {
     /// without one, Google's shared keyless quota is nearly always used up.
     /// Never logged.
     pub google_books_key: Option<String>,
+    /// The Discord channel the live tournament notes go to
+    /// (`DISCORD_WEBHOOK_URL`), `None` when not set. Never logged.
+    pub discord: Option<discord::Webhook>,
     pub auth: auth::Auth,
 }
 

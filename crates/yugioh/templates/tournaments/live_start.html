@@ -24,6 +24,9 @@
       {% endfor %}
     </select>
     <label class="switch"><input type="checkbox" name="is_team" {% if is_team %}checked{% endif %}> Team event</label>
+    {% if discord %}
+    <label class="switch"><input type="checkbox" name="post_to_discord"> Post the rounds to Discord</label>
+    {% endif %}
     <button type="submit" class="btn live-big">Start</button>
   </form>
 </div>
